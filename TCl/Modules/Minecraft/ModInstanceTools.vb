@@ -138,36 +138,6 @@ Public Module ModInstanceTools
         Return Total
     End Function
 
-    ''' <summary>
-    ''' 从另一个 .minecraft 目录导入所有版本（对齐 LumilioCL 游戏库的「导入其他启动器的游戏」）。
-    ''' 只导入 versions 下自带同名 json 的版本，同名实例跳过，原目录不动。返回导入数量。
-    ''' </summary>
-    Public Function ImportVersionsFrom(SourceMcFolder As String) As Integer
-        Dim SourceVersions As String = PathUtils.AddSlashSuffix(SourceMcFolder) & "versions\"
-        If Not DirectoryUtils.Exists(SourceVersions) Then
-            Throw New InvalidOperationException("所选文件夹下没有 versions 目录，无法作为 .minecraft 导入。")
-        End If
-        Dim TargetVersions As String = PathUtils.AddSlashSuffix(McFolderSelected) & "versions\"
-        DirectoryUtils.Create(TargetVersions)
-        Dim Count As Integer = 0
-        For Each Folder In DirectoryUtils.EnumerateDirectories(SourceVersions, False)
-            Try
-                Dim Name As String = PathUtils.GetLastPart(PathUtils.AddSlashSuffix(Folder))
-                If String.IsNullOrWhiteSpace(Name) Then Continue For
-                Dim JsonFile As String = PathUtils.AddSlashSuffix(Folder) & Name & ".json"
-                If Not FileUtils.Exists(JsonFile) Then Continue For
-                Dim Target As String = PathUtils.AddSlashSuffix(TargetVersions) & Name
-                If DirectoryUtils.Exists(Target) Then Continue For
-                DirectoryUtils.Copy(PathUtils.AddSlashSuffix(Folder), Target)
-                Count += 1
-                Logger.Info($"已导入实例：{Folder} → {Target}")
-            Catch ex As Exception
-                Logger.Warn(ex, $"导入实例失败（跳过）：{Folder}")
-            End Try
-        Next
-        Return Count
-    End Function
-
     ''' <summary>在解压目录里找最浅的、含 "id" 字段 json 的目录。</summary>
     Private Function FindVersionRoot(Folder As String, Optional MaxDepth As Integer = 3) As String
         Dim CurrentLevel As New List(Of String) From {Folder}

@@ -157,7 +157,7 @@ Public Class PageInstanceExport
             If CheckBox.Visibility <> Visibility.Visible Then Continue For
             CheckBox.Inlines.Add(New Run(ModLang.L(TargetOption.Title)))
             If Not String.IsNullOrEmpty(TargetOption.Description) Then
-                CheckBox.Inlines.Add(New Run("   " & ModLang.L(TargetOption.Description)) With {.Foreground = ColorGray5})
+                CheckBox.Inlines.Add(New Run("   " & ModLang.L(TargetOption.Description)) With {.Foreground = ColorGray1})
             End If
         Next
     End Sub

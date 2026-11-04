@@ -21,10 +21,10 @@
                         <local:MySearchBox x:Name="TxtSearch" Grid.Column="0" Height="32" Width="230"
                                            HorizontalAlignment="Left" HintText="搜索资源包" />
                         <WrapPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
-                            <local:MyButton x:Name="BtnRefresh" Height="32" MinWidth="86" Padding="13,0" Margin="10,0,0,0" />
-                            <local:MyButton x:Name="BtnOpen" Height="32" MinWidth="106" Padding="13,0" Margin="10,0,0,0" />
-                            <local:MyButton x:Name="BtnEnableAll" Height="32" MinWidth="96" Padding="13,0" Margin="10,0,0,0" />
-                            <local:MyButton x:Name="BtnDisableAll" Height="32" MinWidth="96" Padding="13,0" Margin="10,0,0,0" />
+                            <local:MyButton x:Name="BtnRefresh" Height="32" MinWidth="86" Padding="13,0" Margin="10,5,0,5" />
+                            <local:MyButton x:Name="BtnOpen" Height="32" MinWidth="106" Padding="13,0" Margin="10,5,0,5" />
+                            <local:MyButton x:Name="BtnEnableAll" Height="32" MinWidth="96" Padding="13,0" Margin="10,5,0,5" />
+                            <local:MyButton x:Name="BtnDisableAll" Height="32" MinWidth="96" Padding="13,0" Margin="10,5,0,5" />
                         </WrapPanel>
                     </Grid>
 

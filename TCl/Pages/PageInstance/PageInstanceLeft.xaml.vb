@@ -198,37 +198,6 @@ Public Class PageInstanceLeft
         FrmMain.PageChange(New FormMain.PageStackData With {.Page = FormMain.PageType.Download}, FormMain.PageSubType.DownloadInstall)
     End Sub
 
-    ''' <summary>
-    ''' 从另一个 .minecraft 目录导入所有版本（对齐 LumilioCL 游戏库的「导入其他启动器的游戏」）。
-    ''' </summary>
-    Private Sub ItemImportInstance_Click(sender As Object, e As MouseButtonEventArgs) Handles ItemImportInstance.Click
-        Dim Result As List(Of String) = Dialogs.SelectFolder(ModLang.L("选择要导入的 .minecraft 文件夹"), False)
-        If Result Is Nothing OrElse Not Result.Any() Then Return
-        Dim Source As String = Result.First()
-        If Not DirectoryUtils.Exists(PathUtils.AddSlashSuffix(Source) & "versions\") Then
-            Hint(ModLang.L("所选文件夹下没有 versions 目录，无法导入。"), HintType.Red)
-            Return
-        End If
-        Hint(ModLang.L("正在后台导入实例…"), HintType.Blue, False)
-        RunInNewThread(
-        Sub()
-            Try
-                Dim Count As Integer = ModInstanceTools.ImportVersionsFrom(Source)
-                RunInUi(
-                Sub()
-                    If Count = 0 Then
-                        Hint(ModLang.L("没有新的实例可导入（同名实例会被跳过）。"), HintType.Blue)
-                    Else
-                        Hint(ModLang.L("已导入 ") & Count & ModLang.L(" 个实例，返回实例列表即可看到。"), HintType.Green)
-                    End If
-                End Sub)
-            Catch ex As Exception
-                Logger.Error(ex, "导入实例失败")
-                RunInUi(Sub() Hint(ModLang.L("导入失败：") & ex.Message, HintType.Red))
-            End Try
-        End Sub, "Import Instance", ThreadPriority.BelowNormal)
-    End Sub
-
     ''' <summary>复制当前实例为独立副本（对齐 LumilioCL 游戏页的「复制游戏」）。</summary>
     Private Sub ItemCopyInstance_Click(sender As Object, e As MouseButtonEventArgs) Handles ItemCopyInstance.Click
         If Instance Is Nothing Then Return

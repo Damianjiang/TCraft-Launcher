@@ -46,14 +46,17 @@
         <!-- 日志正文 -->
         <Border Grid.Row="2" CornerRadius="8" BorderThickness="1"
                 BorderBrush="{DynamicResource ColorBrushGray6}"
-                Background="{DynamicResource ColorBrushGray8}">
+                Background="{DynamicResource ColorBrushCardBg}">
             <Grid>
                 <ListBox x:Name="PanLog" BorderThickness="0" Background="Transparent"
                          Padding="10,8" SelectionMode="Extended"
-                         ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                          ScrollViewer.VerticalScrollBarVisibility="Auto"
                          VirtualizingStackPanel.IsVirtualizing="True"
                          VirtualizingStackPanel.VirtualizationMode="Recycling">
+                    <ListBox.Resources>
+                        <Style TargetType="ScrollBar" BasedOn="{StaticResource ThinScrollBar}" />
+                    </ListBox.Resources>
                     <ListBox.ItemContainerStyle>
                         <Style TargetType="ListBoxItem">
                             <Setter Property="Padding" Value="0" />
@@ -73,7 +76,7 @@
                         <DataTemplate>
                             <TextBlock Text="{Binding Text}" Foreground="{Binding ForeBrush}"
                                        FontFamily="Consolas, Microsoft YaHei UI" FontSize="12"
-                                       TextWrapping="NoWrap" />
+                                       TextWrapping="Wrap" />
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>

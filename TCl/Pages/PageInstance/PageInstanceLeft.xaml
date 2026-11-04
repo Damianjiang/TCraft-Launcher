@@ -74,7 +74,6 @@
         <local:MyListItem x:Name="ItemInstallNew" IsScaleAnimationEnabled="False" Type="Clickable" Tag="11" MinPaddingRight="35" Height="36" VerticalAlignment="Top" Title="安装新版本" SvgIcon="lucide/download" />
         <local:MyListItem x:Name="ItemCopyInstance" IsScaleAnimationEnabled="False" Type="Clickable" Tag="16" MinPaddingRight="35" Height="36" VerticalAlignment="Top" Title="复制实例" SvgIcon="lucide/copy" />
         <local:MyListItem x:Name="ItemBackupInstance" IsScaleAnimationEnabled="False" Type="Clickable" Tag="17" MinPaddingRight="35" Height="36" VerticalAlignment="Top" Title="备份与恢复" SvgIcon="lucide/archive" />
-        <local:MyListItem x:Name="ItemImportInstance" IsScaleAnimationEnabled="False" Type="Clickable" Tag="18" MinPaddingRight="35" Height="36" VerticalAlignment="Top" Title="导入其他启动器实例" SvgIcon="lucide/folder-input" />
         <local:MyListItem x:Name="ItemSavesDatapack" IsScaleAnimationEnabled="False" Type="RadioBox" Tag="12" MinPaddingRight="35" Height="36" VerticalAlignment="Top" Title="存档数据包" SvgIcon="lucide/file-box" />
     </StackPanel>
 </local:MyPageLeft>

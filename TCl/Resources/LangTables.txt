@@ -2934,7 +2934,6 @@ ZGC / 分代 ZGC 内存占用更高但回收时不卡顿；G1GC 占用更低但�
 光影	Shaders	光影	光影
 复制实例	Duplicate instance	複製實例	複製實例
 备份与恢复	Backup & restore	備份與恢復	備份與恢復
-导入其他启动器实例	Import instances from other launchers	導入其他啓動器實例	導入其他啓動器實例
 选择一个存档即可查看它已探索的地形。	Select a save to view its explored terrain.	選擇一個存檔即可查看它已探索的地形。	選擇一個存檔即可查看它已探索的地形。
 适应	Fit	適應	適應
 拖动平移 · 滚轮缩放	Drag to pan · scroll to zoom	拖動平移 · 滾輪縮放	拖動平移 · 滾輪縮放
@@ -3212,10 +3211,6 @@ Mojang 官方	Mojang official	Mojang 官方	Mojang 官方
 还没有变更记录。	No changes recorded yet.	還沒有變更記錄。	還沒有變更記錄。
 按时间倒序显示游玩与快照事件，最近的	Play and snapshot events, newest first — showing the last 	按時間倒序顯示遊玩與快照事件，最近的	按時間倒序顯示遊玩與快照事件，最近的
 条。	 entries.	條。	條。
-选择要导入的 .minecraft 文件夹	Select the .minecraft folder to import	選擇要導入的 .minecraft 文件夾	選擇要導入的 .minecraft 文件夾
-所选文件夹下没有 versions 目录，无法导入。	No versions directory under the selected folder; cannot import.	所選文件夾下沒有 versions 目錄，無法導入。	所選文件夾下沒有 versions 目錄，無法導入。
-正在后台导入实例…	Importing instances in background…	正在後臺導入實例…	正在後臺導入實例…
-没有新的实例可导入（同名实例会被跳过）。	No new instances to import (same-name instances are skipped).	沒有新的實例可導入（同名實例會被跳過）。	沒有新的實例可導入（同名實例會被跳過）。
 已导入	Imported 	已導入	已導入
 个实例，返回实例列表即可看到。	 instances — go back to the instance list to see them.	個實例，返回實例列表即可看到。	個實例，返回實例列表即可看到。
 新实例的名称（会复制 Mod、配置与存档）：	New instance name (mods, config and saves are copied): 	新實例的名稱（會複製 Mod、配置與存檔）：	新實例的名稱（會複製 Mod、配置與存檔）：
