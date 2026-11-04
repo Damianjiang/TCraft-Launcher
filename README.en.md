@@ -51,7 +51,7 @@ Grab `TCraft-Launcher-v1.2.exe` from the [latest release](https://github.com/Dam
 
 - **OS**: Windows 7 SP1+ (Windows 10 / 11 recommended), 64-bit
 - **Size**: 3.48 MiB
-- **SHA-256**: `619b5f9766ff890b806934422647af8dd5c16f26f529ff1cb0c849586ee1f1c1`
+- **SHA-256**: `7dc4aaebcf53e2cba4d1b69d07ad7ef30d76ed4ff4c8ea514d3271cd1ad2128d`
 
 > The project does not purchase a code-signing certificate, so SmartScreen may
 > show an "unknown publisher" warning. Verify the hash above, or build from source.

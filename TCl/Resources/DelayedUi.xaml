@@ -319,14 +319,8 @@
                                IsOpen="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
                                Placement="Bottom">
                             <Grid x:Name="PanPopup" Margin="8">
-                                <!-- PanCard 承载全应用统一的卡片弹出动画（见 MyComboBox.vb）；默认即终态，动画失败也不会让列表隐形 -->
-                                <Grid x:Name="PanCard" RenderTransformOrigin="0.5,0">
-                                    <Grid.RenderTransform>
-                                        <TransformGroup>
-                                            <ScaleTransform ScaleX="1" ScaleY="1" />
-                                            <TranslateTransform X="0" Y="0" />
-                                        </TransformGroup>
-                                    </Grid.RenderTransform>
+                                <!-- PanCard 始终不透明（Opacity=1）；弹出动画的变换对象由 MyComboBox.vb 运行时创建 -->
+                                <Grid x:Name="PanCard" Opacity="1" RenderTransformOrigin="0.5,0">
                                     <Border x:Name="dropDownBorder" CornerRadius="10"
                                             Width="{TemplateBinding Width}" MaxHeight="{TemplateBinding MaxDropDownHeight}"
                                             Background="{DynamicResource ColorBrushCardBg}">
@@ -371,14 +365,8 @@
                                        IsOpen="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
                                        Placement="Bottom">
                                     <Grid x:Name="PanPopup" Margin="8">
-                                        <!-- PanCard 承载全应用统一的卡片弹出动画（见 MyComboBox.vb）；默认即终态，动画失败也不会让列表隐形 -->
-                                        <Grid x:Name="PanCard" RenderTransformOrigin="0.5,0">
-                                            <Grid.RenderTransform>
-                                                <TransformGroup>
-                                                    <ScaleTransform ScaleX="1" ScaleY="1" />
-                                                    <TranslateTransform X="0" Y="0" />
-                                                </TransformGroup>
-                                            </Grid.RenderTransform>
+                                        <!-- PanCard 始终不透明（Opacity=1）；弹出动画的变换对象由 MyComboBox.vb 运行时创建 -->
+                                        <Grid x:Name="PanCard" Opacity="1" RenderTransformOrigin="0.5,0">
                                             <Border x:Name="dropDownBorder" CornerRadius="10"
                                                     Width="{TemplateBinding Width}" MaxHeight="{TemplateBinding MaxDropDownHeight}"
                                                     Background="{DynamicResource ColorBrushCardBg}">
