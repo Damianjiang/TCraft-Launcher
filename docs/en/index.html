@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TCraft Launcher — a lightweight, beautiful, ready-to-run Minecraft launcher</title>
-<meta name="description" content="TCraft Launcher (TCL) is an open-source, free Minecraft launcher: a single 3.5 MB file with ~2 s cold start. Supports Forge / NeoForge / Fabric / OptiFine, one-click modpack install, isolated instances, Microsoft & offline login and 3D skin preview.">
+<meta name="description" content="An open-source, free Minecraft launcher: a single 3.5 MB file, ~2 s cold start, a Win11-style translucent interface, with Forge / NeoForge / Fabric and modpack support.">
 <meta name="keywords" content="Minecraft launcher, Minecraft, launcher, TCL, TCraft Launcher, lightweight launcher, open source launcher, Forge, Fabric, NeoForge, OptiFine, modpack, mod download, offline login">
 <meta name="author" content="TCraft Team">
 <meta name="theme-color" content="#08090d">
@@ -14,7 +14,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="TCraft Launcher">
 <meta property="og:title" content="TCraft Launcher — Lighter. Faster.">
-<meta property="og:description" content="A single 3.5 MB file with ~2 s cold start. Open-source Minecraft launcher with Forge / NeoForge / Fabric support and one-click modpack install.">
+<meta property="og:description" content="A single 3.5 MB file, ~2 s cold start, and a good-looking interface. Open-source Minecraft launcher.">
 <meta property="og:url" content="https://damianjiang.github.io/TCraft-Launcher/en/">
 <meta property="og:image" content="https://damianjiang.github.io/TCraft-Launcher/assets/og.png">
 <meta property="og:image:width" content="1200">
@@ -22,12 +22,12 @@
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="TCraft Launcher — Lighter. Faster.">
-<meta name="twitter:description" content="A single 3.5 MB file with ~2 s cold start. Open-source Minecraft launcher.">
+<meta name="twitter:description" content="A single 3.5 MB file, ~2 s cold start, and a good-looking interface. Open-source Minecraft launcher.">
 <meta name="twitter:image" content="https://damianjiang.github.io/TCraft-Launcher/assets/og.png">
 
 <link rel="icon" href="../assets/icon-256.png" sizes="any">
 <link rel="apple-touch-icon" href="../assets/icon-256.png">
-<link rel="stylesheet" href="../assets/style.css?v=8">
+<link rel="stylesheet" href="../assets/style.css?v=9">
 
 <script type="application/ld+json">
 {
@@ -37,7 +37,7 @@
   "alternateName": ["TCL"],
   "applicationCategory": "GameApplication",
   "operatingSystem": "Windows 7 SP1, Windows 10, Windows 11",
-  "description": "Open-source Minecraft launcher: a single 3.5 MB file, ~2 s cold start, Forge / NeoForge / Fabric support and one-click modpack install.",
+  "description": "Open-source Minecraft launcher: a single 3.5 MB file, ~2 s cold start, a Win11-style translucent interface, with Forge / NeoForge / Fabric and modpack support.",
   "url": "https://damianjiang.github.io/TCraft-Launcher/en/",
   "downloadUrl": "https://github.com/Damianjiang/TCraft-Launcher/releases/latest/download/TCraft-Launcher.exe",
   "fileSize": "3.5MB",
@@ -59,7 +59,7 @@
       <span>TCraft<small>LAUNCHER</small></span>
     </a>
     <nav class="nav__links" aria-label="Main navigation">
-      <a href="#why">Why</a>
+      <a href="#why">Highlights</a>
       <a href="#features">Features</a>
       <a href="#showcase">Screenshots</a>
       <a href="#download">Download</a>
@@ -79,7 +79,7 @@
 
 <div class="mobile-menu" id="mobileMenu">
   <a href="../">🌐 中文</a>
-  <a href="#why">Why TCL</a>
+  <a href="#why">Highlights</a>
   <a href="#features">Features</a>
   <a href="#showcase">Screenshots</a>
   <a href="#download">Download</a>
@@ -97,11 +97,6 @@
       <div>
         <span class="eyebrow"><b>Open source</b> Free · No ads</span>
         <h1>Lighter.<br><em>Faster.</em></h1>
-        <p class="hero__lead">
-          TCraft Launcher is a <strong>single-file</strong> Minecraft launcher.
-          3.5 MB, about 2 seconds to a ready main screen. No installer, no
-          bundles, no interruptions.
-        </p>
         <div class="hero__cta">
           <a class="btn btn--primary" href="https://github.com/Damianjiang/TCraft-Launcher/releases/latest/download/TCraft-Launcher.exe" target="_blank" rel="noopener">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -117,9 +112,7 @@
           </a>
         </div>
         <div class="hero__meta">
-          <span>Windows 7 SP1 and up</span>
-          <span>64-bit · portable</span>
-          <span>Java managed automatically</span>
+          <span>Windows 7 SP1 and up · 64-bit · portable</span>
         </div>
       </div>
 
@@ -132,49 +125,29 @@
     </div>
   </section>
 
-  <!-- Stats -->
-  <div class="strip">
-    <div class="wrap strip__inner">
-      <div class="stat"><strong>3.5<small>MB</small></strong><span>one file, zero dependencies</span></div>
-      <div class="stat"><strong>≈2<small>s</small></strong><span>cold start to main screen</span></div>
-      <div class="stat"><strong>6</strong><span>mod loaders supported</span></div>
-      <div class="stat"><strong>100<small>%</small></strong><span>open source, forever free</span></div>
-    </div>
-  </div>
-
   <!-- Why -->
   <section class="section" id="why">
     <div class="wrap">
-      <div class="section__head" data-reveal>
+      <div class="section__head" data-reveal style="margin-bottom:34px">
         <div class="kicker">Why TCL</div>
-        <h2>Launching a game should be<br>a <em>quiet</em> thing.</h2>
-        <p class="section__desc">A launcher shouldn't be something you have to study. Open it, pick a version, press start — the rest is its job.</p>
       </div>
 
       <div class="reasons" data-reveal>
         <div class="reason">
           <div class="reason__icon" aria-hidden="true">
-            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-          </div>
-          <div class="reason__num">01</div>
-          <h3>One file is everything</h3>
-          <p>The launch core and utility libraries ship as compressed snapshots inside the exe. No installer, no runtime dependencies, no stray DLLs — it even runs from a USB stick.</p>
-        </div>
-        <div class="reason">
-          <div class="reason__icon" aria-hidden="true">
             <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
           </div>
-          <div class="reason__num">02</div>
-          <h3>Fast by design</h3>
-          <p>Deferred initialization, on-demand resource dictionaries, fonts and network warmed up in the background. ~2 s cold start, near-zero idle CPU.</p>
+          <div class="reason__num">01</div>
+          <h3>Fast</h3>
+          <p>About 2 seconds from launch to the main screen, and near-zero CPU once you are in. Nothing to sit and wait for.</p>
         </div>
         <div class="reason">
           <div class="reason__icon" aria-hidden="true">
             <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="10.5" r="2.5"/><circle cx="8.5" cy="7.5" r="2.5"/><circle cx="6.5" cy="12.5" r="2.5"/><path d="M12 22a10 10 0 1 1 10-10c0 2-1 3-3 3h-2a2 2 0 0 0-2 2v2c0 2-1 3-3 3Z"/></svg>
           </div>
-          <div class="reason__num">03</div>
-          <h3>Pretty, but quiet</h3>
-          <p>Win11-style translucent surfaces with wallpaper, background video, music and theme colors — all optional. Turn it all off and keep a clean list.</p>
+          <div class="reason__num">02</div>
+          <h3>Looks good</h3>
+          <p>A Win11-style translucent interface. Swap the wallpaper, background video, music and accent color — or turn all of it off and keep a clean list.</p>
         </div>
       </div>
     </div>
@@ -183,73 +156,26 @@
   <!-- Features -->
   <section class="section" id="features" style="padding-top:0">
     <div class="wrap">
-      <div class="section__head" data-reveal>
+      <div class="section__head" data-reveal style="margin-bottom:34px">
         <div class="kicker">Features</div>
-        <h2>Everything you need,<br>nothing you <em>don't</em>.</h2>
-        <p class="section__desc">From vanilla installs to modpack migration, from real login to LAN play — the parts you actually use are all here.</p>
+        <h2>Two that stand out.</h2>
       </div>
 
       <div class="bento">
-        <article class="card card--wide" data-reveal data-spot>
-          <div class="card__icon" aria-hidden="true">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.3 7 12 12 20.7 7"/><line x1="12" y1="22" x2="12" y2="12"/></svg>
-          </div>
-          <h3>Version & loader installs</h3>
-          <p>One-click vanilla installs with automatic Java matching. Forge, NeoForge, Fabric, OptiFine and LiteLoader install directly — and failures come back as readable reasons, not stack traces.</p>
-          <div class="card__chips">
-            <span class="chip">Forge</span><span class="chip">NeoForge</span><span class="chip">Fabric</span><span class="chip">OptiFine</span><span class="chip">LiteLoader</span>
-          </div>
-        </article>
-
-        <article class="card card--wide" data-reveal data-spot>
-          <div class="card__icon" aria-hidden="true">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
-          </div>
-          <h3>Modpacks: just drop them in</h3>
-          <p>CurseForge, Modrinth, MCBBS, MultiMC and HMCL packs are all parsed. Drag a zip in and the launcher shows name, icon, game version and loader before installing.</p>
-          <div class="card__chips">
-            <span class="chip">CurseForge</span><span class="chip">Modrinth</span><span class="chip">MCBBS</span><span class="chip">MultiMC</span><span class="chip">HMCL</span>
-          </div>
-        </article>
-
-        <article class="card card--third" data-reveal data-spot>
-          <div class="card__icon" aria-hidden="true">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
-          </div>
-          <h3>Isolated instances</h3>
-          <p>Every version gets its own mods, saves, config and Java settings. Organize instances by folder.</p>
-        </article>
-
-        <article class="card card--third" data-reveal data-spot>
-          <div class="card__icon" aria-hidden="true">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          </div>
-          <h3>Three ways to log in</h3>
-          <p>Microsoft device-code login, offline play, and external Authlib servers. Account cards switch and export.</p>
-        </article>
-
-        <article class="card card--third" data-reveal data-spot>
+        <article class="card card--half" data-reveal data-spot>
           <div class="card__icon" aria-hidden="true">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg>
           </div>
           <h3>3D skin preview</h3>
-          <p>Real 3D rendering via WPF, auto-detects classic and slim models, drag to rotate.</p>
+          <p>Skin rendered in real 3D, with classic and slim arms detected automatically. Drag to spin it around; premium skins can be previewed before you switch.</p>
         </article>
 
-        <article class="card card--wide" data-reveal data-spot>
-          <div class="card__icon" aria-hidden="true">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          </div>
-          <h3>Multiplayer without a server</h3>
-          <p>Virtual LAN sessions powered by EasyTier. Create a room, share a code, and join a friend's single-player world. Only Minecraft traffic is forwarded.</p>
-        </article>
-
-        <article class="card card--wide" data-reveal data-spot>
+        <article class="card card--half" data-reveal data-spot>
           <div class="card__icon" aria-hidden="true">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M10 18h4"/></svg>
           </div>
-          <h3>Downloads, cleanup & logs</h3>
-          <p>CurseForge / Modrinth search with resumable downloads; a categorized cache cleaner that never touches saves or config; crash analysis that speaks plainly.</p>
+          <h3>Logs & crash analysis</h3>
+          <p>Logs are laid out on a timeline, and crash reports are written in plain language: what broke, which mod is likely responsible, and what to do next.</p>
         </article>
       </div>
     </div>
@@ -261,13 +187,11 @@
       <div class="section__head" data-reveal style="margin-bottom:34px">
         <div class="kicker">Screenshots</div>
         <h2>Judge the UI <em>yourself</em>.</h2>
-        <p class="section__desc">Every screenshot is a real, running app — no renders.</p>
       </div>
 
       <div class="tabs" role="tablist" aria-label="Screenshots">
         <button class="tab is-active" role="tab" aria-selected="true" data-shot="../assets/shot-home.png">Home</button>
         <button class="tab" role="tab" aria-selected="false" data-shot="../assets/shot-download.png">Downloads</button>
-        <button class="tab" role="tab" aria-selected="false" data-shot="../assets/shot-instance.png">Instances</button>
         <button class="tab" role="tab" aria-selected="false" data-shot="../assets/shot-version.png">Version settings</button>
         <button class="tab" role="tab" aria-selected="false" data-shot="../assets/shot-setup.png">Settings</button>
         <button class="tab" role="tab" aria-selected="false" data-shot="../assets/shot-link.png">Multiplayer</button>
@@ -277,7 +201,6 @@
         <div class="screens__stage" id="stage">
           <img class="is-active" src="../assets/shot-home.png" alt="TCraft Launcher home" width="790" height="450">
           <img src="../assets/shot-download.png" alt="Download page" width="790" height="450" loading="lazy">
-          <img src="../assets/shot-instance.png" alt="Instance management" width="790" height="450" loading="lazy">
           <img src="../assets/shot-version.png" alt="Version settings" width="790" height="450" loading="lazy">
           <img src="../assets/shot-setup.png" alt="Settings page" width="790" height="450" loading="lazy">
           <img src="../assets/shot-link.png" alt="Multiplayer page" width="790" height="450" loading="lazy">
@@ -293,8 +216,12 @@
       <div class="download__panel" data-reveal>
         <div class="download__main">
           <span class="download__badge">Open-source edition · Portable</span>
-          <h2>Download, double-click.<br>That's it.</h2>
-          <p>A portable single file — nothing to install. On first start it checks Java and your game folder and walks you through the rest. Want genuine login and community downloads? Hit "Get the full edition" above.</p>
+          <h2>Download</h2>
+          <ul class="download__who">
+            <li><b>Most people</b>: the open-source build is enough. Portable, double-click to run; sign-in and community resources are there when you want them.</li>
+            <li><b>If you would rather not set anything up</b>: the full edition ships with Microsoft sign-in built in — grab it from QQ group 1081955336.</li>
+            <li><b>If you want to change it yourself</b>: the source is MIT. Fork away.</li>
+          </ul>
           <div class="download__actions">
             <a class="btn btn--primary" href="https://github.com/Damianjiang/TCraft-Launcher/releases/latest/download/TCraft-Launcher.exe" target="_blank" rel="noopener">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -365,7 +292,7 @@
           <img src="../assets/logo.png" alt="" width="30" height="30">
           <span>TCraft<small>LAUNCHER</small></span>
         </a>
-        <p>A lightweight, good-looking, ready-to-run Minecraft launcher. Open source, free, no ads.</p>
+        <p>Open source · Free · No ads</p>
       </div>
       <div>
         <h4>Project</h4>

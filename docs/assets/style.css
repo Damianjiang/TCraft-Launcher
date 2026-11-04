@@ -264,17 +264,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   color: transparent;
 }
 
-.hero__lead {
-  max-width: 520px;
-  margin: 24px 0 0;
-  font-size: 17px;
-  color: var(--muted);
-  line-height: 1.75;
-}
-
-.hero__lead strong { color: var(--paper); font-weight: 600; }
-
-.hero__cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 34px; }
+.hero__cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
 
 .hero__meta {
   display: flex;
@@ -335,30 +325,6 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .frame__bar i:nth-child(3) { background: #28c840; }
 .frame__bar span { margin-left: 8px; font-size: 10.5px; color: #6d7079; font-family: var(--mono); }
 
-/* ---------- 跑马灯 ---------- */
-.strip {
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent);
-}
-
-.strip__inner {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
-  padding: 28px 0;
-}
-
-.stat { display: flex; align-items: baseline; gap: 10px; }
-.stat strong {
-  font-size: 30px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  font-variant-numeric: tabular-nums;
-}
-.stat strong small { font-size: 15px; font-weight: 600; color: var(--muted); margin-left: 2px; }
-.stat span { font-size: 13px; color: var(--dim); }
-
 /* ---------- 区块通用 ---------- */
 section { position: relative; }
 
@@ -389,12 +355,10 @@ section { position: relative; }
 
 .section h2 em { font-style: normal; color: var(--amber); }
 
-.section__desc { margin: 18px 0 0; color: var(--muted); font-size: 16px; max-width: 620px; }
-
-/* ---------- 三个理由 ---------- */
+/* ---------- 两个理由 ---------- */
 .reasons {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 1px;
   background: var(--line);
   border: 1px solid var(--line);
@@ -580,6 +544,10 @@ section { position: relative; }
 
 .download__main h2 { margin: 20px 0 0; font-size: clamp(30px, 3.6vw, 42px); letter-spacing: -0.035em; line-height: 1.15; }
 .download__main p { margin: 14px 0 0; color: var(--muted); font-size: 14.5px; }
+
+.download__who { margin: 20px 0 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.download__who li { color: var(--muted); font-size: 14.5px; line-height: 1.7; }
+.download__who b { color: var(--paper); font-weight: 600; }
 
 .download__actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
 
@@ -801,9 +769,6 @@ section { position: relative; }
   .nav__burger { display: block; margin-left: auto; }
   .nav__actions .btn--ghost { display: none; }
   .hero { padding-top: 112px; }
-  .hero__lead { font-size: 15.5px; }
-  .strip__inner { grid-template-columns: 1fr 1fr; gap: 18px; }
-  .stat strong { font-size: 24px; }
   .bento { grid-template-columns: 1fr; }
   .section { padding: 76px 0; }
   .download__main, .download__side { padding: 32px 24px; }
