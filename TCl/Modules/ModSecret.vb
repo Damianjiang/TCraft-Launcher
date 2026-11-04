@@ -7,27 +7,43 @@ Friend Module ModSecret
     '在开源版的注册表与常规版的注册表隔离，以防数据冲突
     Public Const RegFolder As String = "TCLDebug"
     '用于微软登录的 OAuth ClientId（设备码登录流程）。
-    '开源版默认不内置任何微软凭据：未配置时微软登录处于「未启用」状态，
-    '添加账户弹窗会隐藏该选项，登录流程也会给出明确提示。
-    '内部版（编译常量 INTERNAL）：由构建脚本生成的 InternalSecrets.vb 注入默认值，密钥文件不进仓库。
+    '开源版不内置任何微软凭据；内部版由构建脚本注入 InternalSecrets.vb（密钥文件不进仓库）。
+    '改用反射读取而非条件编译：MSBuild 命令行的逗号会截断 DefineConstants，INTERNAL 常量曾因此失效。
     '开源版启用方法：注册 Azure 应用后设置环境变量 TCL_MS_CLIENT_ID 为你的 ClientId，重启启动器即可。
-#If INTERNAL Then
-    Public OAuthClientId As String = If(Environment.GetEnvironmentVariable("TCL_MS_CLIENT_ID"), InternalSecrets.MsClientId)
-#Else
-    Public OAuthClientId As String = If(Environment.GetEnvironmentVariable("TCL_MS_CLIENT_ID"), "")
-#End If
+    Public OAuthClientId As String = ResolveMsClientId()
+
+    ''' <summary>环境变量优先；否则读取内部版注入的常量，开源版中该类型不存在则返回空串。</summary>
+    Private Function ResolveMsClientId() As String
+        Dim Env As String = Environment.GetEnvironmentVariable("TCL_MS_CLIENT_ID")
+        If Not String.IsNullOrWhiteSpace(Env) Then Return Env.Trim
+        Return ReadInternalSecret("MsClientId")
+    End Function
+
+    ''' <summary>读取内部版注入的密钥常量；开源版程序集里没有该类型，直接返回空串。</summary>
+    Private Function ReadInternalSecret(FieldName As String) As String
+        Try
+            '项目根命名空间为 TCraft：先按全名找，再退化为按简单类型名遍历
+            Dim Asm As System.Reflection.Assembly = System.Reflection.Assembly.GetExecutingAssembly()
+            Dim Secrets As System.Type = Asm.GetType("TCraft.InternalSecrets")
+            If Secrets Is Nothing Then
+                Secrets = Array.Find(Asm.GetTypes(), Function(t As System.Type) t.Name = "InternalSecrets")
+            End If
+            If Secrets Is Nothing Then Return ""
+            Dim Field As System.Reflection.FieldInfo = Secrets.GetField(FieldName,
+                System.Reflection.BindingFlags.Public Or System.Reflection.BindingFlags.Static)
+            If Field Is Nothing Then Return ""
+            Return If(CStr(Field.GetValue(Nothing)), "").Trim
+        Catch ex As Exception
+            Return ""
+        End Try
+    End Function
     'CurseForge API Key
     '优先使用环境变量 TCL_CURSEFORGE_API_KEY；否则读取「设置 → 系统/下载 → 社区资源 API Key」。
     'CurseForge 的 API（包括世界/模组/整合包搜索与文件列表）要求携带 x-api-key，缺失时返回 403。
     Public Function GetCurseForgeAPIKey() As String
         Dim Key As String = Environment.GetEnvironmentVariable("TCL_CURSEFORGE_API_KEY")
+        If String.IsNullOrWhiteSpace(Key) Then Key = ReadInternalSecret("CurseForgeApiKey")
         If String.IsNullOrWhiteSpace(Key) Then
-#If INTERNAL Then
-            '内部版：允许由 InternalSecrets 注入默认 Key（仅本地构建，不进仓库）
-            If Not String.IsNullOrWhiteSpace(InternalSecrets.CurseForgeApiKey) Then
-                Return InternalSecrets.CurseForgeApiKey.Trim
-            End If
-#End If
             Try : Key = Settings.Get(Of String)("ToolDownloadCurseForgeKey") : Catch : Key = "" : End Try
         End If
         Return If(Key, "").Trim

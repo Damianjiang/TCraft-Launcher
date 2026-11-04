@@ -198,9 +198,7 @@
     <Compile Include="Modules\Minecraft\ModInstanceHistory.vb" />
     <Compile Include="Modules\Minecraft\ModInstanceContent.vb" />
     <Compile Include="Modules\Minecraft\ModInstanceShortcut.vb" />
-    <Compile Include="Modules\Minecraft\ModInstanceMap.vb" />
     <Compile Include="Modules\Minecraft\ModMsSkin.vb" />
-    <EmbeddedResource Include="Resources\BlockColors.json.gz" />
     <Compile Include="Modules\Minecraft\ModWorldData.vb" />
     <Compile Include="Modules\Minecraft\ModInstanceCollections.vb" />
     <Compile Include="Modules\Minecraft\ModOptionPresets.vb" />
@@ -369,9 +367,6 @@
     </Compile>
     <Compile Include="Pages\PageInstance\PageInstanceShader.xaml.vb">
       <DependentUpon>PageInstanceShader.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="Pages\PageInstance\PageInstanceMap.xaml.vb">
-      <DependentUpon>PageInstanceMap.xaml</DependentUpon>
     </Compile>
     <Compile Include="Pages\PageInstance\PageInstanceLeft.xaml.vb">
       <DependentUpon>PageInstanceLeft.xaml</DependentUpon>
@@ -733,10 +728,6 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="Pages\PageInstance\PageInstanceShader.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="Pages\PageInstance\PageInstanceMap.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

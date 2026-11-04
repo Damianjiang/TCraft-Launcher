@@ -2932,7 +2932,6 @@ ZGC / 分代 ZGC 内存占用更高但回收时不卡顿；G1GC 占用更低但�
 创建快照	Create snapshot	創建快照	創建快照
 游戏选项	Game options	遊戲選項	遊戲選項
 光影	Shaders	光影	光影
-世界地图	World map	世界地圖	世界地圖
 复制实例	Duplicate instance	複製實例	複製實例
 备份与恢复	Backup & restore	備份與恢復	備份與恢復
 导入其他启动器实例	Import instances from other launchers	導入其他啓動器實例	導入其他啓動器實例
@@ -3243,7 +3242,6 @@ Zip 压缩包	Zip archive	Zip 壓縮包	Zip 壓縮包
 该实例还没有任何存档。	This instance has no saves yet.	該實例還沒有任何存檔。	該實例還沒有任何存檔。
 该存档还没有已生成的地形（region 文件夹不存在）。	No generated terrain for this save (region folder missing).	該存檔還沒有已生成的地形（region 文件夾不存在）。	該存檔還沒有已生成的地形（region 文件夾不存在）。
 正在加载已探索地形……	Loading explored terrain…	正在加載已探索地形……	正在加載已探索地形……
-没有找到已生成的地形（世界地图 v1 仅支持 1.18+ 存档的主世界 region 文件）。	No generated terrain found (world map v1 only reads Overworld region files of 1.18+ saves).	沒有找到已生成的地形（世界地圖 v1 僅支持 1.18+ 存檔的主世界 region 文件）。	沒有找到已生成的地形（世界地圖 v1 僅支持 1.18+ 存檔的主世界 region 文件）。
 已加载	Loaded 	已加載	已加載
 张地图瓦片，拖动或缩放查看更多。	 map tiles — drag or zoom to explore.	張地圖瓦片，拖動或縮放查看更多。	張地圖瓦片，拖動或縮放查看更多。
 渲染距离	Render distance	渲染距離	渲染距離
@@ -3510,3 +3508,5 @@ options.txt 存在，但没有包含可编辑的常用选项。可以在游戏�
 已恢复	 restored	已恢復	已恢復
 无变化	no change	無變化	無變化
 大部分设置已即时生效；少数（如缓存文件夹路径）将在重启 TCL 后完全生效。	Most settings apply immediately; a few (like the cache folder path) fully apply after restarting TCL.	大部分設置已即時生效；少數（如緩存文件夾路徑）將在重啓 TCL 後完全生效。	大部分設置已即時生效；少數（如緩存文件夾路徑）將在重啓 TCL 後完全生效。
+当前构建：开源版（微软正版登录未启用）	Current build: Open-source edition (Microsoft login disabled)	目前建置：開源版（微軟正版登入未啟用）	目前建置：開源版（微軟正版登入未啟用）
+当前构建：完整版（已内置微软正版登录）	Current build: Full edition (Microsoft login enabled)	目前建置：完整版（已內建微軟正版登入）	目前建置：完整版（已內建微軟正版登入）

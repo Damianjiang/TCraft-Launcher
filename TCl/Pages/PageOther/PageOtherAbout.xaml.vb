@@ -10,6 +10,11 @@
         If IsLoaded Then Return
         IsLoaded = True
 
+        '构建类型标识：方便一眼确认手上的是完整版还是开源版
+        LabBuildType.Text = If(String.IsNullOrEmpty(OAuthClientId),
+                               ModLang.L("当前构建：开源版（微软正版登录未启用）"),
+                               ModLang.L("当前构建：完整版（已内置微软正版登录）"))
+
     End Sub
 
     ''' <summary>

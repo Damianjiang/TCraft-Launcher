@@ -50,8 +50,8 @@ There is no installer, no bundle, and no telemetry: the whole program is one
 Grab `TCraft-Launcher-v1.2.exe` from the [latest release](https://github.com/Damianjiang/TCraft-Launcher/releases/latest) and run it.
 
 - **OS**: Windows 7 SP1+ (Windows 10 / 11 recommended), 64-bit
-- **Size**: 3.49 MiB
-- **SHA-256**: `5036ad9a0c9bb6f55e79b05493cb699465f15f8fa36041a6b2836b3d4af71ae9`
+- **Size**: 3.48 MiB
+- **SHA-256**: `5618e7cb06567e54cb43d08f7f3bcb7847c6bb6bee1c1433c528039003a07215`
 
 > The project does not purchase a code-signing certificate, so SmartScreen may
 > show an "unknown publisher" warning. Verify the hash above, or build from source.

@@ -674,7 +674,6 @@ EndHint:
     Public FrmInstanceHistory As PageInstanceHistory
     Public FrmInstanceResourcePack As PageInstanceResourcePack
     Public FrmInstanceShader As PageInstanceShader
-    Public FrmInstanceMap As PageInstanceMap
     Public FrmInstanceScreenshot As PageInstanceScreenshot
     Public FrmDownloadModify As PageDownloadModify
 

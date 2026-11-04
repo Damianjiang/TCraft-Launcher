@@ -30,7 +30,7 @@ Public Class PageInstanceLeft
     ''' <summary>
     ''' 勾选事件改变页面。
     ''' </summary>
-    Private Sub PageCheck(sender As FrameworkElement, e As RouteEventArgs) Handles ItemOverall.Check, ItemMod.Check, ItemModDisabled.Check, ItemSetup.Check, ItemModify.Check, ItemExport.Check, ItemSaves.Check, ItemScreenshot.Check, ItemServer.Check, ItemJarInJar.Check, ItemCompResource.Check, ItemSavesDatapack.Check, ItemDiagnostics.Check, ItemOptions.Check, ItemHistory.Check, ItemResourcePack.Check, ItemShader.Check, ItemMap.Check
+    Private Sub PageCheck(sender As FrameworkElement, e As RouteEventArgs) Handles ItemOverall.Check, ItemMod.Check, ItemModDisabled.Check, ItemSetup.Check, ItemModify.Check, ItemExport.Check, ItemSaves.Check, ItemScreenshot.Check, ItemServer.Check, ItemJarInJar.Check, ItemCompResource.Check, ItemSavesDatapack.Check, ItemDiagnostics.Check, ItemOptions.Check, ItemHistory.Check, ItemResourcePack.Check, ItemShader.Check
         '尚未初始化控件属性时，sender.Tag 为 Nothing，会导致切换到页面 0
         '若使用 IsLoaded，则会导致模拟点击不被执行（模拟点击切换页面时，控件的 IsLoaded 为 False）
         If sender.Tag IsNot Nothing Then PageChange(Val(sender.Tag))
@@ -38,6 +38,8 @@ Public Class PageInstanceLeft
 
     Public Function PageGet(Optional ID As FormMain.PageSubType = -1)
         If ID = -1 Then ID = PageID
+        '旧版本可能把已移除的「世界地图」子页（18）记进设置，回退到概览页避免抛异常
+        If CInt(ID) = 18 Then ID = FormMain.PageSubType.InstanceOverall
         Select Case ID
             Case FormMain.PageSubType.InstanceOverall
                 If FrmInstanceOverall Is Nothing Then FrmInstanceOverall = New PageInstanceOverall
@@ -90,9 +92,6 @@ Public Class PageInstanceLeft
             Case FormMain.PageSubType.InstanceShader
                 If FrmInstanceShader Is Nothing Then FrmInstanceShader = New PageInstanceShader
                 Return FrmInstanceShader
-            Case FormMain.PageSubType.InstanceMap
-                If FrmInstanceMap Is Nothing Then FrmInstanceMap = New PageInstanceMap
-                Return FrmInstanceMap
             Case Else
                 Throw New Exception(ModLang.L("未知的版本设置子页面种类：") & ID)
         End Select
@@ -192,9 +191,6 @@ Public Class PageInstanceLeft
             Case FormMain.PageSubType.InstanceShader
                 FrmInstanceShader?.Reload()
                 ItemShader.Checked = True
-            Case FormMain.PageSubType.InstanceMap
-                FrmInstanceMap?.Reload()
-                ItemMap.Checked = True
         End Select
     End Sub
 

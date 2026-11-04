@@ -60,8 +60,8 @@ TCraft Launcher（简称 **TCL**）是一个用 VB.NET / WPF 写的 Minecraft �
 `TCraft-Launcher-v1.2.exe`，双击运行即可。
 
 - **系统**：Windows 7 SP1 及以上（推荐 Windows 10 / 11），64 位
-- **体积**：3.49 MiB
-- **SHA-256**：`5036ad9a0c9bb6f55e79b05493cb699465f15f8fa36041a6b2836b3d4af71ae9`
+- **体积**：3.48 MiB
+- **SHA-256**：`5618e7cb06567e54cb43d08f7f3bcb7847c6bb6bee1c1433c528039003a07215`
 
 > 项目未购买代码签名证书，SmartScreen 可能提示「未知发布者」。
 > 可核对上方哈希，或直接从源码构建。

@@ -21,8 +21,10 @@
                 </StackPanel>
             </local:MyCard>
             <local:MyCard Margin="0,15,0,15" Title="关于">
-                <TextBlock Margin="25,42,23,20" TextWrapping="Wrap" LineHeight="22"
+                <TextBlock Margin="25,42,23,8" TextWrapping="Wrap" LineHeight="22"
                            Text="TCraft Launcher 1.2 由 TCraft 团队开发与维护，持续更新，并已在 GitHub 开源。&#xa;提供游戏与模组、整合包、资源包、光影的下载与管理，支持原版、Forge / NeoForge / Fabric / OptiFine / LiteLoader。&#xa;同时提供登录、启动、联机、实例与整合包导出等完整能力。&#xa;加入 QQ 群 1081955336，获取更新、反馈问题。" />
+                <TextBlock x:Name="LabBuildType" Margin="25,0,23,20" TextWrapping="Wrap" LineHeight="22"
+                           FontWeight="SemiBold" Foreground="{DynamicResource ColorBrush2}" Text="" />
             </local:MyCard>
             <local:MyCard Margin="0,15,0,15" Title="参考与致谢">
                 <TextBlock Margin="25,42,23,20" TextWrapping="Wrap" LineHeight="22"

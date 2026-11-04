@@ -2052,10 +2052,6 @@ Public Class FormMain
         ''' 光影包管理（实例 shaderpacks）。第 125 轮新增。
         ''' </summary>
         InstanceShader = 17
-        ''' <summary>
-        ''' 世界地图（存档 region 渲染）。第 127 轮新增，对齐 LumilioCL 世界探索器的存档底图。
-        ''' </summary>
-        InstanceMap = 18
     End Enum
     ''' <summary>
     ''' 获取次级页面的名称。若并非次级页面则返回空字符串，故可以以此判断是否为次级页面。
