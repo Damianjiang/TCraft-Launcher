@@ -6,9 +6,13 @@ Public Class MyComboBox
     '基础
     Public Uuid As Integer = GetUuid()
     Private TextBox As MyTextBox
+    Private HookedPopup As System.Windows.Controls.Primitives.Popup = Nothing
+    Private LastPopupAnimTick As Long = 0
     Public Property HintText As String = ""
     Public Overrides Sub OnApplyTemplate()
         MyBase.OnApplyTemplate()
+        '两个模板（普通 / 可编辑）的下拉面板都要挂上卡片弹出动画
+        HookDropDownPopup()
         If Not IsEditable Then Return
         Try
             TextBox = Template.FindName("PART_EditableTextBox", Me)
@@ -100,6 +104,59 @@ Public Class MyComboBox
         End If
     End Sub
 
+    ''' <summary>把弹出动画挂到 Popup.Opened：Popup 首次展开时内容才 Loaded，过早播放会被首帧覆盖。</summary>
+    Private Sub HookDropDownPopup()
+        Try
+            Dim Pop = TryCast(Template.FindName("PART_Popup", Me), System.Windows.Controls.Primitives.Popup)
+            If Pop Is Nothing OrElse Pop Is HookedPopup Then Return
+            HookedPopup = Pop
+            AddHandler Pop.Opened, Sub() PlayDropDownAnimation()
+        Catch ex As Exception
+            Logger.Warn(ex, "绑定下拉框弹出动画失败")
+        End Try
+    End Sub
+
+    ''' <summary>所有下拉框共用的卡片动画：淡入 130ms + 缩放 0.94→1（回弹）+ 上浮 10→0，
+    ''' 参数与菜单卡片一致，并遵循「个性化 → 弹出菜单动画」开关。</summary>
+    Private Sub PlayDropDownAnimation()
+        '同一次展开内 Popup.Opened 与 DropDownOpened 都会触发，只播放一次
+        Dim Tick As Long = GetTimeMs()
+        If Tick - LastPopupAnimTick < 60 Then Return
+        LastPopupAnimTick = Tick
+        Try
+            Dim Pan = TryCast(Template.FindName("PanCard", Me), Grid)
+            If Pan Is Nothing Then Return
+            Dim Group = TryCast(Pan.RenderTransform, TransformGroup)
+            Dim Scale As ScaleTransform = Nothing, Pos As TranslateTransform = Nothing
+            If Group IsNot Nothing AndAlso Group.Children.Count >= 2 Then
+                Scale = TryCast(Group.Children(0), ScaleTransform)
+                Pos = TryCast(Group.Children(1), TranslateTransform)
+            End If
+            If Scale Is Nothing OrElse Pos Is Nothing Then Return
+            AniStop("MyComboBox Popup " & Uuid)
+            Dim BaseOpacity As Double = MenuCard.PopupBaseOpacity
+            If AniControlEnabled > 0 OrElse Not MenuCard.PopupAnimEnabled Then
+                '关闭动画时直接呈现终态
+                Scale.ScaleX = 1 : Scale.ScaleY = 1
+                Pos.Y = 0
+                Pan.Opacity = BaseOpacity
+                Return
+            End If
+            Pan.Opacity = 0
+            Scale.ScaleX = 0.94 : Scale.ScaleY = 0.94
+            Pos.Y = 10
+            AniStart({
+                AaOpacity(Pan, BaseOpacity - Pan.Opacity, 130),
+                AaDouble(Sub(i) Scale.ScaleX += i, 1 - Scale.ScaleX, 220, , New AniEaseOutBack(AniEasePower.Middle)),
+                AaDouble(Sub(i) Scale.ScaleY += i, 1 - Scale.ScaleY, 220, , New AniEaseOutBack(AniEasePower.Middle)),
+                AaDouble(Sub(i) Pos.Y += i, 0 - Pos.Y, 220, , New AniEaseOutFluent(AniEasePower.Weak))
+            }, "MyComboBox Popup " & Uuid)
+        Catch ex As Exception
+            '模板默认就是可见终态，动画异常时下拉列表仍可正常使用
+            Logger.Warn(ex, "下拉框弹出动画失败")
+        End Try
+    End Sub
+
     Private RealWidth As Double '由于下拉框 Popup 宽度与 Width 一致，故不能为 NaN（Auto）
     Private Sub MyComboBox_DropDownOpened(sender As Object, e As EventArgs) Handles Me.DropDownOpened
         RealWidth = Width
@@ -110,6 +167,8 @@ Public Class MyComboBox
         Catch ex As Exception
             Logger.Error(ex, "设置下拉框透明度失败")
         End Try
+        '兜底：若模板替换导致 Popup.Opened 未挂上，仍由这里播放动画
+        PlayDropDownAnimation()
     End Sub
     Private Sub MyComboBox_DropDownClosed(sender As Object, e As EventArgs) Handles Me.DropDownClosed
         Width = RealWidth

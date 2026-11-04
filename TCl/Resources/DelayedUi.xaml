@@ -7,7 +7,7 @@
     xmlns:sys="clr-namespace:System;assembly=mscorlib">
 
     <!--
-      延迟 UI 资源字典（第 112 轮启动提速）。
+      延迟 UI 资源字典（首帧启动提速）。
       这里放「首帧渲染用不到」的 Application 级资源（转换器/Label/滚动条/输入框/下拉框/右键菜单），
       原先它们在 Application.xaml 里随启动同步解析（实测 Application.xaml BAML 段 ~510ms 的主要构成）。
       由 Application.EnsureDelayedUiLoaded() 在首帧后、任何页面/弹窗构造前合并进
@@ -308,20 +308,42 @@
             <Setter.Value>
                 <ControlTemplate TargetType="ComboBox">
                     <Grid>
-                        <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="3" BorderThickness="1" BorderBrush="{TemplateBinding Foreground}" />
+                        <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="7" BorderThickness="1" BorderBrush="{TemplateBinding Foreground}" />
                         <ToggleButton Margin="0,0,1.5,0" Foreground="{TemplateBinding Foreground}" IsTabStop="False" SnapsToDevicePixels="False" Focusable="False" IsChecked="{Binding IsDropDownOpen,Mode=TwoWay,RelativeSource={RelativeSource TemplatedParent}}" ClickMode="Press" />
                         <ContentPresenter x:Name="PART_Content" Margin="8.5,0,21.5,0" IsHitTestVisible="False" VerticalAlignment="Center"
                                           Content="{TemplateBinding SelectionBoxItem}"
                                           ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
                                           ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}" />
-                        <Popup x:Name="PART_Popup" SnapsToDevicePixels="True" VerticalOffset="-1.5" AllowsTransparency="True" IsOpen="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" Placement="Bottom" PopupAnimation="Fade">
-                            <Grid x:Name="PanPopup">
-                                <Border Background="White" CornerRadius="3" />
-                                <Border x:Name="dropDownBorder" CornerRadius="3" BorderBrush="{TemplateBinding Foreground}" BorderThickness="1" Width="{TemplateBinding Width}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
-                                    <local:MyScrollViewer x:Name="DropDownScrollViewer" PanningMode="VerticalOnly" SnapsToDevicePixels="False" Style="{StaticResource ScrollViewerFullMargin}" ScrollViewer.CanContentScroll="False" VerticalScrollBarVisibility="Auto">
-                                        <ItemsPresenter x:Name="ItemsPresenter" KeyboardNavigation.DirectionalNavigation="Contained" />
-                                    </local:MyScrollViewer>
-                                </Border>
+                        <Popup x:Name="PART_Popup" AllowsTransparency="True" PopupAnimation="None"
+                               HorizontalOffset="-8" VerticalOffset="-6"
+                               IsOpen="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                               Placement="Bottom">
+                            <Grid x:Name="PanPopup" Margin="8">
+                                <!-- PanCard 承载全应用统一的卡片弹出动画（见 MyComboBox.vb）；默认即终态，动画失败也不会让列表隐形 -->
+                                <Grid x:Name="PanCard" RenderTransformOrigin="0.5,0">
+                                    <Grid.RenderTransform>
+                                        <TransformGroup>
+                                            <ScaleTransform ScaleX="1" ScaleY="1" />
+                                            <TranslateTransform X="0" Y="0" />
+                                        </TransformGroup>
+                                    </Grid.RenderTransform>
+                                    <Border x:Name="dropDownBorder" CornerRadius="10"
+                                            Width="{TemplateBinding Width}" MaxHeight="{TemplateBinding MaxDropDownHeight}"
+                                            Background="{DynamicResource ColorBrushCardBg}">
+                                        <Border.Effect>
+                                            <DropShadowEffect Color="{DynamicResource ColorObject1}" BlurRadius="10"
+                                                              ShadowDepth="1" Opacity="0.1" RenderingBias="Performance" />
+                                        </Border.Effect>
+                                        <Border CornerRadius="9" Padding="5" Background="{DynamicResource ColorBrushCardBg}"
+                                                BorderBrush="{DynamicResource ColorBrush6}" BorderThickness="1">
+                                            <local:MyScrollViewer x:Name="DropDownScrollViewer" PanningMode="VerticalOnly"
+                                                                  Style="{StaticResource ScrollViewerFullMargin}"
+                                                                  ScrollViewer.CanContentScroll="False" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                                                <ItemsPresenter x:Name="ItemsPresenter" KeyboardNavigation.DirectionalNavigation="Contained" />
+                                            </local:MyScrollViewer>
+                                        </Border>
+                                    </Border>
+                                </Grid>
                             </Grid>
                         </Popup>
                     </Grid>
@@ -341,17 +363,39 @@
                     <Setter.Value>
                         <ControlTemplate TargetType="ComboBox">
                             <Grid>
-                                <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="3" BorderThickness="1" BorderBrush="{TemplateBinding Foreground}" />
+                                <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="7" BorderThickness="1" BorderBrush="{TemplateBinding Foreground}" />
                                 <ToggleButton Margin="0,0,1.5,0" Foreground="{TemplateBinding Foreground}" IsTabStop="False" SnapsToDevicePixels="False" Focusable="False" IsChecked="{Binding IsDropDownOpen,Mode=TwoWay,RelativeSource={RelativeSource TemplatedParent}}" ClickMode="Press" />
                                 <local:MyTextBox x:Name="PART_EditableTextBox" BorderThickness="0" Margin="1.5,0,21.5,0" Padding="0" Background="{x:Null}" />
-                                <Popup x:Name="PART_Popup" SnapsToDevicePixels="True" VerticalOffset="-1.5" AllowsTransparency="True" IsOpen="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" Placement="Bottom" PopupAnimation="Fade">
-                                    <Grid x:Name="PanPopup">
-                                        <Border Background="White" CornerRadius="3" />
-                                        <Border x:Name="dropDownBorder" SnapsToDevicePixels="False" CornerRadius="3" BorderBrush="{TemplateBinding Foreground}" BorderThickness="1" Width="{TemplateBinding Width}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
-                                            <local:MyScrollViewer x:Name="DropDownScrollViewer" Style="{StaticResource ScrollViewerFullMargin}" ScrollViewer.CanContentScroll="False" VerticalScrollBarVisibility="Auto">
-                                                <ItemsPresenter x:Name="ItemsPresenter" KeyboardNavigation.DirectionalNavigation="Contained" />
-                                            </local:MyScrollViewer>
-                                        </Border>
+                                <Popup x:Name="PART_Popup" AllowsTransparency="True" PopupAnimation="None"
+                                       HorizontalOffset="-8" VerticalOffset="-6"
+                                       IsOpen="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                       Placement="Bottom">
+                                    <Grid x:Name="PanPopup" Margin="8">
+                                        <!-- PanCard 承载全应用统一的卡片弹出动画（见 MyComboBox.vb）；默认即终态，动画失败也不会让列表隐形 -->
+                                        <Grid x:Name="PanCard" RenderTransformOrigin="0.5,0">
+                                            <Grid.RenderTransform>
+                                                <TransformGroup>
+                                                    <ScaleTransform ScaleX="1" ScaleY="1" />
+                                                    <TranslateTransform X="0" Y="0" />
+                                                </TransformGroup>
+                                            </Grid.RenderTransform>
+                                            <Border x:Name="dropDownBorder" CornerRadius="10"
+                                                    Width="{TemplateBinding Width}" MaxHeight="{TemplateBinding MaxDropDownHeight}"
+                                                    Background="{DynamicResource ColorBrushCardBg}">
+                                                <Border.Effect>
+                                                    <DropShadowEffect Color="{DynamicResource ColorObject1}" BlurRadius="10"
+                                                                      ShadowDepth="1" Opacity="0.1" RenderingBias="Performance" />
+                                                </Border.Effect>
+                                                <Border CornerRadius="9" Padding="5" Background="{DynamicResource ColorBrushCardBg}"
+                                                        BorderBrush="{DynamicResource ColorBrush6}" BorderThickness="1">
+                                                    <local:MyScrollViewer x:Name="DropDownScrollViewer" PanningMode="VerticalOnly"
+                                                                          Style="{StaticResource ScrollViewerFullMargin}"
+                                                                          ScrollViewer.CanContentScroll="False" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                                                        <ItemsPresenter x:Name="ItemsPresenter" KeyboardNavigation.DirectionalNavigation="Contained" />
+                                                    </local:MyScrollViewer>
+                                                </Border>
+                                            </Border>
+                                        </Grid>
                                     </Grid>
                                 </Popup>
                             </Grid>
@@ -371,7 +415,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="ToggleButton">
                     <Border Background="{StaticResource ColorBrushSemiTransparent}">
-                        <Path x:Name="path" Width="15" RenderTransformOrigin="0.3,0.5" HorizontalAlignment="Right" Data="M1,1L4.5,4.5L8,1" StrokeThickness="1.5" Stroke="{TemplateBinding Foreground}" VerticalAlignment="Center">
+                        <Path x:Name="path" Width="15" RenderTransformOrigin="0.3,0.5" HorizontalAlignment="Right" Data="M1,1L4.5,4.5L8,1" StrokeThickness="1.5" Stroke="{TemplateBinding Foreground}" VerticalAlignment="Center" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round">
                             <Path.RenderTransform>
                                 <RotateTransform />
                             </Path.RenderTransform>
@@ -407,16 +451,30 @@
             </Setter.Value>
         </Setter>
     </Style>
+    <!-- 下拉项：圆角悬停块 + 选中指示条，与菜单卡片的行高一致 -->
     <Style TargetType="ComboBoxItem" x:Key="MyComboBoxItem">
         <Setter Property="OverridesDefaultStyle" Value="True" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="MinHeight" Value="30" />
+        <Setter Property="Foreground" Value="{DynamicResource ColorBrush1}" />
         <Setter Property="Background" Value="{StaticResource ColorBrushTransparent}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ComboBoxItem">
-                    <Border x:Name="ItemBorder" Padding="6,4" SnapsToDevicePixels="True" Background="{TemplateBinding Background}">
-                        <ContentPresenter />
-                    </Border>
+                    <Grid>
+                        <Border x:Name="ItemBorder" Margin="3,1" Padding="10,0" CornerRadius="6"
+                                SnapsToDevicePixels="True" Background="{TemplateBinding Background}">
+                            <ContentPresenter VerticalAlignment="Center" />
+                        </Border>
+                        <Border x:Name="ItemMark" Width="3" Height="14" CornerRadius="1.5"
+                                HorizontalAlignment="Left" Margin="7,0,0,0"
+                                Background="{DynamicResource ColorBrush3}" Visibility="Collapsed" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="ItemMark" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -424,18 +482,35 @@
     <Style TargetType="ComboBoxItem">
         <Setter Property="OverridesDefaultStyle" Value="True" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="MinHeight" Value="30" />
+        <Setter Property="Foreground" Value="{DynamicResource ColorBrush1}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ComboBoxItem">
-                    <Border x:Name="ItemBorder" SnapsToDevicePixels="True" Background="{TemplateBinding Background}">
-                        <ContentPresenter />
-                    </Border>
+                    <Grid>
+                        <Border x:Name="ItemBorder" Margin="3,1" Padding="10,0" CornerRadius="6"
+                                SnapsToDevicePixels="True" Background="{TemplateBinding Background}">
+                            <ContentPresenter VerticalAlignment="Center" />
+                        </Border>
+                        <Border x:Name="ItemMark" Width="3" Height="14" CornerRadius="1.5"
+                                HorizontalAlignment="Left" Margin="7,0,0,0"
+                                Background="{DynamicResource ColorBrush3}" Visibility="Collapsed" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource ColorBrush8}" />
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource ColorBrush6}" />
+                            <Setter TargetName="ItemMark" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
     </Style>
 
-    <!-- ContextMenu：与首页「启动按钮展开菜单」统一为圆角卡片（第 124 轮）
+    <!-- ContextMenu：与首页「启动按钮展开菜单」统一为圆角卡片
          底色用 ColorBrushCardBg —— 它由 ModSecret.ApplyCardOpacity() 按「组件半透明程度」实时重设 alpha，
          所以菜单会自动跟随全局组件透明度，不再需要手写 Opacity（旧做法是乘 UiLauncherTransparent，导致双重变淡）。 -->
     <Style TargetType="ContextMenu">
