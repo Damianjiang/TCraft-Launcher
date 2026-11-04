@@ -47,14 +47,15 @@ There is no installer, no bundle, and no telemetry: the whole program is one
 
 ## Download
 
-Grab `TCraft-Launcher-v1.2.exe` from the [latest release](https://github.com/Damianjiang/TCraft-Launcher/releases/latest) and run it.
+Grab `TCraft-Launcher.exe` from the [latest release](https://github.com/Damianjiang/TCraft-Launcher/releases/latest) and run it.
+That link always resolves to the newest build — no version number is hardcoded.
 
 - **OS**: Windows 7 SP1+ (Windows 10 / 11 recommended), 64-bit
-- **Size**: 3.48 MiB
-- **SHA-256**: `7dc4aaebcf53e2cba4d1b69d07ad7ef30d76ed4ff4c8ea514d3271cd1ad2128d`
+- **Size**: about 3.5 MiB (single file, under 4 MB)
+- **Checksum**: listed on the latest release page (updated with every build)
 
 > The project does not purchase a code-signing certificate, so SmartScreen may
-> show an "unknown publisher" warning. Verify the hash above, or build from source.
+> show an "unknown publisher" warning. Verify the checksum on the release page, or build from source.
 
 > Microsoft (genuine) login ships **disabled** in the open-source build: no
 > Microsoft credentials are embedded. To enable it, register your own Azure app

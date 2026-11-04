@@ -28,7 +28,7 @@
 
 <link rel="icon" href="assets/icon-256.png" sizes="any">
 <link rel="apple-touch-icon" href="assets/icon-256.png">
-<link rel="stylesheet" href="assets/style.css?v=6">
+<link rel="stylesheet" href="assets/style.css?v=7">
 
 <script type="application/ld+json">
 {
@@ -40,7 +40,7 @@
   "operatingSystem": "Windows 7 SP1, Windows 10, Windows 11",
   "description": "开源免费的 Minecraft 启动器，单文件 3.5 MB，冷启动约 2 秒，支持 Forge、NeoForge、Fabric、OptiFine 与整合包一键安装。",
   "url": "https://damianjiang.github.io/TCraft-Launcher/",
-  "downloadUrl": "https://github.com/Damianjiang/TCraft-Launcher/releases/latest",
+  "downloadUrl": "https://github.com/Damianjiang/TCraft-Launcher/releases/latest/download/TCraft-Launcher.exe",
   "fileSize": "3.5MB",
   "inLanguage": "zh-CN",
   "license": "https://opensource.org/licenses/MIT",
@@ -103,7 +103,7 @@
           3.5 MB，冷启动约 2 秒。没有安装向导，没有捆绑，也没有打扰。
         </p>
         <div class="hero__cta">
-          <a class="btn btn--primary" href="https://github.com/Damianjiang/TCraft-Launcher/releases/latest" target="_blank" rel="noopener">
+          <a class="btn btn--primary" href="https://github.com/Damianjiang/TCraft-Launcher/releases/latest/download/TCraft-Launcher.exe" target="_blank" rel="noopener">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             下载开源版
           </a>
@@ -296,7 +296,7 @@
           <h2>下载，然后双击。<br>就这样。</h2>
           <p>绿色单文件，不需要安装。首次启动会自动检查 Java 与游戏目录，跟着提示走即可。想要正版登录与社区资源下载？点上面的「获取完整版」。</p>
           <div class="download__actions">
-            <a class="btn btn--primary" href="https://github.com/Damianjiang/TCraft-Launcher/releases/latest" target="_blank" rel="noopener">
+            <a class="btn btn--primary" href="https://github.com/Damianjiang/TCraft-Launcher/releases/latest/download/TCraft-Launcher.exe" target="_blank" rel="noopener">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               下载开源版
             </a>
@@ -308,11 +308,12 @@
           </div>
         </div>
         <div class="download__side">
-          <div class="spec"><span>文件大小</span><b>3.48 MiB</b></div>
+          <div class="spec"><span>文件大小</span><b data-release="size">获取中…</b></div>
           <div class="spec"><span>系统</span><b>Windows 7 SP1+ / 10 / 11</b></div>
           <div class="spec"><span>架构</span><b>x64</b></div>
-          <div class="spec" style="border-bottom:0"><span>SHA-256</span><code>7dc4aaebcf53e2cba4d1b69d07ad7ef30d76ed4ff4c8ea514d3271cd1ad2128d</code></div>
-          <p class="download__hint">未购买代码签名证书，SmartScreen 可能提示「未知发布者」。可核对上方哈希，或直接从源码构建。</p>
+          <div class="spec"><span>更新时间</span><b data-release="date">获取中…</b></div>
+          <div class="spec" style="border-bottom:0"><span>SHA-256</span><code data-release="sha">从最新 Release 自动读取</code></div>
+          <p class="download__hint">未购买代码签名证书，SmartScreen 可能提示「未知发布者」。可核对上方校验值，或直接从源码构建。<br><a href="https://github.com/Damianjiang/TCraft-Launcher/releases/latest" target="_blank" rel="noopener">查看最新 Release 页面 →</a></p>
         </div>
       </div>
     </div>
@@ -416,6 +417,6 @@
   </div>
 </div>
 
-<script src="assets/app.js?v=6"></script>
+<script src="assets/app.js?v=7"></script>
 </body>
 </html>

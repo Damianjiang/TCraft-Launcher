@@ -124,4 +124,55 @@
     copyBtn.textContent = copyBtn.dataset.copied || (original.includes("Copied") ? "Copied!" : "已复制");
     setTimeout(() => { copyBtn.textContent = original; }, 1600);
   });
+
+  // 最新 Release 信息：页面不绑定任何版本号，规格全部从 GitHub 动态读取。
+  // 下载按钮本身指向 /releases/latest/download/<固定资产名>，即使接口不可用也能下载最新版。
+  (async () => {
+    const API = "https://api.github.com/repos/Damianjiang/TCraft-Launcher/releases/latest";
+    const isEn = (document.documentElement.lang || "").toLowerCase().startsWith("en");
+    const fallback = isEn ? "See release page" : "见 Release 页面";
+    const set = (key, val) => document.querySelectorAll(`[data-release="${key}"]`)
+      .forEach((el) => { if (val) el.textContent = val; });
+    const fmtSize = (n) => `${(n / 1048576).toFixed(2)} MiB`;
+    const fmtDate = (s) => {
+      const d = new Date(s);
+      return isNaN(d) ? "" : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    };
+
+    let info = null;
+    try {
+      const cached = sessionStorage.getItem("tcl-latest-release");
+      if (cached) info = JSON.parse(cached);
+    } catch {}
+    if (!info) {
+      try {
+        const res = await fetch(API, { headers: { Accept: "application/vnd.github+json" } });
+        if (!res.ok) throw new Error(String(res.status));
+        const raw = await res.json();
+        info = {
+          published_at: raw.published_at,
+          body: raw.body || "",
+          assets: (raw.assets || []).map((a) => ({
+            name: a.name,
+            size: a.size,
+            updated_at: a.updated_at
+          }))
+        };
+        try { sessionStorage.setItem("tcl-latest-release", JSON.stringify(info)); } catch {}
+      } catch { info = null; }
+    }
+    if (!info) {
+      set("size", "—");
+      set("date", "—");
+      set("sha", fallback);
+      return;
+    }
+    const asset = (info.assets || []).find((a) => /\.exe$/i.test(a.name)) || info.assets[0];
+    if (asset) {
+      set("size", fmtSize(asset.size));
+      set("date", fmtDate(asset.updated_at || info.published_at));
+    }
+    const hash = /\b([a-f0-9]{64})\b/i.exec(info.body || "");
+    set("sha", hash ? hash[1] : fallback);
+  })();
 })();

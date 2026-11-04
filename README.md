@@ -56,15 +56,15 @@ TCraft Launcher（简称 **TCL**）是一个用 VB.NET / WPF 写的 Minecraft �
 
 ## 下载
 
-前往 [Releases](https://github.com/Damianjiang/TCraft-Launcher/releases/latest) 下载
-`TCraft-Launcher-v1.2.exe`，双击运行即可。
+前往 [最新 Release](https://github.com/Damianjiang/TCraft-Launcher/releases/latest) 下载 `TCraft-Launcher.exe`，双击运行即可。
+该链接始终指向最新版本，页面无需随版本更新。
 
 - **系统**：Windows 7 SP1 及以上（推荐 Windows 10 / 11），64 位
-- **体积**：3.48 MiB
-- **SHA-256**：`7dc4aaebcf53e2cba4d1b69d07ad7ef30d76ed4ff4c8ea514d3271cd1ad2128d`
+- **体积**：约 3.5 MiB（单文件，< 4 MB）
+- **校验值**：见最新 Release 页面（随发布同步更新）
 
 > 项目未购买代码签名证书，SmartScreen 可能提示「未知发布者」。
-> 可核对上方哈希，或直接从源码构建。
+> 可在 Release 页面核对校验值，或直接从源码构建。
 
 > 微软正版登录在开源版中**默认未启用**：程序不内置任何微软凭据。
 > 如需使用，注册一个 Azure 应用后设置环境变量 `TCL_MS_CLIENT_ID` 为你的 ClientId，重启启动器即可；
