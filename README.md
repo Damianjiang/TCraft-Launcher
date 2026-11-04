@@ -67,7 +67,8 @@ TCraft Launcher（简称 **TCL**）是一个用 VB.NET / WPF 写的 Minecraft �
 > 可核对上方哈希，或直接从源码构建。
 
 > 微软正版登录在开源版中**默认未启用**：程序不内置任何微软凭据。
-> 如需使用，注册一个 Azure 应用后设置环境变量 `TCL_MS_CLIENT_ID` 为你的 ClientId，重启启动器即可。
+> 如需使用，注册一个 Azure 应用后设置环境变量 `TCL_MS_CLIENT_ID` 为你的 ClientId，重启启动器即可；
+> 也可以加入 QQ 群 **1081955336** 获取内置正版登录的完整版。
 
 ## 从源码构建
 

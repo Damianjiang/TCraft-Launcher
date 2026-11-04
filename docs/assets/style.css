@@ -639,6 +639,75 @@ section { position: relative; }
 .faq p { margin: 0; padding: 0 24px 22px; color: var(--muted); font-size: 14.5px; line-height: 1.8; }
 .faq a { color: var(--amber); border-bottom: 1px solid rgba(242, 182, 50, 0.35); }
 
+/* ---------- 完整版弹窗 ---------- */
+.modal { position: fixed; inset: 0; z-index: 130; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.modal[hidden] { display: none; }
+
+.modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 5, 8, 0.74);
+  backdrop-filter: blur(8px) saturate(120%);
+  -webkit-backdrop-filter: blur(8px) saturate(120%);
+}
+
+.modal__card {
+  position: relative;
+  width: min(480px, 100%);
+  border-radius: 20px;
+  border: 1px solid rgba(242, 182, 50, 0.28);
+  background: linear-gradient(180deg, #13151c, #0b0c11);
+  padding: 38px 36px 30px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    0 50px 100px -30px rgba(0, 0, 0, 0.95);
+  animation: modalIn 0.4s var(--ease);
+}
+
+@keyframes modalIn {
+  from { opacity: 0; transform: translateY(16px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+
+.modal__card h3 { margin: 0 0 14px; font-size: 24px; letter-spacing: -0.02em; }
+.modal__card > p { margin: 0 0 12px; color: var(--muted); font-size: 14.5px; line-height: 1.75; }
+.modal__card > p strong { color: var(--paper); }
+
+.modal__close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  font-size: 20px;
+  color: var(--dim);
+  transition: 0.2s;
+}
+.modal__close:hover { color: var(--paper); background: rgba(255, 255, 255, 0.06); }
+
+.qq-chip {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 18px 0 4px;
+  padding: 14px 18px;
+  border: 1px dashed rgba(242, 182, 50, 0.42);
+  border-radius: 14px;
+  background: var(--amber-soft);
+}
+.qq-chip span { font-size: 13px; color: var(--muted); }
+.qq-chip b {
+  font-family: var(--mono);
+  font-size: 21px;
+  letter-spacing: 0.06em;
+  color: var(--amber-2);
+  margin-right: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.modal__hint { font-size: 12px !important; color: var(--dim) !important; margin-top: 14px !important; }
+
 /* ---------- 页脚 ---------- */
 .footer {
   border-top: 1px solid var(--line);

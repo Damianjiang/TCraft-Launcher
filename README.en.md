@@ -58,7 +58,8 @@ Grab `TCraft-Launcher-v1.2.exe` from the [latest release](https://github.com/Dam
 
 > Microsoft (genuine) login ships **disabled** in the open-source build: no
 > Microsoft credentials are embedded. To enable it, register your own Azure app
-> and set the `TCL_MS_CLIENT_ID` environment variable.
+> and set the `TCL_MS_CLIENT_ID` environment variable — or join QQ group
+> **1081955336** to get the full edition with built-in Microsoft login.
 
 ## Build from source
 

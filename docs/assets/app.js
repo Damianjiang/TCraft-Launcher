@@ -77,4 +77,47 @@
   // 年份
   const year = document.getElementById("year");
   if (year) year.textContent = String(new Date().getFullYear());
+
+  // 完整版弹窗
+  const modal = document.getElementById("modalFull");
+  const openModal = () => {
+    if (!modal) return;
+    modal.hidden = false;
+    document.body.style.overflow = "hidden";
+    modal.querySelector(".modal__close")?.focus();
+  };
+  const closeModal = () => {
+    if (!modal) return;
+    modal.hidden = true;
+    document.body.style.overflow = "";
+  };
+
+  document.querySelectorAll("[data-modal-open]").forEach((btn) => {
+    btn.addEventListener("click", openModal);
+  });
+  modal?.querySelectorAll("[data-modal-close]").forEach((el) => {
+    el.addEventListener("click", closeModal);
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && modal && !modal.hidden) closeModal();
+  });
+
+  // 复制 QQ 群号
+  const copyBtn = document.getElementById("copyQq");
+  copyBtn?.addEventListener("click", async () => {
+    const qq = (document.getElementById("qqNumber")?.textContent || "").trim();
+    try {
+      await navigator.clipboard.writeText(qq);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = qq;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+    }
+    const original = copyBtn.textContent;
+    copyBtn.textContent = copyBtn.dataset.copied || (original.includes("Copied") ? "Copied!" : "已复制");
+    setTimeout(() => { copyBtn.textContent = original; }, 1600);
+  });
 })();
