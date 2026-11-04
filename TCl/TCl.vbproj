@@ -27,7 +27,7 @@
     <MapFileExtensions>true</MapFileExtensions>
     <TargetCulture>zh-CN</TargetCulture>
     <ApplicationRevision>0</ApplicationRevision>
-    <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
+    <ApplicationVersion>1.2.0.%2a</ApplicationVersion>
     <UseApplicationTrust>false</UseApplicationTrust>
     <BootstrapperEnabled>true</BootstrapperEnabled>
     <Deterministic>true</Deterministic>
@@ -268,6 +268,8 @@
     <Compile Include="Modules\ModDevelop.vb" />
     <Compile Include="Modules\Minecraft\ModWatcher.vb" />
     <Compile Include="Modules\ModSecret.vb" />
+    <!-- 内部版专用：由 build_internal.ps1 在构建前生成、构建后删除，密钥不进仓库 -->
+    <Compile Include="Modules\InternalSecrets.vb" Condition="'$(InternalBuild)' == 'true'" />
     <Compile Include="Modules\ModUninstall.vb" />
     <Compile Include="Modules\ModLink.vb" />
   <Compile Include="Modules\ModLang.vb" />

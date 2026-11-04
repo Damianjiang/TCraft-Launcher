@@ -13,7 +13,7 @@
 [![License](https://img.shields.io/github/license/Damianjiang/TCraft-Launcher?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%207%20SP1%2B-blue?style=flat-square)](https://github.com/Damianjiang/TCraft-Launcher/releases/latest)
 
-[下载最新版](https://github.com/Damianjiang/TCraft-Launcher/releases/latest) · [官网](https://damianjiang.github.io/TCraft-Launcher/) · [反馈问题](https://github.com/Damianjiang/TCraft-Launcher/issues)
+[下载最新版](https://github.com/Damianjiang/TCraft-Launcher/releases/latest) · [官网](https://damianjiang.github.io/TCraft-Launcher/) · [English](README.en.md) · [反馈问题](https://github.com/Damianjiang/TCraft-Launcher/issues) · QQ 群 1081955336
 
 <img src="docs/assets/shot-home.png" width="820" alt="TCraft Launcher 启动台界面">
 
@@ -61,7 +61,7 @@ TCraft Launcher（简称 **TCL**）是一个用 VB.NET / WPF 写的 Minecraft �
 
 - **系统**：Windows 7 SP1 及以上（推荐 Windows 10 / 11），64 位
 - **体积**：3.49 MiB
-- **SHA-256**：`b9b043edc43d170e23fd20b41a7da6332380c22942a7f1de29bccdbe7636f6e6`
+- **SHA-256**：`9905f8ee16776b3115706f6238ddc819b7753176e24e102a7f7ba23100c74281`
 
 > 项目未购买代码签名证书，SmartScreen 可能提示「未知发布者」。
 > 可核对上方哈希，或直接从源码构建。
@@ -101,13 +101,25 @@ powershell -ExecutionPolicy Bypass -File scripts\build.ps1
 
 ## 参考与致谢
 
-TCL 的功能规划与交互设计参考了 [HMCL](https://github.com/HMCL-dev/HMCL) 的成熟方案；
-版本安装、资源下载、启动参数构建等核心流程，参考了
-[PCL（Plain Craft Launcher）](https://github.com/Meloong-Git/PCL)的主体代码。
-在此向 HMCL 开发者与 PCL 作者龙腾猫跃致谢。
+TCL 站在前人的肩膀上，这里把每一个来源都写清楚：
 
-同时感谢 [Lucide](https://lucide.dev/)（ISC）等开源组件，
+| 来源 | 参考内容 | 当前状态 |
+| --- | --- | --- |
+| [HMCL](https://github.com/HMCL-dev/HMCL)（GPL-3.0） | 功能规划与交互设计：账户管理布局、版本列表与详情页结构、皮肤编辑器的交互方式、3D 预览的思路 | 仅参考交互与功能形态，**未复制任何源代码**，全部用 VB.NET / WPF 重新实现 |
+| [PCL](https://github.com/Meloong-Git/PCL)（Plain Craft Launcher） | 项目早期（1.0 之前）的版本安装、资源下载、启动参数构建等核心流程，参考了它的公开源码与实现思路 | 此后经过长期重构：模块重新划分、算法与数据结构重写、界面完全自绘，**当前代码与 PCL 的源文件已无直接对应关系**，TCL 是一个独立演化的项目 |
+| [EasyTier](https://github.com/EasyTier/EasyTier) | 联机功能直接调用其官方发行版 | 以独立进程方式使用，未链接、未修改其源码 |
+| [Lucide](https://lucide.dev/) | 界面图标 | 静态资源，遵循 ISC |
+
+关于 PCL 的[分发许可](https://github.com/Meloong-Git/PCL/blob/main/LICENCE)：TCL 属于「参考实现思路后自行开发、且未与 PCL 混淆」的情形，因此按其中的「轻度使用」条款处理——给出署名、不暗示与 PCL 有关，也不使用 PCL 相关名称。如果权利人认为需要调整，请提 Issue，我们会第一时间配合。
+
+同时感谢 Newtonsoft.Json、NAudio、Ookii.Dialogs 等开源组件，
 完整清单见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
+
+## 社区
+
+- **QQ 群**：1081955336（更新通知、问题反馈、交流，本项目唯一即时通讯渠道）
+- **Issue**：[提交问题反馈](https://github.com/Damianjiang/TCraft-Launcher/issues)
+- **讨论区**：[GitHub Discussions](https://github.com/Damianjiang/TCraft-Launcher/discussions)
 
 ## 许可证
 

@@ -9,14 +9,25 @@ Friend Module ModSecret
     '用于微软登录的 OAuth ClientId（设备码登录流程）。
     '开源版默认不内置任何微软凭据：未配置时微软登录处于「未启用」状态，
     '添加账户弹窗会隐藏该选项，登录流程也会给出明确提示。
-    '启用方法：注册 Azure 应用后设置环境变量 TCL_MS_CLIENT_ID 为你的 ClientId，重启启动器即可。
+    '内部版（编译常量 INTERNAL）：由构建脚本生成的 InternalSecrets.vb 注入默认值，密钥文件不进仓库。
+    '开源版启用方法：注册 Azure 应用后设置环境变量 TCL_MS_CLIENT_ID 为你的 ClientId，重启启动器即可。
+#If INTERNAL Then
+    Public OAuthClientId As String = If(Environment.GetEnvironmentVariable("TCL_MS_CLIENT_ID"), InternalSecrets.MsClientId)
+#Else
     Public OAuthClientId As String = If(Environment.GetEnvironmentVariable("TCL_MS_CLIENT_ID"), "")
+#End If
     'CurseForge API Key
     '优先使用环境变量 TCL_CURSEFORGE_API_KEY；否则读取「设置 → 系统/下载 → 社区资源 API Key」。
     'CurseForge 的 API（包括世界/模组/整合包搜索与文件列表）要求携带 x-api-key，缺失时返回 403。
     Public Function GetCurseForgeAPIKey() As String
         Dim Key As String = Environment.GetEnvironmentVariable("TCL_CURSEFORGE_API_KEY")
         If String.IsNullOrWhiteSpace(Key) Then
+#If INTERNAL Then
+            '内部版：允许由 InternalSecrets 注入默认 Key（仅本地构建，不进仓库）
+            If Not String.IsNullOrWhiteSpace(InternalSecrets.CurseForgeApiKey) Then
+                Return InternalSecrets.CurseForgeApiKey.Trim
+            End If
+#End If
             Try : Key = Settings.Get(Of String)("ToolDownloadCurseForgeKey") : Catch : Key = "" : End Try
         End If
         Return If(Key, "").Trim
