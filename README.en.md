@@ -6,7 +6,7 @@
 
 **Lighter. Faster.**
 
-A single-file Minecraft launcher: 3.5 MB, ~5 s cold start. Open source, free, no ads.
+A single-file Minecraft launcher: 3.5 MB, ~2 s cold start. Open source, free, no ads.
 
 [![Release](https://img.shields.io/github/v/release/Damianjiang/TCraft-Launcher?style=flat-square&color=f2b632)](https://github.com/Damianjiang/TCraft-Launcher/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/Damianjiang/TCraft-Launcher/total?style=flat-square&color=5eead4)](https://github.com/Damianjiang/TCraft-Launcher/releases)
@@ -28,7 +28,7 @@ There is no installer, no bundle, and no telemetry: the whole program is one
 3.5 MB exe. Copy it anywhere and run; delete it to uninstall.
 
 - **Single file**: the launch core and utility libraries are embedded as compressed snapshots — no runtime dependencies.
-- **Fast**: lazy initialization, assembly caching and on-demand UI resources give a ~5 s cold start.
+- **Fast**: lazy initialization, assembly caching and on-demand UI resources give a ~2 s cold start.
 - **Good looking**: Win11-style translucent UI with custom wallpaper, background video, music and theme colors — all optional.
 - **Bilingual**: built-in Chinese & English, hot-reloadable language table.
 
@@ -51,7 +51,7 @@ Grab `TCraft-Launcher-v1.2.exe` from the [latest release](https://github.com/Dam
 
 - **OS**: Windows 7 SP1+ (Windows 10 / 11 recommended), 64-bit
 - **Size**: 3.49 MiB
-- **SHA-256**: `9905f8ee16776b3115706f6238ddc819b7753176e24e102a7f7ba23100c74281`
+- **SHA-256**: `5036ad9a0c9bb6f55e79b05493cb699465f15f8fa36041a6b2836b3d4af71ae9`
 
 > The project does not purchase a code-signing certificate, so SmartScreen may
 > show an "unknown publisher" warning. Verify the hash above, or build from source.

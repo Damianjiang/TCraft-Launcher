@@ -264,7 +264,7 @@ Public Class PageInstanceLeft
         Dim Choice As Integer = MyMsgBox(
             ModLang.L("要对这个实例做完整备份（打包成 zip），还是从备份恢复成一个新实例？") & vbCrLf & vbCrLf &
             ModLang.L("完整备份包含 Mod、配置与存档，不包含日志与截图。"),
-            ModLang.L("备份与恢复"), ModLang.L("完整备份"), ModLang.L("从备份恢复"), IsWarn:=False)
+            ModLang.L("备份与恢复"), ModLang.L("完整备份"), ModLang.L("从备份恢复"), ModLang.L("取消"), IsWarn:=False)
         If Choice = 1 Then
             BackupInstance()
         ElseIf Choice = 2 Then

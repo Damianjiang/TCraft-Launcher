@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TCraft Launcher — a lightweight, beautiful, ready-to-run Minecraft launcher</title>
-<meta name="description" content="TCraft Launcher (TCL) is an open-source, free Minecraft launcher: a single 3.5 MB file with ~5 s cold start. Supports Forge / NeoForge / Fabric / OptiFine, one-click modpack install, isolated instances, Microsoft & offline login and 3D skin preview.">
+<meta name="description" content="TCraft Launcher (TCL) is an open-source, free Minecraft launcher: a single 3.5 MB file with ~2 s cold start. Supports Forge / NeoForge / Fabric / OptiFine, one-click modpack install, isolated instances, Microsoft & offline login and 3D skin preview.">
 <meta name="keywords" content="Minecraft launcher, Minecraft, launcher, TCL, TCraft Launcher, lightweight launcher, open source launcher, Forge, Fabric, NeoForge, OptiFine, modpack, mod download, offline login">
 <meta name="author" content="TCraft Team">
 <meta name="theme-color" content="#08090d">
@@ -14,7 +14,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="TCraft Launcher">
 <meta property="og:title" content="TCraft Launcher — Lighter. Faster.">
-<meta property="og:description" content="A single 3.5 MB file with ~5 s cold start. Open-source Minecraft launcher with Forge / NeoForge / Fabric support and one-click modpack install.">
+<meta property="og:description" content="A single 3.5 MB file with ~2 s cold start. Open-source Minecraft launcher with Forge / NeoForge / Fabric support and one-click modpack install.">
 <meta property="og:url" content="https://damianjiang.github.io/TCraft-Launcher/en/">
 <meta property="og:image" content="https://damianjiang.github.io/TCraft-Launcher/assets/og.png">
 <meta property="og:image:width" content="1200">
@@ -22,7 +22,7 @@
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="TCraft Launcher — Lighter. Faster.">
-<meta name="twitter:description" content="A single 3.5 MB file with ~5 s cold start. Open-source Minecraft launcher.">
+<meta name="twitter:description" content="A single 3.5 MB file with ~2 s cold start. Open-source Minecraft launcher.">
 <meta name="twitter:image" content="https://damianjiang.github.io/TCraft-Launcher/assets/og.png">
 
 <link rel="icon" href="../assets/icon-256.png" sizes="any">
@@ -37,7 +37,7 @@
   "alternateName": ["TCL"],
   "applicationCategory": "GameApplication",
   "operatingSystem": "Windows 7 SP1, Windows 10, Windows 11",
-  "description": "Open-source Minecraft launcher: a single 3.5 MB file, ~5 s cold start, Forge / NeoForge / Fabric support and one-click modpack install.",
+  "description": "Open-source Minecraft launcher: a single 3.5 MB file, ~2 s cold start, Forge / NeoForge / Fabric support and one-click modpack install.",
   "url": "https://damianjiang.github.io/TCraft-Launcher/en/",
   "downloadUrl": "https://github.com/Damianjiang/TCraft-Launcher/releases/latest",
   "fileSize": "3.5MB",
@@ -72,9 +72,20 @@
         GitHub
       </a>
       <a class="btn btn--primary btn--sm" href="#download">Download</a>
+      <button class="nav__burger" id="burger" aria-label="Open menu" aria-expanded="false"><span></span><span></span><span></span></button>
     </div>
   </div>
 </header>
+
+<div class="mobile-menu" id="mobileMenu">
+  <a href="../">🌐 中文</a>
+  <a href="#why">Why TCL</a>
+  <a href="#features">Features</a>
+  <a href="#showcase">Screenshots</a>
+  <a href="#download">Download</a>
+  <a href="#faq">FAQ</a>
+  <a href="https://github.com/Damianjiang/TCraft-Launcher" target="_blank" rel="noopener">GitHub</a>
+</div>
 
 <main id="top">
 
@@ -88,7 +99,7 @@
         <h1>Lighter.<br><em>Faster.</em></h1>
         <p class="hero__lead">
           TCraft Launcher is a <strong>single-file</strong> Minecraft launcher.
-          3.5 MB, about 5 seconds to a ready main screen. No installer, no
+          3.5 MB, about 2 seconds to a ready main screen. No installer, no
           bundles, no interruptions.
         </p>
         <div class="hero__cta">
@@ -125,7 +136,7 @@
   <div class="strip">
     <div class="wrap strip__inner">
       <div class="stat"><strong>3.5<small>MB</small></strong><span>one file, zero dependencies</span></div>
-      <div class="stat"><strong>≈5<small>s</small></strong><span>cold start to main screen</span></div>
+      <div class="stat"><strong>≈2<small>s</small></strong><span>cold start to main screen</span></div>
       <div class="stat"><strong>6</strong><span>mod loaders supported</span></div>
       <div class="stat"><strong>100<small>%</small></strong><span>open source, forever free</span></div>
     </div>
@@ -155,7 +166,7 @@
           </div>
           <div class="reason__num">02</div>
           <h3>Fast by design</h3>
-          <p>Deferred initialization, on-demand resource dictionaries, fonts and network warmed up in the background. ~5 s cold start, near-zero idle CPU.</p>
+          <p>Deferred initialization, on-demand resource dictionaries, fonts and network warmed up in the background. ~2 s cold start, near-zero idle CPU.</p>
         </div>
         <div class="reason">
           <div class="reason__icon" aria-hidden="true">
@@ -300,7 +311,7 @@
           <div class="spec"><span>Size</span><b>3.49 MiB</b></div>
           <div class="spec"><span>OS</span><b>Windows 7 SP1+ / 10 / 11</b></div>
           <div class="spec"><span>Architecture</span><b>x64</b></div>
-          <div class="spec" style="border-bottom:0"><span>SHA-256</span><code>9905f8ee16776b3115706f6238ddc819b7753176e24e102a7f7ba23100c74281</code></div>
+          <div class="spec" style="border-bottom:0"><span>SHA-256</span><code>5036ad9a0c9bb6f55e79b05493cb699465f15f8fa36041a6b2836b3d4af71ae9</code></div>
           <p class="download__hint">No paid code-signing certificate yet, so SmartScreen may warn about an "unknown publisher". Verify the hash above or build from source.</p>
         </div>
       </div>

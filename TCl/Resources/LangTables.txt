@@ -2901,3 +2901,612 @@ ZGC / 分代 ZGC 内存占用更高但回收时不卡顿；G1GC 占用更低但�
 ，其中	, of which	，其中	，其中
  项未成功	  item(s) failed	 項未成功	 項未成
 打开缓存目录失败：	Failed to open cache folder: 	開啟快取資料夾失敗：	開快取之夾不果：
+搜索页面、实例与设置（Ctrl+K）	Search pages, instances and settings (Ctrl+K)	搜索頁面、實例與設置（Ctrl+K）	搜索頁面、實例與設置（Ctrl+K）
+没有匹配的结果	No matches	沒有匹配的結果	沒有匹配的結果
+安装整合包	Install modpack	安裝整合包	安裝整合包
+是否安装此整合包？安装后会作为一个新实例出现在实例列表中。	Install this modpack? It will appear in the instance list as a new instance.	是否安裝此整合包？安裝後會作爲一個新實例出現在實例列表中。	是否安裝此整合包？安裝後會作爲一個新實例出現在實例列表中。
+输入信息	Enter information	輸入信息	輸入信息
+请填写皮肤来源所需信息	Fill in the information required by the skin source	請填寫皮膚來源所需信息	請填寫皮膚來源所需信息
+皮肤预览	Skin preview	皮膚預覽	皮膚預覽
+搜索实例	Search instances	搜索實例	搜索實例
+最近游玩	Recently played	最近遊玩	最近遊玩
+名称 A→Z	Name A→Z	名稱 A→Z	名稱 A→Z
+版本 新→旧	Version new→old	版本 新→舊	版本 新→舊
+安装时间	Install time	安裝時間	安裝時間
+清除已完成	Clear finished	清除已完成	清除已完成
+诊断	Diagnostics	診斷	診斷
+查看游戏日志、崩溃报告与启动器日志，定位启动失败的原因。	View game logs, crash reports and launcher logs to find out why a launch failed.	查看遊戲日誌、崩潰報告與啓動器日誌，定位啓動失敗的原因。	查看遊戲日誌、崩潰報告與啓動器日誌，定位啓動失敗的原因。
+搜索日志	Search logs	搜索日誌	搜索日誌
+信息	Info	信息	信息
+调试	Debug	調試	調試
+导出…	Export…	導出…	導出…
+崩溃分析…	Crash analysis…	崩潰分析…	崩潰分析…
+回到底部	Back to bottom	回到底部	回到底部
+没有可显示的日志。	No logs to show.	沒有可顯示的日誌。	沒有可顯示的日誌。
+尚未加载。	Not loaded yet.	尚未加載。	尚未加載。
+历史	History	歷史	歷史
+游玩记录、快照与变更时间线。快照只存游戏内容，不包含日志与崩溃报告。	Play records, snapshots and a change timeline. Snapshots store game content only — no logs or crash reports.	遊玩記錄、快照與變更時間線。快照只存遊戲內容，不包含日誌與崩潰報告。	遊玩記錄、快照與變更時間線。快照只存遊戲內容，不包含日誌與崩潰報告。
+游玩记录	Play records	遊玩記錄	遊玩記錄
+快照	Snapshots	快照	快照
+变更	Changes	變更	變更
+创建快照	Create snapshot	創建快照	創建快照
+游戏选项	Game options	遊戲選項	遊戲選項
+光影	Shaders	光影	光影
+世界地图	World map	世界地圖	世界地圖
+复制实例	Duplicate instance	複製實例	複製實例
+备份与恢复	Backup & restore	備份與恢復	備份與恢復
+导入其他启动器实例	Import instances from other launchers	導入其他啓動器實例	導入其他啓動器實例
+选择一个存档即可查看它已探索的地形。	Select a save to view its explored terrain.	選擇一個存檔即可查看它已探索的地形。	選擇一個存檔即可查看它已探索的地形。
+适应	Fit	適應	適應
+拖动平移 · 滚轮缩放	Drag to pan · scroll to zoom	拖動平移 · 滾輪縮放	拖動平移 · 滾輪縮放
+直接编辑这个实例的 options.txt：和游戏内「选项」等价，请在游戏关闭时修改。	Edit this instance's options.txt directly — equivalent to the in-game "Options" screen. Modify while the game is closed.	直接編輯這個實例的 options.txt：和遊戲內「選項」等價，請在遊戲關閉時修改。	直接編輯這個實例的 options.txt：和遊戲內「選項」等價，請在遊戲關閉時修改。
+操作	Actions	操作	操作
+保存修改	Save changes	保存修改	保存修改
+重新载入	Reload	重新載入	重新載入
+存为预设	Save as preset	存爲預設	存爲預設
+载入预设	Load preset	載入預設	載入預設
+打开所在文件夹	Open folder	打開所在文件夾	打開所在文件夾
+占用空间：计算中…	Disk usage: calculating…	佔用空間：計算中…	佔用空間：計算中…
+查看历史与快照	View history & snapshots	查看歷史與快照	查看歷史與快照
+结束游戏	End game	結束遊戲	結束遊戲
+搜索资源包	Search resource packs	搜索資源包	搜索資源包
+导入 .zip	Import .zip	導入 .zip	導入 .zip
+搜索世界名称或文件夹名	Search world or folder name	搜索世界名稱或文件夾名	搜索世界名稱或文件夾名
+世界信息	World info	世界信息	世界信息
+点缩略图可看大图，大图里能前后翻、复制、在文件夹中显示或删除。	Click a thumbnail to view it full-size; from there you can browse, copy, reveal in folder or delete.	點縮略圖可看大圖，大圖裏能前後翻、複製、在文件夾中顯示或刪除。	點縮略圖可看大圖，大圖裏能前後翻、複製、在文件夾中顯示或刪除。
+上一张	Previous	上一張	上一張
+下一张	Next	下一張	下一張
+复制图片	Copy image	複製圖片	複製圖片
+在文件夹中显示	Reveal in folder	在文件夾中顯示	在文件夾中顯示
+实例改装	Mod loaders	實例改裝	實例改裝
+为该实例追加 Forge / NeoForge / Fabric 等加载器。点击后跳转到安装页，并自动预选此实例对应的原版版本。	Add Forge / NeoForge / Fabric and more to this instance. Opens the install page with this instance's vanilla version preselected.	爲該實例追加 Forge / NeoForge / Fabric 等加載器。點擊後跳轉到安裝頁，並自動預選此實例對應的原版版本。	爲該實例追加 Forge / NeoForge / Fabric 等加載器。點擊後跳轉到安裝頁，並自動預選此實例對應的原版版本。
+安装加载器	Install loader	安裝加載器	安裝加載器
+搜索光影包	Search shader packs	搜索光影包	搜索光影包
+正版皮肤与披风	Premium skin & cape	正版皮膚與披風	正版皮膚與披風
+这里是当前正版账户的皮肤预览。修改后会自动刷新头像与标题栏徽章。	Preview of the current premium account's skin. Changes refresh the avatar and title-bar badge automatically.	這裏是當前正版賬戶的皮膚預覽。修改後會自動刷新頭像與標題欄徽章。	這裏是當前正版賬戶的皮膚預覽。修改後會自動刷新頭像與標題欄徽章。
+兑换 CDKEY	Redeem CDKEY	兌換 CDKEY	兌換 CDKEY
+官网管理	Manage on website	官網管理	官網管理
+TCraft Launcher 1.2 由 TCraft 团队开发与维护，持续更新，并已在 GitHub 开源。\n提供游戏与模组、整合包、资源包、光影的下载与管理，支持原版、Forge / NeoForge / Fabric / OptiFine / LiteLoader。\n同时提供登录、启动、联机、实例与整合包导出等完整能力。\n加入 QQ 群 1081955336，获取更新、反馈问题。	TCraft Launcher 1.2 is developed and maintained by the TCraft team, updated regularly and open-sourced on GitHub.\nIt downloads and manages games, mods, modpacks, resource packs and shaders, supporting vanilla, Forge / NeoForge / Fabric / OptiFine / LiteLoader.\nLogin, launching, multiplayer, instance and modpack export are all on board.\nJoin QQ group 1081955336 for updates and feedback.	TCraft Launcher 1.2 由 TCraft 團隊開發與維護，持續更新，並已在 GitHub 開源。\n提供遊戲與模組、整合包、資源包、光影的下載與管理，支持原版、Forge / NeoForge / Fabric / OptiFine / LiteLoader。\n同時提供登錄、啓動、聯機、實例與整合包導出等完整能力。\n加入 QQ 羣 1081955336，獲取更新、反饋問題。	TCraft Launcher 1.2 由 TCraft 團隊開發與維護，持續更新，並已在 GitHub 開源。\n提供遊戲與模組、整合包、資源包、光影的下載與管理，支持原版、Forge / NeoForge / Fabric / OptiFine / LiteLoader。\n同時提供登錄、啓動、聯機、實例與整合包導出等完整能力。\n加入 QQ 羣 1081955336，獲取更新、反饋問題。
+参考与致谢	Credits & acknowledgements	參考與致謝	參考與致謝
+开源地址	Source code	開源地址	開源地址
+https://github.com/Damianjiang/TCraft-Launcher\n欢迎提交 Issue 与 Pull Request，也欢迎 Star 支持。	https://github.com/Damianjiang/TCraft-Launcher\nIssues and pull requests are welcome — stars help too.	https://github.com/Damianjiang/TCraft-Launcher\n歡迎提交 Issue 與 Pull Request，也歡迎 Star 支持。	https://github.com/Damianjiang/TCraft-Launcher\n歡迎提交 Issue 與 Pull Request，也歡迎 Star 支持。
+控制不同版本的存档 / Mod / 资源包是否互通。关闭＝全部共用同一档案（多个装了 Mod 的版本可能互相冲突）；隔离可装 Mod 的版本＝Mod 版独立、原版共用（最常用）；隔离所有版本＝完全独立（连原版存档都不能共用，一般不推荐）。它只影响之后新装的版本，已装版本请到顶部「实例」页 → 选中该实例 → 左侧「设置」里单独调整。	Controls whether saves / mods / resource packs are shared across versions. Off = everything shared (modded versions may conflict); isolate moddable = modded isolated, vanilla shared (most common); isolate all = fully independent (even vanilla saves are not shared — usually not recommended). Only affects newly installed versions; adjust existing ones via the top "Instances" page → select the instance → "Settings" on the left.	控制不同版本的存檔 / Mod / 資源包是否互通。關閉＝全部共用同一檔案（多個裝了 Mod 的版本可能互相沖突）；隔離可裝 Mod 的版本＝Mod 版獨立、原版共用（最常用）；隔離所有版本＝完全獨立（連原版存檔都不能共用，一般不推薦）。它隻影響之後新裝的版本，已裝版本請到頂部「實例」頁 → 選中該實例 → 左側「設置」裏單獨調整。	控制不同版本的存檔 / Mod / 資源包是否互通。關閉＝全部共用同一檔案（多個裝了 Mod 的版本可能互相沖突）；隔離可裝 Mod 的版本＝Mod 版獨立、原版共用（最常用）；隔離所有版本＝完全獨立（連原版存檔都不能共用，一般不推薦）。它隻影響之後新裝的版本，已裝版本請到頂部「實例」頁 → 選中該實例 → 左側「設置」裏單獨調整。
+启动时 TCL 自动选列表里第一个兼容当前版本的 Java；点右侧箭头可排序控制优先级。要强制无视兼容性用某个 Java，请到顶部「实例」页 → 选中该实例 → 左侧「设置」里改。	On launch TCL picks the first Java compatible with the version; use the arrows to change priority. To force a specific Java regardless of compatibility, go to the top "Instances" page → select the instance → "Settings" on the left.	啓動時 TCL 自動選列表裏第一個兼容當前版本的 Java；點右側箭頭可排序控制優先級。要強制無視兼容性用某個 Java，請到頂部「實例」頁 → 選中該實例 → 左側「設置」裏改。	啓動時 TCL 自動選列表裏第一個兼容當前版本的 Java；點右側箭頭可排序控制優先級。要強制無視兼容性用某個 Java，請到頂部「實例」頁 → 選中該實例 → 左側「設置」裏改。
+进顶部「实例」页选该实例，点左侧「导出」，把生成的文件发给对方，对方在「下载 → 整合包」里导入即可一键还原全套。	Open the top "Instances" page, select the instance, click "Export" on the left and send the generated file; the other side imports it in "Downloads → Modpacks" for a one-click restore.	進頂部「實例」頁選該實例，點左側「導出」，把生成的文件發給對方，對方在「下載 → 整合包」裏導入即可一鍵還原全套。	進頂部「實例」頁選該實例，點左側「導出」，把生成的文件發給對方，對方在「下載 → 整合包」裏導入即可一鍵還原全套。
+存储与清理	Storage & cleanup	存儲與清理	存儲與清理
+看清启动器与游戏各自的磁盘占用，安全释放空间。	See how much disk the launcher and games use, and free space safely.	看清啓動器與遊戲各自的磁盤佔用，安全釋放空間。	看清啓動器與遊戲各自的磁盤佔用，安全釋放空間。
+存储总览	Storage overview	存儲總覽	存儲總覽
+后台计算中…	Calculating in background…	後臺計算中…	後臺計算中…
+缓存占用	Cache usage	緩存佔用	緩存佔用
+检查无用文件	Check for junk files	檢查無用文件	檢查無用文件
+管理可用的 Java 运行时，并设置优先级。	Manage available Java runtimes and their priority.	管理可用的 Java 運行時，並設置優先級。	管理可用的 Java 運行時，並設置優先級。
+下载 Java…	Download Java…	下載 Java…	下載 Java…
+版本、窗口、内存与高级启动选项。	Versions, window, memory and advanced launch options.	版本、窗口、內存與高級啓動選項。	版本、窗口、內存與高級啓動選項。
+Java 8 (1.8.0_171)，64 位：C:\Program Files (x86)\Common Files\Oracle\Java\javapath\javaw.exe	Java 8 (1.8.0_171), 64-bit: C:\Program Files (x86)\Common Files\Oracle\Java\javapath\javaw.exe	Java 8 (1.8.0_171)，64 位：C:\Program Files (x86)\Common Files\Oracle\Java\javapath\javaw.exe	Java 8 (1.8.0_171)，64 位：C:\Program Files (x86)\Common Files\Oracle\Java\javapath\javaw.exe
+搜索设置	Search settings	搜索設置	搜索設置
+没有找到相关设置	No matching settings	沒有找到相關設置	沒有找到相關設置
+P2P 联机连接与节点下载选项。	P2P connection and node download options.	P2P 聯機連接與節點下載選項。	P2P 聯機連接與節點下載選項。
+查看、导出与清理运行日志。	View, export and clean up run logs.	查看、導出與清理運行日誌。	查看、導出與清理運行日誌。
+实时日志	Live log	實時日誌	實時日誌
+全部级别	All levels	全部級別	全部級別
+警告及错误	Warnings & errors	警告及錯誤	警告及錯誤
+仅错误	Errors only	僅錯誤	僅錯誤
+搜索日志内容	Search log content	搜索日誌內容	搜索日誌內容
+自动滚动	Auto scroll	自動滾動	自動滾動
+实时监听 Log1.txt…	Watching Log1.txt…	實時監聽 Log1.txt…	實時監聽 Log1.txt…
+社区与启动器维护。	Community and launcher maintenance.	社區與啓動器維護。	社區與啓動器維護。
+代理、下载源连通性与测速。	Proxy, download source connectivity and speed test.	代理、下載源連通性與測速。	代理、下載源連通性與測速。
+代理	Proxy	代理	代理
+代理模式	Proxy mode	代理模式	代理模式
+不使用代理	No proxy	不使用代理	不使用代理
+跟随系统代理	Follow system proxy	跟隨系統代理	跟隨系統代理
+SOCKS5 代理	SOCKS5 proxy	SOCKS5 代理	SOCKS5 代理
+主机	Host	主機	主機
+例如 127.0.0.1	e.g. 127.0.0.1	例如 127.0.0.1	例如 127.0.0.1
+测试当前代理	Test current proxy	測試當前代理	測試當前代理
+下载源测速	Download source speed test	下載源測速	下載源測速
+测速结果只代表当前网络到该源的连通质量，不影响已下载的内容。	Results only reflect connectivity from this network to each source; downloaded content is unaffected.	測速結果只代表當前網絡到該源的連通質量，不影響已下載的內容。	測速結果只代表當前網絡到該源的連通質量，不影響已下載的內容。
+开始测速	Start test	開始測速	開始測速
+应用推荐源	Apply recommended source	應用推薦源	應用推薦源
+下载、网络、语言与启动器行为。	Downloads, network, language and launcher behavior.	下載、網絡、語言與啓動器行爲。	下載、網絡、語言與啓動器行爲。
+导出全部数据	Export all data	導出全部數據	導出全部數據
+导入全部数据	Import all data	導入全部數據	導入全部數據
+正在导入数据…	Importing data…	正在導入數據…	正在導入數據…
+主题、背景、声音与外观。每项改动即时生效。	Theme, background, sounds and appearance. Every change applies instantly.	主題、背景、聲音與外觀。每項改動即時生效。	主題、背景、聲音與外觀。每項改動即時生效。
+主题与配色	Theme & colors	主題與配色	主題與配色
+主题的强调色会应用到按钮、滑块与选中态，切换后立即生效。	The accent color applies to buttons, sliders and selection states — effective immediately.	主題的強調色會應用到按鈕、滑塊與選中態，切換後立即生效。	主題的強調色會應用到按鈕、滑塊與選中態，切換後立即生效。
+弹出菜单	Popup menus	彈出菜單	彈出菜單
+启用弹出菜单动画效果	Enable popup menu animation	啓用彈出菜單動畫效果	啓用彈出菜單動畫效果
+弹出菜单不透明度	Popup menu opacity	彈出菜單不透明度	彈出菜單不透明度
+说明：弹出菜单卡片独立于「组件半透明」——组件半透明作用于全局卡片，这里只调右键菜单与弹卡。	Note: popup menu opacity is separate from "component opacity" — the latter affects all cards, this one only right-click menus and pop-ups.	說明：彈出菜單卡片獨立於「組件半透明」——組件半透明作用於全局卡片，這裏只調右鍵菜單與彈卡。	說明：彈出菜單卡片獨立於「組件半透明」——組件半透明作用於全局卡片，這裏只調右鍵菜單與彈卡。
+列表按钮	List buttons	列表按鈕	列表按鈕
+所有列表的操作按钮常驻显示	Always show action buttons in lists	所有列表的操作按鈕常駐顯示	所有列表的操作按鈕常駐顯示
+说明：开启后按钮会一直占住右侧空间，列表标题可显示的宽度会略微变窄。	When on, buttons permanently occupy the right side, slightly narrowing the title area.	說明：開啓後按鈕會一直佔住右側空間，列表標題可顯示的寬度會略微變窄。	說明：開啓後按鈕會一直佔住右側空間，列表標題可顯示的寬度會略微變窄。
+检测到 Windows 7 尚未安装 Service Pack 1！	Service Pack 1 is missing on this Windows 7!	檢測到 Windows 7 尚未安裝 Service Pack 1！	檢測到 Windows 7 尚未安裝 Service Pack 1！
+TCraft Launcher 需要 Windows 7 SP1 及更高版本（同时要求 64 位系统与 .NET Framework 4.8）。	TCraft Launcher requires Windows 7 SP1 or later (64-bit and .NET Framework 4.8 as well).	TCraft Launcher 需要 Windows 7 SP1 及更高版本（同時要求 64 位系統與 .NET Framework 4.8）。	TCraft Launcher 需要 Windows 7 SP1 及更高版本（同時要求 64 位系統與 .NET Framework 4.8）。
+请先通过 Windows Update 或微软官网安装 SP1，然后再运行本程序。	Install SP1 via Windows Update or microsoft.com, then run this program again.	請先通過 Windows Update 或微軟官網安裝 SP1，然後再運行本程序。	請先通過 Windows Update 或微軟官網安裝 SP1，然後再運行本程序。
+上次启动器可能异常退出（如断电、强制结束进程或崩溃）。	The launcher may have exited abnormally last time (power loss, forced kill or crash).	上次啓動器可能異常退出（如斷電、強制結束進程或崩潰）。	上次啓動器可能異常退出（如斷電、強制結束進程或崩潰）。
+如果游戏或启动器出现问题，可以打开日志查看原因。	If the game or launcher misbehaves, open the logs to find out why.	如果遊戲或啓動器出現問題，可以打開日誌查看原因。	如果遊戲或啓動器出現問題，可以打開日誌查看原因。
+异常退出提示	Abnormal exit notice	異常退出提示	異常退出提示
+打开日志	Open logs	打開日誌	打開日誌
+知道了	Got it	知道了	知道了
+已取消安装整合包。	Modpack install cancelled.	已取消安裝整合包。	已取消安裝整合包。
+拖入的文件夹里没有 versions 目录，不是可识别的 Minecraft 文件夹。	The dropped folder has no versions directory — not a recognizable Minecraft folder.	拖入的文件夾裏沒有 versions 目錄，不是可識別的 Minecraft 文件夾。	拖入的文件夾裏沒有 versions 目錄，不是可識別的 Minecraft 文件夾。
+添加文件夹失败：	Failed to add folder: 	添加文件夾失敗：	添加文件夾失敗：
+微软账号（未启用）	Microsoft account (disabled)	微軟賬號（未啓用）	微軟賬號（未啓用）
+开源版未内置微软登录凭据；设置环境变量 TCL_MS_CLIENT_ID 后可用	Open-source build ships no Microsoft credentials; set env var TCL_MS_CLIENT_ID to enable	開源版未內置微軟登錄憑據；設置環境變量 TCL_MS_CLIENT_ID 後可用	開源版未內置微軟登錄憑據；設置環境變量 TCL_MS_CLIENT_ID 後可用
+SOCKS5（未填写地址）	SOCKS5 (address empty)	SOCKS5（未填寫地址）	SOCKS5（未填寫地址）
+HTTP（未填写地址）	HTTP (address empty)	HTTP（未填寫地址）	HTTP（未填寫地址）
+代理主机不能为空	Proxy host cannot be empty	代理主機不能爲空	代理主機不能爲空
+国内镜像，版本列表与文件下载	CN mirror for version lists and file downloads	國內鏡像，版本列表與文件下載	國內鏡像，版本列表與文件下載
+Mojang 官方	Mojang official	Mojang 官方	Mojang 官方
+官方源，海外网络质量依赖线路	Official source; quality depends on your international route	官方源，海外網絡質量依賴線路	官方源，海外網絡質量依賴線路
+社区资源，403 也算连通	Community resource; a 403 still counts as reachable	社區資源，403 也算連通	社區資源，403 也算連通
+社区资源，开放 API	Community resource, open API	社區資源，開放 API	社區資源，開放 API
+测速时出现异常	Exception during speed test	測速時出現異常	測速時出現異常
+平均延迟	Average latency	平均延遲	平均延遲
+无法连接	Unreachable	無法連接	無法連接
+（返回 403，无 API Key 属正常）	(403 returned — normal without an API key)	（返回 403，無 API Key 屬正常）	（返回 403，無 API Key 屬正常）
+（返回状态码	(status code 	（返回狀態碼	（返回狀態碼
+请求超时（5 秒）	Request timed out (5 s)	請求超時（5 秒）	請求超時（5 秒）
+连接失败	Connection failed	連接失敗	連接失敗
+复制报告	Copy report	複製報告	複製報告
+—— 系统信息 ——	—— System info ——	—— 系統信息 ——	—— 系統信息 ——
+启动器版本：	Launcher version: 	啓動器版本：	啓動器版本：
+报告已复制到剪贴板，可粘贴给他人协助定位（不会自动上传）。	Report copied to clipboard — paste it for others to help diagnose (nothing is uploaded automatically).	報告已複製到剪貼板，可粘貼給他人協助定位（不會自動上傳）。	報告已複製到剪貼板，可粘貼給他人協助定位（不會自動上傳）。
+合集名不能为空。	Collection name cannot be empty.	合集名不能爲空。	合集名不能爲空。
+合集名不能超过 32 个字符。	Collection name cannot exceed 32 characters.	合集名不能超過 32 個字符。	合集名不能超過 32 個字符。
+合集名不能包含 : 或 | 。	Collection name cannot contain ":" or "|".	合集名不能包含 : 或 | 。	合集名不能包含 : 或 | 。
+已存在同名合集。	A collection with this name already exists.	已存在同名合集。	已存在同名合集。
+实例不存在，无法创建快捷方式。	Instance does not exist; cannot create a shortcut.	實例不存在，無法創建快捷方式。	實例不存在，無法創建快捷方式。
+实例名称为空，无法创建快捷方式。	Instance name is empty; cannot create a shortcut.	實例名稱爲空，無法創建快捷方式。	實例名稱爲空，無法創建快捷方式。
+无法获取启动器自身的路径。	Cannot determine the launcher's own path.	無法獲取啓動器自身的路徑。	無法獲取啓動器自身的路徑。
+找不到桌面目录，请检查系统权限。	Desktop folder not found; check system permissions.	找不到桌面目錄，請檢查系統權限。	找不到桌面目錄，請檢查系統權限。
+系统不支持创建快捷方式（WScript.Shell 不可用）。	System does not support creating shortcuts (WScript.Shell unavailable).	系統不支持創建快捷方式（WScript.Shell 不可用）。	系統不支持創建快捷方式（WScript.Shell 不可用）。
+创建快捷方式对象失败。	Failed to create the shortcut object.	創建快捷方式對象失敗。	創建快捷方式對象失敗。
+写入快捷方式失败：	Failed to write shortcut: 	寫入快捷方式失敗：	寫入快捷方式失敗：
+确定要卸载该 Java 吗？	Uninstall this Java?	確定要卸載該 Java 嗎？	確定要卸載該 Java 嗎？
+将同时删除其文件，该操作不可撤销。	Its files will be deleted — this cannot be undone.	將同時刪除其文件，該操作不可撤銷。	將同時刪除其文件，該操作不可撤銷。
+卸载 Java	Uninstall Java	卸載 Java	卸載 Java
+已卸载 Java：	Uninstalled Java: 	已卸載 Java：	已卸載 Java：
+卸载 Java 失败，请确认相关文件没有被正在运行的程序占用。	Failed to uninstall Java; make sure no running program occupies its files.	卸載 Java 失敗，請確認相關文件沒有被正在運行的程序佔用。	卸載 Java 失敗，請確認相關文件沒有被正在運行的程序佔用。
+，然后在【设置 → Java】中导入它；也可以直接下载官方 Java 运行时。	, then import it in "Settings → Java"; you can also download an official Java runtime directly.	，然後在【設置 → Java】中導入它；也可以直接下載官方 Java 運行時。	，然後在【設置 → Java】中導入它；也可以直接下載官方 Java 運行時。
+下载官方 Java	Download official Java	下載官方 Java	下載官方 Java
+正在获取 Mojang 提供的 Java 列表……	Fetching the Java list from Mojang…	正在獲取 Mojang 提供的 Java 列表……	正在獲取 Mojang 提供的 Java 列表……
+获取 Java 下载列表失败，请检查网络后重试。	Failed to fetch the Java download list; check your network and retry.	獲取 Java 下載列表失敗，請檢查網絡後重試。	獲取 Java 下載列表失敗，請檢查網絡後重試。
+（已安装）	(installed)	（已安裝）	（已安裝）
+下载 Java	Download Java	下載 Java	下載 Java
+下载 Java 失败：	Java download failed: 	下載 Java 失敗：	下載 Java 失敗：
+游戏版本	Game version	遊戲版本	遊戲版本
+不支持的加载器：	Unsupported loader: 	不支持的加載器：	不支持的加載器：
+未知类型	Unknown type	未知類型	未知類型
+该整合包使用了 TCL 不支持的加载器：	This modpack uses a loader TCL does not support: 	該整合包使用了 TCL 不支持的加載器：	該整合包使用了 TCL 不支持的加載器：
+预设名不能为空。	Preset name cannot be empty.	預設名不能爲空。	預設名不能爲空。
+预设名不能超过 40 个字符。	Preset name cannot exceed 40 characters.	預設名不能超過 40 個字符。	預設名不能超過 40 個字符。
+已存在同名预设。	A preset with this name already exists.	已存在同名預設。	已存在同名預設。
+当前没有任何选项可保存。	No options to save.	當前沒有任何選項可保存。	當前沒有任何選項可保存。
+保存预设失败：	Failed to save preset: 	保存預設失敗：	保存預設失敗：
+和平	Peaceful	和平	和平
+简单	Easy	簡單	簡單
+困难	Hard	困難	困難
+普通	Normal	普通	普通
+生存	Survival	生存	生存
+创造	Creative	創造	創造
+旁观	Spectator	旁觀	旁觀
+未知	Unknown	未知	未知
+主世界	Overworld	主世界	主世界
+下界	The Nether	下界	下界
+末地	The End	末地	末地
+找不到所选的图片文件。	The selected image file cannot be found.	找不到所選的圖片文件。	找不到所選的圖片文件。
+该文件不是有效的 PNG 图片，请选择 .png 格式的图标。	That file is not a valid PNG — pick a .png icon.	該文件不是有效的 PNG 圖片，請選擇 .png 格式的圖標。	該文件不是有效的 PNG 圖片，請選擇 .png 格式的圖標。
+无法读取该 PNG 的尺寸，文件可能已损坏。	Cannot read the PNG size; the file may be corrupt.	無法讀取該 PNG 的尺寸，文件可能已損壞。	無法讀取該 PNG 的尺寸，文件可能已損壞。
+世界图标必须是 64×64 像素。	World icons must be 64×64 pixels.	世界圖標必須是 64×64 像素。	世界圖標必須是 64×64 像素。
+（当前为	(currently 	（當前爲	（當前爲
+世界文件夹不存在。	World folder does not exist.	世界文件夾不存在。	世界文件夾不存在。
+备份文件不存在或已被移动。	Backup file does not exist or has been moved.	備份文件不存在或已被移動。	備份文件不存在或已被移動。
+打开文件夹选择框失败：	Failed to open the folder picker: 	打開文件夾選擇框失敗：	打開文件夾選擇框失敗：
+已导入的版本	Imported versions	已導入的版本	已導入的版本
+正在	Ongoing 	正在	正在
+已	Done 	已	已
+切换为列表视图	Switch to list view	切換爲列表視圖	切換爲列表視圖
+切换为网格视图	Switch to grid view	切換爲網格視圖	切換爲網格視圖
+重命名合集	Rename collection	重命名合集	重命名合集
+所有实例上的这个标签会一起改。	This tag changes on every instance that has it.	所有實例上的這個標籤會一起改。	所有實例上的這個標籤會一起改。
+合集已重命名。	Collection renamed.	合集已重命名。	合集已重命名。
+确定要删除合集「	Delete collection "	確定要刪除合集「	確定要刪除合集「
+」吗？	"?	」嗎？	」嗎？
+只会删掉这个标签，实例本身与其文件不受影响。	Only the tag is removed; instances and their files are untouched.	只會刪掉這個標籤，實例本身與其文件不受影響。	只會刪掉這個標籤，實例本身與其文件不受影響。
+删除合集	Delete collection	刪除合集	刪除合集
+合集已删除。	Collection deleted.	合集已刪除。	合集已刪除。
+没有匹配的实例	No matching instances	沒有匹配的實例	沒有匹配的實例
+换个关键词试试，或者清空右上角的搜索框。	Try another keyword, or clear the search box at the top right.	換個關鍵詞試試，或者清空右上角的搜索框。	換個關鍵詞試試，或者清空右上角的搜索框。
+刚刚游玩	Just now	剛剛遊玩	剛剛遊玩
+分钟前	 minutes ago	分鐘前	分鐘前
+小时前	 hours ago	小時前	小時前
+天前	 days ago	天前	天前
+个月前	 months ago	個月前	個月前
+年前	 years ago	年前	年前
+该实例无法被识别	This instance cannot be recognized	該實例無法被識別	該實例無法被識別
+实例设置	Instance settings	實例設置	實例設置
+更多操作	More actions	更多操作	更多操作
+新建合集	New collection	新建合集	新建合集
+合集只是标签，不会移动实例文件。	A collection is just a tag; instance files are not moved.	合集只是標籤，不會移動實例文件。	合集只是標籤，不會移動實例文件。
+已加入合集	Added to collection	已加入合集	已加入合集
+颜色标签	Color tag	顏色標籤	顏色標籤
+已清除颜色标签。	Color tag cleared.	已清除顏色標籤。	已清除顏色標籤。
+已设置颜色标签。	Color tag set.	已設置顏色標籤。	已設置顏色標籤。
+已在桌面创建快捷方式。	Shortcut created on the desktop.	已在桌面創建快捷方式。	已在桌面創建快捷方式。
+创建快捷方式失败。	Failed to create shortcut.	創建快捷方式失敗。	創建快捷方式失敗。
+该版本正在被修改，请稍后再试！	This version is being modified — try again later!	該版本正在被修改，請稍後再試！	該版本正在被修改，請稍後再試！
+重命名实例	Rename instance	重命名實例	重命名實例
+新名称会成为实例的文件夹名。	The new name becomes the instance's folder name.	新名稱會成爲實例的文件夾名。	新名稱會成爲實例的文件夾名。
+该版本正在被修改，请稍后再复制！	This version is being modified — duplicate it later!	該版本正在被修改，請稍後再複製！	該版本正在被修改，請稍後再複製！
+新实例会得到独立的版本文件、Mod 与存档。	The new instance gets its own version files, mods and saves.	新實例會得到獨立的版本文件、Mod 與存檔。	新實例會得到獨立的版本文件、Mod 與存檔。
+实例已复制为	Instance duplicated as 	實例已複製爲	實例已複製爲
+备份实例	Back up instance	備份實例	備份實例
+压缩包	Archive	壓縮包	壓縮包
+实例已备份到	Instance backed up to 	實例已備份到	實例已備份到
+实例图标已更新！	Instance icon updated!	實例圖標已更新！	實例圖標已更新！
+没有已完成的任务	No finished tasks	沒有已完成的任務	沒有已完成的任務
+该资源需要以下前置，但在目标文件夹中未发现它们：	This resource needs the following prerequisites, but they were not found in the target folder: 	該資源需要以下前置，但在目標文件夾中未發現它們：	該資源需要以下前置，但在目標文件夾中未發現它們：
+是否一并下载这些前置？	Download these prerequisites too?	是否一併下載這些前置？	是否一併下載這些前置？
+发现缺失的前置	Missing prerequisites found	發現缺失的前置	發現缺失的前置
+一并下载	Download all	一併下載	一併下載
+仅下载原资源	Download main resource only	僅下載原資源	僅下載原資源
+未选择实例，仅显示启动器日志。	No instance selected — showing launcher logs only.	未選擇實例，僅顯示啓動器日誌。	未選擇實例，僅顯示啓動器日誌。
+日志已刷新。	Logs refreshed.	日誌已刷新。	日誌已刷新。
+没有可用的日志来源。	No log sources available.	沒有可用的日誌來源。	沒有可用的日誌來源。
+正在读取…	Reading…	正在讀取…	正在讀取…
+这个来源还没有内容。	This source has no content yet.	這個來源還沒有內容。	這個來源還沒有內容。
+没有匹配当前筛选的日志。	No logs match the current filter.	沒有匹配當前篩選的日誌。	沒有匹配當前篩選的日誌。
+行，显示	 lines, showing 	行，顯示	行，顯示
+行	 lines	行	行
+没有可复制的日志。	No logs to copy.	沒有可複製的日誌。	沒有可複製的日誌。
+已复制	Copied 	已複製	已複製
+行日志。	 lines of log.	行日誌。	行日誌。
+复制失败：	Copy failed: 	複製失敗：	複製失敗：
+没有可导出的日志。	No logs to export.	沒有可導出的日誌。	沒有可導出的日誌。
+导出日志	Export logs	導出日誌	導出日誌
+日志文件	Log files	日誌文件	日誌文件
+文本文件	Text files	文本文件	文本文件
+日志已导出（已脱敏）。	Logs exported (sanitized).	日誌已導出（已脫敏）。	日誌已導出（已脫敏）。
+导出失败：	Export failed: 	導出失敗：	導出失敗：
+请先加载一份日志。	Load a log first.	請先加載一份日誌。	請先加載一份日誌。
+没有匹配到已知的崩溃特征。	No known crash signature matched.	沒有匹配到已知的崩潰特徵。	沒有匹配到已知的崩潰特徵。
+最近的错误行：	Recent error lines: 	最近的錯誤行：	最近的錯誤行：
+这份日志里也没有错误级别的行。	This log has no error-level lines either.	這份日誌裏也沒有錯誤級別的行。	這份日誌裏也沒有錯誤級別的行。
+崩溃分析	Crash analysis	崩潰分析	崩潰分析
+可能的原因与建议：	Possible causes and suggestions: 	可能的原因與建議：	可能的原因與建議：
+证据（日志原文）：	Evidence (log excerpts): 	證據（日誌原文）：	證據（日誌原文）：
+全部内容	Full content	全部內容	全部內容
+世界：	World: 	世界：	世界：
+还没有记录。启动一次游戏后，这里会显示本次会话的开始时间、时长与退出结果。	No records yet. After a launch, this shows the session's start time, duration and exit result.	還沒有記錄。啓動一次遊戲後，這裏會顯示本次會話的開始時間、時長與退出結果。	還沒有記錄。啓動一次遊戲後，這裏會顯示本次會話的開始時間、時長與退出結果。
+次会话，累计	 sessions, totaling 	次會話，累計	次會話，累計
+；最近 50 次显示在下方，点一行查看对应日志。	; the last 50 are listed below — click a row to open its log.	；最近 50 次顯示在下方，點一行查看對應日誌。	；最近 50 次顯示在下方，點一行查看對應日誌。
+· 时长	· Duration 	· 時長	· 時長
+· 玩家	· Player 	· 玩家	· 玩家
+秒	s	秒	秒
+分	m	分	分
+小时	h	小時	小時
+还没有快照。快照会打包 Mod、配置、存档与资源包，用来在改动前留一份回滚点。	No snapshots yet. A snapshot packs mods, config, saves and resource packs as a rollback point before changes.	還沒有快照。快照會打包 Mod、配置、存檔與資源包，用來在改動前留一份回滾點。	還沒有快照。快照會打包 Mod、配置、存檔與資源包，用來在改動前留一份回滾點。
+份，占用	 snapshot(s), using 	份，佔用	份，佔用
+恢复到这个快照（会先自动备份当前状态）	Restore to this snapshot (current state is backed up automatically first)	恢復到這個快照（會先自動備份當前狀態）	恢復到這個快照（會先自動備份當前狀態）
+删除这个快照	Delete this snapshot	刪除這個快照	刪除這個快照
+给这份快照写一句备注（可留空）：	Write a note for this snapshot (optional): 	給這份快照寫一句備註（可留空）：	給這份快照寫一句備註（可留空）：
+例如：装光影前	e.g. before adding shaders	例如：裝光影前	例如：裝光影前
+正在后台创建快照…	Creating snapshot in background…	正在後臺創建快照…	正在後臺創建快照…
+快照已创建。	Snapshot created.	快照已創建。	快照已創建。
+创建快照失败：	Failed to create snapshot: 	創建快照失敗：	創建快照失敗：
+恢复会用「	Restore overwrites the instance with the content of "	恢復會用「	恢復會用「
+」里的文件覆盖当前实例，当前状态会先自动存一份。是否继续？	". The current state is saved automatically first. Continue?	」裏的文件覆蓋當前實例，當前狀態會先自動存一份。是否繼續？	」裏的文件覆蓋當前實例，當前狀態會先自動存一份。是否繼續？
+恢复快照	Restore snapshot	恢復快照	恢復快照
+恢复	Restore	恢復	恢復
+正在后台恢复快照…	Restoring snapshot in background…	正在後臺恢復快照…	正在後臺恢復快照…
+快照已恢复，原状态已自动备份。	Snapshot restored; the previous state was backed up automatically.	快照已恢復，原狀態已自動備份。	快照已恢復，原狀態已自動備份。
+恢复快照失败：	Failed to restore snapshot: 	恢復快照失敗：	恢復快照失敗：
+确定删除快照「	Delete snapshot "	確定刪除快照「	確定刪除快照「
+」吗？删除后无法找回。	"? This cannot be undone.	」嗎？刪除後無法找回。	」嗎？刪除後無法找回。
+删除快照	Delete snapshot	刪除快照	刪除快照
+快照已删除。	Snapshot deleted.	快照已刪除。	快照已刪除。
+删除快照失败：	Failed to delete snapshot: 	刪除快照失敗：	刪除快照失敗：
+游玩	Play	遊玩	遊玩
+还没有变更记录。	No changes recorded yet.	還沒有變更記錄。	還沒有變更記錄。
+按时间倒序显示游玩与快照事件，最近的	Play and snapshot events, newest first — showing the last 	按時間倒序顯示遊玩與快照事件，最近的	按時間倒序顯示遊玩與快照事件，最近的
+条。	 entries.	條。	條。
+选择要导入的 .minecraft 文件夹	Select the .minecraft folder to import	選擇要導入的 .minecraft 文件夾	選擇要導入的 .minecraft 文件夾
+所选文件夹下没有 versions 目录，无法导入。	No versions directory under the selected folder; cannot import.	所選文件夾下沒有 versions 目錄，無法導入。	所選文件夾下沒有 versions 目錄，無法導入。
+正在后台导入实例…	Importing instances in background…	正在後臺導入實例…	正在後臺導入實例…
+没有新的实例可导入（同名实例会被跳过）。	No new instances to import (same-name instances are skipped).	沒有新的實例可導入（同名實例會被跳過）。	沒有新的實例可導入（同名實例會被跳過）。
+已导入	Imported 	已導入	已導入
+个实例，返回实例列表即可看到。	 instances — go back to the instance list to see them.	個實例，返回實例列表即可看到。	個實例，返回實例列表即可看到。
+新实例的名称（会复制 Mod、配置与存档）：	New instance name (mods, config and saves are copied): 	新實例的名稱（會複製 Mod、配置與存檔）：	新實例的名稱（會複製 Mod、配置與存檔）：
+新实例名称不能和当前实例相同。	The new instance name must differ from the current one.	新實例名稱不能和當前實例相同。	新實例名稱不能和當前實例相同。
+正在后台复制实例…	Duplicating instance in background…	正在後臺複製實例…	正在後臺複製實例…
+实例已复制为：	Instance duplicated as: 	實例已複製爲：	實例已複製爲：
+，返回实例列表即可看到。	 — go back to the instance list to see it.	，返回實例列表即可看到。	，返回實例列表即可看到。
+复制实例失败：	Failed to duplicate instance: 	複製實例失敗：	複製實例失敗：
+要对这个实例做完整备份（打包成 zip），还是从备份恢复成一个新实例？	Fully back up this instance (as a zip), or restore a backup into a new instance?	要對這個實例做完整備份（打包成 zip），還是從備份恢復成一個新實例？	要對這個實例做完整備份（打包成 zip），還是從備份恢復成一個新實例？
+完整备份包含 Mod、配置与存档，不包含日志与截图。	A full backup includes mods, config and saves — logs and screenshots are not included.	完整備份包含 Mod、配置與存檔，不包含日誌與截圖。	完整備份包含 Mod、配置與存檔，不包含日誌與截圖。
+完整备份	Full backup	完整備份	完整備份
+从备份恢复	Restore from backup	從備份恢復	從備份恢復
+保存实例备份	Save instance backup	保存實例備份	保存實例備份
+Zip 压缩包	Zip archive	Zip 壓縮包	Zip 壓縮包
+正在后台打包实例…	Packing instance in background…	正在後臺打包實例…	正在後臺打包實例…
+实例已备份：	Instance backed up: 	實例已備份：	實例已備份：
+备份失败：	Backup failed: 	備份失敗：	備份失敗：
+选择实例备份	Select an instance backup	選擇實例備份	選擇實例備份
+恢复成的新实例名称（不会覆盖已有实例）：	Name of the new instance to restore into (existing instances are not overwritten): 	恢復成的新實例名稱（不會覆蓋已有實例）：	恢復成的新實例名稱（不會覆蓋已有實例）：
+正在后台恢复实例…	Restoring instance in background…	正在後臺恢復實例…	正在後臺恢復實例…
+已恢复为实例：	Restored as instance: 	已恢復爲實例：	已恢復爲實例：
+恢复失败：	Restore failed: 	恢復失敗：	恢復失敗：
+尚未选择实例。	No instance selected.	尚未選擇實例。	尚未選擇實例。
+该实例还没有任何存档。	This instance has no saves yet.	該實例還沒有任何存檔。	該實例還沒有任何存檔。
+该存档还没有已生成的地形（region 文件夹不存在）。	No generated terrain for this save (region folder missing).	該存檔還沒有已生成的地形（region 文件夾不存在）。	該存檔還沒有已生成的地形（region 文件夾不存在）。
+正在加载已探索地形……	Loading explored terrain…	正在加載已探索地形……	正在加載已探索地形……
+没有找到已生成的地形（世界地图 v1 仅支持 1.18+ 存档的主世界 region 文件）。	No generated terrain found (world map v1 only reads Overworld region files of 1.18+ saves).	沒有找到已生成的地形（世界地圖 v1 僅支持 1.18+ 存檔的主世界 region 文件）。	沒有找到已生成的地形（世界地圖 v1 僅支持 1.18+ 存檔的主世界 region 文件）。
+已加载	Loaded 	已加載	已加載
+张地图瓦片，拖动或缩放查看更多。	 map tiles — drag or zoom to explore.	張地圖瓦片，拖動或縮放查看更多。	張地圖瓦片，拖動或縮放查看更多。
+渲染距离	Render distance	渲染距離	渲染距離
+模拟距离	Simulation distance	模擬距離	模擬距離
+画质	Graphics	畫質	畫質
+界面缩放（0 = 自动）	GUI scale (0 = auto)	界面縮放（0 = 自動）	界面縮放（0 = 自動）
+视野	FOV	視野	視野
+粒子效果	Particles	粒子效果	粒子效果
+主音量	Master volume	主音量	主音量
+音乐	Music	音樂	音樂
+方块	Blocks	方塊	方塊
+敌对生物	Hostile creatures	敵對生物	敵對生物
+玩家	Players	玩家	玩家
+鼠标灵敏度	Mouse sensitivity	鼠標靈敏度	鼠標靈敏度
+反转鼠标 Y 轴	Invert mouse Y	反轉鼠標 Y 軸	反轉鼠標 Y 軸
+自动跳跃	Auto-jump	自動跳躍	自動跳躍
+切换潜行	Toggle sneak	切換潛行	切換潛行
+切换疾跑	Toggle sprint	切換疾跑	切換疾跑
+聊天可见性	Chat visibility	聊天可見性	聊天可見性
+聊天不透明度	Chat opacity	聊天不透明度	聊天不透明度
+聊天缩放	Chat scale	聊天縮放	聊天縮放
+这个实例还没有 options.txt。先启动一次游戏，让游戏生成默认选项后再回来修改。	No options.txt in this instance yet. Launch the game once to generate defaults, then come back.	這個實例還沒有 options.txt。先啓動一次遊戲，讓遊戲生成默認選項後再回來修改。	這個實例還沒有 options.txt。先啓動一次遊戲，讓遊戲生成默認選項後再回來修改。
+读取 options.txt 失败：	Failed to read options.txt: 	讀取 options.txt 失敗：	讀取 options.txt 失敗：
+options.txt 存在，但没有包含可编辑的常用选项。可以在游戏内修改，或直接用文本编辑器打开它。	options.txt exists but has no common editable options. Change them in-game or edit the file with a text editor.	options.txt 存在，但沒有包含可編輯的常用選項。可以在遊戲內修改，或直接用文本編輯器打開它。	options.txt 存在，但沒有包含可編輯的常用選項。可以在遊戲內修改，或直接用文本編輯器打開它。
+没有可保存的 options.txt。	No options.txt to save.	沒有可保存的 options.txt。	沒有可保存的 options.txt。
+没有修改需要保存。	No changes to save.	沒有修改需要保存。	沒有修改需要保存。
+游戏选项已保存，下次启动生效。	Game options saved — effective on next launch.	遊戲選項已保存，下次啓動生效。	遊戲選項已保存，下次啓動生效。
+有未保存的修改，重新载入会丢弃它们。是否继续？	There are unsaved changes; reloading discards them. Continue?	有未保存的修改，重新載入會丟棄它們。是否繼續？	有未保存的修改，重新載入會丟棄它們。是否繼續？
+已重新载入。	Reloaded.	已重新載入。	已重新載入。
+存为选项预设	Save options as preset	存爲選項預設	存爲選項預設
+保存当前这张表里的全部选项，之后可以一键套用到其他实例。	Save every option on this sheet, then apply it to other instances in one click.	保存當前這張表裏的全部選項，之後可以一鍵套用到其他實例。	保存當前這張表裏的全部選項，之後可以一鍵套用到其他實例。
+预设已保存：	Preset saved: 	預設已保存：	預設已保存：
+项）	 items)	項）	項）
+还没有任何预设。先在选项页调好一套，再点「存为预设」。	No presets yet. Tune the options page first, then click "Save as preset".	還沒有任何預設。先在選項頁調好一套，再點「存爲預設」。	還沒有任何預設。先在選項頁調好一套，再點「存爲預設」。
+预设已删除：	Preset deleted: 	預設已刪除：	預設已刪除：
+已套用预设「	Applied preset "	已套用預設「	已套用預設「
+」，共	", 	」，共	」，共
+项。记得点「保存修改」写入 options.txt。	 items in total. Remember to click "Save changes" to write options.txt.	項。記得點「保存修改」寫入 options.txt。	項。記得點「保存修改」寫入 options.txt。
+还没有游玩记录。启动一次游戏后，这里会显示最近三次的开始时间与时长。	No play records yet. After a launch, the three most recent sessions with start time and duration show here.	還沒有遊玩記錄。啓動一次遊戲後，這裏會顯示最近三次的開始時間與時長。	還沒有遊玩記錄。啓動一次遊戲後，這裏會顯示最近三次的開始時間與時長。
+占用空间：	Disk usage: 	佔用空間：	佔用空間：
+当前没有由本启动器启动的游戏进程。	No game process launched by this launcher is running.	當前沒有由本啓動器啓動的遊戲進程。	當前沒有由本啓動器啓動的遊戲進程。
+确定要结束正在运行的游戏吗？未保存的游戏进度会丢失。	End the running game? Unsaved progress will be lost.	確定要結束正在運行的遊戲嗎？未保存的遊戲進度會丟失。	確定要結束正在運行的遊戲嗎？未保存的遊戲進度會丟失。
+结束	End	結束	結束
+已请求结束游戏进程。	Game process termination requested.	已請求結束遊戲進程。	已請求結束遊戲進程。
+结束游戏失败：	Failed to end game: 	結束遊戲失敗：	結束遊戲失敗：
+游戏运行时修改可能被游戏覆盖，建议关闭游戏后再调整。	Changes made while the game runs may be overwritten — close the game first.	遊戲運行時修改可能被遊戲覆蓋，建議關閉遊戲後再調整。	遊戲運行時修改可能被遊戲覆蓋，建議關閉遊戲後再調整。
+全部启用	Enable all	全部啓用	全部啓用
+全部停用	Disable all	全部停用	全部停用
+无法定位这个实例的 resourcepacks 文件夹，请检查版本隔离设置。	Cannot locate this instance's resourcepacks folder; check version isolation.	無法定位這個實例的 resourcepacks 文件夾，請檢查版本隔離設置。	無法定位這個實例的 resourcepacks 文件夾，請檢查版本隔離設置。
+资源包列表已刷新。	Resource pack list refreshed.	資源包列表已刷新。	資源包列表已刷新。
+这个实例还没有资源包。把 .zip 拖进来或放到 resourcepacks 文件夹。	No resource packs yet. Drop a .zip in, or place it into the resourcepacks folder.	這個實例還沒有資源包。把 .zip 拖進來或放到 resourcepacks 文件夾。	這個實例還沒有資源包。把 .zip 拖進來或放到 resourcepacks 文件夾。
+没有匹配当前搜索的资源包。	No resource packs match the search.	沒有匹配當前搜索的資源包。	沒有匹配當前搜索的資源包。
+资源包（	Resource packs (	資源包（	資源包（
+已启用：	Enabled: 	已啓用：	已啓用：
+已停用：	Disabled: 	已停用：	已停用：
+切换资源包状态失败：	Failed to toggle resource pack: 	切換資源包狀態失敗：	切換資源包狀態失敗：
+这个实例还没有资源包。	This instance has no resource packs yet.	這個實例還沒有資源包。	這個實例還沒有資源包。
+已启用全部资源包。	All resource packs enabled.	已啓用全部資源包。	已啓用全部資源包。
+已停用全部资源包。	All resource packs disabled.	已停用全部資源包。	已停用全部資源包。
+批量修改失败：	Bulk change failed: 	批量修改失敗：	批量修改失敗：
+文件夹不存在！	Folder does not exist!	文件夾不存在！	文件夾不存在！
+文件不存在！	File does not exist!	文件不存在！	文件不存在！
+确定要删除资源包「	Delete resource pack "	確定要刪除資源包「	確定要刪除資源包「
+删除后会被移入回收站，可以自行恢复。	It goes to the Recycle Bin and can be restored.	刪除後會被移入回收站，可以自行恢復。	刪除後會被移入回收站，可以自行恢復。
+删除资源包	Delete resource pack	刪除資源包	刪除資源包
+已删除：	Deleted: 	已刪除：	已刪除：
+删除失败：	Deletion failed: 	刪除失敗：	刪除失敗：
+个资源包。	 resource pack(s).	個資源包。	個資源包。
+没有匹配当前搜索的存档。	No saves match the current search.	沒有匹配當前搜索的存檔。	沒有匹配當前搜索的存檔。
+复制这个世界	Copy this world	複製這個世界	複製這個世界
+导出为 .zip	Export as .zip	導出爲 .zip	導出爲 .zip
+世界已复制为：	World copied as: 	世界已複製爲：	世界已複製爲：
+复制世界失败：	Failed to copy world: 	複製世界失敗：	複製世界失敗：
+导出世界	Export world	導出世界	導出世界
+正在后台打包世界…	Packing world in background…	正在後臺打包世界…	正在後臺打包世界…
+世界已导出：	World exported: 	世界已導出：	世界已導出：
+导出世界失败：	Failed to export world: 	導出世界失敗：	導出世界失敗：
+选择世界压缩包	Select a world archive	選擇世界壓縮包	選擇世界壓縮包
+正在后台解压世界…	Extracting world in background…	正在後臺解壓世界…	正在後臺解壓世界…
+压缩包里没有找到 level.dat，可能不是世界存档。	No level.dat in the archive — probably not a world save.	壓縮包裏沒有找到 level.dat，可能不是世界存檔。	壓縮包裏沒有找到 level.dat，可能不是世界存檔。
+导入的世界	Imported worlds	導入的世界	導入的世界
+世界已导入：	World imported: 	世界已導入：	世界已導入：
+导入世界失败：	Failed to import world: 	導入世界失敗：	導入世界失敗：
+修改图标…	Change icon…	修改圖標…	修改圖標…
+备份世界	Back up world	備份世界	備份世界
+备份列表…	Backup list…	備份列表…	備份列表…
+已复制到剪贴板	Copied to clipboard	已複製到剪貼板	已複製到剪貼板
+复制失败	Copy failed	複製失敗	複製失敗
+这个文件夹里没有 level.dat，可能不是有效的存档。	No level.dat in this folder — probably not a valid save.	這個文件夾裏沒有 level.dat，可能不是有效的存檔。	這個文件夾裏沒有 level.dat，可能不是有效的存檔。
+读取世界信息失败，level.dat 可能已损坏。	Failed to read world info; level.dat may be corrupt.	讀取世界信息失敗，level.dat 可能已損壞。	讀取世界信息失敗，level.dat 可能已損壞。
+打开世界信息失败：	Failed to open world info: 	打開世界信息失敗：	打開世界信息失敗：
+基本信息	Basics	基本信息	基本信息
+世界名	World name	世界名	世界名
+种子	Seed	種子	種子
+出生点	Spawn point	出生點	出生點
+游戏时长	Play time	遊戲時長	遊戲時長
+天	d	天	天
+刻）	 ticks)	刻）	刻）
+上次游玩	Last played	上次遊玩	上次遊玩
+默认游戏模式	Default game mode	默認遊戲模式	默認遊戲模式
+世界图标	World icon	世界圖標	世界圖標
+已设置	Set	已設置	已設置
+默认（未设置）	Default (not set)	默認（未設置）	默認（未設置）
+可修改	Editable	可修改	可修改
+世界名称	World name	世界名稱	世界名稱
+难度	Difficulty	難度	難度
+允许作弊（开启命令）	Allow cheats (commands)	允許作弊（開啓命令）	允許作弊（開啓命令）
+锁定难度（游戏内无法再更改）	Lock difficulty (cannot be changed in-game)	鎖定難度（遊戲內無法再更改）	鎖定難度（遊戲內無法再更改）
+修改会直接写回 level.dat，原文件会保留一份 level.dat.bak。	Changes are written back to level.dat; the original is kept as level.dat.bak.	修改會直接寫回 level.dat，原文件會保留一份 level.dat.bak。	修改會直接寫回 level.dat，原文件會保留一份 level.dat.bak。
+玩家数据	Player data	玩家數據	玩家數據
+血量	Health	血量	血量
+饥饿	Hunger	飢餓	飢餓
+（饱和度	(saturation 	（飽和度	（飽和度
+经验等级	XP level	經驗等級	經驗等級
+（总计	(total 	（總計	（總計
+坐标	Coordinates	座標	座標
+所在维度	Dimension	所在維度	所在維度
+玩家游戏模式	Player game mode	玩家遊戲模式	玩家遊戲模式
+上次死亡点	Last death position	上次死亡點	上次死亡點
+没有找到玩家数据（可能还没进过这个世界）。	No player data found (this world may never have been entered).	沒有找到玩家數據（可能還沒進過這個世界）。	沒有找到玩家數據（可能還沒進過這個世界）。
+世界名不能为空。	World name cannot be empty.	世界名不能爲空。	世界名不能爲空。
+世界信息已保存。	World info saved.	世界信息已保存。	世界信息已保存。
+保存世界信息失败：	Failed to save world info: 	保存世界信息失敗：	保存世界信息失敗：
+选择世界图标	Select world icon	選擇世界圖標	選擇世界圖標
+世界图标已更新。	World icon updated.	世界圖標已更新。	世界圖標已更新。
+设置世界图标失败。	Failed to set the world icon.	設置世界圖標失敗。	設置世界圖標失敗。
+修改世界图标	Change world icon	修改世界圖標	修改世界圖標
+修改世界图标失败：	Failed to change world icon: 	修改世界圖標失敗：	修改世界圖標失敗：
+正在后台备份世界…	Backing up world in background…	正在後臺備份世界…	正在後臺備份世界…
+备份世界失败，请查看日志。	World backup failed — check the logs.	備份世界失敗，請查看日誌。	備份世界失敗，請查看日誌。
+世界已备份：	World backed up: 	世界已備份：	世界已備份：
+备份保存在：	Backup saved at: 	備份保存在：	備份保存在：
+还没有备份	No backups yet	還沒有備份	還沒有備份
+点存档右侧「更多 → 备份世界」即可创建一份备份。	Click a save's "More → Back up world" to create one.	點存檔右側「更多 → 備份世界」即可創建一份備份。	點存檔右側「更多 → 備份世界」即可創建一份備份。
+份备份	 backup(s)	份備份	份備份
+立即备份	Back up now	立即備份	立即備份
+世界备份	World backups	世界備份	世界備份
+打开备份列表失败：	Failed to open the backup list: 	打開備份列表失敗：	打開備份列表失敗：
+还原此备份	Restore this backup	還原此備份	還原此備份
+删除此备份	Delete this backup	刪除此備份	刪除此備份
+备份所在文件夹已不存在。	The backup's folder no longer exists.	備份所在文件夾已不存在。	備份所在文件夾已不存在。
+确定要还原备份「	Restore backup "	確定要還原備份「	確定要還原備份「
+当前世界会先被自动备份一次（名字以「还原前」开头），然后被这份备份覆盖。	The current world is backed up automatically first (name starts with "pre-restore"), then overwritten by this backup.	當前世界會先被自動備份一次（名字以「還原前」開頭），然後被這份備份覆蓋。	當前世界會先被自動備份一次（名字以「還原前」開頭），然後被這份備份覆蓋。
+还原备份	Restore backup	還原備份	還原備份
+正在后台还原世界…	Restoring world in background…	正在後臺還原世界…	正在後臺還原世界…
+世界已还原。	World restored.	世界已還原。	世界已還原。
+还原失败。	Restore failed.	還原失敗。	還原失敗。
+确定要删除备份「	Delete backup "	確定要刪除備份「	確定要刪除備份「
+备份会被移入回收站。	The backup goes to the Recycle Bin.	備份會被移入回收站。	備份會被移入回收站。
+删除备份	Delete backup	刪除備份	刪除備份
+备份已删除。	Backup deleted.	備份已刪除。	備份已刪除。
+删除备份失败：	Failed to delete backup: 	刪除備份失敗：	刪除備份失敗：
+删除这张截图？删除后无法找回。	Delete this screenshot? This cannot be undone.	刪除這張截圖？刪除後無法找回。	刪除這張截圖？刪除後無法找回。
+删除截图	Delete screenshot	刪除截圖	刪除截圖
+这个服务器没有填写地址。	This server has no address set.	這個服務器沒有填寫地址。	這個服務器沒有填寫地址。
+进入服务器失败：	Failed to join server: 	進入服務器失敗：	進入服務器失敗：
+已复制地址：	Address copied: 	已複製地址：	已複製地址：
+调整顺序失败：	Failed to reorder: 	調整順序失敗：	調整順序失敗：
+进入	Join 	進入	進入
+（查询异常）	(query error)	（查詢異常）	（查詢異常）
+无法识别该实例的原版版本，请直接从 下载 → 安装 页安装。	Cannot detect this instance's vanilla version — install from Downloads → Install instead.	無法識別該實例的原版版本，請直接從 下載 → 安裝 頁安裝。	無法識別該實例的原版版本，請直接從 下載 → 安裝 頁安裝。
+已在安装页预选版本	Version preselected on the install page	已在安裝頁預選版本	已在安裝頁預選版本
+，请选择要安装的加载器。	 — choose the loader to install.	，請選擇要安裝的加載器。	，請選擇要安裝的加載器。
+当前实例没有检测到光影加载器。光影需要 Iris 或 OptiFine，先安装其中一个再来这里。	No shader loader detected in this instance. Shaders need Iris or OptiFine — install one first.	當前實例沒有檢測到光影加載器。光影需要 Iris 或 OptiFine，先安裝其中一個再來這裏。	當前實例沒有檢測到光影加載器。光影需要 Iris 或 OptiFine，先安裝其中一個再來這裏。
+去下载光影加载器	Get a shader loader	去下載光影加載器	去下載光影加載器
+重新检测	Re-detect	重新檢測	重新檢測
+取消当前光影	Clear current shader	取消當前光影	取消當前光影
+无法定位这个实例的 shaderpacks 文件夹，请检查版本隔离设置。	Cannot locate this instance's shaderpacks folder; check version isolation.	無法定位這個實例的 shaderpacks 文件夾，請檢查版本隔離設置。	無法定位這個實例的 shaderpacks 文件夾，請檢查版本隔離設置。
+光影包列表已刷新。	Shader pack list refreshed.	光影包列表已刷新。	光影包列表已刷新。
+当前没有启用光影。	No shader is active.	當前沒有啓用光影。	當前沒有啓用光影。
+当前光影：	Current shader: 	當前光影：	當前光影：
+（重启游戏后生效）	(effective after restarting the game)	（重啓遊戲後生效）	（重啓遊戲後生效）
+还没有光影包。光影需要 Iris 或 OptiFine，装好后把 .zip 放进 shaderpacks 文件夹。	No shader packs yet. Shaders need Iris or OptiFine — install one, then drop a .zip into the shaderpacks folder.	還沒有光影包。光影需要 Iris 或 OptiFine，裝好後把 .zip 放進 shaderpacks 文件夾。	還沒有光影包。光影需要 Iris 或 OptiFine，裝好後把 .zip 放進 shaderpacks 文件夾。
+没有匹配当前搜索的光影包。	No shader packs match the search.	沒有匹配當前搜索的光影包。	沒有匹配當前搜索的光影包。
+光影包（	Shader packs (	光影包（	光影包（
+（使用中） ·	(in use) · 	（使用中） ·	（使用中） ·
+已切换为「	Switched to "	已切換爲「	已切換爲「
+」，重启游戏后生效。	" — effective after restarting the game.	」，重啓遊戲後生效。	」，重啓遊戲後生效。
+切换光影失败：	Failed to switch shader: 	切換光影失敗：	切換光影失敗：
+已取消当前光影，重启游戏后生效。	Current shader cleared — effective after restarting the game.	已取消當前光影，重啓遊戲後生效。	已取消當前光影，重啓遊戲後生效。
+取消光影失败：	Failed to clear shader: 	取消光影失敗：	取消光影失敗：
+确定要删除光影包「	Delete shader pack "	確定要刪除光影包「	確定要刪除光影包「
+删除光影包	Delete shader pack	刪除光影包	刪除光影包
+个光影包。	 shader pack(s).	個光影包。	個光影包。
+微软登录未启用：请设置环境变量 TCL_MS_CLIENT_ID 后重启启动器。	Microsoft login is disabled: set env var TCL_MS_CLIENT_ID and restart the launcher.	微軟登錄未啓用：請設置環境變量 TCL_MS_CLIENT_ID 後重啓啓動器。	微軟登錄未啓用：請設置環境變量 TCL_MS_CLIENT_ID 後重啓啓動器。
+切换该账号的角色（多角色账户）	Switch this account's character (multi-character account)	切換該賬號的角色（多角色賬戶）	切換該賬號的角色（多角色賬戶）
+尚未缓存该账号的多角色列表，或该账号只有一个角色。	No character list cached for this account, or it has only one character.	尚未緩存該賬號的多角色列表，或該賬號只有一個角色。	尚未緩存該賬號的多角色列表，或該賬號只有一個角色。
+使用该账号登录一次游戏后即可在此切换角色。	Log into a game with this account once, then switch here.	使用該賬號登錄一次遊戲後即可在此切換角色。	使用該賬號登錄一次遊戲後即可在此切換角色。
+切换角色	Switch character	切換角色	切換角色
+（当前）	(current)	（當前）	（當前）
+已切换为角色	Switched to character 	已切換爲角色	已切換爲角色
+，下次登录该账号时生效。	 — effective on the next login of this account.	，下次登錄該賬號時生效。	，下次登錄該賬號時生效。
+当前正版账户：	Current premium account: 	當前正版賬戶：	當前正版賬戶：
+。修改皮肤 / 披风后会同步刷新账户头像与标题栏徽章；皮肤文件也可另存为 PNG。	. Skin / cape changes refresh the account avatar and title badge; the skin file can also be saved as PNG.	。修改皮膚 / 披風后會同步刷新賬戶頭像與標題欄徽章；皮膚文件也可另存爲 PNG。	。修改皮膚 / 披風后會同步刷新賬戶頭像與標題欄徽章；皮膚文件也可另存爲 PNG。
+下载支持库	Download support library	下載支持庫	下載支持庫
+（发现节点 ID：	(node ID found: 	（發現節點 ID：	（發現節點 ID：
+，已随码自动匹配）	, auto-matched with the invite code)	，已隨碼自動匹配）	，已隨碼自動匹配）
+发现节点 ID：	Node ID found: 	發現節點 ID：	發現節點 ID：
+（已随邀请码自动匹配）	(auto-matched with the invite code)	（已隨邀請碼自動匹配）	（已隨邀請碼自動匹配）
+发现节点：自动分配	Node found: auto-assigned	發現節點：自動分配	發現節點：自動分配
+实例数据（存档 / Mod / 资源包）	Instance data (saves / mods / resource packs)	實例數據（存檔 / Mod / 資源包）	實例數據（存檔 / Mod / 資源包）
+共享资源（assets / libraries）	Shared resources (assets / libraries)	共享資源（assets / libraries）	共享資源（assets / libraries）
+缓存	Cache	緩存	緩存
+启动器数据	Launcher data	啓動器數據	啓動器數據
+合计	Total	合計	合計
+；条形图按各分类占比绘制，只统计本机实际存在的目录。	; bars are drawn by category share, counting only folders that exist locally.	；條形圖按各分類佔比繪製，只統計本機實際存在的目錄。	；條形圖按各分類佔比繪製，只統計本機實際存在的目錄。
+正在后台检查无用文件…	Checking for junk files in background…	正在後臺檢查無用文件…	正在後臺檢查無用文件…
+没有发现 30 天以前的日志或崩溃报告。	No logs or crash reports older than 30 days.	沒有發現 30 天以前的日誌或崩潰報告。	沒有發現 30 天以前的日誌或崩潰報告。
+发现	Found 	發現	發現
+个 30 天以前的日志 / 崩溃报告，可回收	 logs / crash reports older than 30 days, reclaimable: 	個 30 天以前的日誌 / 崩潰報告，可回收	個 30 天以前的日誌 / 崩潰報告，可回收
+这些文件只用于事后排查，删除不影响游戏存档与 Mod。是否删除？	These files are only for post-hoc diagnosis; deleting them never touches saves or mods. Delete?	這些文件只用於事後排查，刪除不影響遊戲存檔與 Mod。是否刪除？	這些文件只用於事後排查，刪除不影響遊戲存檔與 Mod。是否刪除？
+个无用文件。	 junk file(s).	個無用文件。	個無用文件。
+卸载并删除该官方 Java	Uninstall and remove this official Java	卸載並刪除該官方 Java	卸載並刪除該官方 Java
+供应商：	Vendor: 	供應商：	供應商：
+架构：	Architecture: 	架構：	架構：
+64 位（x64）	64-bit (x64)	64 位（x64）	64 位（x64）
+搜索初始化失败，请查看日志	Search initialization failed — see the logs	搜索初始化失敗，請查看日誌	搜索初始化失敗，請查看日誌
+行 · 实时监听中	 lines · watching live	行 · 實時監聽中	行 · 實時監聽中
+当前 .NET Framework 版本对 SOCKS5 支持有限，建议使用 HTTP 代理或系统代理（可用 Clash / v2rayN 的 HTTP 端口）。	.NET Framework has limited SOCKS5 support; prefer an HTTP proxy or the system proxy (e.g. the HTTP port of Clash / v2rayN).	當前 .NET Framework 版本對 SOCKS5 支持有限，建議使用 HTTP 代理或系統代理（可用 Clash / v2rayN 的 HTTP 端口）。	當前 .NET Framework 版本對 SOCKS5 支持有限，建議使用 HTTP 代理或系統代理（可用 Clash / v2rayN 的 HTTP 端口）。
+请填写代理工具的 HTTP 端口，例如 Clash 默认的 7890。	Enter your proxy tool's HTTP port, e.g. Clash's default 7890.	請填寫代理工具的 HTTP 端口，例如 Clash 默認的 7890。	請填寫代理工具的 HTTP 端口，例如 Clash 默認的 7890。
+请先选择代理模式	Select a proxy mode first	請先選擇代理模式	請先選擇代理模式
+请填写代理主机地址	Enter the proxy host address	請填寫代理主機地址	請填寫代理主機地址
+端口必须是 1~65535 之间的整数	Port must be an integer between 1 and 65535	端口必須是 1~65535 之間的整數	端口必須是 1~65535 之間的整數
+已保存，之后的网络请求会立即使用该代理	Saved — following network requests will use this proxy immediately	已保存，之後的網絡請求會立即使用該代理	已保存，之後的網絡請求會立即使用該代理
+测试中…	Testing…	測試中…	測試中…
+请求超时（5 秒），代理可能不可用	Request timed out (5 s) — the proxy may be unavailable	請求超時（5 秒），代理可能不可用	請求超時（5 秒），代理可能不可用
+（用的是已保存的设置，改动请先保存）	(using the saved settings; save your changes first)	（用的是已保存的設置，改動請先保存）	（用的是已保存的設置，改動請先保存）
+连接成功，耗时	Connected in 	連接成功，耗時	連接成功，耗時
+代理可用	Proxy works	代理可用	代理可用
+连接失败：	Connection failed: 	連接失敗：	連接失敗：
+；当前代理：	; current proxy: 	；當前代理：	；當前代理：
+代理不可用，请检查地址、端口或代理软件是否在运行	Proxy unavailable — check the address, port, or whether the proxy app is running	代理不可用，請檢查地址、端口或代理軟件是否在運行	代理不可用，請檢查地址、端口或代理軟件是否在運行
+点「开始测速」检查各下载源的连通质量。	Click "Start test" to check connectivity to each download source.	點「開始測速」檢查各下載源的連通質量。	點「開始測速」檢查各下載源的連通質量。
+测速中…（每个源最多 3 次采样，单次超时 5 秒）	Testing… (up to 3 samples per source, 5 s timeout each)	測速中…（每個源最多 3 次採樣，單次超時 5 秒）	測速中…（每個源最多 3 次採樣，單次超時 5 秒）
+测速启动失败：	Failed to start the speed test: 	測速啓動失敗：	測速啓動失敗：
+测速中…	Testing…	測速中…	測速中…
+所有源均不可达，请检查网络或代理设置	All sources unreachable — check the network or proxy settings	所有源均不可達，請檢查網絡或代理設置	所有源均不可達，請檢查網絡或代理設置
+推荐使用：	Recommended: 	推薦使用：	推薦使用：
+（延迟最低，	(lowest latency, 	（延遲最低，	（延遲最低，
+还没有可用的测速结果，请先测速	No speed test results yet — run a test first	還沒有可用的測速結果，請先測速	還沒有可用的測速結果，請先測速
+已将文件下载源与版本列表源设为「尽量使用镜像源」	File download and version list sources set to "prefer mirror"	已將文件下載源與版本列表源設爲「儘量使用鏡像源」	已將文件下載源與版本列表源設爲「儘量使用鏡像源」
+已将文件下载源与版本列表源设为「尽量使用官方源」	File download and version list sources set to "prefer official"	已將文件下載源與版本列表源設爲「儘量使用官方源」	已將文件下載源與版本列表源設爲「儘量使用官方源」
+该源用于社区资源检索，与下载源设置无关，无需应用	This source is for community resource search; unrelated to download sources — nothing to apply	該源用於社區資源檢索，與下載源設置無關，無需應用	該源用於社區資源檢索，與下載源設置無關，無需應用
+应用推荐源失败：	Failed to apply the recommended source: 	應用推薦源失敗：	應用推薦源失敗：
+若选择此项，即使在将来出现严重问题时，你也无法获取相关通知。	If you decline, you will not receive related notices even when serious issues appear later.	若選擇此項，即使在將來出現嚴重問題時，你也無法獲取相關通知。	若選擇此項，即使在將來出現嚴重問題時，你也無法獲取相關通知。
+导出 TCL 全部数据	Export all TCL data	導出 TCL 全部數據	導出 TCL 全部數據
+已导出全部数据：全局设置、	All data exported: global settings, 	已導出全部數據：全局設置、	已導出全部數據：全局設置、
+个实例的独立设置与合集清单（不包含背景图、皮肤等媒体文件）。	 instances' settings and the collection list (media files like backgrounds and skins are not included).	個實例的獨立設置與合集清單（不包含背景圖、皮膚等媒體文件）。	個實例的獨立設置與合集清單（不包含背景圖、皮膚等媒體文件）。
+导出数据失败：	Failed to export data: 	導出數據失敗：	導出數據失敗：
+导出数据失败	Data export failed	導出數據失敗	導出數據失敗
+导入 TCL 全部数据	Import all TCL data	導入 TCL 全部數據	導入 TCL 全部數據
+导入失败：文件并非有效的 TCL 数据导出文件。	Import failed: the file is not a valid TCL data export.	導入失敗：文件並非有效的 TCL 數據導出文件。	導入失敗：文件並非有效的 TCL 數據導出文件。
+导入数据失败	Data import failed	導入數據失敗	導入數據失敗
+导入将覆盖当前全部数据，且不可撤销：	Importing overwrites all current data and cannot be undone: 	導入將覆蓋當前全部數據，且不可撤銷：	導入將覆蓋當前全部數據，且不可撤銷：
+· 全局设置（含登录缓存、皮肤、网络代理等）	· Global settings (login cache, skins, network proxy, etc.)	· 全局設置（含登錄緩存、皮膚、網絡代理等）	· 全局設置（含登錄緩存、皮膚、網絡代理等）
+· 各实例的独立设置（仅路径仍存在的实例会被恢复）	· Per-instance settings (only instances whose paths still exist are restored)	· 各實例的獨立設置（僅路徑仍存在的實例會被恢復）	· 各實例的獨立設置（僅路徑仍存在的實例會被恢復）
+· 合集清单	· Collection list	· 合集清單	· 合集清單
+是否继续？	Continue?	是否繼續？	是否繼續？
+导入数据	Import data	導入數據	導入數據
+导入数据失败：	Failed to import data: 	導入數據失敗：	導入數據失敗：
+数据导入完成：恢复设置	Import finished: restored 	數據導入完成：恢復設置	數據導入完成：恢復設置
+项、实例独立设置	 settings, 	項、實例獨立設置	項、實例獨立設置
+个，合集清单	 instance settings, and a collection list of 	個，合集清單	個，合集清單
+已恢复	 restored	已恢復	已恢復
+无变化	no change	無變化	無變化
+大部分设置已即时生效；少数（如缓存文件夹路径）将在重启 TCL 后完全生效。	Most settings apply immediately; a few (like the cache folder path) fully apply after restarting TCL.	大部分設置已即時生效；少數（如緩存文件夾路徑）將在重啓 TCL 後完全生效。	大部分設置已即時生效；少數（如緩存文件夾路徑）將在重啓 TCL 後完全生效。

@@ -66,6 +66,9 @@
     ''' 按当前搜索词与排序方式重建列表（对齐 LumilioCL 世界页的搜索 / 排序）。
     ''' </summary>
     Private Sub Rebuild()
+        'InitializeComponent 期间排序 ComboBox 的默认选中会触发 SelectionChanged，
+        '此时 PanSaves / CardList 尚未完成 XAML 赋值，直接跳过（Loaded 后会统一 Refresh）
+        If PanSaves Is Nothing OrElse CardList Is Nothing Then Return
         PanSaves.Children.Clear()
         Dim Keyword As String = If(TxtSearch Is Nothing, "", If(TxtSearch.Text, "")).Trim()
         Dim Filtered As IEnumerable(Of DirectoryInfo) = AllSaves

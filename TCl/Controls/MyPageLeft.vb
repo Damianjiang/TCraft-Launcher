@@ -2,6 +2,36 @@ Public Class MyPageLeft
     Inherits Grid
     Private Uuid As Integer = GetUuid()
 
+    '第 144 轮：全局侧边栏滚动。与设置 / 下载页一致：导航 StackPanel 超出窗口高度时可竖向滚动，
+    '内容不超高时不显示滚动条。只处理「唯一子元素为导航 StackPanel」的页面；
+    '设置 / 下载 / 首页 / 实例选择等自带滚动或复杂布局的页面不受影响。
+    Private SidebarScrollReady As Boolean = False
+
+    Private Sub MyPageLeft_Loaded(sender As Object, e As RoutedEventArgs) Handles Me.Loaded
+        EnsureSidebarScrollable()
+    End Sub
+
+    Private Sub EnsureSidebarScrollable()
+        If SidebarScrollReady Then Return
+        SidebarScrollReady = True
+        Try
+            If Children.Count <> 1 Then Return
+            Dim Target = TryCast(Children(0), StackPanel)
+            If Target Is Nothing Then Return
+            Dim Scroll As New MyScrollViewer With {
+                .PanningMode = PanningMode.VerticalOnly,
+                .HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                .VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+            }
+            Try : Scroll.Style = CType(FindResource("ScrollViewerFullMargin"), Style) : Catch : End Try
+            Children.Remove(Target)
+            Scroll.Content = Target
+            Children.Add(Scroll)
+        Catch ex As Exception
+            Logger.Warn(ex, "侧边栏滚动包装失败")
+        End Try
+    End Sub
+
     '执行逐个进入动画的控件
     Public Property AnimatedControl As String '需要在 Loaded 之后才能获取到控件，所以不能用 Binding 直接绑定
         Get

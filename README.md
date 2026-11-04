@@ -6,7 +6,7 @@
 
 **轻一点，快一点。**
 
-一个单文件的 Minecraft 启动器：3.5 MB，冷启动约 5 秒，开源、免费、无广告。
+一个单文件的 Minecraft 启动器：3.5 MB，冷启动约 2 秒，开源、免费、无广告。
 
 [![Release](https://img.shields.io/github/v/release/Damianjiang/TCraft-Launcher?style=flat-square&color=f2b632)](https://github.com/Damianjiang/TCraft-Launcher/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/Damianjiang/TCraft-Launcher/total?style=flat-square&color=5eead4)](https://github.com/Damianjiang/TCraft-Launcher/releases)
@@ -28,7 +28,7 @@ TCraft Launcher（简称 **TCL**）是一个用 VB.NET / WPF 写的 Minecraft �
 拷到哪儿都能跑，删掉就是卸载。
 
 - **单文件发布**：启动核心与工具库以压缩快照内嵌进 exe，无需运行库依赖。
-- **快**：延迟初始化 + 汇编缓存 + UI 资源按需加载，冷启动约 5 秒，空闲占用接近 0。
+- **快**：延迟初始化 + 汇编缓存 + UI 资源按需加载，冷启动约 2 秒，空闲占用接近 0。
 - **好看、可换**：Win11 风格半透明界面，支持自定义壁纸、背景视频、音乐与主题色。
 - **多语言**：内置中英文，运行时可热更新语言表。
 
@@ -61,7 +61,7 @@ TCraft Launcher（简称 **TCL**）是一个用 VB.NET / WPF 写的 Minecraft �
 
 - **系统**：Windows 7 SP1 及以上（推荐 Windows 10 / 11），64 位
 - **体积**：3.49 MiB
-- **SHA-256**：`9905f8ee16776b3115706f6238ddc819b7753176e24e102a7f7ba23100c74281`
+- **SHA-256**：`5036ad9a0c9bb6f55e79b05493cb699465f15f8fa36041a6b2836b3d4af71ae9`
 
 > 项目未购买代码签名证书，SmartScreen 可能提示「未知发布者」。
 > 可核对上方哈希，或直接从源码构建。
