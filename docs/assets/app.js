@@ -146,9 +146,19 @@
     } catch {}
     if (!info) {
       try {
-        const res = await fetch(API, { headers: { Accept: "application/vnd.github+json" } });
-        if (!res.ok) throw new Error(String(res.status));
-        const raw = await res.json();
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 6000);
+        let raw;
+        try {
+          const res = await fetch(API, {
+            signal: controller.signal,
+            headers: { Accept: "application/vnd.github+json" }
+          });
+          if (!res.ok) throw new Error(String(res.status));
+          raw = await res.json();
+        } finally {
+          clearTimeout(timer);
+        }
         info = {
           published_at: raw.published_at,
           body: raw.body || "",
@@ -162,7 +172,8 @@
       } catch { info = null; }
     }
     if (!info) {
-      set("size", "—");
+      // 接口不可达时给出可用的兜底值；下载按钮本身不依赖接口
+      set("size", "≈3.5 MiB");
       set("date", "—");
       set("sha", fallback);
       return;
