@@ -1,0 +1,154 @@
+# ModNameIndex.dat — 本仓库自研 Mod 中文名索引（非第三方专有数据）
+# 格式：slug | 中文主名 | 别名(英文缩写/拼音全拼/首字母, 用 / 分隔) | 权重(0-100)
+# 说明：
+#   - 别名可写中文俗称、英文缩写、拼音全拼、首字母缩写（引擎大小写不敏感，写小写即可）
+#   - 想让用户能按拼音/缩写搜某 Mod，就在别名里加上，例如 机械动力 加 jxd / jixiedongli
+#   - 加一行即生效、无需重编译；# 开头为注释；冷门 Mod 不必收录（搜不到自动降级英文搜索）
+#   - 只收录高知名度/高下载量、中文译名众所周知的 Mod，保证别名置信度高
+
+# ---- 加载器 / 引擎 ----
+forge               | Forge 加载器   | forge | 100
+neoforge            | NeoForge 加载器 | neoforge | 95
+fabric              | Fabric 加载器   | fabric | 95
+optifine            | OptiFine 高清   | optifine | 95
+liteloader          | LiteLoader     | liteloader | 70
+cleanroom           | Cleanroom      | cleanroom | 50
+
+# ---- 物品查看 / 配方 ----
+jei                 | 物品管理器     | jei/item/配方查看器/wpgl/wupinguanli | 100
+jei-recipes         | 物品管理器配方扩展 | 配方扩展 | 55
+jei-api             | 物品管理器 API |  | 65
+jei-spawn-egg       | 物品管理器刷怪蛋 |  | 45
+jei-utility         | 物品管理器工具 |  | 50
+jei-misc            | 物品管理器杂项 |  | 45
+jei-schematics      | 物品管理器结构图 |  | 50
+jei-search          | 物品管理器搜索 |  | 50
+jei-crafting-grid   | 物品管理器合成格 |  | 60
+jei-compatibility   | 物品管理器兼容 |  | 55
+jei-structure-display| 物品管理器结构显示 |  | 50
+jei-annotations     | 物品管理器注释 |  | 50
+jei-structure-spawn | 物品管理器结构生成 |  | 50
+jei-batch-craft     | 物品管理器批量合成 |  | 45
+emi                 | 嵌入式物品管理器 | emi/item | 85
+craftpedia          | 合成指南       | 合成指南/craftpedia | 70
+
+# ---- 地图 / 导航 ----
+journeymap          | 旅途地图       | journeymap/jm/地图/旅途/lvtdit | 100
+journeymap-server   | 旅途地图服务端 |  | 70
+waystones           | 界碑          | waystone/界碑/传送碑/jiebi | 95
+xre                 | 经验之球优化   | xre/经验 | 80
+traveling           | 旅行          | traveling/旅行 | 75
+traveling-hub       | 旅行中心       |  | 70
+patrix              | 地图          | patrix | 70
+
+# ---- 红石 / 电力 / 通用 ----
+rftools             | 红石工具       | rftools/rf | 95
+rftoolspower        | 红石工具电力   | 电力 | 85
+rftoolsstorage      | 红石工具存储   | 存储 | 85
+rftoolsutility      | 红石工具实用   |  | 85
+rftoolscontrol      | 红石工具控制   |  | 85
+cofhcore            | 通用核心       | cofh/core | 90
+redstoneflux        | 红石通量       | 通量/flux | 85
+thermal             | 热力系列       | thermal/热力 | 95
+thermalfoundation   | 热力基础       |  | 90
+thermalexpansion    | 热力扩张       | 热力扩容/热扩 | 85
+thermaldynamics     | 热力动力       | 热动 | 80
+thermalinnovation   | 热力创新       | 热创 | 75
+appliedenergistics2 | 应用能源系统   | ae2/ae/应用能源 | 100
+ae2                 | 应用能源系统 2 | ae2/应用能源 | 90
+immersiveengineering| 沉浸工程       | ie/浸工/沉浸工程 | 100
+immersive-portals   | 沉浸传送门     | 传送门 | 85
+immersive-wrench    | 沉浸扳手       | 扳手 | 80
+immersivepetroleum  | 沉浸石油       |  | 75
+immersiveconduits   | 沉浸导管       |  | 75
+immersiveintegration| 沉浸集成       |  | 70
+mekanism            | 梅卡尼姆       | mek/mekanism/械子 | 95
+mekanismgenerators  | 梅卡尼姆发电机 | 发电机 | 85
+mekanismtools       | 梅卡尼姆工具   |  | 85
+mekanismadditions   | 梅卡尼姆附加   |  | 85
+compactdrawers      | 紧凑抽屉       | 抽屉 | 80
+excompressum        | 额外压缩器     | 压缩器 | 75
+ironjetsons         | 铁匠杰克逊     | ij/铁匠 | 85
+torchmaster         | 火把大师       | 火把 | 85
+catalysts           | 催化剂         |  | 75
+custommodeldata     | 自定义模型数据 | cmd | 85
+
+# ---- 机械 / 自动化 / 魔法 ----
+create              | 机械动力       | create/造物/jxdl/jixiedongli/jixie/jx | 100
+create-foundation   | 机械动力基础   |  | 85
+create-automation   | 机械动力自动化 |  | 85
+create-trains       | 机械动力列车   | 列车 | 90
+create-content      | 机械动力内容   |  | 85
+botania             | 植物魔法       | 花魔/盆栽/zwmf/zhiwumofa | 95
+botanypotato        | 植物薯片       |  | 65
+schematica          | 结构          | schematica/结构 | 85
+chorus              | 歌块          | chorus | 70
+
+# ---- 渲染 / 性能 ----
+sodium              | 渲染优化       | sodium/速钠 | 95
+sodium-extra        | 钠附加         |  | 70
+lithium             | 性能优化       | lithium/锂 | 85
+phosphor            | 实体渲染优化   | phosphor/磷 | 85
+rubidium            | 实体动画优化   | rubidium/铼 | 85
+embeddium           | 嵌入式渲染     | embeddium | 85
+krypton             | 性能优化       | krypton/氪 | 80
+iris-shaders        | Iris 光影      | iris/光影 | 90
+oculus              | 实体光影       | oculus | 85
+cavebiome           | 洞穴生物群系   |  | 70
+cavebiomeapi        | 洞穴生物群系 API |  | 60
+cullthefull         | 剔除全块       |  | 70
+lambdaplus          | 光源扩展       |  | 70
+dynamiclights       | 动态光源       |  | 75
+nohotkeys           | 禁用热键       |  | 70
+betterfps           | 帧率优化       |  | 75
+
+# ---- 光影 (Shaders) ----
+optixl              | OptiFine 替代  |  | 85
+complementary-shaders| 综合光影       | 光影 | 85
+bladestorm-shaders  | 风暴光影       |  | 75
+sildurs-vibrant-shaders| 色彩光影    | sildur | 70
+bclib               | 光影库         |  | 65
+
+# ---- 世界 / 建筑 ----
+worldedit           | 世界编辑       | we/worldedit/世界编辑 | 95
+worldguard          | 世界守卫       |  | 80
+chunkloaders        | 区块加载器     |  | 75
+dimensional-door    | 维度之门       |  | 65
+cyclic              | 循环          |  | 60
+railcraft           | 铁路          | railcraft/铁路 | 80
+
+# ---- 魔法 / 冒险 ----
+thaumcraft          | 神秘学         |  | 85
+alexmobs            | 亚历克生物     | alex's mobs | 80
+dungeon-tactics     | 地牢战术       |  | 70
+ice-and-fire        | 冰与火         |  | 75
+aether              | 异星          | aether | 75
+undergarden         | 地底花园       |  | 75
+twilightforest      | 暮色森林       | 暮色森林 | 80
+witchcraft          | 巫术          |  | 70
+blood-magic         | 血魔法         |  | 70
+artemis-galaxies    | 阿尔忒弥斯星系 |  | 65
+astral-additions    | 星界附加       |  | 60
+astral-core         | 星界核心       |  | 60
+
+# ---- 服务器 / 管理 ----
+luckyperms          | 幸运权限       |  | 75
+essentials          | Essentials    | essentials | 75
+spark               | 性能监控       |  | 80
+game-rule-checker   | 游戏规则检查   |  | 60
+server-rules        | 服务器规则     |  | 55
+
+# ---- 工具 / 其他 ----
+mineflayer          | Mineflayer    |  | 65
+mcfunction          | MC 函数       |  | 55
+farsight            | 远视          |  | 55
+better-than-minecraft| 比 MC 更好    |  | 50
+dank-memer          | Dank Memer    |  | 45
+multi-commands      | 多命令         |  | 50
+
+# ---- 车辆 / 载具 ----
+vehicle-tracker-mod | 载具追踪       | vtm | 60
+cars                | 汽车          |  | 50
+
+# ---- 数据包 / 功能包 ----
+csp                 | 兼容性数据包   | csp | 60

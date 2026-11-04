@@ -1,0 +1,65 @@
+<local:MyPageRight x:Class="PageInstanceSaves"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="clr-namespace:TCraft"
+    PanScroll="PanBack">
+    <Grid x:Name="PanPageRoot">
+
+        <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
+            <StackPanel x:Name="PanMain" Margin="25,10" Grid.IsSharedSizeScope="True">
+
+                <!-- 快速操作 -->
+                <local:MyCard Margin="0,15" Title="快速操作">
+                    <WrapPanel Margin="25,40,21,5" ItemHeight="50">
+                        <local:MyButton x:Name="BtnOpenFolder" MinWidth="140" Text="打开存档文件夹"
+                                        Margin="0,0,15,15" ColorType="Highlight" />
+                        <local:MyButton x:Name="BtnImport" MinWidth="140" Text="导入存档" Margin="0,0,15,15"
+                                        ToolTip="从本地文件夹复制一个存档到当前版本。" />
+                        <local:MyButton x:Name="BtnImportZip" MinWidth="140" Text="导入 .zip" Margin="0,0,15,15"
+                                        ToolTip="从压缩包导入世界：自动识别包含 level.dat 的目录。" />
+                        <local:MyButton x:Name="BtnRefresh" MinWidth="140" Text="刷新列表" Margin="0,0,15,15" />
+                    </WrapPanel>
+                </local:MyCard>
+
+                <!-- 存档列表 -->
+                <local:MyCard x:Name="CardList" Margin="0,0,0,15" Title="存档列表">
+                    <StackPanel Margin="25,44,20,15">
+                        <Grid Margin="0,0,5,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <local:MySearchBox x:Name="TxtSearch" Grid.Column="0" Height="32" MaxWidth="320"
+                                               HorizontalAlignment="Left" HintText="搜索世界名称或文件夹名"
+                                               TextChanged="Search_Changed" />
+                            <local:MyComboBox x:Name="ComboSort" Grid.Column="1" Width="150" Height="32" Margin="12,0,0,0"
+                                              SelectionChanged="Sort_Changed">
+                                <local:MyComboBoxItem Content="最近游玩" IsSelected="True" />
+                                <local:MyComboBoxItem Content="名称" />
+                            </local:MyComboBox>
+                        </Grid>
+                        <StackPanel Name="PanSaves" VerticalAlignment="Top" />
+                    </StackPanel>
+                </local:MyCard>
+
+            </StackPanel>
+        </local:MyScrollViewer>
+
+        <!-- 世界信息 / 备份列表：页内覆盖层（不新建 Window，避免多窗口闪烁） -->
+        <Grid x:Name="PanOverlay" Visibility="Collapsed" Background="#66000000">
+            <local:MyCard x:Name="CardOverlay" Width="460" MaxHeight="620" UseAnimation="False"
+                          HorizontalAlignment="Center" VerticalAlignment="Center" Title="世界信息">
+                <local:MyScrollViewer x:Name="PanOverlayScroll" Margin="0,42,0,0" MaxHeight="520"
+                                      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel x:Name="PanOverlayBody" Margin="25,0,20,16" />
+                </local:MyScrollViewer>
+                <local:MyIconButton x:Name="BtnOverlayClose" Width="30" Height="30" SvgIcon="lucide/x"
+                                    HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,6,8,0"
+                                    ToolTip="关闭" />
+            </local:MyCard>
+        </Grid>
+
+    </Grid>
+</local:MyPageRight>

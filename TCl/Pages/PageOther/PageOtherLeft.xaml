@@ -1,0 +1,13 @@
+<local:MyPageLeft x:Class="PageOtherLeft"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:TCraft" AnimatedControl="PanItem">
+    <StackPanel Margin="0,12,0,0" Name="PanItem">
+        <local:MyListItem x:Name="ItemHelp" IsScaleAnimationEnabled="False" Type="RadioBox" Tag="0" MinPaddingRight="35" Height="36" VerticalAlignment="Top" Title="帮助" SvgIcon="lucide/circle-help" />
+        <local:MyListItem x:Name="ItemAbout" IsScaleAnimationEnabled="False" Checked="True" Type="RadioBox" Tag="1" MinPaddingRight="35" Height="36" VerticalAlignment="Top" Title="关于"
+                          LogoScale="0.98" SvgIcon="lucide/info" />
+        <local:MyListItem x:Name="ItemTest" IsScaleAnimationEnabled="False" Type="RadioBox" Tag="2" MinPaddingRight="35" Height="36" VerticalAlignment="Top" Title="实用工具" SvgIcon="lucide/wrench" />
+        <local:MyListItem x:Name="ItemNews" IsScaleAnimationEnabled="False" Type="RadioBox" Tag="3" MinPaddingRight="35" Height="36" VerticalAlignment="Top" Title="Minecraft 新闻" SvgIcon="lucide/newspaper" />
+        <local:MyListItem x:Name="ItemSetup" IsScaleAnimationEnabled="False" Type="Clickable" MinPaddingRight="35" Height="36" VerticalAlignment="Top" Title="设置" SvgIcon="lucide/settings" Margin="0,8,0,0" />
+    </StackPanel>
+</local:MyPageLeft>

@@ -1,0 +1,42 @@
+<local:MyPageRight
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:TCraft" xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d" x:Class="PageInstanceCompResource"
+    PanScroll="{Binding ElementName=PanBack}" Grid.IsSharedSizeScope="True">
+    <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
+        <Grid>
+            <local:MyCard HorizontalAlignment="Center" VerticalAlignment="Center" Margin="40" x:Name="PanNoPack">
+                <Grid Margin="20,17">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Margin="0,0,0,9" HorizontalAlignment="Center"
+                               Text="未找到整合包清单" FontSize="19"
+                               Foreground="{DynamicResource ColorBrush3}" />
+                    <Rectangle Grid.Row="1" HorizontalAlignment="Stretch" Height="2"
+                               Fill="{DynamicResource ColorBrush3}" />
+                    <TextBlock Grid.Row="2" Margin="10,15,10,5" TextWrapping="Wrap"
+                               Text="该版本不是由整合包安装的，或原始整合包文件已被删除。整合包清单需要版本目录下的「原始整合包.zip / .mrpack」。" />
+                </Grid>
+            </local:MyCard>
+            <StackPanel Orientation="Vertical" Margin="10,25,10,10" x:Name="PanContent">
+                <local:MyCard Margin="15,0,15,15" x:Name="CardPack" Title="整合包信息">
+                    <StackPanel Margin="25,40,20,18">
+                        <TextBlock x:Name="LabPackName" FontSize="16" FontWeight="Bold" TextWrapping="Wrap" />
+                        <TextBlock x:Name="LabPackInfo" Margin="0,6,0,0" Opacity="0.7" TextWrapping="Wrap" />
+                    </StackPanel>
+                </local:MyCard>
+                <local:MyCard Margin="15,0,15,15" Title="资源清单">
+                    <StackPanel Margin="20,40,20,15">
+                        <TextBlock x:Name="LabTip" Opacity="0.7" TextWrapping="Wrap" />
+                        <StackPanel x:Name="PanFiles" Margin="0,10,0,0" />
+                    </StackPanel>
+                </local:MyCard>
+            </StackPanel>
+        </Grid>
+    </local:MyScrollViewer>
+</local:MyPageRight>

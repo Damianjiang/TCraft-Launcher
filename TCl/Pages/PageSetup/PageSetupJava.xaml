@@ -1,0 +1,41 @@
+<local:MyPageRight x:Class="PageSetupJava"
+                   xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                   xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                   xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                   xmlns:local="clr-namespace:TCraft"
+                   mc:Ignorable="d"
+                   d:DesignHeight="450" d:DesignWidth="800"
+                   PanScroll="{Binding ElementName=PanBack}" RenderOptions.BitmapScalingMode="LowQuality">
+    <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
+        <DockPanel>
+            <!-- Win11 风格页头 -->
+            <StackPanel DockPanel.Dock="Top" Margin="40,20,36,2">
+                <TextBlock Text="Java" FontSize="30" FontWeight="SemiBold" Foreground="{DynamicResource ColorBrush1}" />
+                <TextBlock Text="管理可用的 Java 运行时，并设置优先级。" FontSize="13" Opacity="0.55" Margin="0,6,0,0" Foreground="{DynamicResource ColorBrush1}" />
+            </StackPanel>
+            <local:MyCard DockPanel.Dock="Top" Title="Java 管理" Margin="32,24,32,0">
+                <StackPanel Margin="32,44,32,26">
+                    <TextBlock TextWrapping="Wrap" FontSize="13" Opacity="0.75" Foreground="{DynamicResource ColorBrush1}"
+                               Text="TCL 需要 Java 才能启动游戏。列表中的第一个可用 Java 将被默认使用，可用右侧箭头调整优先级。" />
+                    <TextBlock x:Name="LabStatus" TextWrapping="Wrap" FontSize="12" Margin="0,10,0,0"
+                               Foreground="{DynamicResource ColorBrushGray4}" Text="" />
+                    <WrapPanel ItemHeight="35" Margin="0,18,0,0">
+                        <local:MyButton MinWidth="130" Text="导入 Java…" ColorType="Highlight" Margin="0,0,15,0"
+                                        Click="BtnImport_Click" />
+                        <local:MyButton x:Name="BtnDownload" MinWidth="110" Text="下载 Java…" ColorType="Normal" Margin="0,0,15,0"
+                                        Click="BtnDownload_Click" />
+                        <local:MyButton x:Name="BtnSearch" MinWidth="110" Text="重新搜索" ColorType="Normal" Margin="0,0,15,0"
+                                        Click="BtnSearch_Click" />
+                        <local:MyButton MinWidth="110" Text="打开数据文件夹" ColorType="Normal" Margin="0,0,15,0"
+                                        Click="BtnOpenFolder_Click" />
+                        <local:MyButton MinWidth="110" Text="初始化此项" ColorType="Red" Click="BtnReset_Click" />
+                    </WrapPanel>
+                </StackPanel>
+            </local:MyCard>
+            <local:MyCard Title="已发现的 Java" Margin="32,24,32,28" x:Name="PanContent">
+                <StackPanel Name="PanList" Orientation="Vertical" Margin="24,40,20,20" />
+            </local:MyCard>
+        </DockPanel>
+    </local:MyScrollViewer>
+</local:MyPageRight>
