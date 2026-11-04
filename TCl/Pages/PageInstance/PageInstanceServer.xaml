@@ -1,0 +1,59 @@
+<local:MyPageRight
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:TCraft" xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d" x:Class="PageInstanceServer"
+    PanScroll="{Binding ElementName=PanBack}">
+    <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
+        <Grid>
+            <!-- UseAnimation=False 必须保留：卡片在 ScrollViewer 里 Center 布局，高度动画会与滚动测量互相触发，导致界面卡死 -->
+            <local:MyCard HorizontalAlignment="Center" VerticalAlignment="Center" Margin="40" x:Name="PanNoServer" UseAnimation="False">
+                <Grid Margin="20,17">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="1*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Row="0" Grid.ColumnSpan="4" Margin="0,0,0,9" HorizontalAlignment="Center"
+                               Text="还没有服务器" FontSize="19"
+                               UseLayoutRounding="True" SnapsToDevicePixels="True"
+                               Foreground="{DynamicResource ColorBrush3}" />
+                    <Rectangle Grid.Row="1" Grid.ColumnSpan="4" HorizontalAlignment="Stretch" Height="2"
+                               Fill="{DynamicResource ColorBrush3}" />
+                    <TextBlock Grid.Row="2" Grid.ColumnSpan="4" Margin="10,15,10,5"
+                               Text="添加服务器后，可以在这里查看在线状态、玩家数量与延迟。" TextWrapping="Wrap" />
+                    <local:MyButton Grid.Row="3" Grid.Column="1" Height="35" HorizontalAlignment="Center"
+                                    x:Name="BtnAddTop" MinWidth="140"
+                                    Text="添加服务器" Margin="10,10,10,0"
+                                    Padding="13,0" ColorType="Highlight" />
+                </Grid>
+            </local:MyCard>
+            <StackPanel Orientation="Vertical" Margin="10,25,10,10" x:Name="PanContent">
+                <local:MyCard Margin="15,0,15,15" Title="服务器列表" UseAnimation="False">
+                    <Grid Height="35" Margin="25,40,15,20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <local:MyButton Grid.Column="0" MinWidth="140"
+                                        Text="添加服务器" Padding="13,0"
+                                        Margin="0,0,20,0"
+                                        HorizontalAlignment="Left" x:Name="BtnAdd" ColorType="Highlight" />
+                        <local:MyButton Grid.Column="1" MinWidth="140"
+                                        Text="刷新状态" Padding="13,0"
+                                        HorizontalAlignment="Left" x:Name="BtnRefresh" />
+                    </Grid>
+                </local:MyCard>
+                <StackPanel Margin="0,0,0,25" Name="PanServers" />
+            </StackPanel>
+        </Grid>
+    </local:MyScrollViewer>
+</local:MyPageRight>

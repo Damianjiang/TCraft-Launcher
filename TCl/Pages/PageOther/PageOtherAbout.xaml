@@ -1,0 +1,37 @@
+﻿<local:MyPageRight
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:TCraft" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+    mc:Ignorable="d" x:Class="PageOtherAbout"
+    PanScroll="PanBack" RenderOptions.BitmapScalingMode="LowQuality">
+    <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
+        <StackPanel x:Name="PanMain" Margin="25,10" Grid.IsSharedSizeScope="True">
+            <!-- 法律声明置顶：按 Minecraft 使用准则的「醒目免责」要求补全（官方原句必须逐字保留英文），
+                 条款较长，用与下载页一致的 CanSwap 折叠卡默认收起，点标题展开 -->
+            <local:MyCard Margin="0,15,0,15" Title="法律声明" Height="40" CanSwap="True" IsSwapped="True" SwapLogoRight="True">
+                <StackPanel Margin="25,42,23,20">
+                    <!-- 官方要求的免责句，必须醒目；英文原句不译，保证与 Mojang 原文逐字一致 -->
+                    <TextBlock TextWrapping="Wrap" LineHeight="21" FontSize="13" FontWeight="Bold"
+                               Foreground="{DynamicResource ColorBrush1}"
+                               Text="NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.&#xa;非 MINECRAFT 官方产品。未经 MOJANG 或 MICROSOFT 批准，也不与 MOJANG 或 MICROSOFT 关联。" />
+                    <TextBlock Margin="0,16,0,0" TextWrapping="Wrap" LineHeight="22"
+                               Text="Minecraft、Minecraft 徽标及相关名称、品牌、图像与音效的著作权和商标权，均归 Mojang Synergies AB 与 Microsoft 所有，本启动器不主张任何权利，也不将 Minecraft 名称用作自身的主标题或标识。&#xa;&#xa;TCraft Launcher（简称 TCL）由 TCraft 团队独立开发与维护，与 Mojang Studios、Microsoft、网易（Minecraft 中国代理）均无隶属、赞助、授权、合作或背书关系，也未获其审查或认可。&#xa;&#xa;本启动器不包含、不分发 Minecraft 游戏本体或任何游戏文件，不提供破解、盗版、绕过正版验证或规避付费的功能；游戏本体与更新始终来自官方渠道。TCL 不运营也不代理任何 Minecraft 服务器，联机功能只负责把你已连接的设备互相连通。&#xa;&#xa;使用本启动器即表示：你已通过官方渠道购买 Minecraft: Java Edition 并持有有效账户，已阅读并同意《Minecraft 最终用户许可协议》（EULA）与《Minecraft 使用准则》；未成年人须取得监护人同意。使用本软件的风险由你自行承担。&#xa;&#xa;本启动器完全免费，不出售、不租赁、不设付费解锁，也不将 Minecraft 品牌用于商业推广。任何以 TCL 名义收费的行为均与本团队无关，也不能作为获得 Minecraft 的途径。" />
+                    <TextBlock Margin="0,16,0,0" TextWrapping="Wrap" LineHeight="22"
+                               Text="开发者、发布者与责任方均为 TCraft 团队。本软件按「现状」提供，不对使用或无法使用本软件造成的直接、间接损失承担责任；对存档、配置等文件的操作请自行备份。&#xa;&#xa;侵权投诉、合规问题与功能反馈：QQ 群 1081955336（本项目唯一对外渠道）。涉及 Minecraft 品牌的投诉，也可通过 https://help.minecraft.net/ 联系 Mojang。&#xa;&#xa;Minecraft EULA：https://www.minecraft.net/eula&#xa;Minecraft 使用准则：https://www.minecraft.net/usage-guidelines&#xa;本启动器使用了 Lucide 图标库（ISC 协议）等开源组件，相关权利归各自作者所有。" />
+                </StackPanel>
+            </local:MyCard>
+            <local:MyCard Margin="0,15,0,15" Title="关于">
+                <TextBlock Margin="25,42,23,20" TextWrapping="Wrap" LineHeight="22"
+                           Text="TCraft Launcher 1.2 由 TCraft 团队开发与维护，持续更新，并已在 GitHub 开源。&#xa;提供游戏与模组、整合包、资源包、光影的下载与管理，支持原版、Forge / NeoForge / Fabric / OptiFine / LiteLoader。&#xa;同时提供登录、启动、联机、实例与整合包导出等完整能力。&#xa;加入 QQ 群 1081955336，获取更新、反馈问题。" />
+            </local:MyCard>
+            <local:MyCard Margin="0,15,0,15" Title="参考与致谢">
+                <TextBlock Margin="25,42,23,20" TextWrapping="Wrap" LineHeight="22"
+                           Text="TCL 的功能规划与交互设计参考了 HMCL（Hello Minecraft! Launcher）的成熟方案；版本安装、资源下载、启动参数构建等核心流程，参考了 PCL（Plain Craft Launcher，作者龙腾猫跃）的主体代码。&#xa;上述参考仅用于学习与兼容性实现：TCL 的界面与代码由 TCraft 团队使用 VB.NET / C# 重新编写，与 HMCL、PCL 均无隶属、赞助或背书关系，也不会与其混淆。在此向 HMCL 开发者与龙腾猫跃致谢。&#xa;同时感谢 Lucide 图标库（ISC）等开源组件，相关权利归各自作者所有。" />
+            </local:MyCard>
+            <local:MyCard Margin="0,15,0,15" Title="开源地址">
+                <TextBlock Margin="25,42,23,20" TextWrapping="Wrap" LineHeight="22"
+                           Text="https://github.com/Damianjiang/TCraft-Launcher&#xa;欢迎提交 Issue 与 Pull Request，也欢迎 Star 支持。" />
+            </local:MyCard>
+        </StackPanel>
+    </local:MyScrollViewer>
+</local:MyPageRight>

@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TCraft Launcher — 轻量、好看、开箱即用的 Minecraft 启动器</title>
+<meta name="description" content="TCraft Launcher（TCL）是一款开源免费的 Minecraft 启动器：单文件 3.5 MB，冷启动约 5 秒，支持 Forge / NeoForge / Fabric / OptiFine，整合包一键安装、多实例隔离、正版与离线登录、3D 皮肤预览。">
+<meta name="keywords" content="Minecraft启动器,我的世界启动器,TCL,TCraft Launcher,轻量启动器,开源启动器,Forge,Fabric,NeoForge,OptiFine,整合包,Mod下载,离线登录,PCL,HMCL">
+<meta name="author" content="TCraft Team">
+<meta name="theme-color" content="#08090d">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="https://damianjiang.github.io/TCraft-Launcher/">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="TCraft Launcher">
+<meta property="og:title" content="TCraft Launcher — 轻一点，快一点。">
+<meta property="og:description" content="单文件 3.5 MB，冷启动约 5 秒。开源免费的 Minecraft 启动器，支持 Forge / NeoForge / Fabric，整合包一键安装。">
+<meta property="og:url" content="https://damianjiang.github.io/TCraft-Launcher/">
+<meta property="og:image" content="https://damianjiang.github.io/TCraft-Launcher/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_CN">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="TCraft Launcher — 轻一点，快一点。">
+<meta name="twitter:description" content="单文件 3.5 MB，冷启动约 5 秒。开源免费的 Minecraft 启动器。">
+<meta name="twitter:image" content="https://damianjiang.github.io/TCraft-Launcher/assets/og.png">
+
+<link rel="icon" href="assets/icon-256.png" sizes="any">
+<link rel="apple-touch-icon" href="assets/icon-256.png">
+<link rel="stylesheet" href="assets/style.css">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "TCraft Launcher",
+  "alternateName": ["TCL", "TCL 启动器", "TCraft 启动器"],
+  "applicationCategory": "GameApplication",
+  "operatingSystem": "Windows 7 SP1, Windows 10, Windows 11",
+  "description": "开源免费的 Minecraft 启动器，单文件 3.5 MB，冷启动约 5 秒，支持 Forge、NeoForge、Fabric、OptiFine 与整合包一键安装。",
+  "url": "https://damianjiang.github.io/TCraft-Launcher/",
+  "downloadUrl": "https://github.com/Damianjiang/TCraft-Launcher/releases/latest",
+  "softwareVersion": "1.2",
+  "fileSize": "3.5MB",
+  "inLanguage": "zh-CN",
+  "license": "https://opensource.org/licenses/MIT",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" },
+  "author": { "@type": "Organization", "name": "TCraft Team" }
+}
+</script>
+</head>
+<body>
+
+<div class="progress" id="progress" aria-hidden="true"></div>
+
+<header class="nav" id="nav">
+  <div class="wrap nav__inner">
+    <a class="brand" href="#top" aria-label="TCraft Launcher 首页">
+      <img src="assets/logo.png" alt="TCraft Launcher 图标" width="30" height="30">
+      <span>TCraft<small>LAUNCHER</small></span>
+    </a>
+    <nav class="nav__links" aria-label="主导航">
+      <a href="#why">为什么</a>
+      <a href="#features">功能</a>
+      <a href="#showcase">界面</a>
+      <a href="#download">下载</a>
+      <a href="#faq">常见问题</a>
+    </nav>
+    <div class="nav__actions">
+      <a class="btn btn--ghost btn--sm" href="https://github.com/Damianjiang/TCraft-Launcher" target="_blank" rel="noopener">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        GitHub
+      </a>
+      <a class="btn btn--primary btn--sm" href="#download">下载</a>
+      <button class="nav__burger" id="burger" aria-label="打开菜单" aria-expanded="false"><span></span><span></span><span></span></button>
+    </div>
+  </div>
+</header>
+
+<div class="mobile-menu" id="mobileMenu">
+  <a href="#why">为什么选择 TCL</a>
+  <a href="#features">功能</a>
+  <a href="#showcase">界面</a>
+  <a href="#download">下载</a>
+  <a href="#faq">常见问题</a>
+  <a href="https://github.com/Damianjiang/TCraft-Launcher" target="_blank" rel="noopener">GitHub 仓库</a>
+</div>
+
+<main id="top">
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero__bg" aria-hidden="true"></div>
+    <div class="hero__grid" aria-hidden="true"></div>
+    <div class="wrap hero__inner">
+      <div>
+        <span class="eyebrow"><b>v1.2</b> 开源 · 免费 · 无广告</span>
+        <h1>轻一点，<br><em>快一点。</em></h1>
+        <p class="hero__lead">
+          TCraft Launcher 是一个<strong>单文件</strong>的 Minecraft 启动器。
+          3.5 MB，冷启动约 5 秒。没有安装向导，没有捆绑，也没有打扰。
+        </p>
+        <div class="hero__cta">
+          <a class="btn btn--primary" href="https://github.com/Damianjiang/TCraft-Launcher/releases/latest" target="_blank" rel="noopener">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            下载 Windows 版
+          </a>
+          <a class="btn btn--ghost" href="https://github.com/Damianjiang/TCraft-Launcher" target="_blank" rel="noopener">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.6v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.1.1 1.7 1.2 1.7 1.2 1 1.7 2.6 1.2 3.3.9.1-.7.4-1.2.7-1.5-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0c2.2-1.5 3.2-1.2 3.2-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5Z"/></svg>
+            在 GitHub 上 Star
+          </a>
+        </div>
+        <div class="hero__meta">
+          <span>Windows 7 SP1 及以上</span>
+          <span>64 位 · 免安装</span>
+          <span>自动管理 Java</span>
+        </div>
+      </div>
+
+      <div class="hero__shot">
+        <div class="frame">
+          <div class="frame__bar" aria-hidden="true"><i></i><i></i><i></i><span>TCraft Launcher</span></div>
+          <img src="assets/shot-home.png" alt="TCraft Launcher 启动台界面" width="790" height="450" fetchpriority="high">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 数据条 -->
+  <div class="strip">
+    <div class="wrap strip__inner">
+      <div class="stat"><strong>3.5<small>MB</small></strong><span>单文件，无依赖</span></div>
+      <div class="stat"><strong>≈5<small>s</small></strong><span>冷启动进主界面</span></div>
+      <div class="stat"><strong>6<small>种</small></strong><span>启动核心与加载器</span></div>
+      <div class="stat"><strong>100<small>%</small></strong><span>开源，永久免费</span></div>
+    </div>
+  </div>
+
+  <!-- 为什么 -->
+  <section class="section" id="why">
+    <div class="wrap">
+      <div class="section__head" data-reveal>
+        <div class="kicker">Why TCL</div>
+        <h2>把启动游戏这件事，<br>做得<em>干净</em>一点。</h2>
+        <p class="section__desc">启动器不该是一个需要研究的东西。打开、选版本、点启动，剩下的交给它。</p>
+      </div>
+
+      <div class="reasons" data-reveal>
+        <div class="reason">
+          <div class="reason__icon" aria-hidden="true">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          </div>
+          <div class="reason__num">01</div>
+          <h3>一个文件，就是全部</h3>
+          <p>启动核心与工具库以压缩快照内嵌进 exe，不需要安装、不需要运行库、不会在系统里留下第二份 DLL。拷到 U 盘也能跑。</p>
+        </div>
+        <div class="reason">
+          <div class="reason__icon" aria-hidden="true">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          </div>
+          <div class="reason__num">02</div>
+          <h3>快，是设计出来的</h3>
+          <p>延迟初始化、资源字典按需加载、字体与网络预热放在后台。冷启动约 5 秒，空闲时 CPU 占用接近 0。</p>
+        </div>
+        <div class="reason">
+          <div class="reason__icon" aria-hidden="true">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="10.5" r="2.5"/><circle cx="8.5" cy="7.5" r="2.5"/><circle cx="6.5" cy="12.5" r="2.5"/><path d="M12 22a10 10 0 1 1 10-10c0 2-1 3-3 3h-2a2 2 0 0 0-2 2v2c0 2-1 3-3 3Z"/></svg>
+          </div>
+          <div class="reason__num">03</div>
+          <h3>好看，也可以很安静</h3>
+          <p>Win11 风格的半透明界面，支持壁纸、背景视频、音乐与主题色；全部可关，也可以只留一个干净的列表。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 功能 -->
+  <section class="section" id="features" style="padding-top:0">
+    <div class="wrap">
+      <div class="section__head" data-reveal>
+        <div class="kicker">Features</div>
+        <h2>该有的都有，<br>不该有的<em>都没有</em>。</h2>
+        <p class="section__desc">从原版安装到整合包迁移，从正版登录到联机开房，日常用得到的部分都做完整了。</p>
+      </div>
+
+      <div class="bento">
+        <article class="card card--wide" data-reveal data-spot>
+          <div class="card__icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.3 7 12 12 20.7 7"/><line x1="12" y1="22" x2="12" y2="12"/></svg>
+          </div>
+          <h3>版本安装与加载器</h3>
+          <p>原版一键安装，自动匹配 Java 与资源索引。Forge、NeoForge、Fabric、OptiFine、LiteLoader 都能直接装，安装失败会给出可读的原因，而不是一段堆栈。</p>
+          <div class="card__chips">
+            <span class="chip">Forge</span><span class="chip">NeoForge</span><span class="chip">Fabric</span><span class="chip">OptiFine</span><span class="chip">LiteLoader</span>
+          </div>
+        </article>
+
+        <article class="card card--wide" data-reveal data-spot>
+          <div class="card__icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
+          </div>
+          <h3>整合包，拖进来就行</h3>
+          <p>支持 CurseForge、Modrinth、MCBBS、MultiMC、HMCL 五种整合包格式。拖入压缩包后先显示名称、图标、游戏版本与加载器，确认无误再安装。</p>
+          <div class="card__chips">
+            <span class="chip">CurseForge</span><span class="chip">Modrinth</span><span class="chip">MCBBS</span><span class="chip">MultiMC</span><span class="chip">HMCL</span>
+          </div>
+        </article>
+
+        <article class="card card--third" data-reveal data-spot>
+          <div class="card__icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+          </div>
+          <h3>多实例隔离</h3>
+          <p>每个版本独立的 Mod、存档、配置与 Java 设置，互不污染。支持按文件夹归类。</p>
+        </article>
+
+        <article class="card card--third" data-reveal data-spot>
+          <div class="card__icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <h3>三种登录方式</h3>
+          <p>微软账号设备码登录、离线登录、外置 Authlib 登录。账户卡片可切换、导入导出。</p>
+        </article>
+
+        <article class="card card--third" data-reveal data-spot>
+          <div class="card__icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg>
+          </div>
+          <h3>3D 皮肤预览</h3>
+          <p>用 WPF 3D 渲染真实模型，自动判断经典与纤细手臂，可拖拽旋转。正版皮肤只读预览。</p>
+        </article>
+
+        <article class="card card--wide" data-reveal data-spot>
+          <div class="card__icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </div>
+          <h3>联机，不用开服</h3>
+          <p>基于 EasyTier 虚拟局域网，创建房间或输入邀请码即可加入好友的单人游戏。只有 Minecraft 的流量会被转发。</p>
+        </article>
+
+        <article class="card card--wide" data-reveal data-spot>
+          <div class="card__icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M10 18h4"/></svg>
+          </div>
+          <h3>下载、清理与日志</h3>
+          <p>CurseForge / Modrinth 资源搜索与断点续传；缓存分类统计后按需清理，绝不碰存档与配置；日志与崩溃分析用中文说人话。</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- 截图 -->
+  <section class="showcase" id="showcase">
+    <div class="wrap">
+      <div class="section__head" data-reveal style="margin-bottom:34px">
+        <div class="kicker">Screenshots</div>
+        <h2>界面，<em>自己看</em>。</h2>
+        <p class="section__desc">所有截图都来自真实运行，没有渲染图。</p>
+      </div>
+
+      <div class="tabs" role="tablist" aria-label="界面截图">
+        <button class="tab is-active" role="tab" aria-selected="true" data-shot="assets/shot-home.png">启动台</button>
+        <button class="tab" role="tab" aria-selected="false" data-shot="assets/shot-download.png">下载</button>
+        <button class="tab" role="tab" aria-selected="false" data-shot="assets/shot-instance.png">实例</button>
+        <button class="tab" role="tab" aria-selected="false" data-shot="assets/shot-version.png">版本管理</button>
+        <button class="tab" role="tab" aria-selected="false" data-shot="assets/shot-setup.png">设置</button>
+        <button class="tab" role="tab" aria-selected="false" data-shot="assets/shot-link.png">联机</button>
+      </div>
+
+      <div class="screens" data-reveal>
+        <div class="screens__stage" id="stage">
+          <img class="is-active" src="assets/shot-home.png" alt="TCraft Launcher 启动台" width="790" height="450">
+          <img src="assets/shot-download.png" alt="版本下载页" width="790" height="450" loading="lazy">
+          <img src="assets/shot-instance.png" alt="实例管理页" width="790" height="450" loading="lazy">
+          <img src="assets/shot-version.png" alt="版本设置页" width="790" height="450" loading="lazy">
+          <img src="assets/shot-setup.png" alt="设置页" width="790" height="450" loading="lazy">
+          <img src="assets/shot-link.png" alt="联机页" width="790" height="450" loading="lazy">
+        </div>
+      </div>
+      <p class="showcase__note">界面会随壁纸与主题色变化，截图仅为其中一种配色。</p>
+    </div>
+  </section>
+
+  <!-- 下载 -->
+  <section class="section" id="download">
+    <div class="wrap">
+      <div class="download__panel" data-reveal>
+        <div class="download__main">
+          <span class="download__badge">LATEST · v1.2</span>
+          <h2>下载，然后双击。<br>就这样。</h2>
+          <p>绿色单文件，不需要安装。首次启动会自动检查 Java 与游戏目录，跟着提示走即可。</p>
+          <div class="download__actions">
+            <a class="btn btn--primary" href="https://github.com/Damianjiang/TCraft-Launcher/releases/latest" target="_blank" rel="noopener">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              前往 Release 下载
+            </a>
+            <a class="btn btn--ghost" href="https://github.com/Damianjiang/TCraft-Launcher#%E4%BB%8E%E6%BA%90%E7%A0%81%E6%9E%84%E5%BB%BA" target="_blank" rel="noopener">从源码构建</a>
+          </div>
+        </div>
+        <div class="download__side">
+          <div class="spec"><span>版本</span><b>1.2</b></div>
+          <div class="spec"><span>文件大小</span><b>3.49 MiB</b></div>
+          <div class="spec"><span>系统</span><b>Windows 7 SP1+ / 10 / 11</b></div>
+          <div class="spec"><span>架构</span><b>x64</b></div>
+          <div class="spec" style="border-bottom:0"><span>SHA-256</span><code>b9b043edc43d170e23fd20b41a7da6332380c22942a7f1de29bccdbe7636f6e6</code></div>
+          <p class="download__hint">未购买代码签名证书，SmartScreen 可能提示「未知发布者」。可核对上方哈希，或直接从源码构建。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="section" id="faq" style="padding-top:0">
+    <div class="wrap">
+      <div class="section__head" data-reveal>
+        <div class="kicker">FAQ</div>
+        <h2>几个<em>常见问题</em>。</h2>
+      </div>
+
+      <div class="faq" data-reveal>
+        <details open>
+          <summary>需要先安装 Java 吗？</summary>
+          <p>不需要。启动器会扫描系统里已有的 Java，并在需要时下载与游戏版本匹配的运行时。也可以在「设置 → Java」里手动指定路径。</p>
+        </details>
+        <details>
+          <summary>支持正版登录吗？</summary>
+          <p>支持微软账号设备码登录、离线登录与外置 Authlib 登录。开源版出于合规考虑不内置微软凭据：微软登录默认处于「未启用」状态，注册自己的 Azure 应用后设置环境变量 <code>TCL_MS_CLIENT_ID</code> 并重启启动器即可开启。</p>
+        </details>
+        <details>
+          <summary>整合包安装会不会覆盖我的存档？</summary>
+          <p>不会。整合包会安装为一个独立实例，Mod、配置与存档都在自己的目录里。安装前会先解析名称、图标、游戏版本与加载器并让你确认。</p>
+        </details>
+        <details>
+          <summary>为什么 Windows 提示「未知发布者」？</summary>
+          <p>代码签名证书需要按年付费，个人项目没有购买。你可以对照下载页的 SHA-256 校验文件，或使用 Visual Studio 从源码自行构建。</p>
+        </details>
+        <details>
+          <summary>会收集我的数据吗？</summary>
+          <p>不会。启动器没有统计上报；只有在你主动使用下载、联机、皮肤或登录功能时，才会访问对应的官方或第三方服务。</p>
+        </details>
+        <details>
+          <summary>可以二次开发或商用吗？</summary>
+          <p>代码以 MIT 协议开源，保留版权声明即可使用与修改。内置的第三方组件遵循各自许可证，详见仓库中的 THIRD-PARTY-NOTICES。</p>
+        </details>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    <div class="footer__top">
+      <div class="footer__brand">
+        <a class="brand" href="#top">
+          <img src="assets/logo.png" alt="" width="30" height="30">
+          <span>TCraft<small>LAUNCHER</small></span>
+        </a>
+        <p>一个轻量、好看、开箱即用的 Minecraft 启动器。开源、免费、无广告。</p>
+      </div>
+      <div>
+        <h4>项目</h4>
+        <ul>
+          <li><a href="https://github.com/Damianjiang/TCraft-Launcher" target="_blank" rel="noopener">GitHub 仓库</a></li>
+          <li><a href="https://github.com/Damianjiang/TCraft-Launcher/releases" target="_blank" rel="noopener">版本发布</a></li>
+          <li><a href="https://github.com/Damianjiang/TCraft-Launcher/issues" target="_blank" rel="noopener">问题反馈</a></li>
+          <li><a href="https://github.com/Damianjiang/TCraft-Launcher/blob/main/LICENSE" target="_blank" rel="noopener">开源协议</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>社区</h4>
+        <ul>
+          <li><a href="https://github.com/Damianjiang/TCraft-Launcher/discussions" target="_blank" rel="noopener">讨论区</a></li>
+          <li><a href="#faq">常见问题</a></li>
+          <li>QQ 群 1081955336</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="disclaimer">
+      NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.<br>
+      非 Minecraft 官方产品。未经 Mojang 或 Microsoft 批准，也不与 Mojang 或 Microsoft 关联。Minecraft 名称、品牌与相关素材的权利归 Mojang Synergies AB 与 Microsoft 所有。
+    </div>
+
+    <div class="footer__bottom">
+      <span>© <span id="year">2026</span> TCraft Team · MIT License</span>
+      <span>参考与致谢：HMCL · PCL（Plain Craft Launcher）· Lucide</span>
+    </div>
+
+    <div class="wordmark" aria-hidden="true">TCRAFT</div>
+  </div>
+</footer>
+
+<script src="assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+<local:MyPageRight
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:TCraft" xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d" x:Class="PageInstanceHistory" PanScroll="PanBack">
+    <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
+        <StackPanel Margin="25,10">
+            <local:MyCard Margin="0,15" UseAnimation="False">
+                <StackPanel Margin="25,18,20,16">
+                    <TextBlock Text="历史" FontSize="24" FontWeight="SemiBold" Foreground="{DynamicResource ColorBrush1}" />
+                    <TextBlock x:Name="LabDesc" Margin="0,8,0,0" FontSize="13" Opacity="0.6" TextWrapping="Wrap"
+                               Foreground="{DynamicResource ColorBrush1}"
+                               Text="游玩记录、快照与变更时间线。快照只存游戏内容，不包含日志与崩溃报告。" />
+                    <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                        <local:MyButton x:Name="BtnTabPlay" MinWidth="110" Height="34" Text="游玩记录" ColorType="Highlight"
+                                        Padding="13,0" Margin="0,0,10,0" Tag="0" Click="Tab_Click" />
+                        <local:MyButton x:Name="BtnTabSnap" MinWidth="110" Height="34" Text="快照" ColorType="Normal"
+                                        Padding="13,0" Margin="0,0,10,0" Tag="1" Click="Tab_Click" />
+                        <local:MyButton x:Name="BtnTabChange" MinWidth="110" Height="34" Text="变更" ColorType="Normal"
+                                        Padding="13,0" Tag="2" Click="Tab_Click" />
+                    </StackPanel>
+                </StackPanel>
+            </local:MyCard>
+
+            <!-- 游玩记录 -->
+            <local:MyCard x:Name="CardPlay" Title="游玩记录" Margin="0,0,0,25" UseAnimation="False">
+                <StackPanel Margin="25,44,20,16">
+                    <TextBlock x:Name="LabPlaySum" FontSize="12" Opacity="0.55" Margin="0,0,0,10" TextWrapping="Wrap"
+                               Foreground="{DynamicResource ColorBrush1}" Text="—" />
+                    <StackPanel x:Name="PanPlay" />
+                </StackPanel>
+            </local:MyCard>
+
+            <!-- 快照 -->
+            <local:MyCard x:Name="CardSnap" Title="快照" Margin="0,0,0,25" UseAnimation="False">
+                <StackPanel Margin="25,44,20,16">
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <local:MyComboBox x:Name="ComboScope" Grid.Column="0" Width="200" Height="32" Margin="0,0,10,0" />
+                        <local:MyButton x:Name="BtnCreateSnap" Grid.Column="1" MinWidth="120" Height="34" Text="创建快照"
+                                        ColorType="Highlight" Padding="13,0" Click="BtnCreateSnap_Click" />
+                        <TextBlock x:Name="LabSnapSum" Grid.Column="2" FontSize="12" Opacity="0.55" Margin="12,0,0,0"
+                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                   Foreground="{DynamicResource ColorBrush1}" Text="—" />
+                    </Grid>
+                    <StackPanel x:Name="PanSnap" />
+                </StackPanel>
+            </local:MyCard>
+
+            <!-- 变更 -->
+            <local:MyCard x:Name="CardChange" Title="变更" Margin="0,0,0,25" UseAnimation="False" Visibility="Collapsed">
+                <StackPanel Margin="25,44,20,16">
+                    <TextBlock x:Name="LabChangeSum" FontSize="12" Opacity="0.55" Margin="0,0,0,10" TextWrapping="Wrap"
+                               Foreground="{DynamicResource ColorBrush1}" Text="—" />
+                    <StackPanel x:Name="PanChange" />
+                </StackPanel>
+            </local:MyCard>
+        </StackPanel>
+    </local:MyScrollViewer>
+</local:MyPageRight>

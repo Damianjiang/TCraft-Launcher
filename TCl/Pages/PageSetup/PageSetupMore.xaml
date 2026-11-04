@@ -1,0 +1,39 @@
+<local:MyPageRight x:Class="PageSetupMore"
+                   xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                   xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                   xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                   xmlns:local="clr-namespace:TCraft"
+                   mc:Ignorable="d"
+                   d:DesignHeight="450" d:DesignWidth="800"
+                   PanScroll="{Binding ElementName=PanBack}" RenderOptions.BitmapScalingMode="LowQuality">
+    <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
+        <StackPanel x:Name="PanMain" Margin="36,20,36,28">
+            <!-- Win11 风格页头 -->
+            <StackPanel Margin="4,8,4,2">
+                <TextBlock Text="更多" FontSize="30" FontWeight="SemiBold" Foreground="{DynamicResource ColorBrush1}" />
+                <TextBlock Text="社区与启动器维护。" FontSize="13" Opacity="0.55" Margin="0,6,0,0" Foreground="{DynamicResource ColorBrush1}" />
+            </StackPanel>
+            <local:MyCard Title="社区" Margin="0,24,0,0">
+                <StackPanel Margin="32,44,32,26">
+                    <TextBlock TextWrapping="Wrap" LineHeight="24" Opacity="0.7" FontSize="13"
+                               Text="想第一时间了解新版本、反馈问题或了解社区动态，可以加入 TCraft NEXT 社群。" />
+                    <WrapPanel Margin="0,18,0,0">
+                        <local:MyButton Height="35" MinWidth="150" Text="加入 QQ 群" ColorType="Highlight"
+                                        Click="BtnJoinQQ_Click" />
+                    </WrapPanel>
+                </StackPanel>
+            </local:MyCard>
+            <local:MyCard Title="卸载" Margin="0,24,0,0">
+                <StackPanel Margin="32,44,32,26">
+                    <TextBlock TextWrapping="Wrap" LineHeight="24" Opacity="0.7" FontSize="13"
+                               Text="仅清理启动器自建的内容（配置、日志、缓存、主程序与快捷方式），不会删除 .minecraft 及 Minecraft 数据。确认后程序立即退出，约 3 秒完成清理并自动删除自身。" />
+                    <WrapPanel Margin="0,18,0,0">
+                        <local:MyButton Height="35" MinWidth="170" Text="卸载 TCraft Launcher" ColorType="Red"
+                                        Click="BtnUninstall_Click" />
+                    </WrapPanel>
+                </StackPanel>
+            </local:MyCard>
+        </StackPanel>
+    </local:MyScrollViewer>
+</local:MyPageRight>

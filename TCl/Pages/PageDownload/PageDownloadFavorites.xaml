@@ -1,0 +1,43 @@
+<local:MyPageRight
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:TCraft" xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d" x:Class="PageDownloadFavorites"
+    PanScroll="{Binding ElementName=PanBack}" Grid.IsSharedSizeScope="True">
+    <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
+        <Grid>
+            <local:MyCard HorizontalAlignment="Center" VerticalAlignment="Center" Margin="40" x:Name="PanNoFav">
+                <Grid Margin="20,17">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="1*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Row="0" Grid.ColumnSpan="3" Margin="0,0,0,9" HorizontalAlignment="Center"
+                               Text="收藏夹是空的" FontSize="19"
+                               UseLayoutRounding="True" SnapsToDevicePixels="True"
+                               Foreground="{DynamicResource ColorBrush3}" />
+                    <Rectangle Grid.Row="1" Grid.ColumnSpan="3" HorizontalAlignment="Stretch" Height="2"
+                               Fill="{DynamicResource ColorBrush3}" />
+                    <TextBlock Grid.Row="2" Grid.ColumnSpan="3" Margin="10,15,10,5" TextWrapping="Wrap"
+                               Text="在资源详情页点击「收藏」，即可把 Mod、整合包等资源保存到这里，方便下次查找。" />
+                </Grid>
+            </local:MyCard>
+            <StackPanel Orientation="Vertical" Margin="10,25,10,10" x:Name="PanContent">
+                <local:MyCard Margin="15,0,15,15" Title="资源收藏夹">
+                    <Grid Height="35" Margin="25,40,15,20">
+                        <local:MyButton MinWidth="140" Text="刷新" Padding="13,0"
+                                        HorizontalAlignment="Left" x:Name="BtnRefresh" />
+                    </Grid>
+                </local:MyCard>
+                <StackPanel Margin="0,0,0,25" Name="PanFavorites" />
+            </StackPanel>
+        </Grid>
+    </local:MyScrollViewer>
+</local:MyPageRight>

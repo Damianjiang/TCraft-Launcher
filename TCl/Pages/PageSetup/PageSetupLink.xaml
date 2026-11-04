@@ -1,0 +1,78 @@
+<local:MyPageRight
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:TCraft" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+    mc:Ignorable="d" x:Class="PageSetupLink"
+    PanScroll="PanBack">
+    <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
+        <StackPanel x:Name="PanMain" Margin="36,20,36,28">
+            <!-- Win11 风格页头 -->
+            <StackPanel Margin="4,8,4,2">
+                <TextBlock Text="联机" FontSize="30" FontWeight="SemiBold" Foreground="{DynamicResource ColorBrush1}" />
+                <TextBlock Text="P2P 联机连接与节点下载选项。" FontSize="13" Opacity="0.55" Margin="0,6,0,0" Foreground="{DynamicResource ColorBrush1}" />
+            </StackPanel>
+            <local:MyCard x:Name="CardArgument" Margin="0,24,0,0" Title="连接选项">
+                <StackPanel Margin="32,44,32,26">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="Name" />
+                            <ColumnDefinition Width="1*" />
+                            <ColumnDefinition Width="60" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="36" />
+                            <RowDefinition Height="14" />
+                            <RowDefinition Height="36" />
+                            <RowDefinition Height="14" />
+                            <RowDefinition Height="36" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" VerticalAlignment="Center" HorizontalAlignment="Left" Text="模式" Margin="0,0,25,0" />
+                        <local:MyComboBox Grid.Row="0" x:Name="ComboLatencyMode" Grid.ColumnSpan="2" local:SettingService.Key="LinkLatencyMode" Grid.Column="1">
+                            <local:MyComboBoxItem Content="优先直连" IsSelected="True" ToolTip="尽量不进行中转，而是 P2P 直连。" />
+                            <local:MyComboBoxItem Content="优先低延迟" ToolTip="如果使用中转节点能降低延迟，就不进行直连。&#xa;不过，这会增加社区节点的负载……" />
+                        </local:MyComboBox>
+                        <TextBlock Grid.Row="2" VerticalAlignment="Center" HorizontalAlignment="Left" Text="节点" Margin="0,0,25,0" />
+                        <local:MyComboBox Grid.Row="2" x:Name="ComboPeer" Grid.ColumnSpan="2" local:SettingService.Key="LinkPeer" Grid.Column="1">
+                            <local:MyComboBoxItem Content="自动选择" IsSelected="True" ToolTip="按内置顺序尝试所有可用节点，最稳妥。" />
+                            <local:MyComboBoxItem Content="etnode（陶瓦官方节点）" ToolTip="优先连接 https://etnode.zkitefly.eu.org/node1。" />
+                            <local:MyComboBoxItem Content="225284.xyz（上海）" ToolTip="优先连接 tcp://225284.xyz:11010。" />
+                            <local:MyComboBoxItem Content="et1.fuis.top（武汉）" ToolTip="优先连接 tcp://et1.fuis.top:11010。" />
+                            <local:MyComboBoxItem Content="自定义（见下方输入框）" ToolTip="优先使用下方填写的节点。" />
+                        </local:MyComboBox>
+                        <TextBlock Grid.Row="4" VerticalAlignment="Center" HorizontalAlignment="Left" Text="自定义节点" Margin="0,0,25,0" />
+                        <local:MyTextBox x:Name="TextCustomPeer" local:SettingService.Key="LinkCustomPeer" Grid.Row="4" Grid.Column="1" MaxHeight="28" 
+                            ToolTip="只连接此处填写的节点，优先级最高。&#xa;如果你自己搭建了 EasyTier 节点，可以填在这里。&#xa;&#xa;使用逗号分隔多个节点，例如：&#xa;tcp://mc.yqst.top:11010,tcp://225284.xyz:11010&#xa;&#xa;房主和加入者必须连接到至少一个相同节点，才能互相连上。" />
+                    </Grid>
+                </StackPanel>
+            </local:MyCard>
+
+            <local:MyCard Margin="0,24,0,0" Title="下载节点">
+                <StackPanel Margin="32,44,32,26">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="Name" />
+                            <ColumnDefinition Width="1*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="36" />
+                            <RowDefinition Height="14" />
+                            <RowDefinition Height="36" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" VerticalAlignment="Center" HorizontalAlignment="Left" Text="下载方式" Margin="0,0,25,0" />
+                        <local:MyComboBox Grid.Row="0" x:Name="ComboDownloadMode" Grid.Column="1" local:SettingService.Key="LinkDownloadMode"
+                            ToolTip="下载联机核心（EasyTier）时使用的下载节点。">
+                            <local:MyComboBoxItem Content="自动选择最快节点" IsSelected="True" ToolTip="首次下载时并行测速各节点，记录最快的一条，之后直接沿用，不再反复测速。" />
+                            <local:MyComboBoxItem Content="指定节点" ToolTip="手动指定一个下载节点，不自动测速。" />
+                        </local:MyComboBox>
+                        <TextBlock Grid.Row="2" VerticalAlignment="Center" HorizontalAlignment="Left" Text="指定节点" Margin="0,0,25,0" />
+                        <local:MyComboBox Grid.Row="2" x:Name="ComboDownloadNode" Grid.Column="1" local:SettingService.Key="LinkDownloadNode"
+                            ToolTip="「指定节点」模式使用。列出常用的 GitHub 加速镜像，节点来自 github.qqday.com 的实测速度榜。" />
+                    </Grid>
+                    <TextBlock Margin="2,8,2,0" TextWrapping="Wrap" FontSize="12" Opacity="0.72"
+                        Text="「自动选择最快节点」会在首次下载联机核心时并行测速各节点，记下最快的一条，之后直接沿用。无论哪种方式，下载都是多线程进行，并且保留其余节点作为备用，因此单个节点失效也不会中断下载。" />
+                </StackPanel>
+            </local:MyCard>
+
+        </StackPanel>
+    </local:MyScrollViewer>
+</local:MyPageRight>

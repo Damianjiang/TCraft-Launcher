@@ -1,0 +1,191 @@
+<local:MyPageRight x:Class="PageOtherTest"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="clr-namespace:TCraft"
+    xmlns:sys="clr-namespace:System;assembly=mscorlib"
+    PanScroll="PanBack">
+    <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
+        <StackPanel x:Name="PanMain" Margin="25,10" Grid.IsSharedSizeScope="True">
+
+            <!-- 游戏联机 -->
+            <local:MyCard Margin="0,15" Title="游戏联机">
+                <StackPanel Margin="25,40,25,20">
+                    <TextBlock Text="创建一个联机房间，把单人存档分享给朋友一起玩；也可以输入收到的邀请码，加入别人的房间。" TextWrapping="Wrap" />
+                    <local:MyButton x:Name="BtnGameLink" MinWidth="140" Padding="13,5" Text="打开联机" ColorType="Highlight"
+                                    HorizontalAlignment="Left" Margin="0,15,0,0"
+                                    ToolTip="进入联机页面，可创建房间或凭邀请码加入房间。" />
+                </StackPanel>
+            </local:MyCard>
+
+            <!-- 实用工具 -->
+            <local:MyCard Margin="0,15" Title="实用工具">
+                <WrapPanel Margin="25,40,21,5" ItemHeight="50">
+                    <local:MyButton x:Name="BtnClear" MinWidth="120" Text="清理垃圾"
+                                    ToolTip="清理各个 Minecraft 文件夹中的崩溃报告、日志、Natives 等缓存文件。&#xa;需要在没有运行中的游戏，且没有下载任务时进行。"
+                                    Margin="0,0,15,15" />
+                    <local:MyButton x:Name="BtnLuck" MinWidth="100" Text="今日人品" Margin="0,0,15,15"
+                                    ToolTip="查看今天的运气如何。" />
+                    <local:MyButton x:Name="BtnCreateShortcut" MinWidth="120" Text="创建快捷方式" Margin="0,0,15,15"
+                                    ToolTip="在桌面或开始菜单创建启动器的快捷方式。" />
+                    <local:MyButton x:Name="BtnLaunchCount" MinWidth="120" Text="启动次数" Margin="0,0,15,15"
+                                    ToolTip="查看 Minecraft 的启动次数。" />
+                </WrapPanel>
+            </local:MyCard>
+
+            <!-- 自定义下载 -->
+            <local:MyCard Margin="0,0,0,15" Title="自定义下载">
+                <StackPanel Orientation="Vertical" Margin="25,40,25,20">
+                    <TextBlock Text="输入一个网址，将文件下载到指定位置。" TextWrapping="Wrap" />
+                    <Grid Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" VerticalAlignment="Center" HorizontalAlignment="Left" Text="下载网址" Margin="0,0,25,0" />
+                        <local:MyTextBox x:Name="TextDownloadUrl" Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2"
+                                         HintText="https://example.com/file.jar" />
+                        <TextBlock Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Left" Text="保存到" Margin="0,10,25,0" />
+                        <local:MyTextBox x:Name="TextDownloadFolder" Grid.Row="1" Grid.Column="1" Margin="0,10,0,0" />
+                        <local:MyTextButton x:Name="BtnDownloadSelect" Grid.Row="1" Grid.Column="2" Text="选择" Margin="10,10,0,0" VerticalAlignment="Center" />
+                        <TextBlock Grid.Row="2" VerticalAlignment="Center" HorizontalAlignment="Left" Text="文件名" Margin="0,10,25,0" />
+                        <local:MyTextBox x:Name="TextDownloadName" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,10,0,0" />
+                    </Grid>
+                    <Grid Margin="0,15,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="35" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition />
+                            <ColumnDefinition />
+                        </Grid.ColumnDefinitions>
+                        <local:MyButton x:Name="BtnDownloadStart" Grid.Column="0" Width="140" Text="开始下载"
+                                        ColorType="Highlight" Margin="0,0,15,0" HorizontalAlignment="Right" />
+                        <local:MyButton x:Name="BtnDownloadOpen" Grid.Column="1" Width="140" Text="打开文件夹"
+                                        Margin="0,0,15,0" HorizontalAlignment="Left" />
+                    </Grid>
+                </StackPanel>
+            </local:MyCard>
+
+            <!-- 正版皮肤保存 -->
+            <local:MyCard Margin="0,0,0,15" Title="正版皮肤保存">
+                <StackPanel Margin="25,40,25,15">
+                    <Grid Margin="0,14,0,2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center" HorizontalAlignment="Left" Text="玩家名" Margin="0,0,25,0" />
+                        <local:MyTextBox x:Name="TextSkinID" Grid.Column="1" MaxLength="50" />
+                    </Grid>
+                    <Grid Margin="0,14,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <local:MyButton x:Name="BtnSkinSave" Text="获取并保存" MinWidth="140" Padding="13,0" />
+                    </Grid>
+                </StackPanel>
+            </local:MyCard>
+
+            <!-- 服务器查询 -->
+            <local:MyCard Margin="0,0,0,15" Title="服务器查询">
+                <StackPanel Margin="25,40,25,15">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <local:MyTextBox x:Name="TextServerAddress" HintText="例如 mc.hypixel.net 或 127.0.0.1:25565" />
+                        <local:MyButton x:Name="BtnServerQuery" Grid.Column="1" Text="查询" MinWidth="80" Margin="10,0,0,0" />
+                    </Grid>
+                    <TextBlock x:Name="LabServerResult" Margin="0,12,0,0" TextWrapping="Wrap"
+                               Text="输入服务器地址后点击查询。" />
+                </StackPanel>
+            </local:MyCard>
+
+            <!-- 成就图片生成 -->
+            <local:MyCard Margin="0,0,0,15" Title="成就图片生成" CanSwap="True" IsSwapped="True">
+                <StackPanel Margin="25,30,25,15">
+                    <Grid Margin="0,4,0,2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" VerticalAlignment="Center" HorizontalAlignment="Left" Text="物品 ID" Margin="0,0,25,0" />
+                        <local:MyTextBox x:Name="TextAchievementBlock" Grid.Row="0" Grid.Column="1" MaxLength="50" Margin="0,10,0,0"
+                                         HintText="例如 diamond、grass_block" />
+                        <TextBlock Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Left" Text="标题" Margin="0,0,25,0" />
+                        <local:MyTextBox x:Name="TextAchievementTitle" Grid.Row="1" Grid.Column="1" MaxLength="50" Margin="0,10,0,0" />
+                        <TextBlock Grid.Row="2" VerticalAlignment="Center" HorizontalAlignment="Left" Text="第一行描述" Margin="0,0,25,0" />
+                        <local:MyTextBox x:Name="TextAchievementLine1" Grid.Row="2" Grid.Column="1" MaxLength="50" Margin="0,10,0,0" />
+                        <TextBlock Grid.Row="3" VerticalAlignment="Center" HorizontalAlignment="Left" Text="第二行描述" Margin="0,0,25,0" />
+                        <local:MyTextBox x:Name="TextAchievementLine2" Grid.Row="3" Grid.Column="1" MaxLength="50" Margin="0,10,0,0" />
+                    </Grid>
+                    <Grid Margin="0,15,0,10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="35" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition />
+                            <ColumnDefinition />
+                        </Grid.ColumnDefinitions>
+                        <local:MyButton x:Name="BtnAchievementPreview" Grid.Column="0" Width="140" Text="预览"
+                                        ColorType="Highlight" Margin="0,0,15,0" HorizontalAlignment="Right" />
+                        <local:MyButton x:Name="BtnAchievementSave" Grid.Column="1" Width="140" Text="保存"
+                                        Margin="0,0,15,0" HorizontalAlignment="Left" />
+                    </Grid>
+                    <Image x:Name="ImgAchievement" Margin="0,5,0,0" HorizontalAlignment="Left" Width="320" Height="64"
+                           Stretch="Uniform" Visibility="Collapsed" />
+                </StackPanel>
+            </local:MyCard>
+
+            <!-- 头像生成 -->
+            <local:MyCard Margin="0,0,0,15" Title="头像生成" CanSwap="True" IsSwapped="True">
+                <StackPanel Orientation="Vertical" Margin="25,40,25,20">
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="头像尺寸" VerticalAlignment="Center" Margin="0,0,10,0" />
+                        <local:MyComboBox x:Name="ComboHeadSize" Grid.Column="1" Height="26">
+                            <local:MyComboBoxItem Content="64x64" IsSelected="True" />
+                            <local:MyComboBoxItem Content="96x96" />
+                            <local:MyComboBoxItem Content="128x128" />
+                        </local:MyComboBox>
+                    </Grid>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <local:MyButton x:Name="BtnSelectSkin" Grid.Column="1" Text="选择皮肤" Width="140" Height="35" Margin="0,0,10,0" />
+                        <local:MyButton x:Name="BtnSaveHead" Grid.Column="2" Text="保存头像" Width="140" Height="35" />
+                    </Grid>
+                    <Border x:Name="PanSkinPreview" Margin="0,15,0,0" HorizontalAlignment="Center" Padding="10" Visibility="Collapsed">
+                        <Grid x:Name="PanSkinPreviewContainer" Width="80" Height="80">
+                            <Image x:Name="ImgFace" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor" />
+                            <Image x:Name="ImgHair" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor" />
+                        </Grid>
+                    </Border>
+                </StackPanel>
+            </local:MyCard>
+
+        </StackPanel>
+    </local:MyScrollViewer>
+</local:MyPageRight>

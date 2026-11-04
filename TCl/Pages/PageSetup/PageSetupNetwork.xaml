@@ -1,0 +1,106 @@
+<local:MyPageRight x:Class="PageSetupNetwork"
+                   xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                   xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                   xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                   xmlns:local="clr-namespace:TCraft"
+                   mc:Ignorable="d"
+                   d:DesignHeight="620" d:DesignWidth="820"
+                   PanScroll="{Binding ElementName=PanBack}">
+    <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
+        <StackPanel x:Name="PanMain" Margin="36,20,36,28">
+            <!-- Win11 风格页头 -->
+            <StackPanel Margin="4,8,4,2">
+                <TextBlock Text="网络" FontSize="30" FontWeight="SemiBold" Foreground="{DynamicResource ColorBrush1}" />
+                <TextBlock Text="代理、下载源连通性与测速。" FontSize="13" Opacity="0.55" Margin="0,6,0,0" Foreground="{DynamicResource ColorBrush1}" />
+            </StackPanel>
+
+            <!-- 代理 -->
+            <local:MyCard Margin="0,24,0,0" Title="代理">
+                <Grid Margin="32,44,32,24">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="Name" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="36" />
+                        <RowDefinition Height="14" />
+                        <RowDefinition Height="36" />
+                        <RowDefinition Height="14" />
+                        <RowDefinition Height="36" />
+                        <RowDefinition Height="14" />
+                        <RowDefinition Height="36" />
+                        <RowDefinition Height="14" />
+                        <RowDefinition Height="36" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" VerticalAlignment="Center" HorizontalAlignment="Left" Text="代理模式" Margin="0,0,25,0" />
+                    <local:MyComboBox Grid.Row="0" Grid.Column="1" x:Name="ComboProxyMode">
+                        <local:MyComboBoxItem Content="不使用代理" />
+                        <local:MyComboBoxItem Content="跟随系统代理" />
+                        <local:MyComboBoxItem Content="HTTP 代理" />
+                        <local:MyComboBoxItem Content="SOCKS5 代理" />
+                    </local:MyComboBox>
+
+                    <TextBlock Grid.Row="2" VerticalAlignment="Center" HorizontalAlignment="Left" Text="主机" Margin="0,0,25,0" />
+                    <local:MyTextBox Grid.Row="2" Grid.Column="1" x:Name="TextProxyHost"
+                                     HintText="例如 127.0.0.1" MaxLength="200"
+                                     ToolTip="代理服务器的主机名或 IP。&#xa;可直接粘贴地址，形如 http://127.0.0.1:7890 的前缀会被自动去掉。" />
+
+                    <TextBlock Grid.Row="4" VerticalAlignment="Center" HorizontalAlignment="Left" Text="端口" Margin="0,0,25,0" />
+                    <local:MyTextBox Grid.Row="4" Grid.Column="1" x:Name="TextProxyPort" Width="140" HorizontalAlignment="Left"
+                                     HorizontalContentAlignment="Center" HintText="7890" MaxLength="5"
+                                     ToolTip="代理端口，必须是 1~65535 之间的整数。" />
+
+                    <TextBlock Grid.Row="6" VerticalAlignment="Center" HorizontalAlignment="Left" Text="用户名" Margin="0,0,25,0" />
+                    <local:MyTextBox Grid.Row="6" Grid.Column="1" x:Name="TextProxyUser"
+                                     HintText="可选" MaxLength="120"
+                                     ToolTip="代理需要身份验证时才填写。" />
+
+                    <TextBlock Grid.Row="8" VerticalAlignment="Center" HorizontalAlignment="Left" Text="密码" Margin="0,0,25,0" />
+                    <PasswordBox Grid.Row="8" Grid.Column="1" x:Name="PassProxyPassword" Height="32" MaxLength="200" Padding="5,5"
+                                 ToolTip="代理需要身份验证时才填写。" />
+
+                    <TextBlock Grid.Row="9" Grid.ColumnSpan="2" x:Name="LabProxyNote" TextWrapping="Wrap" FontSize="12"
+                               Opacity="0.6" LineHeight="20" Margin="0,14,0,0" Visibility="Collapsed"
+                               Foreground="{DynamicResource ColorBrush1}" />
+
+                    <WrapPanel Grid.Row="10" Grid.ColumnSpan="2" Margin="0,18,0,0">
+                        <local:MyButton x:Name="BtnProxySave" Height="35" MinWidth="90" Text="保存"
+                                        ColorType="Highlight" Padding="13,0" Margin="0,0,15,0" />
+                        <local:MyButton x:Name="BtnProxyTest" Height="35" MinWidth="130" Text="测试当前代理"
+                                        ColorType="Normal" Padding="13,0" />
+                    </WrapPanel>
+
+                    <TextBlock Grid.Row="11" Grid.ColumnSpan="2" x:Name="LabProxyTest" Text="" FontSize="12"
+                               TextWrapping="Wrap" Opacity="0.65" Margin="0,12,0,0"
+                               Foreground="{DynamicResource ColorBrush1}" />
+                </Grid>
+            </local:MyCard>
+
+            <!-- 下载源测速 -->
+            <local:MyCard Margin="0,24,0,28" Title="下载源测速">
+                <StackPanel Margin="32,44,32,24">
+                    <TextBlock Text="测速结果只代表当前网络到该源的连通质量，不影响已下载的内容。"
+                               FontSize="12" Opacity="0.6" TextWrapping="Wrap" LineHeight="20" Margin="0,0,0,18"
+                               Foreground="{DynamicResource ColorBrush1}" />
+
+                    <WrapPanel Margin="0,0,0,18">
+                        <local:MyButton x:Name="BtnSourceTest" Height="35" MinWidth="120" Text="开始测速"
+                                        ColorType="Highlight" Padding="13,0" Margin="0,0,15,0" />
+                        <local:MyButton x:Name="BtnApplySource" Height="35" MinWidth="140" Text="应用推荐源"
+                                        ColorType="Normal" Padding="13,0" IsEnabled="False" />
+                    </WrapPanel>
+
+                    <StackPanel x:Name="PanTestRows" />
+
+                    <TextBlock x:Name="LabTestSummary" Text="" FontSize="13" TextWrapping="Wrap" LineHeight="20" Margin="0,6,0,0"
+                               Foreground="{DynamicResource ColorBrush1}" />
+                </StackPanel>
+            </local:MyCard>
+        </StackPanel>
+    </local:MyScrollViewer>
+</local:MyPageRight>

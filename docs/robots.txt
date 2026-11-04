@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://damianjiang.github.io/TCraft-Launcher/sitemap.xml

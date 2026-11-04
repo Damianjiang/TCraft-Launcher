@@ -1,0 +1,57 @@
+<local:MyPageRight x:Class="PageSetupCache"
+                   xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                   xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                   xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                   xmlns:local="clr-namespace:TCraft"
+                   mc:Ignorable="d"
+                   d:DesignHeight="450" d:DesignWidth="800"
+                   PanScroll="{Binding ElementName=PanBack}" RenderOptions.BitmapScalingMode="LowQuality">
+    <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
+        <DockPanel>
+            <!-- Win11 风格页头 -->
+            <StackPanel DockPanel.Dock="Top" Margin="40,20,36,2">
+                <TextBlock Text="存储与清理" FontSize="30" FontWeight="SemiBold" Foreground="{DynamicResource ColorBrush1}" />
+                <TextBlock Text="看清启动器与游戏各自的磁盘占用，安全释放空间。" FontSize="13" Opacity="0.55" Margin="0,6,0,0" Foreground="{DynamicResource ColorBrush1}" />
+            </StackPanel>
+
+            <!-- 存储总览（对齐 LumilioCL 的「下载与存储 · 存储占用」条形图） -->
+            <local:MyCard DockPanel.Dock="Top" Title="存储总览" Margin="32,24,32,0">
+                <StackPanel Margin="32,44,32,22">
+                    <StackPanel x:Name="PanStorage" />
+                    <TextBlock x:Name="LabStorageNote" Text="后台计算中…" FontSize="12" Opacity="0.55"
+                               TextWrapping="Wrap" Margin="0,8,0,0" Foreground="{DynamicResource ColorBrush1}" />
+                </StackPanel>
+            </local:MyCard>
+
+            <!-- 占用统计 + 分类勾选 -->
+            <local:MyCard DockPanel.Dock="Top" Title="缓存占用" Margin="32,24,32,0">
+                <StackPanel Margin="32,44,32,22">
+                    <StackPanel x:Name="PanTotal" Margin="0,0,0,16" />
+                    <StackPanel x:Name="PanList" />
+                </StackPanel>
+            </local:MyCard>
+
+            <!-- 操作 -->
+            <local:MyCard DockPanel.Dock="Top" Title="操作" Margin="32,24,32,28">
+                <StackPanel Margin="32,44,32,26">
+                    <TextBlock x:Name="LabNote"
+                               Text="只清理可重新生成或重新下载的内容；不会删除你的配置、背景与音乐、皮肤、翻译文件或游戏数据。"
+                               TextWrapping="Wrap" LineHeight="22" Opacity="0.65" FontSize="13" Margin="0,0,0,18" />
+                    <!-- 第 113 轮：按钮补齐项目标准 Padding="13,0" + Height="35"（与其余设置页一致），
+                         修复原先无内边距导致的"压扁"外观。 -->
+                    <WrapPanel>
+                        <local:MyButton Height="35" MinWidth="150" Text="清理所选缓存" ColorType="Red" Padding="13,0" Margin="0,0,15,0"
+                                        Click="BtnClean_Click" />
+                        <local:MyButton Height="35" MinWidth="150" Text="检查无用文件" ColorType="Normal" Padding="13,0" Margin="0,0,15,0"
+                                        Click="BtnScanJunk_Click" />
+                        <local:MyButton Height="35" MinWidth="90" Text="刷新" ColorType="Normal" Padding="13,0" Margin="0,0,15,0"
+                                        Click="BtnRefresh_Click" />
+                        <local:MyButton Height="35" MinWidth="150" Text="打开缓存目录" ColorType="Normal" Padding="13,0"
+                                        Click="BtnOpen_Click" />
+                    </WrapPanel>
+                </StackPanel>
+            </local:MyCard>
+        </DockPanel>
+    </local:MyScrollViewer>
+</local:MyPageRight>

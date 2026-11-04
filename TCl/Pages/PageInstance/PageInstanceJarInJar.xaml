@@ -1,0 +1,48 @@
+<local:MyPageRight
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:TCraft" xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d" x:Class="PageInstanceJarInJar"
+    PanScroll="{Binding ElementName=PanBack}" Grid.IsSharedSizeScope="True">
+    <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
+        <Grid>
+            <local:MyCard HorizontalAlignment="Center" VerticalAlignment="Center" Margin="40" x:Name="PanNoMod">
+                <Grid Margin="20,17">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Margin="0,0,0,9" HorizontalAlignment="Center"
+                               Text="没有可查看的 Mod" FontSize="19"
+                               Foreground="{DynamicResource ColorBrush3}" />
+                    <Rectangle Grid.Row="1" HorizontalAlignment="Stretch" Height="2"
+                               Fill="{DynamicResource ColorBrush3}" />
+                    <TextBlock Grid.Row="2" Margin="10,15,10,5" TextWrapping="Wrap"
+                               Text="当前版本没有安装 Mod，或 Mod 文件夹为空。Jar-in-Jar 用于查看 Fabric Mod 内嵌的依赖。" />
+                </Grid>
+            </local:MyCard>
+            <StackPanel Orientation="Vertical" Margin="10,25,10,10" x:Name="PanContent">
+                <local:MyCard Margin="15,0,15,15" Title="选择 Mod">
+                    <Grid Margin="25,40,15,20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <local:MyComboBox Grid.Column="0" x:Name="ComboMods" Height="30" Margin="0,0,20,0" />
+                        <local:MyButton Grid.Column="1" MinWidth="120" Text="刷新" Padding="13,0" x:Name="BtnRefresh" />
+                    </Grid>
+                </local:MyCard>
+                <local:MyCard Margin="15,0,15,15" Title="内嵌依赖">
+                    <StackPanel Margin="20,40,20,15">
+                        <TextBlock x:Name="LabTip" Text="请选择一个 Mod。" Opacity="0.7" TextWrapping="Wrap" />
+                        <StackPanel x:Name="PanJars" Margin="0,10,0,0" />
+                        <local:MyButton x:Name="BtnExportAll" MinWidth="140" Text="全部导出" Padding="13,0"
+                                        HorizontalAlignment="Left" Margin="0,15,0,0" Visibility="Collapsed" />
+                    </StackPanel>
+                </local:MyCard>
+            </StackPanel>
+        </Grid>
+    </local:MyScrollViewer>
+</local:MyPageRight>

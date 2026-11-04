@@ -1,0 +1,102 @@
+<Grid x:Class="MyMsgSkinLegacy"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:my="clr-namespace:TCraft"
+             RenderTransformOrigin="0.5,0.5" UseLayoutRounding="True" SnapsToDevicePixels="True" MinWidth="580" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="25">
+    <Grid.RenderTransform>
+        <TransformGroup>
+            <ScaleTransform x:Name="TransformScale" ScaleX="0.92" ScaleY="0.92" />
+            <TranslateTransform x:Name="TransformPos" X="0" Y="18" />
+        </TransformGroup>
+    </Grid.RenderTransform>
+    <Border Name="PanBorder" CornerRadius="7" Background="#FBFBFB">
+        <Border.Effect>
+            <DropShadowEffect Color="{DynamicResource ColorObject1}" BlurRadius="20" ShadowDepth="4" RenderingBias="Performance" Opacity="0.8" x:Name="EffectShadow" />
+        </Border.Effect>
+        <Grid Name="PanMain" VerticalAlignment="Top" Margin="22,22,22,18">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="2" />
+                <RowDefinition Height="10" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <TextBlock Grid.Row="0" FontSize="23" TextTrimming="None" Foreground="{DynamicResource ColorBrush2}" HorizontalAlignment="Left" Name="LabTitle" Margin="7,-1,70,9" Text="编辑皮肤" VerticalAlignment="Top" SnapsToDevicePixels="False" UseLayoutRounding="False" />
+            <Rectangle x:Name="ShapeLine" Grid.Row="1" Height="2" Fill="{Binding Foreground, ElementName=LabTitle}" />
+            <!-- 左侧 3D 皮肤预览 + 右侧来源单选列表（第 74/96/97 轮：列表限高 252 = 7 行 × 36，全部 7 项一次放下不滚动）
+                 第 101 轮：正版 / LittleSkin / 自定义皮肤站这三项不再就地铺输入框（会撑高主弹窗致超载），
+                 改为弹出下方 PanSub 子弹窗收集输入；选中仅更新预览，「确定」才应用 -->
+            <Grid Grid.Row="3" Margin="7,0,7,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="1*" />
+                </Grid.ColumnDefinitions>
+                <!-- 第 113 轮：预览 284→240，给底部「取消/确定」腾出竖向空间（弹窗居中在 ~440px 内容区，
+                     原 284 高预览把底部按钮挤到卡片底缘、贴着圆角点不准）。 -->
+                <Border x:Name="PanPreviewBack" Grid.Column="0" CornerRadius="5" Background="{DynamicResource ColorBrush7}" Margin="0,0,12,0"
+                        Height="240" VerticalAlignment="Top">
+                    <my:MySkin3D x:Name="Skin3D" Width="196" Height="240" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <StackPanel Grid.Column="1" MinWidth="300">
+                    <ScrollViewer x:Name="PanListScroll" MaxHeight="252" VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled" Focusable="False">
+                        <StackPanel x:Name="PanList" />
+                    </ScrollViewer>
+                </StackPanel>
+            </Grid>
+            <!-- 底部：提示 + 取消 / 确定 -->
+            <Grid Grid.Row="4" Margin="7,8,7,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="LabHint" FontSize="13" Foreground="{DynamicResource ColorBrush1}" Opacity="0.55" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="2,0,0,0" />
+                <!-- 第 113 轮：主弹窗「取消/确定」补 Height="32" + 水平内边距，恢复项目标准按钮高度，
+                     修复原先无高度导致的「塌扁/被遮到按不了」。 -->
+                <StackPanel Grid.Column="1" Name="PanBtn" VerticalAlignment="Top" HorizontalAlignment="Right" Orientation="Horizontal">
+                    <my:MyButton ColorType="Normal" x:FieldModifier="public" Text="取消" x:Name="Btn2" Margin="12,0,0,0" Height="32" TextPadding="7" SnapsToDevicePixels="False" Padding="12,0" UseLayoutRounding="False" />
+                    <my:MyButton ColorType="Normal" x:FieldModifier="public" Text="确定" x:Name="Btn1" Margin="12,0,0,0" Height="32" TextPadding="7" SnapsToDevicePixels="False" Padding="12,0" UseLayoutRounding="False" />
+                </StackPanel>
+            </Grid>
+        </Grid>
+    </Border>
+    <!-- 第 101 轮：子弹窗（覆盖层）。半透明遮罩盖住整个主弹窗 + 居中小卡片，
+         用于收集「正版玩家皮肤 / LittleSkin 皮肤站 / 自定义皮肤站」需要的角色名（及站点地址）。
+         这样主弹窗本体不再因输入框铺开而超载；子弹窗确定即写回 pending 并刷新预览，取消则保留原状。 -->
+    <Grid x:Name="PanSub" Visibility="Collapsed" Background="#55000000">
+        <Border x:Name="PanSubCard" CornerRadius="6" Background="#FBFBFB" Width="340"
+                HorizontalAlignment="Center" VerticalAlignment="Center"
+                RenderTransformOrigin="0.5,0.5">
+            <Border.RenderTransform>
+                <ScaleTransform x:Name="SubCardScale" ScaleX="0.94" ScaleY="0.94" />
+            </Border.RenderTransform>
+            <Border.Effect>
+                <DropShadowEffect Color="{DynamicResource ColorObject1}" BlurRadius="18" ShadowDepth="3" RenderingBias="Performance" Opacity="0.7" />
+            </Border.Effect>
+            <Grid Margin="22,20,22,18">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="8" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="8" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="16" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <TextBlock x:Name="LabSubTitle" Grid.Row="0" FontSize="19" Foreground="{DynamicResource ColorBrush2}"
+                            Text="输入信息" HorizontalAlignment="Left" SnapsToDevicePixels="False" />
+                <TextBlock x:Name="LabSubDesc" Grid.Row="2" FontSize="13" Foreground="{DynamicResource ColorBrush1}"
+                            Opacity="0.6" TextWrapping="Wrap" Text="请填写皮肤来源所需信息" />
+                <my:MyTextBox x:Name="TextSubWho" Grid.Row="4" Height="28" MaxLength="40"
+                              HintText="玩家名（皮肤站上的角色名）" />
+                <my:MyTextBox x:Name="TextSubApi" Grid.Row="5" Height="28" MaxLength="120" Visibility="Collapsed"
+                              HintText="皮肤站地址，例如 https://littleskin.cn/csl" />
+                <StackPanel x:Name="PanSubBtn" Grid.Row="7" Orientation="Horizontal" HorizontalAlignment="Right">
+                    <my:MyButton ColorType="Normal" x:FieldModifier="public" Text="取消" x:Name="BtnSub2" Margin="0,0,12,0" Height="32" TextPadding="7" SnapsToDevicePixels="False" Padding="12,0" UseLayoutRounding="False" />
+                    <my:MyButton ColorType="Normal" x:FieldModifier="public" Text="确定" x:Name="BtnSub1" Margin="0,0,0,0" Height="32" TextPadding="7" SnapsToDevicePixels="False" Padding="12,0" UseLayoutRounding="False" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Grid>

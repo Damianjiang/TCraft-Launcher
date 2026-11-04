@@ -1,0 +1,60 @@
+<local:MyPageRight x:Class="PageSetupLog"
+                   xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                   xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                   xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                   xmlns:local="clr-namespace:TCraft"
+                   mc:Ignorable="d"
+                   d:DesignHeight="450" d:DesignWidth="800"
+                   PanScroll="{Binding ElementName=PanBack}" RenderOptions.BitmapScalingMode="LowQuality">
+    <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
+        <DockPanel>
+            <!-- Win11 风格页头 -->
+            <StackPanel DockPanel.Dock="Top" Margin="40,20,36,2">
+                <TextBlock Text="日志" FontSize="30" FontWeight="SemiBold" Foreground="{DynamicResource ColorBrush1}" />
+                <TextBlock Text="查看、导出与清理运行日志。" FontSize="13" Opacity="0.55" Margin="0,6,0,0" Foreground="{DynamicResource ColorBrush1}" />
+            </StackPanel>
+            <local:MyCard DockPanel.Dock="Top" Title="日志操作" Margin="32,24,32,0">
+                <WrapPanel ItemHeight="35" Margin="32,44,24,26">
+                    <local:MyButton MinWidth="100" Text="导出当前日志" ColorType="Highlight" Margin="0,0,15,0"
+                                    Click="BtnExport_Click" />
+                    <local:MyButton MinWidth="120" Text="导出全部日志" ColorType="Normal" Margin="0,0,15,0"
+                                    Click="BtnExportAll_Click" />
+                    <local:MyButton MinWidth="120" Text="打开日志文件夹" ColorType="Normal" Margin="0,0,15,0"
+                                    Click="BtnOpenDir_Click" />
+                    <local:MyButton MinWidth="120" Text="清理历史日志" ColorType="Red" Click="BtnClean_Click" />
+                </WrapPanel>
+            </local:MyCard>
+            <!-- 第 130 轮（D4）：启动器自身日志实时查看器。仅页面可见时以 600ms 轮询增量读取 Log1.txt，
+                 Unloaded 即停（性能纪律：无页面外驻留）；级别过滤 + 内容搜索 + 自动滚动。 -->
+            <local:MyCard DockPanel.Dock="Top" Title="实时日志" Margin="32,24,32,0">
+                <StackPanel Margin="24,44,24,20">
+                    <Grid Height="30">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <local:MyComboBox x:Name="ComboLogLevel" Width="110" Height="30" VerticalAlignment="Center" SelectionChanged="ComboLogLevel_SelectionChanged">
+                            <local:MyComboBoxItem Content="全部级别" IsSelected="True" />
+                            <local:MyComboBoxItem Content="警告及错误" />
+                            <local:MyComboBoxItem Content="仅错误" />
+                        </local:MyComboBox>
+                        <local:MyTextBox x:Name="TxtLogFilter" Grid.Column="1" Height="30" Margin="10,0,0,0" HintText="搜索日志内容" MaxLength="200" />
+                        <local:MyCheckBox x:Name="CheckLogAutoScroll" Grid.Column="2" Text="自动滚动" Margin="12,0,0,0" VerticalAlignment="Center" />
+                    </Grid>
+                    <Border CornerRadius="6" Margin="0,12,0,0" Background="{DynamicResource ColorBrushGray8}" ClipToBounds="True">
+                        <TextBox x:Name="TxtLogView" IsReadOnly="True" BorderThickness="0" Background="Transparent"
+                                 FontFamily="Consolas, Microsoft YaHei UI" FontSize="12" Foreground="{DynamicResource ColorBrush1}"
+                                 VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" TextWrapping="NoWrap"
+                                 Height="300" Padding="8,6" />
+                    </Border>
+                    <TextBlock x:Name="LabLogStatus" Text="实时监听 Log1.txt…" FontSize="12" Opacity="0.5" Margin="2,8,2,0" />
+                </StackPanel>
+            </local:MyCard>
+            <local:MyCard Title="全部日志" Margin="32,24,32,28" x:Name="PanContent">
+                <StackPanel Name="PanList" Orientation="Vertical" Margin="24,40,20,20" />
+            </local:MyCard>
+        </DockPanel>
+    </local:MyScrollViewer>
+</local:MyPageRight>
