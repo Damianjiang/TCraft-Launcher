@@ -13,7 +13,7 @@
 [![License](https://img.shields.io/github/license/Damianjiang/TCraft-Launcher?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%207%20SP1%2B-blue?style=flat-square)](https://github.com/Damianjiang/TCraft-Launcher/releases/latest)
 
-[下载最新版](https://github.com/Damianjiang/TCraft-Launcher/releases/latest) · [官网](https://damianjiang.github.io/TCraft-Launcher/) · [English](README.en.md) · [反馈问题](https://github.com/Damianjiang/TCraft-Launcher/issues) · QQ 群 1081955336
+[下载最新版](https://github.com/Damianjiang/TCraft-Launcher/releases/latest) · [官网](https://damianjiang.github.io/TCraft-Launcher/) · [更新日志](CHANGELOG.md) · [English](README.en.md) · [反馈问题](https://github.com/Damianjiang/TCraft-Launcher/issues) · QQ 群 1081955336
 
 <img src="docs/assets/shot-home.png" width="820" alt="TCraft Launcher 启动台界面">
 
@@ -62,6 +62,7 @@ TCraft Launcher（简称 **TCL**）是一个用 VB.NET / WPF 写的 Minecraft �
 - **系统**：Windows 7 SP1 及以上（推荐 Windows 10 / 11），64 位
 - **体积**：约 3.5 MiB（单文件，< 4 MB）
 - **校验值**：见最新 Release 页面（随发布同步更新）
+- **更新日志**：[CHANGELOG.md](CHANGELOG.md)，中英双语，按版本记录每次改动
 
 > 项目未购买代码签名证书，SmartScreen 可能提示「未知发布者」。
 > 可在 Release 页面核对校验值，或直接从源码构建。

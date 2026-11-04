@@ -13,7 +13,7 @@ A single-file Minecraft launcher: 3.5 MB, ~2 s cold start. Open source, free, no
 [![License](https://img.shields.io/github/license/Damianjiang/TCraft-Launcher?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%207%20SP1%2B-blue?style=flat-square)](https://github.com/Damianjiang/TCraft-Launcher/releases/latest)
 
-[Download](https://github.com/Damianjiang/TCraft-Launcher/releases/latest) · [Website](https://damianjiang.github.io/TCraft-Launcher/en/) · [中文文档](README.md) · [Issues](https://github.com/Damianjiang/TCraft-Launcher/issues)
+[Download](https://github.com/Damianjiang/TCraft-Launcher/releases/latest) · [Website](https://damianjiang.github.io/TCraft-Launcher/en/) · [Changelog](CHANGELOG.md) · [中文文档](README.md) · [Issues](https://github.com/Damianjiang/TCraft-Launcher/issues)
 
 <img src="docs/assets/shot-home.png" width="820" alt="TCraft Launcher home page">
 
@@ -53,6 +53,7 @@ That link always resolves to the newest build — no version number is hardcoded
 - **OS**: Windows 7 SP1+ (Windows 10 / 11 recommended), 64-bit
 - **Size**: about 3.5 MiB (single file, under 4 MB)
 - **Checksum**: listed on the latest release page (updated with every build)
+- **Changelog**: [CHANGELOG.md](CHANGELOG.md), bilingual, organised by version
 
 > The project does not purchase a code-signing certificate, so SmartScreen may
 > show an "unknown publisher" warning. Verify the checksum on the release page, or build from source.
