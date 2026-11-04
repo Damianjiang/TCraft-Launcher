@@ -78,13 +78,12 @@
   const year = document.getElementById("year");
   if (year) year.textContent = String(new Date().getFullYear());
 
-  // 完整版弹窗
+  // 完整版弹窗（事件委托：即使上方任一模块初始化失败也能工作）
   const modal = document.getElementById("modalFull");
   const openModal = () => {
     if (!modal) return;
     modal.hidden = false;
     document.body.style.overflow = "hidden";
-    modal.querySelector(".modal__close")?.focus();
   };
   const closeModal = () => {
     if (!modal) return;
@@ -92,11 +91,16 @@
     document.body.style.overflow = "";
   };
 
-  document.querySelectorAll("[data-modal-open]").forEach((btn) => {
-    btn.addEventListener("click", openModal);
-  });
-  modal?.querySelectorAll("[data-modal-close]").forEach((el) => {
-    el.addEventListener("click", closeModal);
+  document.addEventListener("click", (e) => {
+    const t = e.target instanceof Element ? e.target : null;
+    if (!t) return;
+    if (t.closest("[data-modal-open]")) {
+      e.preventDefault();
+      openModal();
+    } else if (t.closest("[data-modal-close]")) {
+      e.preventDefault();
+      closeModal();
+    }
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && modal && !modal.hidden) closeModal();
