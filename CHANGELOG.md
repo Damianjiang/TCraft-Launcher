@@ -12,6 +12,31 @@ The website and download link always resolve to the newest build, so no version 
 
 ---
 
+## v1.2 补丁更新 — 2026-11-06 / 中文
+
+（程序集 / 文件版本保持 1.2.0.0；资产 `TCraft-Launcher.exe`，校验值见最新 Release 页面）
+
+- 社区群迁移：对外统一群更换为 **TCraft Launcher 启动器交流群（QQ 群号 1131373915）**，
+  加入链接 https://qm.qq.com/q/WaG64YE9uo ；官网弹窗、FAQ、页脚、README、更新日志与程序内
+  文案同步更新，旧群号不再出现。
+- 移除仓库中的 JavaFX 跨平台目录（`tcljavafx/`，源码、构建脚本与产物）；官网 Mac / Linux
+  条目改为「从源码自行构建」。
+- 重新生成 `LangTables.txt.gz` 及全部内嵌 gz 快照（与当前 dll 字节一致）。
+
+## Patch update — 2026-11-06 / English
+
+(Assembly / file version stays 1.2.0.0; asset `TCraft-Launcher.exe`, checksum on the latest release page)
+
+- Community group moved: the project's external channel is now the **TCraft Launcher group
+  (QQ 1131373915)** — join link https://qm.qq.com/q/WaG64YE9uo ; the website modal, FAQ,
+  footer, READMEs, changelog and in-app copy were updated accordingly; the old group number
+  no longer appears anywhere.
+- Removed the JavaFX cross-platform tree (`tcljavafx/`: source, build scripts and artifacts)
+  from the repository; the website's Mac / Linux entry now points to building from source.
+- Regenerated `LangTables.txt.gz` and all embedded gz snapshots so they match the current dlls.
+
+---
+
 ## v1.2 (1.2.0.0) — 2026-11-04 / 中文
 
 首个开源版本，也是自 1.0 / 1.1 以来改动最大的一次更新。
@@ -68,7 +93,7 @@ The website and download link always resolve to the newest build, so no version 
 ### 官网
 
 - 中英切换（桌面 / 移动端）、SEO、社交预览卡片、sitemap。
-- 「获取完整版」入口弹窗引导加入 QQ 群 **1081955336**，支持复制群号、Esc / 遮罩 / × 关闭。
+- 「获取完整版」入口弹窗引导加入 <a href="https://qm.qq.com/q/WaG64YE9uo">TCraft Launcher 启动器交流群</a>（群号 **1131373915**），支持复制群号、Esc / 遮罩 / × 关闭。
 - 冷启动数据修正为 2 秒，官网不显示版本号。
 - 下载指向永远最新的 Release，体积 / 时间 / SHA-256 由 GitHub 接口动态读取，含超时与失败兜底。
 
@@ -137,7 +162,7 @@ The first open-source release, and the largest update since 1.0 / 1.1.
 ### Website
 
 - Chinese / English switch on desktop and mobile, SEO, Open Graph cards, sitemap.
-- "Get the full edition" modal pointing to QQ group **1081955336**, with copy-to-clipboard and
+- "Get the full edition" modal pointing to the <a href="https://qm.qq.com/q/WaG64YE9uo">TCraft Launcher group</a> (QQ **1131373915**), with copy-to-clipboard and
   Esc / backdrop / × close.
 - Cold-start figure corrected to 2 seconds; no version number is shown on the site.
 - Download points at the always-latest release; size, date and SHA-256 are read from the GitHub API

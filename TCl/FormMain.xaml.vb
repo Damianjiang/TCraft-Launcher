@@ -869,7 +869,7 @@ Public Class FormMain
             Settings.Set("HintTCLInfo", True)
             MyMsgBox(ModLang.L("TCL 由 TCraft 团队开发与维护。") & vbCrLf & vbCrLf &
                      ModLang.L("提供游戏与模组、整合包、资源包、光影的下载与管理，支持原版、Forge / NeoForge / Fabric / OptiFine / LiteLoader。") & vbCrLf & vbCrLf &
-                     ModLang.L("新版本在群内发布，手动下载新版 exe 覆盖即可。加群 1081955336 获取更新、反馈问题。"), ModLang.L("关于 TCL"), ModLang.L("我知道了"), IsWarn:=False)
+                     ModLang.L("新版本在群内发布，手动下载新版 exe 覆盖即可。加入 TCraft Launcher 启动器交流群（群号 1131373915）获取更新、反馈问题。"), ModLang.L("关于 TCL"), ModLang.L("我知道了"), IsWarn:=False)
         End If
         If BuildType = BuildTypes.Snapshot Then
             Select Case Settings.Get(Of Integer)("SystemCount")

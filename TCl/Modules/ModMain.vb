@@ -1003,7 +1003,7 @@ EndHint:
         Catch
         End Try
         Try
-            MyMsgBox(ModLang.L("请加入 QQ 群 1081955336 提交问题。") & vbCrLf &
+            MyMsgBox(ModLang.L("请加入 TCraft Launcher 启动器交流群（群号 1131373915）提交问题。") & vbCrLf &
                      If(String.IsNullOrEmpty(Detail), ModLang.L("你也可以在 设置 → 日志 中查看并复制错误信息。"), ModLang.L("错误信息已复制到剪贴板，可直接粘贴到群内。")),
                      ModLang.L("反馈"), IsWarn:=True)
         Catch

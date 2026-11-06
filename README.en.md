@@ -60,8 +60,7 @@ That link always resolves to the newest build — no version number is hardcoded
 
 > Microsoft (genuine) login ships **disabled** in the open-source build: no
 > Microsoft credentials are embedded. To enable it, register your own Azure app
-> and set the `TCL_MS_CLIENT_ID` environment variable — or join QQ group
-> **1081955336** to get the full edition with built-in Microsoft login.
+> and set the `TCL_MS_CLIENT_ID` environment variable — or join the [TCraft Launcher 启动器交流群](https://qm.qq.com/q/WaG64YE9uo) (QQ **1131373915**) to get the full edition with built-in Microsoft login.
 
 ## Build from source
 
@@ -116,7 +115,7 @@ components — see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 - **Issues**: [open an issue](https://github.com/Damianjiang/TCraft-Launcher/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/Damianjiang/TCraft-Launcher/discussions)
-- **QQ group** (Chinese): 1081955336
+- **TCraft Launcher 启动器交流群** (Chinese): [点击加入](https://qm.qq.com/q/WaG64YE9uo)（群号 1131373915）
 
 ## License
 

@@ -15,7 +15,7 @@ Public Class PageOtherHelp
     ''' </summary>
     Public Shared Sub OpenHelpCenter()
         Try
-            Hint(ModLang.L("帮助中心：加入 QQ 群 1081955336，可获取使用帮助、更新公告与问题反馈。"), HintType.Blue)
+            Hint(ModLang.L("帮助中心：加入 TCraft Launcher 启动器交流群（群号 1131373915，https://qm.qq.com/q/WaG64YE9uo），可获取使用帮助、更新公告与问题反馈。"), HintType.Blue)
         Catch ex As Exception
             Logger.Error(ex, "打开帮助中心失败")
         End Try

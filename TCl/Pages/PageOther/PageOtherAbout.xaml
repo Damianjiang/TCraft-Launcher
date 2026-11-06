@@ -17,12 +17,12 @@
                     <TextBlock Margin="0,16,0,0" TextWrapping="Wrap" LineHeight="22"
                                Text="Minecraft、Minecraft 徽标及相关名称、品牌、图像与音效的著作权和商标权，均归 Mojang Synergies AB 与 Microsoft 所有，本启动器不主张任何权利，也不将 Minecraft 名称用作自身的主标题或标识。&#xa;&#xa;TCraft Launcher（简称 TCL）由 TCraft 团队独立开发与维护，与 Mojang Studios、Microsoft、网易（Minecraft 中国代理）均无隶属、赞助、授权、合作或背书关系，也未获其审查或认可。&#xa;&#xa;本启动器不包含、不分发 Minecraft 游戏本体或任何游戏文件，不提供破解、盗版、绕过正版验证或规避付费的功能；游戏本体与更新始终来自官方渠道。TCL 不运营也不代理任何 Minecraft 服务器，联机功能只负责把你已连接的设备互相连通。&#xa;&#xa;使用本启动器即表示：你已通过官方渠道购买 Minecraft: Java Edition 并持有有效账户，已阅读并同意《Minecraft 最终用户许可协议》（EULA）与《Minecraft 使用准则》；未成年人须取得监护人同意。使用本软件的风险由你自行承担。&#xa;&#xa;本启动器完全免费，不出售、不租赁、不设付费解锁，也不将 Minecraft 品牌用于商业推广。任何以 TCL 名义收费的行为均与本团队无关，也不能作为获得 Minecraft 的途径。" />
                     <TextBlock Margin="0,16,0,0" TextWrapping="Wrap" LineHeight="22"
-                               Text="开发者、发布者与责任方均为 TCraft 团队。本软件按「现状」提供，不对使用或无法使用本软件造成的直接、间接损失承担责任；对存档、配置等文件的操作请自行备份。&#xa;&#xa;侵权投诉、合规问题与功能反馈：QQ 群 1081955336（本项目唯一对外渠道）。涉及 Minecraft 品牌的投诉，也可通过 https://help.minecraft.net/ 联系 Mojang。&#xa;&#xa;Minecraft EULA：https://www.minecraft.net/eula&#xa;Minecraft 使用准则：https://www.minecraft.net/usage-guidelines&#xa;本启动器使用了 Lucide 图标库（ISC 协议）等开源组件，相关权利归各自作者所有。" />
+                               Text="开发者、发布者与责任方均为 TCraft 团队。本软件按「现状」提供，不对使用或无法使用本软件造成的直接、间接损失承担责任；对存档、配置等文件的操作请自行备份。&#xa;&#xa;侵权投诉、合规问题与功能反馈：TCraft Launcher 启动器交流群（群号 1131373915，https://qm.qq.com/q/WaG64YE9uo）（本项目唯一对外渠道）。涉及 Minecraft 品牌的投诉，也可通过 https://help.minecraft.net/ 联系 Mojang。&#xa;&#xa;Minecraft EULA：https://www.minecraft.net/eula&#xa;Minecraft 使用准则：https://www.minecraft.net/usage-guidelines&#xa;本启动器使用了 Lucide 图标库（ISC 协议）等开源组件，相关权利归各自作者所有。" />
                 </StackPanel>
             </local:MyCard>
             <local:MyCard Margin="0,15,0,15" Title="关于">
                 <TextBlock Margin="25,42,23,8" TextWrapping="Wrap" LineHeight="22"
-                           Text="TCraft Launcher 1.2 由 TCraft 团队开发与维护，持续更新，并已在 GitHub 开源。&#xa;提供游戏与模组、整合包、资源包、光影的下载与管理，支持原版、Forge / NeoForge / Fabric / OptiFine / LiteLoader。&#xa;同时提供登录、启动、联机、实例与整合包导出等完整能力。&#xa;加入 QQ 群 1081955336，获取更新、反馈问题。" />
+                           Text="TCraft Launcher 1.2 由 TCraft 团队开发与维护，持续更新，并已在 GitHub 开源。&#xa;提供游戏与模组、整合包、资源包、光影的下载与管理，支持原版、Forge / NeoForge / Fabric / OptiFine / LiteLoader。&#xa;同时提供登录、启动、联机、实例与整合包导出等完整能力。&#xa;加入 TCraft Launcher 启动器交流群（群号 1131373915，https://qm.qq.com/q/WaG64YE9uo），获取更新、反馈问题。" />
                 <TextBlock x:Name="LabBuildType" Margin="25,0,23,20" TextWrapping="Wrap" LineHeight="22"
                            FontWeight="SemiBold" Foreground="{DynamicResource ColorBrush2}" Text="" />
             </local:MyCard>

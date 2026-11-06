@@ -106,24 +106,26 @@
     if (e.key === "Escape" && modal && !modal.hidden) closeModal();
   });
 
-  // 复制 QQ 群号
+  // 复制群号 / 打开群链接
   const copyBtn = document.getElementById("copyQq");
-  copyBtn?.addEventListener("click", async () => {
-    const qq = (document.getElementById("qqNumber")?.textContent || "").trim();
-    try {
-      await navigator.clipboard.writeText(qq);
-    } catch {
-      const ta = document.createElement("textarea");
-      ta.value = qq;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      ta.remove();
-    }
-    const original = copyBtn.textContent;
-    copyBtn.textContent = copyBtn.dataset.copied || (original.includes("Copied") ? "Copied!" : "已复制");
-    setTimeout(() => { copyBtn.textContent = original; }, 1600);
-  });
+  if (copyBtn) {
+    copyBtn.addEventListener("click", async () => {
+      const qq = (document.getElementById("qqNumber")?.textContent || "").trim();
+      try {
+        await navigator.clipboard.writeText(qq);
+      } catch {
+        const ta = document.createElement("textarea");
+        ta.value = qq;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        ta.remove();
+      }
+      const original = copyBtn.textContent;
+      copyBtn.textContent = copyBtn.dataset.copied || "已复制";
+      setTimeout(() => { copyBtn.textContent = original; }, 1600);
+    });
+  }
 
   // 最新 Release 信息：页面不绑定任何版本号，规格全部从 GitHub 动态读取。
   // 下载按钮本身指向 /releases/latest/download/<固定资产名>，即使接口不可用也能下载最新版。

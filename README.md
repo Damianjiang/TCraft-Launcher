@@ -13,7 +13,7 @@
 [![License](https://img.shields.io/github/license/Damianjiang/TCraft-Launcher?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%207%20SP1%2B-blue?style=flat-square)](https://github.com/Damianjiang/TCraft-Launcher/releases/latest)
 
-[下载最新版](https://github.com/Damianjiang/TCraft-Launcher/releases/latest) · [官网](https://damianjiang.github.io/TCraft-Launcher/) · [更新日志](CHANGELOG.md) · [English](README.en.md) · [反馈问题](https://github.com/Damianjiang/TCraft-Launcher/issues) · QQ 群 1081955336
+[下载最新版](https://github.com/Damianjiang/TCraft-Launcher/releases/latest) · [官网](https://damianjiang.github.io/TCraft-Launcher/) · [更新日志](CHANGELOG.md) · [English](README.en.md) · [反馈问题](https://github.com/Damianjiang/TCraft-Launcher/issues) · [TCraft Launcher 启动器交流群](https://qm.qq.com/q/WaG64YE9uo)（群号 1131373915）
 
 <img src="docs/assets/shot-home.png" width="820" alt="TCraft Launcher 启动台界面">
 
@@ -69,7 +69,7 @@ TCraft Launcher（简称 **TCL**）是一个用 VB.NET / WPF 写的 Minecraft �
 
 > 微软正版登录在开源版中**默认未启用**：程序不内置任何微软凭据。
 > 如需使用，注册一个 Azure 应用后设置环境变量 `TCL_MS_CLIENT_ID` 为你的 ClientId，重启启动器即可；
-> 也可以加入 QQ 群 **1081955336** 获取内置正版登录的完整版。
+> 也可以加入 [TCraft Launcher 启动器交流群](https://qm.qq.com/q/WaG64YE9uo)（群号 **1131373915**）获取内置正版登录的完整版。
 
 ## 从源码构建
 
@@ -119,7 +119,7 @@ TCL 站在前人的肩膀上，这里把每一个来源都写清楚：
 
 ## 社区
 
-- **QQ 群**：1081955336（更新通知、问题反馈、交流，本项目唯一即时通讯渠道）
+- **TCraft Launcher 启动器交流群**：[点击加入](https://qm.qq.com/q/WaG64YE9uo)（群号 1131373915，更新通知、问题反馈、交流，本项目唯一即时通讯渠道）
 - **Issue**：[提交问题反馈](https://github.com/Damianjiang/TCraft-Launcher/issues)
 - **讨论区**：[GitHub Discussions](https://github.com/Damianjiang/TCraft-Launcher/discussions)
 
