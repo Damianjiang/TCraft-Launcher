@@ -8,12 +8,12 @@
 
 一个单文件的 Minecraft 启动器：3.5 MB，冷启动约 2 秒，开源、免费、无广告。
 
-[![Release](https://img.shields.io/github/v/release/Damianjiang/TCraft-Launcher?style=flat-square&color=f2b632)](https://github.com/Damianjiang/TCraft-Launcher/releases/latest)
+[![Release](https://img.shields.io/github/v/release/Damianjiang/TCraft-Launcher?style=flat-square&color=f2b632)](https://github.com/Damianjiang/TCraft-Launcher/releases)
 [![Downloads](https://img.shields.io/github/downloads/Damianjiang/TCraft-Launcher/total?style=flat-square&color=5eead4)](https://github.com/Damianjiang/TCraft-Launcher/releases)
 [![License](https://img.shields.io/github/license/Damianjiang/TCraft-Launcher?style=flat-square)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows%207%20SP1%2B-blue?style=flat-square)](https://github.com/Damianjiang/TCraft-Launcher/releases/latest)
+[![Platform](https://img.shields.io/badge/platform-Windows%207%20SP1%2B-blue?style=flat-square)](https://github.com/Damianjiang/TCraft-Launcher/releases)
 
-[下载最新版](https://github.com/Damianjiang/TCraft-Launcher/releases/latest) · [官网](https://damianjiang.github.io/TCraft-Launcher/) · [更新日志](CHANGELOG.md) · [English](README.en.md) · [反馈问题](https://github.com/Damianjiang/TCraft-Launcher/issues) · [TCraft Launcher 启动器交流群](https://qm.qq.com/q/WaG64YE9uo)（群号 1131373915）
+[下载最新版](https://github.com/Damianjiang/TCraft-Launcher/releases) · [官网](https://damianjiang.github.io/TCraft-Launcher/) · [更新日志](CHANGELOG.md) · [English](README.en.md) · [反馈问题](https://github.com/Damianjiang/TCraft-Launcher/issues) · [TCraft Launcher 启动器交流群](https://qm.qq.com/q/WaG64YE9uo)（群号 1131373915）
 
 <img src="docs/assets/shot-home.png" width="820" alt="TCraft Launcher 启动台界面">
 
@@ -56,7 +56,7 @@ TCraft Launcher（简称 **TCL**）是一个用 VB.NET / WPF 写的 Minecraft �
 
 ## 下载
 
-前往 [最新 Release](https://github.com/Damianjiang/TCraft-Launcher/releases/latest) 下载 `TCraft-Launcher.exe`，双击运行即可。
+前往 [最新 Release](https://github.com/Damianjiang/TCraft-Launcher/releases) 下载 `TCraft-Launcher.exe`，双击运行即可。
 该链接始终指向最新版本，页面无需随版本更新。
 
 - **系统**：Windows 7 SP1 及以上（推荐 Windows 10 / 11），64 位

@@ -8,12 +8,12 @@
 
 A single-file Minecraft launcher: 3.5 MB, ~2 s cold start. Open source, free, no ads.
 
-[![Release](https://img.shields.io/github/v/release/Damianjiang/TCraft-Launcher?style=flat-square&color=f2b632)](https://github.com/Damianjiang/TCraft-Launcher/releases/latest)
+[![Release](https://img.shields.io/github/v/release/Damianjiang/TCraft-Launcher?style=flat-square&color=f2b632)](https://github.com/Damianjiang/TCraft-Launcher/releases)
 [![Downloads](https://img.shields.io/github/downloads/Damianjiang/TCraft-Launcher/total?style=flat-square&color=5eead4)](https://github.com/Damianjiang/TCraft-Launcher/releases)
 [![License](https://img.shields.io/github/license/Damianjiang/TCraft-Launcher?style=flat-square)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows%207%20SP1%2B-blue?style=flat-square)](https://github.com/Damianjiang/TCraft-Launcher/releases/latest)
+[![Platform](https://img.shields.io/badge/platform-Windows%207%20SP1%2B-blue?style=flat-square)](https://github.com/Damianjiang/TCraft-Launcher/releases)
 
-[Download](https://github.com/Damianjiang/TCraft-Launcher/releases/latest) · [Website](https://damianjiang.github.io/TCraft-Launcher/en/) · [Changelog](CHANGELOG.md) · [中文文档](README.md) · [Issues](https://github.com/Damianjiang/TCraft-Launcher/issues)
+[Download](https://github.com/Damianjiang/TCraft-Launcher/releases) · [Website](https://damianjiang.github.io/TCraft-Launcher/en/) · [Changelog](CHANGELOG.md) · [中文文档](README.md) · [Issues](https://github.com/Damianjiang/TCraft-Launcher/issues)
 
 <img src="docs/assets/shot-home.png" width="820" alt="TCraft Launcher home page">
 
@@ -47,7 +47,7 @@ There is no installer, no bundle, and no telemetry: the whole program is one
 
 ## Download
 
-Grab `TCraft-Launcher.exe` from the [latest release](https://github.com/Damianjiang/TCraft-Launcher/releases/latest) and run it.
+Grab `TCraft-Launcher.exe` from the [latest release](https://github.com/Damianjiang/TCraft-Launcher/releases) and run it.
 That link always resolves to the newest build — no version number is hardcoded.
 
 - **OS**: Windows 7 SP1+ (Windows 10 / 11 recommended), 64-bit

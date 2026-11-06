@@ -3,11 +3,11 @@
 [English](#english) · **中文**
 
 每个版本的完整发布说明（下载、校验、合规说明）见
-[最新 Release](https://github.com/Damianjiang/TCraft-Launcher/releases/latest)。
+[最新 Release](https://github.com/Damianjiang/TCraft-Launcher/releases)。
 官网与下载链接始终指向最新构建，因此页面上不写死版本号。
 
 Full release notes for every build (download, checksum, compliance) are on the
-[latest release](https://github.com/Damianjiang/TCraft-Launcher/releases/latest).
+[latest release](https://github.com/Damianjiang/TCraft-Launcher/releases).
 The website and download link always resolve to the newest build, so no version number is hardcoded there.
 
 ---

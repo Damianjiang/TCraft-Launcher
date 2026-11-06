@@ -794,3 +794,115 @@ section { position: relative; }
 .mobile-menu.is-open { display: flex; }
 .mobile-menu a { padding: 13px 6px; border-bottom: 1px solid var(--line); font-size: 15px; color: var(--muted); }
 .mobile-menu .btn { margin-top: 14px; }
+
+/* ---------- 官网 v10：导语 / 细节格 / 对比 / 关于 ---------- */
+.hero__lead {
+  margin: 20px 0 0;
+  font-size: 16.5px;
+  line-height: 1.75;
+  color: var(--muted);
+  max-width: 480px;
+}
+
+/* 功能下的细节格 */
+.details {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-top: 14px;
+}
+
+.detail {
+  background: var(--ink);
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  transition: background 0.35s;
+}
+
+.detail:hover { background: var(--ink-2); }
+.detail b { font-size: 14.5px; letter-spacing: -0.01em; }
+.detail span { font-size: 12.5px; color: var(--dim); line-height: 1.6; }
+
+/* 对比区 */
+.compare { position: relative; }
+
+.compare__table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  font-size: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.compare__table th, .compare__table td {
+  padding: 15px 18px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--line);
+}
+
+.compare__table thead th {
+  font-size: 11.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--dim);
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.compare__table thead th:nth-child(2) { color: var(--amber); background: var(--amber-soft); }
+
+.compare__table td { color: var(--muted); line-height: 1.65; }
+.compare__table td:first-child { color: var(--dim); font-size: 13px; white-space: nowrap; }
+.compare__table td:nth-child(2) {
+  color: #d8d4cc;
+  background: rgba(242, 182, 50, 0.05);
+  border-left: 1px solid rgba(242, 182, 50, 0.18);
+  border-right: 1px solid rgba(242, 182, 50, 0.18);
+}
+
+.compare__table tbody tr:last-child td { border-bottom: 0; }
+.compare__table tbody tr:last-child td:nth-child(2) {
+  background: rgba(242, 182, 50, 0.07);
+}
+
+.compare__note {
+  margin: 18px 0 0;
+  font-size: 12.5px;
+  color: var(--dim);
+  line-height: 1.75;
+  max-width: 720px;
+}
+
+/* 关于（长尾文案区） */
+.about__inner { max-width: 900px; }
+.about__inner h2 { margin-bottom: 22px; }
+
+.about__text p {
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.95;
+  max-width: 840px;
+  margin: 0 0 16px;
+}
+
+.about__text b { color: var(--paper); font-weight: 600; }
+
+/* 对比表窄屏横向滚动 */
+@media (max-width: 760px) {
+  .compare { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -16px; padding: 0 16px; }
+  .details { grid-template-columns: 1fr 1fr; }
+  .hero__lead { max-width: none; }
+}
+
+@media (max-width: 1020px) {
+  .details { grid-template-columns: repeat(2, 1fr); }
+}
