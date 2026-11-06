@@ -834,9 +834,9 @@ section { position: relative; }
 
 .compare__table {
   width: 100%;
-  min-width: 560px;
+  min-width: 720px;
   border-collapse: collapse;
-  font-size: 14px;
+  font-size: 13.5px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   overflow: hidden;
