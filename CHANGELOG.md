@@ -12,6 +12,26 @@ The website and download link always resolve to the newest build, so no version 
 
 ---
 
+## v1.3.3 (1.3.3.0) — 2026-11-07 / 中文
+
+（灰度预览更新；资产 `TCraft-Launcher.exe`，校验值见 Release 页面）
+
+- **Windows 7 下载彻底修复（自研 TLS 1.2 客户端）**：v1.3.2 的证书兜底在 Win7 上仍不够——Win7 系统加密栈（SChannel）缺少现代网站必需的密码套件，与 Cloudflare 系 CDN（Modrinth / ForgeCDN / fabricmc / neoforged / BMCLAPI 等）在密码协商阶段就直接失败，任何证书方案都无效。现内置一个只覆盖启动器所需的轻量 TLS 1.2 客户端（ECDHE secp256r1 + AES-128-GCM，加密原语全部来自系统 CNG，无第三方依赖），Win7 上自动切换、彻底绕开系统加密栈；Windows 10/11 不走此路径。HMCL 在 Win7 正常的原理相同（Java 托管 TLS）。
+- 下载主机实测 11/11 通过（Modrinth API/CDN、CurseForge API/CDN、MCIM、Mojang、BMCLAPI、GitHub）。
+- 下载失败自动重试时弹出提示（卡在哪个环节 + 第几轮重试，同文本只强调不刷屏）。
+- 体积 3.73 MiB（< 4 MB ✅）。
+
+## v1.3.3 (1.3.3.0) — 2026-11-07 / English
+
+(Gray preview update; asset `TCraft-Launcher.exe`, checksum on the Release page)
+
+- **Windows 7 downloads fixed for real (built-in lightweight TLS 1.2 client)**: the v1.3.2 certificate fallback was still not enough — Win7's crypto stack (SChannel) lacks the cipher suites modern sites require, so the handshake with Cloudflare-fronted CDNs (Modrinth / ForgeCDN / fabricmc / neoforged / BMCLAPI) dies at cipher negotiation, where no certificate fix can help. The launcher now embeds a minimal TLS 1.2 client covering exactly what it needs (ECDHE secp256r1 + AES-128-GCM, crypto primitives from the OS CNG, no third-party dependencies), automatically used on Win7 to bypass SChannel entirely; Windows 10/11 are unaffected. Same reason HMCL works on Win7 (Java's managed TLS).
+- Verified against 11 download hosts (Modrinth API/CDN, CurseForge API/CDN, MCIM, Mojang, BMCLAPI, GitHub).
+- Download auto-retries now announce themselves via toast (which stage + which round, deduplicated).
+- Size 3.73 MiB (< 4 MB).
+
+---
+
 ## v1.3.2 (1.3.2.0) — 2026-11-07 / 中文
 
 （灰度预览更新；资产 `TCraft-Launcher.exe`，校验值见 Release 页面）

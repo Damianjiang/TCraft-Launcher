@@ -910,6 +910,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Modules\Base\ModAnimation.vb" />
+    <Compile Include="Modules\Base\ModTls.vb" />
     <Compile Include="Modules\Base\ModArchive.vb" />
     <Compile Include="Modules\Base\ModProxy.vb" />
     <Compile Include="Modules\Base\ModSourceTest.vb" />

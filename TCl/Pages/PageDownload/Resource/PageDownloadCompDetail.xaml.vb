@@ -357,9 +357,7 @@ Public Class PageDownloadResourceDetail
             Dim Loaders As New List(Of LoaderBase)
             Dim Target As String = $"{McFolderSelected}versions\{InstanceName}\原始整合包.{If(Project.Platform = ResourcePlatforms.CurseForge, "zip", "mrpack")}"
             Dim LogoFileAddress As String = ResourceItem.PathLogo.ActualSource
-            Loaders.Add(New LoaderDownload("下载整合包文件", {
-                File.ToNetFile(Target, ResourceVersion.DownloadReason.Standalone, File.GameVersions.FirstOrDefault, File.ModLoaders)
-            }) With {.ProgressWeight = 10, .Block = True})
+            Loaders.Add(CreateFileDownloadStep("下载整合包文件", File.DownloadUrls, Target, 10))
             Loaders.Add(New LoaderTask(Of Integer, Integer)("准备安装整合包",
             Sub() ModpackInstall(Target, InstanceName, If(FileUtils.Exists(LogoFileAddress), LogoFileAddress, Nothing))) With {.ProgressWeight = 0.1})
 
@@ -522,9 +520,7 @@ Public Class PageDownloadResourceDetail
                     Dim LoaderName As String = Desc & "下载：" & PathUtils.GetFileNameWithoutExtension(Target) & " "
                     If Not PathUtils.IsSame(PathUtils.RemoveLastPart(Target), DefaultFolder) Then CachedFolder(File.ResourceType) = PathUtils.RemoveLastPart(Target)
                     Dim Loaders As New List(Of LoaderBase)
-                    Loaders.Add(New LoaderDownload("下载文件", {
-                        File.ToNetFile(Target, If(TargetResourceType = ResourceTypes.Any, ResourceVersion.DownloadReason.Dependency, ResourceVersion.DownloadReason.Standalone))
-                    }) With {.ProgressWeight = 6, .Block = True})
+                    Loaders.Add(CreateFileDownloadStep("下载文件", File.DownloadUrls, Target, 6))
                     '一并下载缺失的前置
                     If DepFiles.Any Then
                         Dim DepNetFiles = DepFiles.Select(
@@ -532,7 +528,18 @@ Public Class PageDownloadResourceDetail
                             Dim DepTarget = IO.Path.Combine(PathUtils.RemoveLastPart(Target), D.Item2.FileName)
                             Return D.Item2.ToNetFile(DepTarget, ResourceVersion.DownloadReason.Dependency)
                         End Function).ToList
-                        Loaders.Add(New LoaderDownload("下载前置文件", DepNetFiles) With {.ProgressWeight = 3, .Block = True})
+                        If ModTls.Win7TlsMode Then
+                            'Win7：SChannel 与 Cloudflare 系无法协商 TLS → 前置文件走内置 TLS 客户端逐个下载
+                            Loaders.Add(New LoaderTask(Of Integer, Integer)("下载前置文件",
+                            Sub(MyTask As LoaderTask(Of Integer, Integer))
+                                For Each DepFile In DepFiles
+                                    Dim DepTargetInner = IO.Path.Combine(PathUtils.RemoveLastPart(Target), DepFile.Item2.FileName)
+                                    ModTls.TlsDownload(DepFile.Item2.DownloadUrls, DepTargetInner)
+                                Next
+                            End Sub) With {.ProgressWeight = 3, .Block = True})
+                        Else
+                            Loaders.Add(New LoaderDownload("下载前置文件", DepNetFiles) With {.ProgressWeight = 3, .Block = True})
+                        End If
                     End If
                     '世界下载后需解压到 saves\ 再删除压缩包，否则 MC 无法直接使用该 zip 存档（对齐主流启动器的世界安装流程）
                     Dim ExtL As String = If(PathUtils.GetExtension(File.FileName), "").Lower

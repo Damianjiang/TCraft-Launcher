@@ -240,7 +240,6 @@ Public Module ModProxy
             Try
                 Return ApplyWinHttp(New WinHttpHandler With {
                     .AutomaticDecompression = DecompressionMethods.Deflate Or DecompressionMethods.GZip,
-                    .ServerCertificateValidationCallback = AddressOf ValidateServerCertificate,
                     .CookieUsePolicy = CookieUsePolicy.IgnoreCookies, '不存 Cookie，从 Header 手动传入（等价原 UseCookies=False）
                     .SendTimeout = TimeSpan.FromSeconds(30),
                     .ReceiveHeadersTimeout = TimeSpan.FromSeconds(60),
@@ -254,7 +253,6 @@ Public Module ModProxy
         End If
         Return Apply(New HttpClientHandler With {
             .AutomaticDecompression = DecompressionMethods.Deflate Or DecompressionMethods.GZip,
-            .ServerCertificateCustomValidationCallback = AddressOf ValidateServerCertificate,
             .UseCookies = False
         })
     End Function
@@ -265,6 +263,8 @@ Public Module ModProxy
     '安全通道建立信任关系」（PCL 官方确认的 Win7 下载问题即此，PCL 只能建议用户升级系统）。
     '对策：内嵌当前 Mozilla CA 根证书束（与 curl 同源，随版本更新），OS 验证失败时改用内置束重新验证——
     '链必须能锚定到内置自签根且域名匹配，安全语义与标准 PKI 一致，只是信任锚更新鲜。
+    '注意：必须挂全局 ServicePointManager.ServerCertificateValidationCallback——.NET Framework 的
+    'HttpClientHandler 级回调在握手早期失败（如密码协商被拒）时不触发，实测 Win7 上从不触发。
 
     ''' <summary>内置 CA 根证书束（Mozilla 列表，随构建更新），首次验证失败时惰性加载。</summary>
     Private ReadOnly BundledRoots As New Lazy(Of List(Of X509.X509Certificate2))(
@@ -301,32 +301,37 @@ Public Module ModProxy
             Return Thumbs
         End Function, LazyThreadSafetyMode.ExecutionAndPublication)
 
-    ''' <summary>服务器证书验证：先信 OS 结果；OS 验证失败（Win7 根库冻结等）改用内置 CA 束重验。
-    ''' 重验要求：链能锚定到内置自签根、无时间/签名有效性错误、叶子证书域名与请求主机匹配。</summary>
-    Public Function ValidateServerCertificate(Request As Net.Http.HttpRequestMessage, Cert As X509.X509Certificate2,
+''' <summary>叶子证书用内置 CA 束重验：链能锚定到内置自签根、无时间/签名有效性错误。
+''' Win7 兜底核心——系统根证书库冻结（EOL）导致现代 CDN 证书链不被信任时，用随版本更新的内置束作为信任锚。</summary>
+    Friend Function ValidateChainWithBundle(Leaf As X509.X509Certificate2) As Boolean
+        Dim Roots = BundledRoots.Value
+        If Roots.Count = 0 Then Return False
+        Dim Chain2 As New X509.X509Chain
+        Chain2.ChainPolicy.RevocationMode = X509.X509RevocationMode.NoCheck
+        Chain2.ChainPolicy.ExtraStore.AddRange(Roots.ToArray())
+        Chain2.Build(Leaf) '返回值只代表有无状态错误，链结构以 ChainElements 为准
+        If Chain2.ChainElements.Count < 2 Then Return False
+        For Each Element In Chain2.ChainElements
+            For Each Status In Element.ChainElementStatus
+                If Status.Status = X509.X509ChainStatusFlags.NotTimeValid OrElse
+                   Status.Status = X509.X509ChainStatusFlags.NotSignatureValid Then Return False
+            Next
+        Next
+        Dim Last = Chain2.ChainElements(Chain2.ChainElements.Count - 1).Certificate
+        Return Last.Subject = Last.Issuer AndAlso BundledRootThumbprints.Value.Contains(Last.Thumbprint)
+    End Function
+
+''' <summary>服务器证书验证（全局 ServicePointManager 回调路径）：先信 OS 结果；
+''' OS 验证失败（Win7 根库冻结等）改用内置 CA 束重验。域名不匹配由 SChannel 校验，任何情况都拒绝。</summary>
+    Friend Function ValidateServerCertificate(Sender As Object, Cert As X509.X509Certificate2,
                                                      Chain As X509.X509Chain, Errors As Net.Security.SslPolicyErrors) As Boolean
         If Errors = Net.Security.SslPolicyErrors.None Then Return True 'OS 验证通过（Win10 常态）
         Try
-            If Cert Is Nothing OrElse Request Is Nothing Then Return False
-            Dim Roots = BundledRoots.Value
-            If Roots.Count = 0 Then Return False
-            Dim Chain2 As New X509.X509Chain
-            Chain2.ChainPolicy.RevocationMode = X509.X509RevocationMode.NoCheck
-            Chain2.ChainPolicy.ExtraStore.AddRange(Roots.ToArray())
-            Chain2.Build(Cert) '返回值只代表有无状态错误，链结构以 ChainElements 为准
-            If Chain2.ChainElements.Count < 2 Then Return False
-            For Each Element In Chain2.ChainElements
-                For Each Status In Element.ChainElementStatus
-                    If Status.Status = X509.X509ChainStatusFlags.NotTimeValid OrElse
-                       Status.Status = X509.X509ChainStatusFlags.NotSignatureValid Then Return False
-                Next
-            Next
-            Dim Last = Chain2.ChainElements(Chain2.ChainElements.Count - 1).Certificate
-            If Not (Last.Subject = Last.Issuer AndAlso BundledRootThumbprints.Value.Contains(Last.Thumbprint)) Then Return False
+            If Cert Is Nothing Then Return False
             '域名匹配：由 SChannel 在 OS 层校验并反映在 Errors 标志里（RemoteCertificateNameMismatch），
             '此处只兜「信任锚」问题——域名不匹配无论根是否可信都绝不放行
-            If Errors.HasFlag(Net.Security.SslPolicyErrors.RemoteCertificateNameMismatch) Then Return False
-            Return True
+            If Errors.HasFlag(Net.Security.SslPolicyErrors.RemoteCertificateNameMismatch) Then Return False 'SChannel 已校验域名
+            Return ValidateChainWithBundle(Cert)
         Catch ex As Exception
             Logger.Warn(ex, "内置证书束验证失败")
             Return False

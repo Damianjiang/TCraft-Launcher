@@ -13,6 +13,37 @@ Public Module ModNet
             Optional Encoding As Encoding = Nothing, Optional SimulateBrowserHeaders As Boolean = False, Optional MakeLog As Boolean = True) As String
         If Method Is Nothing Then Method = HttpMethod.Get
         If MakeLog Then Logger.Info($"发起网络请求（{Method.Method}，{Url}），最大超时 {Timeout}")
+        'Win7 网络兜底：SChannel 缺少现代密码套件，Cloudflare 系主机（Modrinth / ForgeCDN / fabricmc /
+        'neoforged / BMCLAPI 等）握手直接失败——GET 请求优先走内置 TLS 1.2 客户端（ModTls，绕开
+        'SChannel），失败再回退系统网络栈。Win10+ 不进入此路径。
+        If ModTls.Win7TlsMode AndAlso Method = HttpMethod.Get AndAlso Url.StartsWithF("https", True) AndAlso Content Is Nothing Then
+            Try
+                Dim TlsHeaders As New List(Of KeyValuePair(Of String, String))
+                If Accept IsNot Nothing AndAlso Accept <> "*/*" Then TlsHeaders.Add(New KeyValuePair(Of String, String)("Accept", Accept))
+                If Headers IsNot Nothing Then
+                    For i = 0 To Headers.GetLength(0) - 1
+                        TlsHeaders.Add(New KeyValuePair(Of String, String)(Headers(i, 0), Headers(i, 1)))
+                    Next
+                End If
+                If Url.Contains("api.curseforge.com") OrElse Url.Contains("forgecdn.net") Then
+                    TlsHeaders.Add(New KeyValuePair(Of String, String)("x-api-key", ModSecret.GetCurseForgeAPIKey()))
+                End If
+                Dim TlsResult = Encoding.UTF8.GetString(ModTls.TlsGet(Url, Timeout, TlsHeaders))
+                If RequireJson Then
+                    Dim TlsTrim = TlsResult.Trim((vbCrLf & " ").ToCharArray)
+                    If Not (TlsTrim.StartsWithF("{") AndAlso TlsTrim.EndsWithF("}")) AndAlso
+                       Not (TlsTrim.StartsWithF("[") AndAlso TlsTrim.EndsWithF("]")) Then
+                        Throw New FormatException(ModLang.L("返回结果并非 JSON 格式：") & If(TlsTrim.Length > 200, TlsTrim.Substring(0, 200) & "…", TlsTrim))
+                    End If
+                End If
+                If MakeLog Then Logger.Info($"内置 TLS 请求成功（{Url}）")
+                Return TlsResult
+            Catch ex As FormatException
+                Throw
+            Catch ex As Exception
+                Logger.Warn(ex, $"内置 TLS 请求失败，回退系统网络栈（{Url}）")
+            End Try
+        End If
         Try
             Dim HeaderDictionary = If(Headers, {}).ToDictionary
             If ContentType IsNot Nothing Then HeaderDictionary("Content-Type") = ContentType
@@ -243,12 +274,33 @@ Public Module ModNet
     Public Sub NetDownloadByLoader(Url As String, LocalPath As String, Optional LoaderToSyncProgress As LoaderBase = Nothing, Optional Check As FileChecker = Nothing, Optional SimulateBrowserHeaders As Boolean = False)
         NetDownloadByLoader({Url}, LocalPath, LoaderToSyncProgress, Check, SimulateBrowserHeaders)
     End Sub
+
+    ''' <summary>
+    ''' 构造单文件/多地址下载步骤：Win7 走内置 TLS 1.2 客户端（SChannel 与 Cloudflare 系无法协商），
+    ''' 其余走多线程下载引擎。
+    ''' </summary>
+    Public Function CreateFileDownloadStep(Name As String, Urls As IEnumerable(Of String), LocalPath As String,
+                                           Optional ProgressWeight As Double = 1, Optional Check As FileChecker = Nothing) As LoaderBase
+        If ModTls.Win7TlsMode Then
+            Return New LoaderTask(Of Integer, Integer)(Name,
+                Sub(Task As LoaderTask(Of Integer, Integer))
+                    ModTls.TlsDownload(Urls, LocalPath)
+                End Sub) With {.ProgressWeight = ProgressWeight, .Block = True}
+        End If
+        Return New LoaderDownload(Name, New List(Of NetFile) From {New NetFile(Urls, LocalPath, Check)}) With {.ProgressWeight = ProgressWeight, .Block = True}
+    End Function
+
     ''' <summary>
     ''' 通过多线程下载引擎下载文件。
     ''' </summary>
     ''' <param name="Urls">文件的 Url 列表。</param>
     ''' <param name="LocalPath">下载的本地地址。</param>
     Public Sub NetDownloadByLoader(Urls As IEnumerable(Of String), LocalPath As String, Optional LoaderToSyncProgress As LoaderBase = Nothing, Optional Check As FileChecker = Nothing, Optional SimulateBrowserHeaders As Boolean = False)
+        'Win7 网络兜底：SChannel 与 Cloudflare 系无法协商 TLS（见 ModTls），文件下载走内置 TLS 1.2 客户端
+        If ModTls.Win7TlsMode Then
+            ModTls.TlsDownload(Urls, LocalPath)
+            Exit Sub
+        End If
         Dim NewTask As New LoaderDownload($"文件下载 {GetUuid()}#", New List(Of NetFile) From {New NetFile(Urls, LocalPath, Check, SimulateBrowserHeaders)})
         Try
             NewTask.WaitForExit(LoaderToSyncProgress:=LoaderToSyncProgress)
@@ -267,6 +319,11 @@ Public Module ModNet
     ''' </summary>
     Public Sub NetDownloadByRace(PreferredUrl As String, SecondaryUrl As String, LocalPath As String,
                                  Optional SecondDelayMs As Integer = 1500, Optional SimulateBrowserHeaders As Boolean = False)
+        'Win7 网络兜底：SChannel 与 Cloudflare 系无法协商 TLS，按序尝试两个源（内置 TLS 1.2 客户端）
+        If ModTls.Win7TlsMode Then
+            ModTls.TlsDownload({PreferredUrl, SecondaryUrl}, LocalPath)
+            Exit Sub
+        End If
         Dim PathA = LocalPath & ".raceA", PathB = LocalPath & ".raceB"
         Try
             Dim Finished As Int32 = 0
@@ -1247,7 +1304,12 @@ SourceBreak:
                     ElseIf Not Retried Then
                         '合并失败或首次下载失败，未重试：将所有下载源重新标记为不允许断点续传的下载源，逐个重新尝试下载
                         '若所有源均不支持 Range，也会走到这里重试
-                        If Not IsRangeNotSupported Then Logger.Warn($"{LocalName}：文件下载失败，正在自动重试……")
+                        If Not IsRangeNotSupported Then
+                            Logger.Warn($"{LocalName}：文件下载失败，正在自动重试……")
+                            '玩家可见反馈：Toast 标明卡住的环节（Hint 按正文去重，同文本只会强调不会刷屏）
+                            Dim StepName = Tasks.FirstOrDefault()?.Name
+                            If StepName IsNot Nothing Then Hint(ModLang.L("下载遇到问题：") & StepName & ModLang.L("，正在自动重试"), HintType.Blue)
+                        End If
                         Retried = True
                         SyncLock LockSource
                             SourcesOnce.Clear()
@@ -1265,6 +1327,8 @@ SourceBreak:
                         '（弱网/Win7 下常见「两源恰好同时抖动」的场景，隔一小段时间重试命中率不低）
                         RetriedTwice = True
                         Logger.Warn($"{LocalName}：自动重试仍失败，1.5 秒后进行最后一轮重试")
+                        Dim StepName2 = Tasks.FirstOrDefault()?.Name
+                        If StepName2 IsNot Nothing Then Hint(ModLang.L("下载仍未恢复：") & StepName2 & ModLang.L("，正在进行最后一轮自动重试"), HintType.Blue)
                         System.Threading.Thread.Sleep(1500)
                         SyncLock LockSource
                             SourcesOnce.Clear()

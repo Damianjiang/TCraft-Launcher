@@ -245,6 +245,9 @@ RetryCacheCheck:
             If Environment.OSVersion.Version < New Version(6, 2) Then 'Windows 7 兼容：显式启用 TLS 1.2 等
                 ServicePointManager.SecurityProtocol = SecurityProtocolType.Ssl3 Or SecurityProtocolType.Tls Or SecurityProtocolType.Tls11 Or SecurityProtocolType.Tls12
             End If
+            '证书兜底回调（全局）：OS 验证失败（Win7 根库冻结）时用内置 CA 束重验——见 ModProxy.ValidateServerCertificate。
+            '必须挂全局 ServicePointManager 回调：handler 级回调在 .NET Framework 上不保证触发（实测 Win7 从不触发）。
+            ServicePointManager.ServerCertificateValidationCallback = AddressOf ModProxy.ValidateServerCertificate
             AniControlEnabled += 1
         Catch ex As Exception
             Dim FilePath As String = Nothing
