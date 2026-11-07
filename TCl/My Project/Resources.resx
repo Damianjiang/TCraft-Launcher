@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -148,6 +148,9 @@
   </data>
   <data name="System.Net.Http.WinHttpHandler" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\gz\System.Net.Http.WinHttpHandler.gz;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="CACertBundle" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\CACertBundle.pem.gz;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
   <data name="System.Buffers" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\gz\System.Buffers.gz;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>

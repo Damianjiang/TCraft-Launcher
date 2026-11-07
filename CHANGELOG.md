@@ -12,6 +12,22 @@ The website and download link always resolve to the newest build, so no version 
 
 ---
 
+## v1.3.2 (1.3.2.0) — 2026-11-07 / 中文
+
+（灰度预览更新；资产 `TCraft-Launcher.exe`，校验值见 Release 页面）
+
+- **修复 Windows 7 下载全挂**：Win7 已停止支持，系统根证书库冻结，现代 CDN 签发的证书链验证失败，所有 HTTPS 请求报「未能为 SSL/TLS 安全通道建立信任关系」（Mod 列表图标全部加载失败即此）。现内置最新 CA 根证书库（118 个根，随版本更新）作为兜底信任锚：系统验证失败时改用内置库重新验证，要求链锚定到内置根且域名匹配，安全语义不变。Windows 10/11 行为零变化。
+- 下载主机实测：Modrinth API/CDN、CurseForge API/CDN、MCIM 镜像、Mojang、BMCLAPI、GitHub 共 11 个主机全部通过。
+
+## v1.3.2 (1.3.2.0) — 2026-11-07 / English
+
+(Gray preview update; asset `TCraft-Launcher.exe`, checksum on the Release page)
+
+- **Fixed Windows 7 downloads entirely broken**: Win7 is EOL and its root certificate store is frozen, so certificate chains issued by modern CDNs fail validation and every HTTPS request dies with "could not create SSL/TLS secure channel" (the reason all mod-list icons failed to load). The launcher now embeds an up-to-date CA root store (118 roots, refreshed per release) as a fallback trust anchor: when OS validation fails, the chain is re-validated against the bundled roots (must anchor to a bundled self-signed root and match the hostname). No behavior change on Windows 10/11.
+- Verified against 11 download hosts: Modrinth API/CDN, CurseForge API/CDN, MCIM mirror, Mojang, BMCLAPI, GitHub.
+
+---
+
 ## v1.3.1 (1.3.1.0) — 2026-11-07 / 中文
 
 （灰度预览更新；资产 `TCraft-Launcher.exe`，校验值见 Release 页面）
