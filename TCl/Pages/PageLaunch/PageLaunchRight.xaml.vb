@@ -3,7 +3,7 @@
 Public Class PageLaunchRight
     Private Sub Init() Handles Me.Loaded
         '把启动侧边栏移交给窗口层：放在本页里的话它只能从「右栏的左边」开始展开，
-        '盖不住左边栏。移交后它和 PanMain 同级，才能真正从窗口最左边擦出来（第 91 轮）。
+        '盖不住左边栏。移交后它和 PanMain 同级，才能真正从窗口最左边擦出来。
         '注意必须先 Children.Remove 再 Add：直接 Add 会报「指定的元素已经是另一个元素的逻辑子元素」。
         Try
             If PanLaunching.Parent IsNot FrmMain.HostLaunchSide Then
@@ -23,7 +23,7 @@ Public Class PageLaunchRight
     End Sub
 
 
-#Region "启动按钮与启动遮罩（第 86 轮自左栏迁入）"
+#Region "启动按钮与启动遮罩"
 
     '启动侧边栏展开后的宽度：XAML 里 PanLaunchSideInner 固定 312，左右各 26 边距
     Private Const LaunchSideWidth As Double = 364
@@ -82,7 +82,7 @@ Public Class PageLaunchRight
         McLaunchWatcher = Nothing
         '获取 “你知道吗” 提示
         LabLaunchingHint.Text = PageOtherTest.GetRandomHint()
-        '初始化页面动画：左栏淡出，启动侧边栏从窗口最左边向右展开（第 91 轮）
+        '初始化页面动画：左栏淡出，启动侧边栏从窗口最左边向右展开
         FrmLaunchLeft.PanInput.IsHitTestVisible = False
         PanLaunching.IsHitTestVisible = False
         LoadLaunching.State.LoadingState = MyLoading.MyLoadingState.Run
@@ -263,12 +263,12 @@ Public Class PageLaunchRight
                 Return
             End Try
             '第 N 轮：这里原先是裸中文字面量，切到英文等语言后每 0.1s 把标题打回中文（用户实测「正在启动游戏」标题不切换）。
-            '统一走 L()：命中词典则返回当前语言译文，未命中回退原文。
+            '统一走 L：命中词典则返回当前语言译文，未命中回退原文。
             LabLaunchingTitle.Text = If(IsLaunched OrElse McLaunchLoaderReal.State = LoadState.Finished,
                 ModLang.L("已启动游戏"),
                 If(CurrentLaunchOptions.SaveBatch Is Nothing, ModLang.L("正在启动游戏"), ModLang.L("正在导出启动脚本")))
             If AniIsRun("Launch State Page") Then IsLaunched = False '等待页面切换动画完成
-            '启动成功后自动收起侧边栏（第 91 轮）。"等待游戏窗口出现" 阶段就代表游戏进程已经拉起来了，
+            '启动成功后自动收起侧边栏。"等待游戏窗口出现" 阶段就代表游戏进程已经拉起来了，
             '此时留 1s 让用户看到「已启动游戏 / 100%」，再把侧边栏滑走；真正结束时 McLaunchState
             '还会调一次 PageChangeToLogin，那里有幂等保护，不会重播收起动画。
             If IsLaunched AndAlso Not LaunchSideCollapsed AndAlso Not LaunchSideAutoCollapseScheduled Then
@@ -467,7 +467,7 @@ Public Class PageLaunchRight
 
 #End Region
 
-#Region "账户摘要（第 86 轮自左栏迁入，SJMCL 玩家卡式）"
+#Region "账户摘要"
 
     ' 当前显示的账户名（供左栏问候语刷新）。
     Public CurrentDisplayName As String = ""
@@ -505,13 +505,13 @@ Public Class PageLaunchRight
                     Name = AuthName
                     TypeName = "Authlib-Injector"
             End Select
-            '第 89 轮：本方法此前只算不用，导致标题栏账号徽章永远是空白药丸、问候语永远不带名字
+            '本方法此前只算不用，导致标题栏账号徽章永远是空白药丸、问候语永远不带名字
             CurrentDisplayName = If(Name, "")
             Dim Face As String = ""
             If CurrentDisplayName <> "" Then Face = PageLaunchLeft.GetAccountFaceOrDefault(CurrentDisplayName)
             If FrmMain IsNot Nothing Then FrmMain.SetTitleAccount(CurrentDisplayName, TypeName, Face)
             '启动期就把当前账户的皮肤加载器跑起来：Faces2 头像缓存是「皮肤加载完」才裁出来的，
-            '以前只有进「登录」页才启动皮肤加载，标题栏徽章于是一直顶着默认脸（第 132 轮）
+            '以前只有进「登录」页才启动皮肤加载，标题栏徽章于是一直顶着默认脸
             If FrmMain IsNot Nothing AndAlso CurrentDisplayName <> "" AndAlso PageLaunchLeft.GetAccountFace(CurrentDisplayName) Is Nothing Then
                 Select Case Type
                     Case McLoginType.Ms : PageLaunchLeft.SkinMs.Start()
@@ -528,7 +528,7 @@ Public Class PageLaunchRight
 
 #End Region
 
-    ' 问候语（第 87 轮自左上角并入信息列）
+    ' 问候语
 
     ''' <summary>
     ''' 顶部欢迎语：按本地时区的当前时间自动问候（凌晨/上午/中午/下午/晚上），并带上玩家名。
@@ -557,7 +557,7 @@ Public Class PageLaunchRight
     End Sub
     '连体下拉：版本选择 / 版本设置（HMCL 式主按钮 + 附加段）
     '注意：MyIconButton 的 MouseUp 会把 e.Handled 置 True，事件不会冒泡到 BtnLaunchMenu，
-    '因此图标本身必须单独挂一次（否则点箭头没反应——第 89 轮用户反馈的「按钮坏掉」）。
+    '因此图标本身必须单独挂一次（否则点箭头没反应——用户反馈的「按钮坏掉」）。
     Private Sub BtnLaunchMenu_Click(sender As Object, e As RoutedEventArgs) Handles BtnLaunchMenu.MouseLeftButtonUp
         ToggleLaunchMenu()
     End Sub
@@ -601,7 +601,7 @@ Public Class PageLaunchRight
     Private Sub PopupLaunchMenu_Opened(sender As Object, e As EventArgs) Handles PopupLaunchMenu.Opened
         '放在 Opened 里跑：Popup 首次打开时内容才 Loaded，早于此开始动画会被首帧覆盖
         If Not MenuCard.PopupAnimEnabled Then
-            '个性化关闭了弹卡动画：直接呈现终态（第 131 轮）
+            '个性化关闭了弹卡动画：直接呈现终态
             TransformLaunchMenuScale.ScaleX = 1
             TransformLaunchMenuScale.ScaleY = 1
             TransformLaunchMenuPos.Y = 0

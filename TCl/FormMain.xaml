@@ -98,7 +98,7 @@
                 <Canvas x:Name="ImgBack" IsHitTestVisible="False" Grid.Row="1" RenderOptions.BitmapScalingMode="LowQuality"
                         HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
                 <!-- 背景视频层：位于背景图之上、内容之下；不拦截鼠标；默认 Collapsed。
-                     第 112 轮起不在 XAML 构造（首个 MediaElement 会初始化 WPF 媒体栈），
+                     起不在 XAML 构造（首个 MediaElement 会初始化 WPF 媒体栈），
                      改由代码属性 VidBack 惰性创建，仅当用户真的使用背景视频时才实例化。 -->
                 <Grid x:Name="PanTitle" Height="48">
                     <Grid.Background>
@@ -113,18 +113,18 @@
                                        LogoScale="0.72" Logo="F1 M0,0 h15 v2 h-15 v-2 Z" />
                     <local:MyIconButton x:Name="BtnTitleLang" HorizontalAlignment="Right" Height="28" VerticalAlignment="Center" Width="28" Margin="0,0,84,0" Theme="White"
                                        ToolTip="切换界面语言" LogoScale="0.9" />
-                    <!-- 第 130 轮（G1 全局搜索）：标题栏放大镜，Ctrl+K 同效 -->
+                    <!-- （G1 全局搜索）：标题栏放大镜，Ctrl+K 同效 -->
                     <local:MyIconButton x:Name="BtnTitleSearch" HorizontalAlignment="Right" Height="28" VerticalAlignment="Center" Width="28" Margin="0,0,124,0" Theme="White"
                                        ToolTip="全局搜索（Ctrl+K）" SvgIcon="lucide/search" LogoScale="0.9" />
-                    <!-- 第 95 轮（改真自适应）：外层 Stretch + 右 margin 让出右侧「搜索/语言/最小化/关闭」图标区（第 130 轮 112→152），
+                    <!-- （改真自适应）：外层 Stretch + 右 margin 让出右侧「搜索/语言/最小化/关闭」图标区，
                          两个 1* 平衡列只在「徽章右缘 → 图标区左缘」间分配，按钮组严格居中且不压图标；
                          随窗口变窄则由代码 AdaptTitleTabsToWidth 实测并自动缩字号/间距（FormMain_SizeChanged 重算）。 -->
                     <Grid x:Name="PanTitleMain" HorizontalAlignment="Stretch" Margin="0,0,152,0">
                         <Grid.ColumnDefinitions>
-                            <!-- 第 93 轮（按用户要求改回居中）：Logo 在最左（col0），账号徽章紧跟其右（col1，靠左）；
+                            <!-- （按用户要求改回居中）：Logo 在最左（col0），账号徽章紧跟其右（col1，靠左）；
                                  col2/col4 两列 1* 等宽平衡，把 col3 的切换按钮组推到整行居中；
                                  徽章宽度变化不再影响按钮居中。原 89 轮为「整组紧跟 Logo 左对齐」。 -->
-                            <!-- 第 95 轮（改真自适应）：右侧图标区（语言/最小化/关闭，占最右 112px）改由外层
+                            <!-- （改真自适应）：右侧图标区（语言/最小化/关闭，占最右 112px）改由外层
                                  PanTitleMain 的右 margin 统一让出，不再用 col5 占位列（避免双重预留把按钮推偏）。
                                  于是本行只 4 列：Logo(Auto) | 账号徽章(Auto,靠左) | 1* | 按钮组(Auto,居中) | 1*，
                                  两个 1* 等宽把按钮组居中于「徽章右缘 → 图标区左缘」；窗口变窄时由代码
@@ -194,30 +194,32 @@
                         </Border>
                     </Border>
                 </Grid>
-                <!-- 左下角提示区：底部留 74，给「关闭 Minecraft」悬浮按钮让位，两者不再互相压住 -->
-                <StackPanel x:Name="PanHint" IsHitTestVisible="False" UseLayoutRounding="True" SnapsToDevicePixels="True" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="0,0,0,74" Grid.RowSpan="2" />
+                <!-- 右下角通知区（样式对照 PCL-CE-dev 的 MyToast）：底部留白由 MyToast.Show 按
+                     PanExtraButtons 的实际高度动态调整为 extraHeight + 20，给右下角悬浮按钮让位；
+                     可交互（关闭按钮 / 拖动关闭），故不再设 IsHitTestVisible="False" -->
+                <StackPanel x:Name="PanHint" UseLayoutRounding="True" SnapsToDevicePixels="True" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,0,20" Grid.RowSpan="2" Panel.ZIndex="1" />
                 <!-- 关闭 Minecraft：从右下角挪到左下角（用户要求「以后改成左边」）。
                      单独一个 StackPanel 是为了不牵动右下角那组按钮（返回顶部/任务管理/投降/音乐）的位置。 -->
                 <StackPanel HorizontalAlignment="Left" VerticalAlignment="Bottom" Grid.Row="1" Margin="15">
                     <!-- 巨型 Logo 几何（1.2~2.5KB 的 Path 字符串 ×4）已改为代码延迟赋值（ApplyExtraButtonLogos，
-                         第 112 轮）：这些按钮默认 Collapsed，BAML 解析阶段的 GeometryConverter 解析纯属白花。 -->
+                         ）：这些按钮默认 Collapsed，BAML 解析阶段的 GeometryConverter 解析纯属白花。 -->
                     <local:MyExtraButton x:Name="BtnExtraShutdown" HorizontalAlignment="Left" VerticalAlignment="Center" ToolTip="关闭 Minecraft" Visibility="Collapsed" />
                 </StackPanel>
-                <StackPanel HorizontalAlignment="Right" VerticalAlignment="Bottom" Grid.Row="1" Margin="15">
+                <StackPanel x:Name="PanExtraButtons" HorizontalAlignment="Right" VerticalAlignment="Bottom" Grid.Row="1" Margin="15">
                     <local:MyExtraButton x:Name="BtnExtraBack" HorizontalAlignment="Right" VerticalAlignment="Center" ToolTip="返回顶部" Visibility="Collapsed" />
                     <local:MyExtraButton x:Name="BtnExtraDownload" HorizontalAlignment="Right" VerticalAlignment="Center" ToolTip="任务管理" Visibility="Collapsed"
                                        LogoScale="1.1" />
                     <local:MyExtraButton x:Name="BtnExtraApril" HorizontalAlignment="Right" VerticalAlignment="Center" ToolTip="投降" Visibility="Collapsed" />
                     <local:MyExtraButton x:Name="BtnExtraMusic" HorizontalAlignment="Right" VerticalAlignment="Center" Visibility="Collapsed" CanRightClick="True" />
                 </StackPanel>
-                <!--启动侧边栏宿主（第 91 轮）：PageLaunchRight 会在 Init 里把自己的 PanLaunching
+                <!--启动侧边栏宿主：PageLaunchRight 会在 Init 里把自己的 PanLaunching
                     移交到这里，这样侧边栏能盖住左边栏、真正从窗口最左边向右展开。
                     空的 Grid 没有背景，不占交互；弹窗层 PanMsg 在它上面。-->
                 <Grid x:Name="HostLaunchSide" Grid.Row="1" />
                 <Grid x:Name="PanMsg" Grid.RowSpan="2" Background="#00000000" Visibility="Collapsed" />
             </Grid>
         </Border>
-        <!-- 第 130 轮（G1）：全局聚合搜索弹卡（Ctrl+K / 标题栏放大镜），首页「更多」卡片同款三段动画 -->
+        <!-- （G1）：全局聚合搜索弹卡（Ctrl+K / 标题栏放大镜），首页「更多」卡片同款三段动画 -->
         <Popup x:Name="PopupGlobalSearch" AllowsTransparency="True" StaysOpen="False" PopupAnimation="None" Placement="Center">
             <Border x:Name="CardGlobalSearch" Background="{DynamicResource ColorBrushCardBg}" CornerRadius="10" Padding="14,12" Margin="14"
                     Opacity="0" RenderTransformOrigin="0.5,0">

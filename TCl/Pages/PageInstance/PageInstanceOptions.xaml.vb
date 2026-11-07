@@ -338,7 +338,7 @@ Public Class PageInstanceOptions
                 Hint(ModLang.L("还没有任何预设。先在选项页调好一套，再点「存为预设」。"), HintType.Red)
                 Return
             End If
-            '第 131 轮：改用动画菜单卡片；原「删除预设」子菜单拍平为独立行（前缀文案区分）
+            '改用动画菜单卡片；原「删除预设」子菜单拍平为独立行（前缀文案区分）
             Dim Rows As New List(Of MenuCard.MenuCardRow)
             For Each P In All
                 Dim One As ModOptionPresets.OptionPreset = P

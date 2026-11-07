@@ -167,11 +167,13 @@ Public Class MyImage
         Sub()
             Dim IsLocalFallback As Boolean = Not String.IsNullOrEmpty(FallbackSource) AndAlso Not FallbackSource.StartsWithF("http")
             Try
-                '下载
-                NetDownloadByLoader(
-                    If(FallbackSource IsNot Nothing AndAlso FallbackSource.StartsWithF("http") AndAlso Source <> FallbackSource,
-                        {Source, FallbackSource}, {Source}),
-                    TempPath, SimulateBrowserHeaders:=True)
+                '下载。有 HTTP 镜像备用源时走双源竞速：直连源先发、镜像 1.5s 后补发，任一完成即用——
+                '原先的串行换源在慢 CDN（forgecdn 实测单源 15s+）下要等满首源超时才轮到镜像，列表图标因此迟迟不显示
+                If FallbackSource IsNot Nothing AndAlso FallbackSource.StartsWithF("http") AndAlso Source <> FallbackSource Then
+                    NetDownloadByRace(Source, FallbackSource, TempPath, SimulateBrowserHeaders:=True)
+                Else
+                    NetDownloadByLoader(Source, TempPath, SimulateBrowserHeaders:=True)
+                End If
                 ActualSource = TempPath
                 If Not EnableCache Then FileUtils.Delete(TempPath)
             Catch ex As Exception

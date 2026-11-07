@@ -12,6 +12,52 @@ The website and download link always resolve to the newest build, so no version 
 
 ---
 
+## v1.3 (1.3.0.0) — 2026-11-07 / 中文
+
+（资产 `TCraft-Launcher.exe`，校验值见 Release 页面）
+
+### 新功能
+- **通知条全面改版**：新样式通知条（图标 + 粗体文本 + 关闭按钮 + 倒计时进度条，支持拖拽关闭）。
+- **主题色扩充至 21 种**：新增青柠绿、薄荷绿、靛夜蓝、葡萄紫、雾霭蓝、玫瑰金；控件底色跟随全局半透明设置。
+- **社区资源双源竞速**：官方 API 与镜像源几乎同时请求、取最快响应——下载页列表与图标加载数倍提速（实测最坏 27s → 约 5s）。
+- 下载 Mod 自动补全前置依赖（递归解析 + 已装检查）；光影 / 资源包列表即预览（自动提取 pack.png）。
+
+### 修复
+- **语言切换根治**：切换即时生效、永不重启、往返不回退——原「重启应用语言」机制的全部竞态（等锁超时、异常退出误报、设置文件写回竞态）已随重构移除。
+- 单文件部署下社区资源报「System.Buffers 找不到」：已补齐 WinHttpHandler 的依赖闭包（4 个程序集入嵌）。
+- 取消启动不再闪退：后台线程异常接入全局兜底记录，可在日志定位。
+- 实例页工具栏按钮全部可用（视图切换 / 刷新 / 下载新版本 / 导入整合包 / 打开目录）。
+- 补齐缺失的加载动画（光影 / 材质包 / 存档 / Jar-in-Jar 刷新）；按钮样式统一。
+
+### 性能
+- **动画引擎重写**：帧循环迁移至 WPF 渲染管线（`CompositionTarget.Rendering`），与合成同相位——切页、侧边栏、加载动画全面跟手；空闲 2 秒自动停用渲染订阅，后台占用归零。
+- 下载层启用 HTTP/2 多路复用（Win10 1607+，Win7 自动回退）；启动优化（多核 JIT 预编译、热点消除）；主时钟迁移 DispatcherTimer。
+- 单文件体积保持在 3.6 MiB 左右（< 4 MB）。
+
+## v1.3 (1.3.0.0) — 2026-11-07 / English
+
+(Asset `TCraft-Launcher.exe`, checksum on the Release page)
+
+### New
+- **Redesigned toast notifications**: icon + bold text + close button + countdown progress bar; drag to dismiss.
+- **21 theme colors** (6 new: lime, mint, indigo night, grape, mist blue, rose gold); control backgrounds now follow the global translucency setting.
+- **Dual-source racing for community resources**: official API and mirror are queried near-simultaneously, fastest response wins — download-page lists and icons load several times faster (worst case 27s → ~5s measured).
+- Missing dependency auto-completion when downloading mods (recursive resolution + installed check); shader / resource-pack lists preview icons via pack.png.
+
+### Fixed
+- **Language switching rebuilt**: applies instantly, never restarts, never reverts — all races of the old restart-based mechanism (mutex wait timeout, false "abnormal exit" report, settings-file write-back race) are gone.
+- Fixed "System.Buffers not found" in single-file deployments by embedding the full WinHttpHandler dependency closure (4 assemblies).
+- Cancelling a launch no longer crashes: background-thread exceptions now hit a global safety-net logger.
+- All instance-page toolbar buttons work (view mode / refresh / download / import / open folder).
+- Restored missing loading animations (shader / resource-pack / saves / Jar-in-Jar refresh); unified button styles.
+
+### Performance
+- **Animation engine rewrite**: the frame loop now runs on the WPF render pipeline (`CompositionTarget.Rendering`), phase-locked to composition — page switches, sidebar and loaders feel snappy; the render subscription self-detaches after 2s idle, zero idle overhead.
+- HTTP/2 multiplexing for downloads (Win10 1607+, automatic fallback on Win7); startup optimizations (multi-core JIT profiling, hot-path cleanup); main clock moved to DispatcherTimer.
+- Single-file size stays around 3.6 MiB (< 4 MB).
+
+---
+
 ## v1.2 补丁更新 — 2026-11-06 / 中文
 
 （程序集 / 文件版本保持 1.2.0.0；资产 `TCraft-Launcher.exe`，校验值见最新 Release 页面）

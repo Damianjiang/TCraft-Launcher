@@ -20,7 +20,7 @@ Public Module ModLang
     '仍被引用的控件不会提前失效，语义与原先的强引用字典一致。
     Private Originals As New ConditionalWeakTable(Of DependencyObject, List(Of String))
 
-    '这些控件的文本由业务代码（状态机）实时经 ModLang.L() 刷新，不属于静态文案，
+    '这些控件的文本由业务代码（状态机）实时经 ModLang.L 刷新，不属于静态文案，
     '不能被「记录原文 + 套译文」机制覆盖：否则切语言后会被打回 XAML 占位文本（如启动按钮
     '卡在 "Loading / 正在加载"），且 RefreshButtonsUI 的「状态未变则跳过」保护使其无法自我修复。
     '若新增此类代码驱动的标签，把其控件 Name 加进来即可。
@@ -43,7 +43,7 @@ Public Module ModLang
 
     '译文值的归一化：只统一换行，**不裁剪首尾空白**。
     '原因：大量拼接式词条的首尾空格是有意的（如 "Download failed: " 后面要接动态内容），
-    '若在这里 Trim，译文会变成 "Download failed:xxx"，中英混排时缺空格（第 64 轮修）。
+    '若在这里 Trim，译文会变成 "Download failed:xxx"，中英混排时缺空格。
     Private Function NormValue(s As String) As String
         If s Is Nothing Then Return ""
         Return s.Replace(vbCrLf, vbLf).Replace(vbCr, vbLf)
@@ -51,7 +51,7 @@ Public Module ModLang
 
     '语言选项的「母体名」：简体中文/English/繁體中文/文言文 这 4 个词本身就是语言标识，
     '任何界面语言下都必须保持原样显示，否则用户切到某语言后就找不到其他语言选项（"找不到回家的路"）。
-    'L() 命中即原样返回。注意：这些词无首尾空白/换行，Norm(x)=x，故与 L() 里 Norm 后的 Key 可比。
+    'L 命中即原样返回。注意：这些词无首尾空白/换行，Norm(x)=x，故与 L 里 Norm 后的 Key 可比。
     Private ProtectedLanguageNames As New HashSet(Of String) From {
         "简体中文", "English", "繁體中文", "文言文"
     }
@@ -86,10 +86,10 @@ Public Module ModLang
     End Function
 
     ''' <summary>
-    ''' L() 的崩溃路径安全版：再包一层 Try/Catch。
-    ''' <para/>L() 内部虽有整体 Try/Catch，但其本体首次 JIT 时需解析 TClKit（Logger）——
+    ''' L 的崩溃路径安全版：再包一层 Try/Catch。
+    ''' <para/>L 内部虽有整体 Try/Catch，但其本体首次 JIT 时需解析 TClKit（Logger）——
     ''' 若在启动最外层错误处理（Application_Startup 的 Catch、TclLogger.HandleBehavior）中调用，
-    ''' 此时触发处理的异常本身可能就是程序集加载失败，L() 的 JIT 会再抛而炸掉错误处理链。
+    ''' 此时触发处理的异常本身可能就是程序集加载失败，L 的 JIT 会再抛而炸掉错误处理链。
     ''' 此方法保证任何情况下都不二次抛出：JIT 失败即原样返回，弹窗退化为简体中文而非崩溃。
     ''' </summary>
     Public Function LSafe(Original As String) As String
@@ -101,7 +101,7 @@ Public Module ModLang
     End Function
 
     ''' <summary>
-    ''' 后台预热入口（第 111 轮启动提速）：触碰 Dicts 强制触发模块初始化（词典构建，~85-97ms 纯 CPU）。
+    ''' 后台预热入口：触碰 Dicts 强制触发模块初始化（词典构建，~85-97ms 纯 CPU）。
     ''' 启动期在后台线程调用；此后任何线程首次触碰本模块都会因初始化已完成而零等待。
     ''' </summary>
     Public Sub Warmup()
@@ -127,7 +127,7 @@ Public Module ModLang
             '先确保外置覆盖已并入内存字典（幂等），这样导出的文件始终包含用户已改条目
             ReloadTranslations()
             '0 段自愈：全新环境（尚无 i18n.json）时 Dicts(0) 为空，导出的文件会缺「简体中文基准段」，
-            '违背「i18n.json 是所有语言的单一可编辑来源」的设计（第 66 轮修复）。把内置词条的键补种进 0 段
+            '违背「i18n.json 是所有语言的单一可编辑来源」的设计。把内置词条的键补种进 0 段
             '（键=值=原文）；已存在的条目（用户改写过的中文基准，经 ReloadTranslations 并入 Dicts(0)）原样保留。
             If Dicts(0) IsNot Nothing AndAlso Dicts(1) IsNot Nothing Then
                 For Each Pair In Dicts(1)
@@ -187,7 +187,7 @@ Public Module ModLang
                     Dicts(i)(Prop.Name) = NormValue(Prop.Value.ToString)
                 Next
             Next
-            RevMaps = Nothing '外置覆盖可能改写译文值，反向映射需重建（第 68 轮）
+            RevMaps = Nothing '外置覆盖可能改写译文值，反向映射需重建
             I18nLoaded = True
             Logger.Info($"已加载外置翻译文件 {I18nFilePath()}（{Root.Count} 个语言段）")
             '即时把已记录的原文重新套一遍，让改动立刻可见
@@ -228,8 +228,8 @@ Public Module ModLang
         End Try
     End Sub
 
-    '——反向映射（第 68 轮）：值 → 键——
-    '用于把「已被翻译的文本」还原为词典键。场景：列表项等由代码以 L() 按当前语言构建，
+    '——反向映射：值 → 键——
+    '用于把「已被翻译的文本」还原为词典键。场景：列表项等由代码以 L 按当前语言构建，
     '翻译机制随后才记录原文；若记录的是译文，语言切换后 L(译文) 永远命不中，文本被钉死。
     Private RevMaps As Dictionary(Of Integer, Dictionary(Of String, String))
     Private Function GetRevMap(Lang As Integer) As Dictionary(Of String, String)
@@ -257,7 +257,7 @@ Public Module ModLang
         Return Text
     End Function
 
-    '——语言切换后的「活翻译」（第 66 轮）——
+    '——语言切换后的「活翻译」——
     '切换语言那一刻不在可视树里的内容（虚拟化列表尚未滚到的项、下拉框展开时才实例化的 ComboBoxItem、
     '右键菜单、Tooltip、之后才创建的弹窗内容等），树遍历（ApplyToWindow/ApplyTo）永远覆盖不到，
     '它们加载后会显示 XAML 原文（简中），造成「界面一半新语言一半简中」的混乱。
@@ -297,10 +297,39 @@ Public Module ModLang
         Try
             Dim el = TryCast(sender, FrameworkElement)
             If el Is Nothing Then Return
-            TranslateNode(el)
+            TranslateSingle(el)
         Catch
             'Loaded 是高频路径，任何异常都只能静默吞掉，绝不能影响界面加载
         End Try
+    End Sub
+
+    ''' <summary>
+    ''' 只处理单个元素自身的文本槽，不递归子树（性能关键路径）。
+    ''' 每个 FrameworkElement 都会触发自己的 Loaded——若在钩子里对父元素再整棵扫子树，
+    ''' 一页 500 个元素就是 500 次子树遍历（O(n²)），页面越大、切到非中文语言时加载越卡。
+    ''' 元素级处理把整页开销压回 O(n)；批量入口（ApplyToWindow/ApplyTo）仍走两遍式的 TranslateNode。
+    ''' </summary>
+    Private Sub TranslateSingle(el As FrameworkElement)
+        If IsDynamicLabel(el) Then Return
+        Dim Targets = GetTargets(el)
+        If Targets Is Nothing Then Return
+        '记录原文（幂等；与 TranslateNode 第一遍同语义，译文经反向映射还原为词典键）
+        Dim Recs As List(Of String) = Nothing
+        If Not Originals.TryGetValue(el, Recs) Then
+            Recs = New List(Of String)
+            Dim LangNow As Integer = ModBase.ResolveLanguage()
+            For Each T In Targets
+                Dim txt As String = T.val()
+                Recs.Add(If(String.IsNullOrEmpty(txt), Nothing, ResolveOriginalKey(Norm(txt), LangNow)))
+            Next
+            Originals.Add(el, Recs)
+        End If
+        '套当前语言译文
+        For j As Integer = 0 To Targets.Count - 1
+            Dim base As String = Recs(j)
+            If base Is Nothing Then Continue For
+            Targets(j).apply(L(base))
+        Next
     End Sub
 
     '对指定根节点的可视子树统一套译文（两遍：先记录所有「原文」，再套译文；幂等可重复调用）
@@ -332,7 +361,7 @@ Public Module ModLang
                     Dim LangNow As Integer = ModBase.ResolveLanguage()
                     For Each T In Targets
                         Dim txt As String = T.val()
-                        '第 68 轮修复：代码可能已按当前语言把「译文」设进控件（如列表项以 L() 构建），
+                        '修复：代码可能已按当前语言把「译文」设进控件（如列表项以 L 构建），
                         '此时记录译文为原文会让该文本在切换语言后永远停留（L(译文) 命不中）。
                         '用反向映射把译文还原为词典键再记录，任何语言下都能正确往返。
                         Recs.Add(If(String.IsNullOrEmpty(txt), Nothing, ResolveOriginalKey(Norm(txt), LangNow)))
@@ -362,7 +391,7 @@ Public Module ModLang
     End Sub
 
     ''' <summary>
-    ''' 该控件是否属于"代码驱动"的标签（其文本由业务状态机实时经 L() 刷新）。
+    ''' 该控件是否属于"代码驱动"的标签（其文本由业务状态机实时经 L 刷新）。
     ''' 这类标签不参与 i18n 的「记录原文 + 套译文」流程，避免切语言时被覆盖回占位文本。
     ''' 除了控件自身 Name 命中，也向上找最近的命名可视祖先（如 MyButton 内部模板标签
     ''' LabText 的 Name 不唯一，但其祖先按钮 Name 唯一），命中即排除。
@@ -442,7 +471,7 @@ Public Module ModLang
             ElseIf TypeOf el Is System.Windows.Controls.ContentControl Then
                 '通用兜底：原生 WPF ContentControl（Button / Label / ContentControl / 菜单项…）
                 '携带「字符串」Content 的一并翻译。已处理的 My* 专用控件走上面的分支，不会重复；
-                'Content 为子控件/非字符串时 val() 返回 Nothing，套用阶段自动跳过（安全）。
+                'Content 为子控件/非字符串时 val 返回 Nothing，套用阶段自动跳过（安全）。
                 Dim cc = CType(el, System.Windows.Controls.ContentControl)
                 Lst.Add(New TextTarget(
                     Function() If(TypeOf cc.Content Is String, CStr(cc.Content), Nothing),
@@ -502,7 +531,7 @@ Public Module ModLang
 
     '安全包裹：词典构建若抛异常（如某些运行时 Chr 调用失败），降级为空词典而非毒化整个
     '模块。.NET 中模块级 .cctor 抛出的异常会永久毒化该类型（后续任何访问都再抛
-    'TypeInitializationException），导致所有 L() 静默失败、全界面卡死中文。此处捕获后
+    'TypeInitializationException），导致所有 L 静默失败、全界面卡死中文。此处捕获后
     '返回空词典，程序保持可用，并写日志提示。
     Private Function BuildDictsSafe() As Dictionary(Of Integer, Dictionary(Of String, String))
         Try
@@ -519,7 +548,7 @@ Public Module ModLang
         Dim Ww = New Dictionary(Of String, String)
 
         '================================================================
-        '内置译表（第 111 轮体积优化）：原先约 3100 行 Add3(...) 字面量把 ~500KB 的 UTF-16
+        '内置译表：原先约 3100 行 Add3(...) 字面量把 ~500KB 的 UTF-16
         '文本塞进程序集 #US 堆；现外移为 gzip 嵌入资源 LangTables.txt.gz（UTF-8 行式，约 227KB），
         '由 scripts\gen_langtables.py 生成（解析历史 Add3 调用，语义保持「同键后者覆盖前者」）。
         '行格式：原文<TAB>英<TAB>繁<TAB>文言；值内的 Tab/LF/CR/反斜杠转义为 \t \n \r \\。

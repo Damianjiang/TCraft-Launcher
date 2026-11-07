@@ -109,7 +109,7 @@
         '点击事件
         AddHandler sender.Changed, AddressOf CheckChanged
         AddHandler sender.Click, Sub(ss As MyLocalModItem, ee As EventArgs) ss.Checked = Not ss.Checked
-        '图标按钮（第 72 轮：统一换 lucide 图标）
+        '图标按钮
         Dim BtnOpen As New MyIconButton With {.LogoScale = 1.05, .SvgIcon = "lucide/folder-open", .Tag = sender}
         BtnOpen.ToolTip = ModLang.L("打开文件位置")
         AddHandler BtnOpen.Click, AddressOf Open_Click

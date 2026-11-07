@@ -11,7 +11,7 @@
             Btn2.Name = Btn2.Name & GetUuid()
             Btn3.Name = Btn3.Name & GetUuid()
             MyConverter = Converter
-            'i18n：弹窗标题/正文/按钮走 L()。命中词典则翻译，未命中（多为动态拼接文案）保持原文。
+            'i18n：弹窗标题/正文/按钮走 L。命中词典则翻译，未命中（多为动态拼接文案）保持原文。
             LabTitle.Text = ModLang.L(Converter.Title)
             LabCaption.Text = ModLang.L(Converter.Text)
             Btn1.Text = ModLang.L(Converter.Button1)
@@ -55,7 +55,7 @@
     Private Sub Close()
         MyConverter.WaitFrame.Continue = False
         Interop.ComponentDispatcher.PopModal()
-        '统一的关闭动画（第 136 轮：原先 8 个弹窗各复制一份）
+        '统一的关闭动画
         MyMsgCloseAnimation.Play(Me, Uuid, TransformPos, TransformScale)
     End Sub
 

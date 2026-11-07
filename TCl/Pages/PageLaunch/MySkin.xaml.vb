@@ -40,7 +40,7 @@
         End If
     End Sub
 
-    '右键菜单（第 131 轮：改用动画菜单卡片，替代裸 ContextMenu）
+    '右键菜单
     Private Sub Skin_MouseRightButtonUp(sender As Object, e As MouseButtonEventArgs) Handles Me.MouseRightButtonUp
         Dim Rows As New List(Of MenuCard.MenuCardRow)
         If Address <> "" Then Rows.Add(New MenuCard.MenuCardRow("另存为", "lucide/save", Sub() Save(Loader)))
@@ -199,7 +199,7 @@
         End Sub)
     End Sub
 
-    '披风（第 131 轮：原按钮已由动画菜单行取代，True 时右键菜单提供「更换披风」）
+    '披风
     Public Property HasCape As Boolean
     Private IsChanging As Boolean = False
     Public Sub BtnSkinCape_Click()

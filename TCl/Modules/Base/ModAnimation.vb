@@ -1,4 +1,4 @@
-'动画引擎模块
+﻿'动画引擎模块
 '使用 Ani 作为方法或属性的开头，使用 Aa 作为单个动画对象的开头（便于自动补全）
 
 Imports System.Windows.Media.Effects
@@ -20,11 +20,6 @@ Public Module ModAnimation
     ''' 动画组列表。
     ''' </summary>
     Public AniGroups As New Dictionary(Of String, AniGroupEntry)
-    ''' <summary>
-    ''' 动画线程空闲时的唤醒事件：AniStart 入队时 Set 一次即可立即开始动画，
-    ''' 避免空闲时固定 20ms 轮询让线程每秒空醒 50 次（第 127 轮）。
-    ''' </summary>
-    Private ReadOnly AniIdleWake As New EventWaitHandle(False, EventResetMode.AutoReset)
     Public Class AniGroupEntry
         Public Data As List(Of AniData)
         Public StartTick As Long
@@ -773,7 +768,7 @@ Public Module ModAnimation
             AniStop(Name)
         End If
         AniGroups.Add(Name, NewEntry)
-        AniIdleWake.Set() '空闲中的动画线程立即醒来开跑；若线程本就在跑动画则此信号被无害吸收
+        AniEnsureHooked() '空闲摘钩后由入队动作重挂渲染钩子并踢一次渲染管线
     End Sub
     ''' <summary>
     ''' 开始一个动画组。
@@ -844,77 +839,114 @@ Public Module ModAnimation
         AniLastTick = GetTimeMs()
         AniFPSTimer = AniLastTick
         AniRunning = True '标记动画执行开始
+        '帧循环从「后台 AboveNormal 线程 + 每帧 RunInUiWait 跨线程往返 + Thread.Sleep 控帧」
+        '整体迁移到 CompositionTarget.Rendering（对照 PCL-CE Animations/Core.cs 的做法）：
+        '- 帧回调由 WPF 渲染管线在 UI 线程逐帧触发，与当帧合成同相位。旧架构每帧都要跨线程投递，
+        ' 帧落地时机相对合成存在 1~15ms 的调度抖动，属性变更常晚一拍才被合成——这正是切页、
+        ' 侧边栏、镐子加载等所有动画「发卡、不跟手」的根源；
+        '- 手动帧率上限（UiMaxFps）改为按累积时间跳帧，不再用 Thread.Sleep（默认精度约 15.6ms，
+        ' 本身就是帧间隔抖动的来源）。
+        '补充（后台占用优化）：挂载 Rendering 订阅会让 WPF 按 vsync 持续合成（MSDN 已知行为），
+        '空闲时也是纯空转——现在连续约 2 秒无动画即自动摘除钩子（见 AniOnRendering），空闲占用归零，
+        '比 PCL-CE 的常驻订阅与旧版 PCL 的常驻动画线程都更省；动画入队时由 AniEnsureHooked 重挂。
+        AniEnsureHooked()
         '记一行帧率上限，方便日后排查「动画为什么不够流畅 / CPU 为什么高」
         Try
             Dim SettingFps As Integer = CInt(Settings.Get("UiMaxFps"))
             Logger.Info($"动画帧率上限：{If(SettingFps > 0, $"{SettingFps}（手动设置）", $"{AniAutoMaxFps}（自动，跟随显示器刷新率）")}")
         Catch
         End Try
+    End Sub
 
-        RunInNewThread(
+    ''' <summary>渲染回调重入保护：WM_SIZE 等场景会同步重入渲染回调。</summary>
+    Private AniInFrame As Boolean = False
+    ''' <summary>手动帧率上限下的帧债累积（ms）。</summary>
+    Private AniFrameDebt As Double = 0
+    ''' <summary>渲染钩子是否已挂载。空闲自动摘除、入队时重挂。</summary>
+    Private AniHooked As Boolean = False
+    ''' <summary>连续无动画的帧数（空闲计数）。</summary>
+    Private AniIdleFrames As Integer = 0
+
+    ''' <summary>挂载/重挂渲染钩子（幂等）。空闲摘除后 WPF 不再主动合成，需强制一次渲染唤醒管线。</summary>
+    Private Sub AniEnsureHooked()
+        If AniHooked Then Return '廉价预检；权威判定在 UI 线程内（与空闲摘钩同线程，天然无竞态）
+        RunInUi(
         Sub()
+            If AniHooked Then Return
+            AniHooked = True
+            AniIdleFrames = 0
+            AniLastTick = GetTimeMs() '重置帧时钟：摘钩期间的累积时间不能算进首帧 delta，否则动画被瞬移到结尾
+            RemoveHandler System.Windows.Media.CompositionTarget.Rendering, AddressOf AniOnRendering
+            AddHandler System.Windows.Media.CompositionTarget.Rendering, AddressOf AniOnRendering
+            '强制一次渲染：WPF 在无脏区且无订阅者时不会自行合成，钩子重挂后须踢一脚才有首帧
+            Dim Wnd = Application.Current?.MainWindow
+            Wnd?.InvalidateVisual()
+        End Sub, True)
+    End Sub
+
+    ''' <summary>
+    ''' 渲染管线逐帧回调（UI 线程）。
+    ''' </summary>
+    Private Sub AniOnRendering(sender As Object, e As EventArgs)
+        If AniInFrame Then Return
+        AniInFrame = True
+        Try
+            '空闲自动摘钩：挂载 Rendering 订阅会让 WPF 按 vsync 持续合成（MSDN 已知行为），
+            '完全没有动画时这纯属空转。连续约 2 秒无动画就摘除，空闲占用归零（比 PCL-CE 的常驻订阅更省）；
+            '下一个动画入队时 AniEnsureHooked 会重挂并踢一次渲染管线。
+            If AniGroups.Count = 0 Then
+                AniIdleFrames += 1
+                If AniIdleFrames > 120 Then
+                    AniHooked = False
+                    RemoveHandler System.Windows.Media.CompositionTarget.Rendering, AddressOf AniOnRendering
+                End If
+                Return
+            End If
+            AniIdleFrames = 0
+            Dim Now As Long = GetTimeMs()
+            Dim RawDelta As Long = (Now - AniLastTick).Clamp(0, 100000)
+            AniLastTick = Now
+            '记录 FPS
+            If ModeDebug Then
+                If (Now - AniFPSTimer).Clamp(0, 100000) >= 500 Then
+                    AniFPS = AniFPSCounter
+                    AniFPSCounter = 0
+                    AniFPSTimer = Now
+                End If
+                AniFPSCounter += 2
+            End If
+            '手动帧率上限：累积不足一个帧间隔就跳过本帧（0 = 自动，跟随 vsync，无需跳帧）。
+            '注意处理时必须用累积帧债而不是当前帧间隔，否则 30fps 上限会把动画拖慢约 2 倍。
+            Dim MaxFps As Integer = 0
             Try
-                Logger.Info("动画线程开始")
-                Do While True
-                    '没有正在执行的动画时进入低功耗等待，避免持续占用 UI 线程
-                    If AniGroups.Count = 0 Then
-                        AniLastTick = GetTimeMs()
-                        '第 127 轮：空闲时改为事件等待（AniStart 入队即唤醒），兜底 250ms 自查一次；
-                        '原先固定 Sleep(20) 会让线程在完全空闲时仍每秒空醒 50 次
-                        AniIdleWake.WaitOne(250)
-                        Continue Do
-                    End If
-                    '两帧之间的间隔时间
-                    Dim DeltaTime As Long = (GetTimeMs() - AniLastTick).Clamp(0, 100000)
-                    If DeltaTime >= 3 Then
-                    AniLastTick = GetTimeMs()
-                    '记录 FPS
-                    If ModeDebug Then
-                        If (AniLastTick - AniFPSTimer).Clamp(0, 100000) >= 500 Then
-                            AniFPS = AniFPSCounter
-                            AniFPSCounter = 0
-                            AniFPSTimer = AniLastTick
-                        End If
-                        AniFPSCounter += 2
-                    End If
-                    '执行动画
-                    RunInUiWait(
-                    Sub()
-                        AniCount = 0
-                        AniTimer(DeltaTime * AniSpeed)
-                        If RandomInteger(0, 64 * If(ModeDebug, 5, 30)) = 0 AndAlso ((AniFPS < 62 AndAlso AniFPS > 0) OrElse AniCount > 4 OrElse NetManager.FileRemain <> 0) Then
-                            Logger.Info($"FPS {AniFPS}, 动画 {AniCount}, 下载中 {NetManager.FileRemain}（{StringUtils.FormatByteSize(NetManager.Speed)}/s）")
-                            If NetManager.FileRemain < 5 Then
-                                For Each File In NetManager.AllFiles.Values
-                                    If File.State < NetState.Finished Then Logger.Trace($"- {File.State} {StringUtils.FormatByteSize(File.Speed)}/s {File.LocalPath}")
-                                Next
-                            End If
-                        End If
-                    End Sub)
-                    End If
-                    '控制 FPS
-                    '原来是「UiMaxFps = 0 视为完全不限速」，于是走 Thread.Sleep(1) 忙等：
-                    '动画期间这个 AboveNormal 线程每秒最多把 333 帧 RunInUiWait 投递到 UI 线程，
-                    '每一帧都要整窗重绘、整棵可视树重新合成——软件渲染（远程桌面/无 GPU）下直接吃满一个核，
-                    '这就是「一开动画风扇就转、任务管理器 CPU 飙升」的来源。
-                    '而 WPF 的合成本身超不过显示器刷新率，多出来的帧没有任何视觉收益，是纯空烧。
-                    '这里把 0 解释为「自动 = 跟随当前显示器刷新率」（60/75/120/144），并给 240 的硬上限。
-                    Dim MaxFps As Integer = 0
-                    Try
-                        MaxFps = CInt(Settings.Get("UiMaxFps"))
-                    Catch ex As Exception
-                        Logger.Warn(ex, "读取最大帧率设置失败（按自动处理）")
-                    End Try
-                    If MaxFps <= 0 Then MaxFps = AniAutoMaxFps
-                    If MaxFps > 240 Then MaxFps = 240
-                    Dim FrameInterval As Long = 1000 \ MaxFps
-                    Dim Cost As Long = GetTimeMs() - AniLastTick
-                    If Cost < FrameInterval Then Thread.Sleep(CInt(FrameInterval - Cost))
-                Loop
-            Catch ex As Exception
-                Logger.Error(ex, "动画帧执行失败", LogBehavior.AlertThenCrash)
+                MaxFps = CInt(Settings.Get("UiMaxFps"))
+            Catch
             End Try
-        End Sub, "Animation", ThreadPriority.AboveNormal)
+            Dim ProcessDelta As Long = RawDelta
+            If MaxFps > 0 Then
+                AniFrameDebt += RawDelta
+                If AniFrameDebt < 1000.0 / Math.Min(MaxFps, 240) Then Return
+                ProcessDelta = CLng(AniFrameDebt)
+                AniFrameDebt = 0
+            End If
+            If ProcessDelta < 3 Then Return '与旧引擎一致：间隔极小的帧不值得处理
+            '执行动画
+            AniCount = 0
+            AniTimer(ProcessDelta * AniSpeed)
+            If RandomInteger(0, 64 * If(ModeDebug, 5, 30)) = 0 AndAlso ((AniFPS < 62 AndAlso AniFPS > 0) OrElse AniCount > 4 OrElse NetManager.FileRemain <> 0) Then
+                Logger.Info($"FPS {AniFPS}, 动画 {AniCount}, 下载中 {NetManager.FileRemain}（{StringUtils.FormatByteSize(NetManager.Speed)}/s）")
+                If NetManager.FileRemain < 5 Then
+                    For Each File In NetManager.AllFiles.Values
+                        If File.State < NetState.Finished Then Logger.Trace($"- {File.State} {StringUtils.FormatByteSize(File.Speed)}/s {File.LocalPath}")
+                    Next
+                End If
+            End If
+        Catch ex As Exception
+            '逐帧回调不允许崩溃：AniTimer 内部已有兜底，这里只拦 AniTimer 之外的意外
+            Logger.Error(ex, "动画帧执行失败", LogBehavior.Toast)
+        Finally
+            AniInFrame = False
+        End Try
     End Sub
 
     ''' <summary>
@@ -922,7 +954,7 @@ Public Module ModAnimation
     ''' </summary>
     Public Sub AniTimer(DeltaTick As Double)
         Try
-            If DeltaTick / AniSpeed > 100 Then Logger.Info($"两个动画帧间隔 {DeltaTick} ms")
+            If ModeDebug AndAlso DeltaTick / AniSpeed > 100 Then Logger.Info($"两个动画帧间隔 {DeltaTick} ms")
             Dim i As Integer = -1
             '循环每个动画组
             Do While i + 1 < AniGroups.Count

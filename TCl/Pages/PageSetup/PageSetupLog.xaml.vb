@@ -31,10 +31,10 @@
     End Sub
 
     Private Sub PageSetupLog_Unloaded(sender As Object, e As RoutedEventArgs) Handles Me.Unloaded
-        StopLogWatcher() '性能纪律：页面不可见即停止监听（第 130 轮 D4）
+        StopLogWatcher() '性能纪律：页面不可见即停止监听
     End Sub
 
-#Region "实时日志查看（第 130 轮 D4）"
+#Region "实时日志查看"
 
     Private LogWatchTimer As System.Windows.Threading.DispatcherTimer
     ''' <summary>下一条要读的 Log1.txt 字节位置；-1 表示首次（只读末尾 64KB）。</summary>
@@ -77,7 +77,7 @@
                     Got += Count
                 End While
                 If Got = 0 Then Return
-                If Got < EndLen Then EndLen = Got '短读兜底（第 130 轮体检 P3）
+                If Got < EndLen Then EndLen = Got '短读兜底
                 '只消费到最后一个换行，半行留给下一轮
                 Dim LastLf As Integer = -1
                 For i = EndLen - 1 To 0 Step -1
@@ -90,7 +90,7 @@
                 Dim NewText = Encoding.UTF8.GetString(Buffer, 0, LastLf + 1)
                 LogReadPos += LastLf + 1
                 '首批可能从 64KB 截断处开始：只对第一行做半行粗滤（不以时间戳开头即丢弃），
-                '其余行完整保留，避免误伤异常堆栈的续行（第 130 轮体检 P2）
+                '其余行完整保留，避免误伤异常堆栈的续行
                 Dim FirstLine As Boolean = LogRawLines.Count = 0
                 For Each Line In NewText.Replace(vbCr, "").Split(CChar(vbLf))
                     If Line = "" Then Continue For

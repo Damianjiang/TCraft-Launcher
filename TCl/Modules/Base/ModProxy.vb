@@ -218,13 +218,74 @@ Public Module ModProxy
         Return Handler
     End Function
 
-    ''' <summary>创建一个已经套好代理的 HttpClientHandler。新代码统一用这个。</summary>
-    Public Function CreateHandler() As HttpClientHandler
+    ''' <summary>
+    ''' 创建已套好代理的 HTTP 消息处理器（新代码统一用这个）。
+    ''' Windows 10 1607+ 用 WinHttpHandler：HTTP/2 多路复用 + TLS 1.3，几十个下载线程共用少量连接
+    ''' （对齐 PCL-CE（net10）SocketsHttpHandler 的连接行为），省掉每线程独立的 TCP+TLS 握手与慢启动开销；
+    ''' HTTP/1.1-only 的源由 ALPN 自动回退、明文 http:// 自动回退，行为不变。
+    ''' Win7/8 的 WinHTTP 不支持 HTTP/2 且默认未启用 TLS 1.2，回退 HttpClientHandler
+    ''' （TLS 版本由 .NET 4.8 自行管理，预热已显式开启 TLS 1.2），保证 Win7 完整兼容；
+    ''' SOCKS5 同样走 HttpClientHandler（WinHTTP 不支持 socks 方案，维持原栈的尽力而为行为）。
+    ''' </summary>
+    Public Function CreateHandler() As HttpMessageHandler
+        If Environment.OSVersion.Version >= New Version(10, 0, 14393) AndAlso GetMode() <> ModeSocks5 Then 'Win10 1607+ 才有支持 HTTP/2 的 WinHTTP
+            Try
+                Return ApplyWinHttp(New WinHttpHandler With {
+                    .AutomaticDecompression = DecompressionMethods.Deflate Or DecompressionMethods.GZip,
+                    .CookieUsePolicy = CookieUsePolicy.IgnoreCookies, '不存 Cookie，从 Header 手动传入（等价原 UseCookies=False）
+                    .SendTimeout = TimeSpan.FromSeconds(30),
+                    .ReceiveHeadersTimeout = TimeSpan.FromSeconds(60),
+                    .ReceiveDataTimeout = TimeSpan.FromSeconds(60),
+                    .TcpKeepAliveEnabled = True, 'TCP 保活：跨文件/分片复用池内连接，避免空闲被掐后重新握手
+                    .EnableMultipleHttp2Connections = True '单条 h2 连接的流配额不足时自动开新连接，64 并发不排队
+                })
+            Catch ex As Exception
+                Logger.Warn(ex, "创建 WinHttpHandler 失败，回退 HttpClientHandler")
+            End Try
+        End If
         Return Apply(New HttpClientHandler With {
             .AutomaticDecompression = DecompressionMethods.Deflate Or DecompressionMethods.GZip,
             .UseCookies = False
         })
     End Function
+
+    ''' <summary>给 WinHttpHandler 套上代理。WinHTTP 不读 WebRequest.DefaultWebProxy，必须显式指定。
+    ''' 经过 <see cref="WinHttpProxyAdapter"/> 适配直连语义并保留「改设置即时生效」。</summary>
+    Private Function ApplyWinHttp(Handler As WinHttpHandler) As WinHttpHandler
+        Handler.WindowsProxyUsePolicy = WindowsProxyUsePolicy.UseCustomProxy
+        Handler.Proxy = New WinHttpProxyAdapter()
+        Return Handler
+    End Function
+
+    ''' <summary>
+    ''' 把 HttpProxyManager 的 IWebProxy 语义适配成 WinHttpHandler 期望的语义。
+    ''' WinHttpHandler（源码 line 1292）：IsBypassed 为 True 或 GetProxy 返回 Nothing = 直连；
+    ''' 返回目标地址本身会被当成「连接到目标地址的 NAMED_PROXY」（WebProxy 惯例里这是直连标记），
+    ''' 必须显式转成 Nothing，否则无代理环境下所有请求都会炸。
+    ''' 每次调用实时透传 HttpProxyManager（动态 IWebProxy），改代理设置即时生效。
+    ''' </summary>
+    Private Class WinHttpProxyAdapter
+        Implements IWebProxy
+
+        Public Property Credentials As ICredentials Implements IWebProxy.Credentials
+            Get
+                Return HttpProxyManager.Instance.Credentials
+            End Get
+            Set(value As ICredentials)
+                HttpProxyManager.Instance.Credentials = value
+            End Set
+        End Property
+
+        Public Function GetProxy(destination As Uri) As Uri Implements IWebProxy.GetProxy
+            Dim Result As Uri = HttpProxyManager.Instance.GetProxy(destination)
+            If Result Is Nothing OrElse Result.Equals(destination) Then Return Nothing '直连
+            Return Result
+        End Function
+
+        Public Function IsBypassed(destination As Uri) As Boolean Implements IWebProxy.IsBypassed
+            Return HttpProxyManager.Instance.IsBypassed(destination)
+        End Function
+    End Class
 
 #End Region
 

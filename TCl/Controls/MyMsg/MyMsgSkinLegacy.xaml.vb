@@ -2,13 +2,13 @@
 Imports System.Windows.Threading
 
 ''' <summary>
-''' HMCL 式离线账户皮肤选择弹窗（第 71 轮建，第 74 轮对齐 HMCL SkinPane）：
+''' HMCL 式离线账户皮肤选择弹窗：
 ''' 左侧 3D 皮肤预览 + 右侧单选列表（默认 / Steve / Alex / 正版 / 本地文件 / LittleSkin / 自定义皮肤站）。
 ''' <para/>
 ''' 交互与 HMCL 一致：点击单选项仅更新选中态与左侧预览；「确定」才写入按账户隔离的皮肤配置（ModLegacySkin），
 ''' 「取消」直接关闭不生效。皮肤加载器（PageLaunchLeft.SkinLegacy）会因配置指纹变化自动重载。
 ''' <para/>
-''' 第 101 轮：正版 / LittleSkin / 自定义皮肤站这三项需要补充信息（角色名 / CSL 地址），
+''' 正版 / LittleSkin / 自定义皮肤站这三项需要补充信息（角色名 / CSL 地址），
 ''' 原先就地铺开输入框会让主弹窗「超载」，现改为弹出**子弹窗**（PanSub 覆盖层）集中收集输入；
 ''' 子弹窗「确定」才写回暂存并刷新预览，「取消」保留原状。主弹窗本体不再因输入框铺开而增高。
 ''' <para/>
@@ -70,7 +70,7 @@ Public Class MyMsgSkinLegacy
             '构建单选列表（HMCL SkinPane 对齐）
             Dim Current = ModLegacySkin.GetConfig(PlayerName)
             PendingType = Current.Type : PendingId = Current.Id : PendingFile = Current.File : PendingApi = Current.Api
-            '第 97 轮：配置自愈——越界类型、以及「皮肤站但没有角色名」这种永远取不到图的残配置，
+            '配置自愈——越界类型、以及「皮肤站但没有角色名」这种永远取不到图的残配置，
             '一律回落到「默认」。否则弹窗一打开就停在皮肤站上，用户会以为是自己被改成了皮肤站皮肤。
             If PendingType < 0 OrElse PendingType > 6 Then PendingType = 0
             If (PendingType = 5 OrElse PendingType = 6) AndAlso PendingId.Trim = "" Then
@@ -90,7 +90,7 @@ Public Class MyMsgSkinLegacy
             AddItem(4, "lucide/image", "本地皮肤图片文件", "从电脑中选择一张 64×32 或 64×64 的皮肤图片")
             AddItem(5, "lucide/cloud-download", "LittleSkin 皮肤站", "输入 LittleSkin 上的角色名，直接拉取该角色皮肤")
             AddItem(6, "lucide/server", "自定义皮肤站", "填写 Blessing Skin 等站点的 CSL 地址与角色名")
-            '第 101 轮：补充输入全部收进子弹窗（PanSub），主弹窗不再就地铺开输入框
+            '补充输入全部收进子弹窗（PanSub），主弹窗不再就地铺开输入框
             TextSubWho.HintText = ModLang.L("玩家名（皮肤站上的角色名）")
             TextSubApi.HintText = ModLang.L("皮肤站地址，例如 https://littleskin.cn/csl")
             '高亮当前生效项并预览（打开时不自动弹子弹窗，只按已存配置预览；需补信息时由用户主动点击该项再弹出）
@@ -155,7 +155,7 @@ Public Class MyMsgSkinLegacy
                 Pair.Value.SetChecked(Pair.Key = Type, False, False)
             Next
             If Type = 3 OrElse Type = 5 OrElse Type = 6 Then
-                OpenSubDialog(Type) '第 101 轮：补充信息改走子弹窗，避免主弹窗铺开输入框
+                OpenSubDialog(Type) '补充信息改走子弹窗，避免主弹窗铺开输入框
                 Return
             End If
             UpdatePreview()
@@ -167,7 +167,7 @@ Public Class MyMsgSkinLegacy
 
     ''' <summary>
     ''' 确定：把暂存的选择写入配置并关闭（HMCL「确定」语义）。
-    ''' 第 102 轮修复：必须为 Public——FormMain_KeyDown 对回车走 VB 晚绑定，只找公共成员；
+    ''' 修复：必须为 Public——FormMain_KeyDown 对回车走 VB 晚绑定，只找公共成员；
     ''' Private 会让「回车 / 点击确定」抛 MissingMemberException（未知错误）。
     ''' </summary>
     Public Sub Btn1_Click() Handles Btn1.Click
@@ -185,7 +185,7 @@ Public Class MyMsgSkinLegacy
             Return
         End If
         Try
-            '第 101 轮：补充信息已收在子弹窗里写回 PendingId/PendingApi，此处不再就地读输入框
+            '补充信息已收在子弹窗里写回 PendingId/PendingApi，此处不再就地读输入框
             '胖瘦按实际贴图检测（本地文件 / 皮肤站皮肤 / 内置皮肤都能判准），比让用户手选可靠
             Dim Slim As Boolean = Skin3D.HasSkin AndAlso Skin3D.IsSlim
             '皮肤站额外记住本地缓存路径（Config.File 只在这个分支写），断网时还能拿它兜底
@@ -202,7 +202,7 @@ Public Class MyMsgSkinLegacy
         Close()
     End Sub
 
-#Region "子弹窗（第 101 轮：皮肤站 / 正版补充信息）"
+#Region "子弹窗"
 
     ''' <summary>
     ''' 打开子弹窗收集 3/5/6 的补充信息：预填当前暂存值，按类型定标题 / 说明 / 提示；
@@ -358,7 +358,7 @@ Public Class MyMsgSkinLegacy
     ''' <summary>
     ''' 解码皮肤 PNG 为可跨线程使用的冻结位图。
     ''' <para/>
-    ''' 第 97 轮修正：内置皮肤是 pack:// 资源，不能用 IO.File.OpenRead 读（这正是上一版 3D 一片空白的原因），
+    ''' 修正：内置皮肤是 pack:// 资源，不能用 IO.File.OpenRead 读（这正是上一版 3D 一片空白的原因），
     ''' 必须走 Application.GetResourceStream 拿到资源流。
     ''' </summary>
     Private Shared Function DecodeSkin(Path As String) As BitmapSource
@@ -412,7 +412,7 @@ Public Class MyMsgSkinLegacy
     Private Sub Close()
         MyConverter.WaitFrame.Continue = False
         Interop.ComponentDispatcher.PopModal()
-        '统一的关闭动画（第 136 轮：原先 8 个弹窗各复制一份）
+        '统一的关闭动画
         MyMsgCloseAnimation.Play(Me, Uuid, TransformPos, TransformScale)
     End Sub
 

@@ -12,7 +12,7 @@ public enum RateLimitMode {
 /// <summary>
 /// 对高频调用进行限制。
 /// 详见：<see href="https://aldaviva.com/portfolio.html#ratelimiting" />
-/// <para/>第 130 轮：底层改用自写的 <see cref="SimpleRateLimiter"/>，不再依赖 ThrottleDebounce 包。
+/// <para/>底层改用自写的 <see cref="SimpleRateLimiter"/>，不再依赖 ThrottleDebounce 包。
 /// </summary>
 public class RateLimitedWorker(Action workload, double minimalIntervalMs, RateLimitMode mode) : IDisposable {
 

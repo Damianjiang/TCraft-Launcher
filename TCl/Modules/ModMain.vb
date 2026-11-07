@@ -26,7 +26,7 @@ Public Module ModMain
     ''' </summary>
     Private HintWaiting As New ConcurrentQueue(Of HintMessage)
     ''' <summary>
-    ''' 在窗口左下角弹出提示文本。
+    ''' 在窗口右下角弹出提示文本（样式对照 PCL-CE-dev 的 MyToast）。
     ''' </summary>
     Public Sub Hint(Text As String, Optional Type As HintType = HintType.Blue, Optional Log As Boolean = True)
         HintWaiting.Enqueue(New HintMessage With {.Text = If(Text, ""), .Type = Type, .Log = Log})
@@ -34,101 +34,27 @@ Public Module ModMain
 
     Private Sub HintTick()
         Try
-            Application.EnsureDelayedUiLoaded() '提示控件依赖延迟字典里的样式（第 112 轮）
-            'Tag 存储了：{ 是否可以重用, Uuid }
+            Application.EnsureDelayedUiLoaded() '提示控件依赖延迟字典里的样式
             Dim CurrentHint As HintMessage = Nothing
             Do While HintWaiting.TryDequeue(CurrentHint)
-                ''清除空提示
-                'If IsNothing(HintWaiting(0)) OrElse IsNothing(HintWaiting(0)(0)) Then
-                '    HintWaiting.RemoveAt(0)
-                '    Continue Do
-                'End If
                 '去回车
                 CurrentHint.Text = CurrentHint.Text.ReplaceLineEndings(" ", mergeMultiple:=True)
                 '超量提示直接忽略
                 If FrmMain.PanHint.Children.Count >= 20 Then GoTo EndHint
-                '检查是否有重复提示
-                Dim DoubleStack As Border = Nothing
-                For Each stack As Border In FrmMain.PanHint.Children
-                    If stack.Tag(0) AndAlso CType(stack.Child, TextBlock).Text = CurrentHint.Text Then DoubleStack = stack
+                '检查是否有重复提示（正文与类型相同则重新强调，对照参考项目 HintService）
+                Dim DoubleToast As MyToast = Nothing
+                For Each stack As MyToast In FrmMain.PanHint.Children
+                    If Not stack.IsClosed AndAlso Not stack.IsDismissing AndAlso
+                       stack.Context = CurrentHint.Text AndAlso stack.Kind = CurrentHint.Type Then DoubleToast = stack
                 Next
-                '获取渐变颜色
-                Dim TargetColor0, TargetColor1 As MyColor
-                Dim Percent As Double = 0.3
-                Select Case CurrentHint.Type
-                    Case HintType.Blue
-                        TargetColor0 = New MyColor(215, 37, 155, 252)
-                        TargetColor1 = New MyColor(215, 10, 142, 252)
-                    Case HintType.Green
-                        TargetColor0 = New MyColor(215, 33, 177, 33)
-                        TargetColor1 = New MyColor(215, 29, 160, 29)
-                    Case Else 'HintType.Red
-                        TargetColor0 = New MyColor(215, 255, 53, 11)
-                        TargetColor1 = New MyColor(215, 255, 43, 0)
-                End Select
-                If Not IsNothing(DoubleStack) Then
-                    '有重复提示，且该提示的进入动画已播放
-                    If Not AniIsRun("Hint Show " & DoubleStack.Tag(1)) Then
-                        AniStop("Hint Hide " & DoubleStack.Tag(1))
-                        Dim Delay As Double = (800 + CurrentHint.Text.Length.Clamp(5, 23) * 180) * AniSpeed
-                        AniStart({
-                            AaX(DoubleStack, -12 - DoubleStack.Margin.Left, 50,, New AniEaseOutFluent),
-                            AaX(DoubleStack, -8, 50, 50, New AniEaseInFluent),
-                            AaX(DoubleStack, 8, 50, 100, New AniEaseOutFluent),
-                            AaX(DoubleStack, -8, 50, 150, New AniEaseInFluent),
-                            AaDouble(Sub(i)
-                                         Percent += i
-                                         Dim Gradient As LinearGradientBrush = DoubleStack.Background
-                                         Gradient.GradientStops(0).Color = TargetColor0 * Percent + New MyColor(255, 255, 255) * (1 - Percent)
-                                         Gradient.GradientStops(1).Color = TargetColor1 * Percent + New MyColor(255, 255, 255) * (1 - Percent)
-                                     End Sub, 0.7, 250),
-                            AaX(DoubleStack, -50, 200, Delay, New AniEaseInFluent),
-                            AaOpacity(DoubleStack, -1, 150, Delay),
-                            AaCode(Sub() DoubleStack.Tag(0) = False, Delay),
-                            AaHeight(DoubleStack, -26, 100,, New AniEaseOutFluent, True),
-                            AaCode(Sub() FrmMain.PanHint.Children.Remove(DoubleStack), , True)
-                      }, "Hint Hide " & DoubleStack.Tag(1))
-                    End If
+                If Not IsNothing(DoubleToast) Then
+                    '有重复提示：晃动提醒并重新计时
+                    DoubleToast.Emphasize()
                 Else
-                    '准备控件
-                    Dim NewHintControl As New Border With {.Tag = {True, GetUuid()}, .Margin = New Thickness(-70, 0, 20, 0), .Opacity = 0, .Height = 0, .HorizontalAlignment = HorizontalAlignment.Left, .CornerRadius = New CornerRadius(0, 6, 6, 0)}
-                    NewHintControl.Background = New LinearGradientBrush(New GradientStopCollection(New List(Of GradientStop) From {
-                        New GradientStop(TargetColor0 * Percent + New MyColor(255, 255, 255) * (1 - Percent), 0),
-                        New GradientStop(TargetColor1 * Percent + New MyColor(255, 255, 255) * (1 - Percent), 1)}), 90)
-                    NewHintControl.Child = New TextBlock With {.TextTrimming = TextTrimming.CharacterEllipsis, .FontSize = 13, .Text = CurrentHint.Text, .Foreground = New MyColor(255, 255, 255), .Margin = New Thickness(33, 5, 8, 5)}
-                    'AddHandler NewHintControl.MouseLeftButtonDown, AddressOf HideAllHint
-                    FrmMain.PanHint.Children.Add(NewHintControl)
-                    '控件动画
-                    Dim Animations As New List(Of AniData)
-                    If FrmMain.PanHint.Children.Count > 1 Then
-                        '已有提示
-                        Animations.Add(AaHeight(NewHintControl, 26, 150, , New AniEaseOutFluent))
-                    Else
-                        '是唯一提示
-                        NewHintControl.Height = 26
-                    End If
-                    '开始动画
-                    Animations.AddRange({
-                        AaX(NewHintControl, 30, 400, , New AniEaseOutElastic(AniEasePower.Weak)),
-                        AaX(NewHintControl, 20, 200, , New AniEaseOutFluent),
-                        AaOpacity(NewHintControl, 1, 100),
-                        AaDouble(Sub(i)
-                                     Percent += i
-                                     Dim Gradient As LinearGradientBrush = NewHintControl.Background
-                                     Gradient.GradientStops(0).Color = TargetColor0 * Percent + New MyColor(255, 255, 255) * (1 - Percent)
-                                     Gradient.GradientStops(1).Color = TargetColor1 * Percent + New MyColor(255, 255, 255) * (1 - Percent)
-                                 End Sub, 0.7, 250, 100)
-                    })
-                    AniStart(Animations, "Hint Show " & NewHintControl.Tag(1))
-                    '结束动画
-                    Dim Delay As Double = (800 + CurrentHint.Text.Length.Clamp(5, 23) * 180) * AniSpeed
-                    AniStart({
-                        AaX(NewHintControl, -50, 200, Delay, New AniEaseInFluent),
-                        AaOpacity(NewHintControl, -1, 150, Delay),
-                        AaCode(Sub() NewHintControl.Tag(0) = False, Delay),
-                        AaHeight(NewHintControl, -26, 100,, New AniEaseOutFluent, True),
-                        AaCode(Sub() FrmMain.PanHint.Children.Remove(NewHintControl), , True)
-                    }, "Hint Hide " & NewHintControl.Tag(1))
+                    '准备控件并展示（从右下角滑入）
+                    Dim NewToast As New MyToast(CurrentHint.Text, CurrentHint.Type)
+                    FrmMain.PanHint.Children.Add(NewToast)
+                    NewToast.Show()
                 End If
                 '结束处理
 EndHint:
@@ -139,15 +65,9 @@ EndHint:
         End Try
     End Sub
     Private Sub HideAllHint()
-        For Each Control As Border In FrmMain.PanHint.Children
+        For Each Control As MyToast In FrmMain.PanHint.Children
             Control.IsHitTestVisible = False
-            AniStart({
-                AaX(Control, -50, 200, , New AniEaseInFluent),
-                AaOpacity(Control, -1, 150, , New AniEaseInFluent),
-                AaCode(Sub() Control.Tag(0) = False),
-                AaHeight(Control, -26, 100,, New AniEaseOutFluent, True),
-                AaCode(Sub() FrmMain.PanHint.Children.Remove(Control), , True)
-            }, "Hint Hide " & Control.Tag(1))
+            Control.Dismiss()
         Next
     End Sub
 
@@ -224,7 +144,7 @@ EndHint:
         Auth
         ''' <summary>皮肤预览弹窗：先 3D 预览再决定是否保存（用于「正版皮肤获取」）。</summary>
         SkinPreview
-        ''' <summary>整合包确认弹窗：显示图标/名称/类型，询问是否安装（拖入压缩包时使用，第 137 轮）。</summary>
+        ''' <summary>整合包确认弹窗：显示图标/名称/类型，询问是否安装（拖入压缩包时使用，）。</summary>
         Modpack
     End Enum
 
@@ -266,9 +186,9 @@ EndHint:
                              Optional Button1 As String = "确定", Optional Button2 As String = "", Optional Button3 As String = "",
                              Optional IsWarn As Boolean = False, Optional HighLight As Boolean = True, Optional ForceWait As Boolean = False,
                              Optional Button1Action As Action = Nothing, Optional Button2Action As Action = Nothing, Optional Button3Action As Action = Nothing) As Integer
-        Application.EnsureDelayedUiLoaded() '弹窗依赖延迟字典里的样式（第 112 轮）
-        '默认参数是简体中文（"提示"/"确定"/"取消"），调用点大多不显式传，故在此统一过一次 L()；
-        '已翻译过的文本再走一次 L() 是无害的（译文不是字典键，原样返回）。
+        Application.EnsureDelayedUiLoaded() '弹窗依赖延迟字典里的样式
+        '默认参数是简体中文（"提示"/"确定"/"取消"），调用点大多不显式传，故在此统一过一次 L；
+        '已翻译过的文本再走一次 L 是无害的（译文不是字典键，原样返回）。
         Caption = ModLang.L(Caption) : Title = ModLang.L(Title)
         Button1 = ModLang.L(Button1) : Button2 = ModLang.L(Button2) : Button3 = ModLang.L(Button3)
         '将弹窗列入队列
@@ -324,8 +244,8 @@ EndHint:
     ''' <param name="Button2">显示的第二个按钮，默认为“取消”。</param>
     ''' <param name="IsWarn">是否为警告弹窗，若为 True，弹窗配色和背景会变为红色。</param>
     Public Function MyMsgBoxInput(Title As String, Optional Text As String = Nothing, Optional DefaultInput As String = Nothing, Optional ValidateRules As Collection(Of Validate) = Nothing, Optional HintText As String = "", Optional Button1 As String = "确定", Optional Button2 As String = "取消", Optional IsWarn As Boolean = False) As String
-        Application.EnsureDelayedUiLoaded() '弹窗依赖延迟字典里的样式（第 112 轮）
-        '默认参数是简体中文，调用点大多不显式传，故在此统一过一次 L()
+        Application.EnsureDelayedUiLoaded() '弹窗依赖延迟字典里的样式
+        '默认参数是简体中文，调用点大多不显式传，故在此统一过一次 L
         Title = ModLang.L(Title) : Button1 = ModLang.L(Button1) : Button2 = ModLang.L(Button2)
         If Text IsNot Nothing Then Text = ModLang.L(Text)
         HintText = ModLang.L(HintText)
@@ -349,7 +269,7 @@ EndHint:
     ''' 返回玩家名；点击取消或关闭则返回 Nothing。UUID 一律由系统按玩家名自动生成，用户无需干预。
     ''' </summary>
     Public Function MyMsgBoxOfflineAccount() As String
-        Application.EnsureDelayedUiLoaded() '弹窗依赖延迟字典里的样式（第 112 轮）
+        Application.EnsureDelayedUiLoaded() '弹窗依赖延迟字典里的样式
         Dim Converter As New MyMsgBoxConverter With {.Type = MyMsgBoxType.Offline, .Title = "添加离线模式账户", .Button1 = "登录", .Button2 = "取消", .ForceWait = True}
         WaitingMyMsgBox.Enqueue(Converter)
         Try
@@ -368,7 +288,7 @@ EndHint:
     ''' 与离线账号表单同一模式：提交即回传账号数据；取消返回 Nothing。
     ''' </summary>
     Public Function MyMsgBoxAuthAccount() As AuthAccountData?
-        Application.EnsureDelayedUiLoaded() '弹窗依赖延迟字典里的样式（第 112 轮）
+        Application.EnsureDelayedUiLoaded() '弹窗依赖延迟字典里的样式
         Dim Converter As New MyMsgBoxConverter With {.Type = MyMsgBoxType.Auth, .Title = "添加 LittleSkin 账号", .Button1 = "登录", .Button2 = "取消", .ForceWait = True}
         WaitingMyMsgBox.Enqueue(Converter)
         Try
@@ -390,7 +310,7 @@ EndHint:
     ''' 返回 1 = 微软账号，2 = 离线账号；取消或关闭则返回 Nothing。
     ''' </summary>
     Public Function MyMsgBoxAddAccount() As Integer?
-        Application.EnsureDelayedUiLoaded() '弹窗依赖延迟字典里的样式（第 112 轮）
+        Application.EnsureDelayedUiLoaded() '弹窗依赖延迟字典里的样式
         Dim Converter As New MyMsgBoxConverter With {.Type = MyMsgBoxType.AddAccount, .Title = "添加账户", .Button1 = "确定", .Button2 = "取消", .ForceWait = True}
         WaitingMyMsgBox.Enqueue(Converter)
         Try
@@ -411,7 +331,7 @@ EndHint:
     ''' </summary>
     Public Function MyMsgBoxSkinLegacy(PlayerName As String, Optional PreviewOnly As Boolean = False,
                                        Optional PresetType As Integer = -1, Optional PresetId As String = "") As Integer?
-        Application.EnsureDelayedUiLoaded() '弹窗依赖延迟字典里的样式（第 112 轮）
+        Application.EnsureDelayedUiLoaded() '弹窗依赖延迟字典里的样式
         Dim Args As New ModLegacySkin.SkinEditorArgs With {
             .PlayerName = PlayerName, .PreviewOnly = PreviewOnly, .PresetType = PresetType, .PresetId = PresetId}
         Dim Converter As New MyMsgBoxConverter With {.Type = MyMsgBoxType.SkinLegacy, .Title = If(PreviewOnly, "查看皮肤", "编辑皮肤"),
@@ -435,8 +355,8 @@ EndHint:
     ''' <param name="Button2">显示的第二个按钮，默认为空。</param>
     ''' <param name="IsWarn">是否为警告弹窗，若为 True，弹窗配色和背景会变为红色。</param>
     Public Function MyMsgBoxSelect(Selections As IEnumerable(Of IMyRadio), Optional Title As String = "提示", Optional Button1 As String = "确定", Optional Button2 As String = "", Optional IsWarn As Boolean = False) As Integer?
-        Application.EnsureDelayedUiLoaded() '弹窗依赖延迟字典里的样式（第 112 轮）
-        '默认参数是简体中文，调用点大多不显式传，故在此统一过一次 L()
+        Application.EnsureDelayedUiLoaded() '弹窗依赖延迟字典里的样式
+        '默认参数是简体中文，调用点大多不显式传，故在此统一过一次 L
         Title = ModLang.L(Title) : Button1 = ModLang.L(Button1) : Button2 = ModLang.L(Button2)
         '将弹窗列入队列
         Dim Converter As New MyMsgBoxConverter With {.Type = MyMsgBoxType.Select, .Button1 = Button1, .Button2 = Button2, .Content = Selections, .IsWarn = IsWarn, .Title = Title}
@@ -562,7 +482,7 @@ EndHint:
 #End Region
 
     ''' <summary>
-    ''' 列表行右侧操作按钮是否常驻显示（个性化 → 列表按钮，第 132 轮）。
+    ''' 列表行右侧操作按钮是否常驻显示（个性化 → 列表按钮，）。
     ''' False = 仅在鼠标悬停该行时显示；True = 所有列表行始终显示按钮。
     ''' 每次读取设置，切换后无需重启（FormMain.RefreshListButtons 会刷新已实例化的行）。
     ''' </summary>
@@ -584,7 +504,7 @@ EndHint:
     Public FrmStart As SplashScreen
 
     '页面声明（出于单元测试考虑，初始化页面已转入 FormMain 中）
-    '左栏与右栏对称（第 105 轮启动提速）：延迟到窗口首帧后构造，把「BAML 解析 + 控件树构造」
+    '左栏与右栏对称：延迟到窗口首帧后构造，把「BAML 解析 + 控件树构造」
     '移出「窗口显示」关键路径。任何代码访问 FrmLaunchLeft 都会按需创建，无需担心 Nothing。
     Friend _FrmLaunchLeft As PageLaunchLeft '由 FormMain.EnsureLaunchLeftCreated 延迟填充
     Public Property FrmLaunchLeft As PageLaunchLeft
@@ -597,7 +517,7 @@ EndHint:
         End Set
     End Property
     '右栏（主页）延迟创建：主页内容本身就是异步生成的，晚一帧挂上用户无感，
-    '但能把约 430ms 的 XAML 解析移出「窗口显示」关键路径（第 65 轮启动提速）。
+    '但能把约 430ms 的 XAML 解析移出「窗口显示」关键路径。
     '任何代码访问 FrmLaunchRight 都会按需创建，因此无需担心 Nothing。
     Friend _FrmLaunchRight As PageLaunchRight '由 FormMain.EnsureLaunchRightCreated 延迟填充
     Public Property FrmLaunchRight As PageLaunchRight
@@ -655,7 +575,7 @@ EndHint:
     Public FrmLoginAuthSkin As PageLoginAuthSkin
     Public FrmLoginMs As PageLoginMs
     Public FrmLoginMsSkin As PageLoginMsSkin
-    Public FrmLoginManager As PageAccountManager '账户管理页（第 72 轮，HMCL 式全屏）
+    Public FrmLoginManager As PageAccountManager '账户管理页
 
     '版本设置页面声明
     Public FrmInstanceLeft As PageInstanceLeft
@@ -1013,7 +933,7 @@ EndHint:
     ''' 在日志中输出系统诊断信息。
     ''' </summary>
     Public Sub FeedbackInfo()
-        Application.EnsureDelayedUiLoaded() '弹窗依赖延迟字典里的样式（第 112 轮）
+        Application.EnsureDelayedUiLoaded() '弹窗依赖延迟字典里的样式
         Try
             Logger.Warn($"诊断信息：{vbCrLf}" &
                 ModLang.L("操作系统：") & My.Computer.Info.OSFullName & vbCrLf &
@@ -1079,17 +999,12 @@ EndHint:
         End If
     End Sub
     Public Sub TimerMainStart()
-        RunInNewThread(
-        Sub()
-            Try
-                Do While True
-                    RunInUiWait(AddressOf TimerMain)
-                    Thread.Sleep(50 * 0.98)
-                Loop
-            Catch ex As Exception
-                Logger.Error(ex, "程序主时钟出错")
-            End Try
-        End Sub, "Timer Main")
+        '主时钟改为 UI 线程 DispatcherTimer：原来的常驻「Timer Main」线程每 50ms 做一次
+        'RunInUiWait（阻塞式 Dispatcher.Invoke 跨线程往返），一秒 20 次上下文切换纯属白费；
+        'TimerMain 本体本来就只在 UI 线程干活，直接用 DispatcherTimer 免掉整条链路。
+        Dim MainTimer As New Threading.DispatcherTimer With {.Interval = New TimeSpan(0, 0, 0, 0, 49)}
+        AddHandler MainTimer.Tick, Sub() TimerMain()
+        MainTimer.Start()
         If Not IsAprilEnabled Then Return
         RunInNewThread(
         Sub()

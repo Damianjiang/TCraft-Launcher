@@ -9,7 +9,7 @@
         <StackPanel x:Name="PanMain" Margin="25,25,25,25">
             <local:MyHint Text="这些设置只对该游戏版本生效，不影响其他版本。" Theme="Blue" Margin="0,0,0,15"
                           CanClose="True" RelativeSetup="HintIndieSetup"  />
-            <!-- 第 130 轮：实例内改装加载器——带当前实例的原版版本号跳到安装页预选 -->
+            <!-- 实例内改装加载器——带当前实例的原版版本号跳到安装页预选 -->
             <local:MyCard x:Name="CardModifyLoader" Margin="0,0,0,15" Title="实例改装">
                 <StackPanel Margin="25,40,25,15">
                     <TextBlock TextWrapping="Wrap" LineHeight="22" Opacity="0.7" FontSize="13" Foreground="{DynamicResource ColorBrush1}"

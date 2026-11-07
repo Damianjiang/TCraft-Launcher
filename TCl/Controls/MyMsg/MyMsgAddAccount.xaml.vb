@@ -62,7 +62,7 @@ Public Class MyMsgAddAccount
     Private Sub Close()
         MyConverter.WaitFrame.Continue = False
         Interop.ComponentDispatcher.PopModal()
-        '统一的关闭动画（第 136 轮：原先 8 个弹窗各复制一份）
+        '统一的关闭动画
         MyMsgCloseAnimation.Play(Me, Uuid, TransformPos, TransformScale)
     End Sub
 

@@ -253,7 +253,7 @@ Public Class MyTextBox
                         AnimationTime = 100
                     Else '未选中
                         ForeColorName = "ColorBrushBg0"
-                        BackColorName = "ColorBrushHalfWhite"
+                        BackColorName = "ColorBrushFieldBg" '随全局半透明缩放的控件底色（与卡片同族），恒定 HalfWhite 会在壁纸上发闷
                         AnimationTime = 100
                     End If
                 Else

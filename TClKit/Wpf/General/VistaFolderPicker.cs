@@ -5,8 +5,8 @@ using System.Text;
 namespace TClKit.Wpf;
 
 /// <summary>
-/// 自写的 Vista 风格文件夹选择对话框（IFileDialog COM 封装，第 130 轮替代 Ookii.Dialogs.Wpf 以减少内嵌体积）。
-/// <para/>第 137 轮修复：原先用 <c>[ComImport]</c> 类 + <c>new</c> 激活对话框，在实际机器上抛出
+/// 自写的 Vista 风格文件夹选择对话框（IFileDialog COM 封装，替代 Ookii.Dialogs.Wpf 以减少内嵌体积）。
+/// <para/>修复：原先用 <c>[ComImport]</c> 类 + <c>new</c> 激活对话框，在实际机器上抛出
 /// <c>REGDB_E_CLASSNOTREG (0x80040154)</c>（该 CLSID 明明已注册，是 CLR 的类厂激活路径问题），
 /// 异常被 <see cref="Dialogs.SelectFolder"/> 吞掉并返回空数组，表现为「点了没反应」。
 /// 现改为直接 P/Invoke <c>CoCreateInstance</c> 取接口指针，并在失败时回落到 shell32 的
@@ -54,7 +54,7 @@ public static class VistaFolderPicker {
     }
 
     // CLSID_FileOpenDialog = {DC1C5A9C-E88A-4DDE-A5A1-60F82A20AEF7}（注册表 HKCR\CLSID 下名称 "File Open Dialog"）。
-    // 第 137 轮修正：第 130 轮这里写成了 DC1C5A6C-2EF0-4A3A-950E-372E59EA70D4 —— 整段 GUID 都抄错，
+    // 修正：这里写成了 DC1C5A6C-2EF0-4A3A-950E-372E59EA70D4 —— 整段 GUID 都抄错，
     // 该 CLSID 在任何系统上都不存在，CoCreateInstance 必然返回 REGDB_E_CLASSNOTREG (0x80040154)，
     // 于是「添加已有文件夹」永远静默失败（异常被 SelectFolder 吞掉）。
     private static readonly Guid ClsidFileOpenDialog = new("DC1C5A9C-E88A-4DDE-A5A1-60F82A20AEF7");

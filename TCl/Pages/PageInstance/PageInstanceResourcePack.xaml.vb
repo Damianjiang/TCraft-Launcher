@@ -76,34 +76,73 @@ Public Class PageInstanceResourcePack
     End Sub
 
     ''' <summary>重新读取磁盘列表。</summary>
-    Public Sub Refresh()
+    ''' <summary>重新读取磁盘列表（扫描放后台线程，期间显示镐子加载卡）。</summary>
+    Public Sub Refresh(Optional OnFinished As Action = Nothing)
+        If IsRefreshing Then Return
+        Dim CurrentInstance = Instance
+        If CurrentInstance Is Nothing Then
+            PanList.Children.Clear()
+            ApplyRefresh(Nothing, Nothing)
+            If OnFinished IsNot Nothing Then OnFinished()
+            Return
+        End If
+        IsRefreshing = True
+        PanList.Children.Clear()
+        PanLoad.Visibility = Visibility.Visible
+        RunInNewThread(
+        Sub()
+            Try
+                Dim Folder As String = Nothing
+                Try : Folder = ModInstanceContent.GetPacksFolder(CurrentInstance, "resourcepacks") : Catch : End Try
+                Dim Entries As List(Of ModInstanceContent.PackEntry) = Nothing
+                If Folder IsNot Nothing Then Entries = ModInstanceContent.ListPacks(Folder)
+                RunInUi(Sub()
+                            ApplyRefresh(Folder, Entries)
+                            FinishRefresh(OnFinished)
+                        End Sub)
+            Catch ex As Exception
+                Logger.Error(ex, "刷新资源包列表失败")
+                RunInUi(Sub()
+                            ApplyRefresh(Nothing, Nothing)
+                            FinishRefresh(OnFinished)
+                        End Sub)
+            End Try
+        End Sub, "ResourcePack Refresh")
+    End Sub
+
+    Private IsRefreshing As Boolean = False
+    Private Sub FinishRefresh(OnFinished As Action)
+        PanLoad.Visibility = Visibility.Collapsed
+        IsRefreshing = False
+        If OnFinished IsNot Nothing Then OnFinished()
+    End Sub
+
+    ''' <summary>把扫描结果应用到界面（只在 UI 线程调用）。</summary>
+    Private Sub ApplyRefresh(Folder As String, Entries As List(Of ModInstanceContent.PackEntry))
         Try
             AllPacks.Clear()
-            PanList.Children.Clear()
             If Instance Is Nothing Then
                 CardPacks.Title = ModLang.L("资源包")
                 LabPath.Text = ""
                 AddNotice(ModLang.L("请先选择一个 Minecraft 版本。"))
                 Return
             End If
-            Dim Folder As String = PackFolder
-            If Folder Is Nothing Then
+            If Folder Is Nothing OrElse Entries Is Nothing Then
                 CardPacks.Title = ModLang.L("资源包")
                 LabPath.Text = ""
                 AddNotice(ModLang.L("无法定位这个实例的 resourcepacks 文件夹，请检查版本隔离设置。"))
                 Return
             End If
             LabPath.Text = Folder
-            AllPacks.AddRange(ModInstanceContent.ListPacks(Folder))
+            AllPacks.AddRange(Entries)
             Rebuild()
         Catch ex As Exception
-            Logger.Error(ex, "刷新资源包列表失败")
+            Logger.Error(ex, "应用资源包列表失败")
         End Try
     End Sub
 
     Private Sub RefreshWithHint()
-        Refresh()
-        Hint(ModLang.L("资源包列表已刷新。"), HintType.Green)
+        Refresh(Sub() Hint(ModLang.L("资源包列表已刷新。"), HintType.Green))
     End Sub
 
     ''' <summary>按搜索词重建列表。</summary>

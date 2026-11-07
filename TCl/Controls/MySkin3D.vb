@@ -186,15 +186,35 @@ Public Class MySkin3D
         '关键：3D 材质默认按"网格 UV 的包围盒"去铺画刷，而每个部件只占贴图的一小块——
         '用相对视口会把那一小块放大铺满整个面（模型看起来像被打散的色块）。
         '必须改成绝对视口，把画刷钉死在纹理坐标 0..1，UV 才按像素比例生效。
-        Dim Tex As New ImageBrush(Bmp) With {
+        '清晰度：WPF 3D 的纹理采样是双线性，64×64 像素画直接上会把每个像素拉成渐变（发糊）。
+        '对照 HMCL SkinCanvas.updateSkin：先用最近邻把皮肤放大到 1024 宽再上材质——
+        '放大后双线性采样落在同色块内部，视觉等同游戏里的 NEAREST 过滤，像素边缘锐利。
+        'UV 仍按原始皮肤宽高归一化（比例不变，自动映射到放大后的纹理）。
+        Dim Multiple As Integer = Math.Max(CInt(1024 / Bmp.PixelWidth), 1)
+        Dim TexImage As BitmapSource = If(Multiple > 1, EnlargeNearest(Bmp, Multiple), Bmp)
+        Dim Tex As New ImageBrush(TexImage) With {
             .Stretch = Stretch.Fill,
             .ViewboxUnits = BrushMappingMode.RelativeToBoundingBox,
             .Viewbox = New Rect(0, 0, 1, 1),
             .ViewportUnits = BrushMappingMode.Absolute,
             .Viewport = New Rect(0, 0, 1, 1),
             .TileMode = TileMode.None}
-        RenderOptions.SetBitmapScalingMode(Tex, BitmapScalingMode.HighQuality)
         Return Tex
+    End Function
+
+    ''' <summary>最近邻放大（等效 HMCL SkinHelper.enlarge 的逐像素复制），把 64×64 像素画放大到高清纹理。</summary>
+    Private Shared Function EnlargeNearest(Bmp As BitmapSource, Multiple As Integer) As BitmapSource
+        Dim W As Integer = Bmp.PixelWidth * Multiple
+        Dim H As Integer = Bmp.PixelHeight * Multiple
+        Dim Rt As New RenderTargetBitmap(W, H, 96, 96, PixelFormats.Pbgra32)
+        Dim Dv As New DrawingVisual
+        Using Dc As DrawingContext = Dv.RenderOpen()
+            RenderOptions.SetBitmapScalingMode(Dv, BitmapScalingMode.NearestNeighbor)
+            Dc.DrawImage(Bmp, New Rect(0, 0, W, H))
+        End Using
+        Rt.Render(Dv)
+        Rt.Freeze()
+        Return Rt
     End Function
 
     ''' <summary>

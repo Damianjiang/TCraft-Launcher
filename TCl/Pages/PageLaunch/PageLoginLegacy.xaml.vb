@@ -37,7 +37,7 @@ Public Class PageLoginLegacy
     Public Shared Function GetLoginData() As McLoginData
         Dim UserName As String = If(FrmLoginLegacy Is Nothing, "", FrmLoginLegacy.ComboName.Text.Replace("¨", "").Trim)
         'UUID 一律由系统按用户名自动生成（McLoginLegacyUuid 规则），不提供自定义入口
-        '第 71 轮：皮肤配置按离线账户独立读取（ModLegacySkin），不再读全局 LaunchSkinType
+        '皮肤配置按离线账户独立读取（ModLegacySkin），不再读全局 LaunchSkinType
         Dim Config = ModLegacySkin.GetConfig(UserName)
         Return New McLoginLegacy With {.UserName = UserName, .SkinType = Config.Type, .SkinName = Config.Id, .SkinSlim = Config.Slim, .SkinFile = Config.File}
     End Function

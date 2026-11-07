@@ -12,8 +12,8 @@
             <local:MyScrollViewer DeltaMult="0.7" Grid.Row="1" MaxWidth="300" MinWidth="250" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Style="{StaticResource ScrollViewerFullMargin}">
                 <StackPanel x:Name="PanList" />
             </local:MyScrollViewer>
-            <!-- 第 131 轮：文件夹操作菜单改为动画卡片（与首页「更多」/实例页同款三段动画），替代裸 ContextMenu -->
-            <!-- 第 132 轮：定位改由 MenuCard.ApplyAnchor 按「锚点 + 对齐方向」计算，不再裸用 Placement=Bottom -->
+            <!-- 文件夹操作菜单改为动画卡片（与首页「更多」/实例页同款三段动画），替代裸 ContextMenu -->
+            <!-- 定位改由 MenuCard.ApplyAnchor 按「锚点 + 对齐方向」计算，不再裸用 Placement=Bottom -->
             <Popup x:Name="PopupFolderMenu" AllowsTransparency="True" StaysOpen="False" PopupAnimation="None" Placement="Custom">
             <Border x:Name="CardFolderMenu" Background="{DynamicResource ColorBrushCardBg}" CornerRadius="10" Padding="8" Margin="14"
                     Opacity="0" RenderTransformOrigin="0.5,0">

@@ -12,7 +12,7 @@
                 Case 2
                     NewText = "真·七曜彩"
             End Select
-            '第 131 轮：主题单选项已并入 WrapPanel，改为递归遍历逻辑树（原直接子项遍历早已失效）
+            '主题单选项已并入 WrapPanel，改为递归遍历逻辑树（原直接子项遍历早已失效）
             RenameThemeRadios(PanLauncherTheme, NewText)
         End If
 
@@ -69,7 +69,7 @@
     Private Sub BtnBackgroundRefresh_Click(sender As Object, e As EventArgs) Handles BtnBackgroundRefresh.Click
         BackgroundRefresh(True, True)
     End Sub
-    '背景卡片状态（第 67 轮：图片/视频合并为单卡片，按 UiBackgroundType 显隐）
+    '背景卡片状态
     Private BackgroundImageShow As Boolean = False
     Private BackgroundImageCount As Integer = 0
     Private BackgroundVideoCount As Integer = 0
@@ -96,7 +96,7 @@
 
     ' <summary>
     ' 按背景类型（UiBackgroundType：0=图片，1=视频）切换卡片内容显隐并更新标题。
-    ' 图片与视频只能选其一作为背景展示（第 67 轮，合并原「背景图片」「背景视频」两张卡片）。
+    ' 图片与视频只能选其一作为背景展示。
     ' </summary>
     Public Sub UpdateBackgroundCardUI()
         Try

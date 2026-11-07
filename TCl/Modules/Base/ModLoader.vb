@@ -712,13 +712,21 @@ Restart:
             Dim NewState As Shell.TaskbarItemProgressState
             Dim NewProgress As Double = LoaderTaskbarProgressGet()
             '若单个任务已中止，或全部任务已完成，则刷新并移除
+            '先收集再移除：原来在 For Each 遍历 LoaderTaskbar 的同时 Remove，枚举中修改集合
+            '随时可能抛 InvalidOperationException——取消启动时的无声闪退与此高度相关
+            'AnyLoading 只算一次：原来每个循环项都对全表跑一遍 All()，O(n²)（每 50ms 一次的主时钟上无谓）
+            Dim AnyLoading As Boolean = LoaderTaskbar.Any(Function(l) l.State = LoadState.Loading)
+            Dim TaskbarToRemove As New List(Of LoaderBase)
             For Each Task In LoaderTaskbar
-                If LoaderTaskbar.All(Function(l) l.State <> LoadState.Loading) OrElse
+                If (Not AnyLoading) OrElse
                    (Task.State = LoadState.Waiting OrElse Task.State = LoadState.Canceled) Then
-                    FrmSpeedLeft?.TaskRefresh(Task)
-                    LoaderTaskbar.Remove(Task)
-                    Logger.Info($"{Task.Name} 已移出任务列表")
+                    TaskbarToRemove.Add(Task)
                 End If
+            Next
+            For Each Task In TaskbarToRemove
+                FrmSpeedLeft?.TaskRefresh(Task)
+                LoaderTaskbar.Remove(Task)
+                Logger.Info($"{Task.Name} 已移出任务列表")
             Next
             '更新平滑后的进度
             If NewProgress <= 0 OrElse NewProgress >= 1 OrElse LoaderTaskbarProgress > NewProgress Then

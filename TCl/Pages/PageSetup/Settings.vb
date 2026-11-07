@@ -79,11 +79,11 @@ Public Class Settings
         New Setting("LoginNidePass", "", Source:=Sources.Registry, Encrypted:=True),
         New Setting("LoginAuthEmail", "", Source:=Sources.Registry, Encrypted:=True),
         New Setting("LoginAuthPass", "", Source:=Sources.Registry, Encrypted:=True),
-        New Setting("LoginAuthAccounts", "{}", Source:=Sources.Registry, Encrypted:=True), '{玩家名: {Pass, Server, Register}, ...} 第三方/LittleSkin 账号列表（第 75 轮）
-        New Setting("CacheProfilesJson", "{}", Source:=Sources.Registry, Encrypted:=True), '{"Token:用户名": [{Id, Name}, ...]} 登录时缓存的多角色列表（第 130 轮 B1，供账户页切换角色）
+        New Setting("LoginAuthAccounts", "{}", Source:=Sources.Registry, Encrypted:=True), '{玩家名: {Pass, Server, Register}, ...} 第三方/LittleSkin 账号列表
+        New Setting("CacheProfilesJson", "{}", Source:=Sources.Registry, Encrypted:=True), '{"Token:用户名": [{Id, Name}, ...]} 登录时缓存的多角色列表
         New Setting("LoginType", McLoginType.Legacy, Source:=Sources.Registry),
         New Setting("LoginPageType", 0),
-        New Setting("LoginLegacySkinJson", "{}", Source:=Sources.Registry, Encrypted:=True), '离线账户皮肤配置（按玩家名存储，JSON：{玩家名: {Type, Id, Slim}}）；第 70 轮引入：皮肤按账户隔离，不再全局共享（注意：VB 隐式续行下此处不能插入独立注释行）
+        New Setting("LoginLegacySkinJson", "{}", Source:=Sources.Registry, Encrypted:=True), '离线账户皮肤配置（按玩家名存储，JSON：{玩家名: {Type, Id, Slim}}）；引入：皮肤按账户隔离，不再全局共享（注意：VB 隐式续行下此处不能插入独立注释行）
         New Setting("LaunchFolderSelect", ""),
         New Setting("LaunchFolders", "", Source:=Sources.Registry),
         New Setting("LaunchArgumentTitle", ""),
@@ -125,8 +125,8 @@ Public Class Settings
         New Setting("LinkDownloadNode", 0, Source:=Sources.Registry),
         New Setting("LinkBestNode", -1, Source:=Sources.Registry),
         New Setting("ToolHelpChinese", True, Source:=Sources.Registry),
-        New Setting("UiBackgroundType", 0, Source:=Sources.Registry, OnChanged:=AddressOf ModVideo.ApplyBackgroundType), '背景展示类型：0=图片，1=视频，二选一（第 67 轮）
-        New Setting("ToolLanguage", 0, Source:=Sources.Registry, OnChanged:=AddressOf ModBase.ApplyToolLanguage), '默认简体中文（第 93 轮按用户要求改回中文；索引 0=简中，1=英文，原为 1）
+        New Setting("UiBackgroundType", 0, Source:=Sources.Registry, OnChanged:=AddressOf ModVideo.ApplyBackgroundType), '背景展示类型：0=图片，1=视频，二选一
+        New Setting("ToolLanguage", 0, Source:=Sources.Normal, OnChanged:=AddressOf ModBase.ApplyToolLanguage), '界面语言（0=简中，1=英，2=繁，3=文言，4=自动）。存储源由 Registry 改 ini：语言切换=写设置→实时应用，与其他可靠持久化的设置同源
         New Setting("ToolDownloadThread", 63, Source:=Sources.Registry),
         New Setting("ToolDownloadSpeed", 42, Source:=Sources.Registry, OnChanged:=AddressOf ModNet.UpdateNetTaskSpeedLimitHigh),
         New Setting("ToolDownloadSource", 1, Source:=Sources.Registry),
@@ -153,9 +153,9 @@ Public Class Settings
         New Setting("UiMaxFps", 0, Source:=Sources.Registry),
         New Setting("UiLauncherEmail", False),
         New Setting("UiComponentOpacity", 50, OnChanged:=AddressOf UpdateComponentOpacity), '组件半透明程度：0 = 完全透明，100 = 完全不透明
-        New Setting("UiMenuAnimation", True, Source:=Sources.Registry), '弹出菜单是否启用过渡动画（第 131 轮个性化细化）
-        New Setting("UiMenuOpacity", 100, Source:=Sources.Registry), '弹出菜单卡片不透明度：30~100，100 = 完全不透明（第 131 轮个性化细化）
-        New Setting("UiListButtonsAlwaysShow", False, Source:=Sources.Registry, OnChanged:=Sub() If FrmMain IsNot Nothing Then FrmMain.RefreshListButtons()), '列表行操作按钮常驻显示（第 132 轮个性化）
+        New Setting("UiMenuAnimation", True, Source:=Sources.Registry), '弹出菜单是否启用过渡动画
+        New Setting("UiMenuOpacity", 100, Source:=Sources.Registry), '弹出菜单卡片不透明度：30~100，100 = 完全不透明
+        New Setting("UiListButtonsAlwaysShow", False, Source:=Sources.Registry, OnChanged:=Sub() If FrmMain IsNot Nothing Then FrmMain.RefreshListButtons()), '列表行操作按钮常驻显示
         New Setting("UiInstanceSortMode", 0, Source:=Sources.Registry), '实例排序: 0=最近游玩 1=名称 2=版本 3=创建时间
         New Setting("UiInstanceViewMode", 0, Source:=Sources.Registry), '实例视图: 0=列表 1=网格
         New Setting("UiWindowRadius", 6, OnChanged:=Sub(Value As Object) If FrmMain IsNot Nothing Then FrmMain.ApplyWindowRadius(Value)), '窗口圆角半径（px），0 = 直角
@@ -323,6 +323,7 @@ Public Class Settings
             If Entry.GetCache(Instance) = Value Then Return
             '设置新值
             Entry.Set(Value, Instance)
+            If Key = "ToolLanguage" Then Logger.Info($"界面语言设置写入：{Value}（调用源：{New Diagnostics.StackTrace(True).GetFrame(1)?.GetMethod?.Name}）") '留痕：曾有语言被写回 0 的报告
             Entry.Save(Instance)
             '触发改变事件（必须在保存之后，以保证 VersionServerLogin 之类的在事件中读取到的是最新的值）
             If Entry.OnChanged IsNot Nothing Then Entry.OnChanged.Invoke(Value)

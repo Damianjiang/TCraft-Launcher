@@ -24,14 +24,14 @@
             <TextBlock Grid.Row="0" FontSize="23" TextTrimming="None" Foreground="{DynamicResource ColorBrush2}" HorizontalAlignment="Left" Name="LabTitle" Margin="7,-1,70,9" Text="编辑皮肤" VerticalAlignment="Top" SnapsToDevicePixels="False" UseLayoutRounding="False" />
             <Rectangle x:Name="ShapeLine" Grid.Row="1" Height="2" Fill="{Binding Foreground, ElementName=LabTitle}" />
             <!-- 左侧 3D 皮肤预览 + 右侧来源单选列表（第 74/96/97 轮：列表限高 252 = 7 行 × 36，全部 7 项一次放下不滚动）
-                 第 101 轮：正版 / LittleSkin / 自定义皮肤站这三项不再就地铺输入框（会撑高主弹窗致超载），
+                 正版 / LittleSkin / 自定义皮肤站这三项不再就地铺输入框（会撑高主弹窗致超载），
                  改为弹出下方 PanSub 子弹窗收集输入；选中仅更新预览，「确定」才应用 -->
             <Grid Grid.Row="3" Margin="7,0,7,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="1*" />
                 </Grid.ColumnDefinitions>
-                <!-- 第 113 轮：预览 284→240，给底部「取消/确定」腾出竖向空间（弹窗居中在 ~440px 内容区，
+                <!-- 预览 284→240，给底部「取消/确定」腾出竖向空间（弹窗居中在 ~440px 内容区，
                      原 284 高预览把底部按钮挤到卡片底缘、贴着圆角点不准）。 -->
                 <Border x:Name="PanPreviewBack" Grid.Column="0" CornerRadius="5" Background="{DynamicResource ColorBrush7}" Margin="0,0,12,0"
                         Height="240" VerticalAlignment="Top">
@@ -51,7 +51,7 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <TextBlock x:Name="LabHint" FontSize="13" Foreground="{DynamicResource ColorBrush1}" Opacity="0.55" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="2,0,0,0" />
-                <!-- 第 113 轮：主弹窗「取消/确定」补 Height="32" + 水平内边距，恢复项目标准按钮高度，
+                <!-- 主弹窗「取消/确定」补 Height="32" + 水平内边距，恢复项目标准按钮高度，
                      修复原先无高度导致的「塌扁/被遮到按不了」。 -->
                 <StackPanel Grid.Column="1" Name="PanBtn" VerticalAlignment="Top" HorizontalAlignment="Right" Orientation="Horizontal">
                     <my:MyButton ColorType="Normal" x:FieldModifier="public" Text="取消" x:Name="Btn2" Margin="12,0,0,0" Height="32" TextPadding="7" SnapsToDevicePixels="False" Padding="12,0" UseLayoutRounding="False" />
@@ -60,7 +60,7 @@
             </Grid>
         </Grid>
     </Border>
-    <!-- 第 101 轮：子弹窗（覆盖层）。半透明遮罩盖住整个主弹窗 + 居中小卡片，
+    <!-- 子弹窗（覆盖层）。半透明遮罩盖住整个主弹窗 + 居中小卡片，
          用于收集「正版玩家皮肤 / LittleSkin 皮肤站 / 自定义皮肤站」需要的角色名（及站点地址）。
          这样主弹窗本体不再因输入框铺开而超载；子弹窗确定即写回 pending 并刷新预览，取消则保留原状。 -->
     <Grid x:Name="PanSub" Visibility="Collapsed" Background="#55000000">

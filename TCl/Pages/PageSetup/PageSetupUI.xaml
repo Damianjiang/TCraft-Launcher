@@ -14,7 +14,7 @@
             <local:MyHint Theme="Blue" Margin="4,16,4,0"
                           Text="以下外观与配色选项仅对本机生效。&#xa;你可以随时切换主题、调整不透明度，或叠加自定义背景图片与背景音乐。" />
 
-            <!-- 第 131 轮：配色预览并入主题卡，颜色选择合并为一处（用户反馈：颜色应合并在一起） -->
+            <!-- 配色预览并入主题卡，颜色选择合并为一处（用户反馈：颜色应合并在一起） -->
             <local:MyCard Margin="0,24,0,0" Title="主题与配色" x:Name="CardLauncher">
                 <Grid Margin="32,44,32,28">
                     <StackPanel>
@@ -56,7 +56,7 @@
                             <local:MySlider local:SettingService.Key="UiLauncherLight" 
                                             Grid.Row="2" Grid.Column="4" x:Name="SliderLauncherLight" Visibility="Collapsed" MaxValue="40" ValueByKey="5" Margin="0,16,0,0" />
                         </Grid>
-                        <!-- 第 131 轮：全部主题合并为一个流式 WrapPanel（原「主题 / 隐藏主题」两行拆分是历史
+                        <!-- 全部主题合并为一个流式 WrapPanel（原「主题 / 隐藏主题」两行拆分是历史
                              解锁彩蛋的遗留，如今所有主题均可直接选择，拆行徒增困惑）；单选项按内容自然宽度
                              摆放、自动换行，任何语言不截断。Key/Value/x:Name 与设置读写逻辑不变。 -->
                         <Grid x:Name="PanLauncherTheme" Margin="0,0,0,22">
@@ -80,6 +80,12 @@
                                 <local:MyRadioBox local:SettingService.Key="UiLauncherTheme" local:SettingService.Value="11" Margin="0,0,18,10" Text="海盐蓝" x:Name="RadioLauncherTheme11" />
                                 <local:MyRadioBox local:SettingService.Key="UiLauncherTheme" local:SettingService.Value="12" Margin="0,0,18,10" Text="七曜彩" x:Name="RadioLauncherTheme12" />
                                 <local:MyRadioBox local:SettingService.Key="UiLauncherTheme" local:SettingService.Value="13" Margin="0,0,18,10" Text="曜光彩" x:Name="RadioLauncherTheme13" />
+                                <local:MyRadioBox local:SettingService.Key="UiLauncherTheme" local:SettingService.Value="15" Margin="0,0,18,10" Text="青柠绿" x:Name="RadioLauncherTheme15" />
+                                <local:MyRadioBox local:SettingService.Key="UiLauncherTheme" local:SettingService.Value="16" Margin="0,0,18,10" Text="薄荷绿" x:Name="RadioLauncherTheme16" />
+                                <local:MyRadioBox local:SettingService.Key="UiLauncherTheme" local:SettingService.Value="17" Margin="0,0,18,10" Text="靛夜蓝" x:Name="RadioLauncherTheme17" />
+                                <local:MyRadioBox local:SettingService.Key="UiLauncherTheme" local:SettingService.Value="18" Margin="0,0,18,10" Text="葡萄紫" x:Name="RadioLauncherTheme18" />
+                                <local:MyRadioBox local:SettingService.Key="UiLauncherTheme" local:SettingService.Value="19" Margin="0,0,18,10" Text="雾霭蓝" x:Name="RadioLauncherTheme19" />
+                                <local:MyRadioBox local:SettingService.Key="UiLauncherTheme" local:SettingService.Value="20" Margin="0,0,18,10" Text="玫瑰金" x:Name="RadioLauncherTheme20" />
                                 <local:MyRadioBox local:SettingService.Key="UiLauncherTheme" local:SettingService.Value="14" Margin="0,0,18,10" Text="自定义" x:Name="RadioLauncherTheme14" />
                             </WrapPanel>
                         </Grid>
@@ -112,7 +118,7 @@
                     </StackPanel>
                 </Grid>
             </local:MyCard>
-            <!-- 第 131 轮：弹出菜单细化设置（动画开关 + 卡片不透明度；作用于全部右键/「更多」弹卡与全局搜索卡） -->
+            <!-- 弹出菜单细化设置（动画开关 + 卡片不透明度；作用于全部右键/「更多」弹卡与全局搜索卡） -->
             <local:MyCard Margin="0,24,0,0" Title="弹出菜单">
                 <StackPanel Margin="32,44,32,24">
                     <local:MyCheckBox local:SettingService.Key="UiMenuAnimation" Text="启用弹出菜单动画效果" Height="22" Margin="-1,0,0,14"
@@ -129,7 +135,7 @@
                     <TextBlock Text="说明：弹出菜单卡片独立于「组件半透明」——组件半透明作用于全局卡片，这里只调右键菜单与弹卡。" FontSize="12" Opacity="0.55" TextWrapping="Wrap" Margin="0,2,0,0" Foreground="{DynamicResource ColorBrush1}" />
                 </StackPanel>
             </local:MyCard>
-            <!-- 第 132 轮：列表按钮常驻显示（版本/实例/存档/Mod/Java/下载等所有列表行右侧按钮） -->
+            <!-- 列表按钮常驻显示（版本/实例/存档/Mod/Java/下载等所有列表行右侧按钮） -->
             <local:MyCard Margin="0,24,0,0" Title="列表按钮">
                 <StackPanel Margin="32,44,32,24">
                     <local:MyCheckBox local:SettingService.Key="UiListButtonsAlwaysShow" Text="所有列表的操作按钮常驻显示" Height="22" Margin="-1,0,0,12"
@@ -137,7 +143,7 @@
                     <TextBlock Text="说明：开启后按钮会一直占住右侧空间，列表标题可显示的宽度会略微变窄。" FontSize="12" Opacity="0.55" TextWrapping="Wrap" Margin="0,2,0,0" Foreground="{DynamicResource ColorBrush1}" />
                 </StackPanel>
             </local:MyCard>
-            <!--第 96 轮：界面细节（圆角 / 标题栏 / 动画速度 / 账户徽章 / 启动动画）-->
+            <!--界面细节（圆角 / 标题栏 / 动画速度 / 账户徽章 / 启动动画）-->
             <local:MyCard x:Name="CardDetail" Margin="0,24,0,0" Title="界面细节">
                 <StackPanel Margin="32,44,32,26">
                     <Grid Height="44" Margin="0,0,0,16">

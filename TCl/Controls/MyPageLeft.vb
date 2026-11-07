@@ -2,7 +2,7 @@ Public Class MyPageLeft
     Inherits Grid
     Private Uuid As Integer = GetUuid()
 
-    '第 144 轮：全局侧边栏滚动。与设置 / 下载页一致：导航 StackPanel 超出窗口高度时可竖向滚动，
+    '全局侧边栏滚动。与设置 / 下载页一致：导航 StackPanel 超出窗口高度时可竖向滚动，
     '内容不超高时不显示滚动条。只处理「唯一子元素为导航 StackPanel」的页面；
     '设置 / 下载 / 首页 / 实例选择等自带滚动或复杂布局的页面不受影响。
     Private SidebarScrollReady As Boolean = False

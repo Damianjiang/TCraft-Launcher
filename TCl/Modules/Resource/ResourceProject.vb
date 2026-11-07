@@ -386,7 +386,7 @@ Public Class ResourceProject
             If Not Tags.Any() Then Tags.Add("其他")
             Tags.Sort()
         End If
-        '保存缓存（第 134 轮：走带上限的 CachePut）
+        '保存缓存
         CachePut(Id)
     End Sub
     ''' <summary>
@@ -658,7 +658,7 @@ Public Class ResourceProject
 
     ''' <summary>
     ''' 工程 ID 对应的工程实例的缓存。不会保存到文件。
-    ''' <para/>第 134 轮：加容量上限。原先无上限——逛一下午资源页/详情页，每个工程连同简介、
+    ''' <para/>加容量上限。原先无上限——逛一下午资源页/详情页，每个工程连同简介、
     ''' 标签、版本列表都驻留内存，越积越多（内存占用高的来源之一）。现在按插入顺序淘汰，
     ''' 需要时重新请求即可；只在写入端加锁，读端保持原样（与历史行为一致）。
     ''' </summary>

@@ -4,7 +4,7 @@ using System.Threading;
 namespace TClKit.Concurrency;
 
 /// <summary>
-/// 自写的限频器（第 130 轮替代 ThrottleDebounce 库，减少内嵌体积约 13KB）。
+/// 自写的限频器。
 /// 支持两种基础语义的组合：<c>leading</c>（进入窗口立即执行一次）与
 /// <c>trailing</c>（窗口结束时若期间有新调用则补执行一次）；
 /// 两者皆关时为「节流忽略」：窗口内的调用直接丢弃。
@@ -69,7 +69,7 @@ public sealed class SimpleRateLimiter(Action workload, double intervalMs, bool l
         try {
             workload();
         } catch (Exception ex) {
-            // 限频器不能让后台定时线程带异常退出：记录后继续（第 130 轮体检 P2）
+            // 限频器不能让后台定时线程带异常退出：记录后继续
             Logger.Warn(ex, "RateLimitedWorker 执行失败");
         }
     }

@@ -14,7 +14,7 @@ Public Class PageLaunchLeft
         IsLoad = True
         AniControlEnabled += 1
 
-        '开始按钮（第 86 轮迁至右页 PageLaunchRight，由其自行挂接事件）
+        '开始按钮
 
         '加载版本
         RunInNewThread(
@@ -103,7 +103,7 @@ Public Class PageLaunchLeft
             End Sub)
         End Sub, "Version Check", ThreadPriority.AboveNormal)
 
-        '刷新登录状态与首页账户摘要（第 68 轮：正版/离线切换徽章已移除，账户管理在独立页面）
+        '刷新登录状态与首页账户摘要
         RefreshPage(False, False)
         If FrmLaunchRight IsNot Nothing Then FrmLaunchRight.RefreshAccountSummary()
 
@@ -111,7 +111,7 @@ Public Class PageLaunchLeft
     End Sub
 
 
-#Region "切换大页面（第 86 轮：启动遮罩迁至右页，此处保留门面以免改动调用方）"
+#Region "切换大页面"
 
     ' <summary>切换至启动中页面。</summary>
     Public Sub PageChangeToLaunching()
@@ -130,7 +130,7 @@ Public Class PageLaunchLeft
 
     ''' <summary>
     ''' 确认登录类型（含版本服务器要求），确保对应登录页实例已创建并同步其状态，
-    ''' 然后刷新首页账户摘要。原「正版/离线切换徽章 + 内嵌登录表单」已移入账户管理页（第 68 轮）:
+    ''' 然后刷新首页账户摘要。原「正版/离线切换徽章 + 内嵌登录表单」已移入账户管理页:
     ''' 启动时的账户数据仍从登录页窗体状态读取（GetLoginData），故此处保持窗体实例与设置同步。
     ''' </summary>
     Public Sub RefreshPage(KeepInput As Boolean, Anim As Boolean)
@@ -322,7 +322,7 @@ Finish:
     ''' 账户头像；没有缓存时退回「内置默认皮肤裁出来的脸」。
     ''' <para/>
     ''' 绝不能退回整张皮肤图：徽章只有 18px、账户行 32px，整张 64×64 皮肤缩进方框里
-    ''' 就是一团花屏（第 132 轮用户反馈「账号管理上面的图标是炸的」）。
+    ''' 就是一团花屏。
     ''' </summary>
     Public Shared Function GetAccountFaceOrDefault(AccountKey As String) As String
         Try
@@ -354,7 +354,7 @@ Finish:
         Return Nothing
     End Function
 
-    ''' <summary>清除账户头像缓存（第 71 轮：供账户行「刷新」按钮使用，刷新后会重新生成）。</summary>
+    ''' <summary>清除账户头像缓存。</summary>
     Public Shared Sub ClearAccountFace(AccountKey As String)
         Try
             If AccountKey = "" Then Return
@@ -365,7 +365,7 @@ Finish:
     End Sub
 
     '离线皮肤
-    '第 70 轮：皮肤配置改为按离线账户独立存储（ModLegacySkin），不再全局共享。
+    '皮肤配置改为按离线账户独立存储（ModLegacySkin），不再全局共享。
     Public Shared SkinLegacy As New LoaderTask(Of (String, String), String)("Loader Skin Legacy", AddressOf SkinLegacyLoad, AddressOf SkinLegacyInput, ThreadPriority.AboveNormal)
     ''' <summary>
     ''' 当前生效的离线账户名（皮肤配置的归属者）。
@@ -388,7 +388,7 @@ Finish:
                         If FrmLoginLegacy IsNot Nothing AndAlso FrmLoginLegacy.Skin IsNot Nothing Then FrmLoginLegacy.Skin.Clear()
                         RunInUi(Sub() FrmMain.RefreshTitleAccountFace())
                     End Sub)
-        '第 71 轮：按离线账户独立的皮肤配置加载（ModLegacySkin），不再读全局 LaunchSkinType
+        '按离线账户独立的皮肤配置加载（ModLegacySkin），不再读全局 LaunchSkinType
         Dim PlayerName As String = Data.Input.Item2
         Data.Output = ResolveLegacySkinPath(PlayerName)
         If Data.IsCanceled Then Data.Output = ""
@@ -436,7 +436,7 @@ Finish:
                         Return Fallback
                     End If
                     Return Config.File
-                Case 5, 6 '皮肤站（第 96 轮：复刻 HMCL 的 LittleSkin / 自定义 CSL 站点导入）
+                Case 5, 6 '皮肤站
                     Try
                         '5 = LittleSkin（地址固定），6 = 自定义皮肤站（Config.Api，形如 https://站点/csl）
                         Dim Api As String = If(Config.Type = 5, "https://littleskin.cn/csl", Config.Api)
@@ -460,7 +460,7 @@ Finish:
     ''' <summary>
     ''' 为还没有头像缓存的离线账户补生成头像。
     ''' <para/>
-    ''' 第 97 轮：头像是皮肤加载完才裁出来的，而皮肤加载只跑「当前账户」，
+    ''' 头像是皮肤加载完才裁出来的，而皮肤加载只跑「当前账户」，
     ''' 所以列表里其它账户（以及标题栏切过去之前）永远是第一次生成的那张默认脸。
     ''' </summary>
     Public Shared Sub EnsureAccountFaces(Names As IEnumerable(Of String))
@@ -506,7 +506,7 @@ Finish:
 
     ''' <summary>
     ''' 皮肤配置改动后，重新解析该账户的皮肤并刷新它的头像缓存（不管它是不是当前账户）。
-    ''' 第 97 轮：此前只有「当前账户」会重载皮肤，导致账户列表与标题栏的头像永远停在第一次生成的那张。
+    ''' 此前只有「当前账户」会重载皮肤，导致账户列表与标题栏的头像永远停在第一次生成的那张。
     ''' </summary>
     Public Shared Sub RefreshAccountSkin(PlayerName As String)
         If PlayerName = "" Then Return

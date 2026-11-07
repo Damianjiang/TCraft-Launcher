@@ -3,7 +3,7 @@
     Private LoadedFirst As Boolean = False
 
     ''' <summary>
-    ''' 安装加载器（第 130 轮）：以当前实例的原版版本号预选安装页并跳转，补齐「实例内改装加载器」入口。
+    ''' 安装加载器：以当前实例的原版版本号预选安装页并跳转，补齐「实例内改装加载器」入口。
     ''' </summary>
     Private Sub BtnInstallLoader_Click(sender As Object, e As MouseButtonEventArgs) Handles BtnInstallLoader.Click
         Try
@@ -23,7 +23,7 @@
 
         '重复加载部分
         PanBack.ScrollToHome()
-        RamRefreshTimer?.Start() '内存自动刷新：仅页面可见时运行（第 131 轮后台占用清理）
+        RamRefreshTimer?.Start() '内存自动刷新：仅页面可见时运行
         RefreshRam(False)
 
         '由于各个版本不同，每次都需要重新加载
@@ -57,13 +57,13 @@
             End Try
         End Function)}
 
-        '内存自动刷新（第 131 轮：改为字段定时器，Unloaded 即停，不再离页后常驻空转）
+        '内存自动刷新
         RamRefreshTimer = New Threading.DispatcherTimer With {.Interval = New TimeSpan(0, 0, 0, 1)}
         AddHandler RamRefreshTimer.Tick, AddressOf RefreshRam
 
     End Sub
 
-    ''' <summary>内存自动刷新定时器（第 131 轮：离开实例设置页即停止，回到页面再启动）。</summary>
+    ''' <summary>内存自动刷新定时器。</summary>
     Private RamRefreshTimer As Threading.DispatcherTimer = Nothing
 
     Private Sub PageSetupSystem_Unloaded(sender As Object, e As RoutedEventArgs) Handles Me.Unloaded

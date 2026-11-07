@@ -1,7 +1,7 @@
-' 通用动画弹出菜单卡片（第 131 轮）：首页「更多」/实例页同款三段动画（淡入 130ms + 缩放
+' 通用动画弹出菜单卡片：首页「更多」/实例页同款三段动画（淡入 130ms + 缩放
 ' 0.94→1 OutBack 220ms + 上浮 10→0，关闭 80/90ms），全应用单例，用于替代裸 ContextMenu。
 ' 行 = 图标 + 标题，点击即关卡并执行动作；对同一目标再次 Show 为收起（切换语义）。
-' 第 132 轮：新增 ApplyAnchor，按「锚点 + 对齐方向」精确定位（替代 Placement=Bottom + 硬编码偏移）。
+' 新增 ApplyAnchor，按「锚点 + 对齐方向」精确定位（替代 Placement=Bottom + 硬编码偏移）。
 Imports PopupControl = System.Windows.Controls.Primitives.Popup
 Imports PopupPlacement = System.Windows.Controls.Primitives.CustomPopupPlacement
 Imports PopupAxis = System.Windows.Controls.Primitives.PopupPrimaryAxis
@@ -20,7 +20,7 @@ Public Class MenuCard
     Private ReadOnly TransformPos As New TranslateTransform(0, 10)
     Private ReadOnly Pan As New StackPanel
     ''' <summary>菜单内容滚动容器：用启动器自己的 MyScrollViewer（含 MyScrollBar 样式），
-    ''' 条目超出屏幕时显示 TCL 风格滚动条（第 135 轮）。</summary>
+    ''' 条目超出屏幕时显示 TCL 风格滚动条。</summary>
     Private ReadOnly Scroll As New MyScrollViewer With {
         .VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
         .HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
@@ -30,7 +30,7 @@ Public Class MenuCard
     ''' <summary>卡片 Border 给投影留的 Margin（与构造函数里一致）。</summary>
     Private Const ShadowPad As Double = 14
 
-    ''' <summary>弹出菜单动画是否启用（个性化 → 弹出菜单，第 131 轮）。其他页面的弹卡动画也引用此设置。</summary>
+    ''' <summary>弹出菜单动画是否启用（个性化 → 弹出菜单，）。其他页面的弹卡动画也引用此设置。</summary>
     Public Shared ReadOnly Property PopupAnimEnabled As Boolean
         Get
             Try
@@ -41,7 +41,7 @@ Public Class MenuCard
         End Get
     End Property
 
-    ''' <summary>弹出菜单卡片的基础不透明度 0.1~1（个性化 → 弹出菜单，第 131 轮）。</summary>
+    ''' <summary>弹出菜单卡片的基础不透明度 0.1~1（个性化 → 弹出菜单，）。</summary>
     Public Shared ReadOnly Property PopupBaseOpacity As Double
         Get
             Try
@@ -159,7 +159,7 @@ Public Class MenuCard
     ''' 按目标控件在屏幕上的位置，算出菜单最大可用高度（DIP）：
     ''' 取「下方」与「上方」中更宽敞的一侧，留 16px 边距，且不超过所在显示器的工作区。
     ''' <para/>
-    ''' 第 135 轮：菜单条目一多就会超出屏幕（用户截图点名）。原来写死 MaxHeight = 380 且滚动条
+    ''' 菜单条目一多就会超出屏幕（用户截图点名）。原来写死 MaxHeight = 380 且滚动条
     ''' 是 Hidden——矮屏上照样溢出，而且看不出还能滚。现在高度按锚点算、滚动条走 TCL 样式。
     ''' </summary>
     Public Shared Function CalcMaxMenuHeight(Target As FrameworkElement) As Double
@@ -225,7 +225,7 @@ Public Class MenuCard
             TransformScale.ScaleY = 0.94
             TransformPos.Y = 10
             Card.Opacity = If(PopupAnimEnabled, 0, PopupBaseOpacity)
-            '菜单最长不超过锚点这一侧的可用高度，超出部分用滚动条看（第 135 轮）
+            '菜单最长不超过锚点这一侧的可用高度，超出部分用滚动条看
             Scroll.MaxHeight = CalcMaxMenuHeight(Target)
             Popup.PlacementTarget = Target
             Popup.IsOpen = True

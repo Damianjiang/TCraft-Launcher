@@ -202,7 +202,7 @@ Public Module ModMusic
 
     ''' <summary>
     ''' 开始播放音乐。全部播放器操作都汇总到 UI 线程（WPF MediaPlayer 为 DispatcherObject），
-    ''' 播放本身由媒体管线异步进行，不再有后台轮询线程（第 130 轮以 WPF 自带 MediaPlayer 替代 NAudio）。
+    ''' 播放本身由媒体管线异步进行，不再有后台轮询线程。
     ''' </summary>
     Private Sub MusicStartPlay(Address As String, Optional IsFirstLoad As Boolean = False)
         If Address Is Nothing Then Return
@@ -213,7 +213,7 @@ Public Module ModMusic
             Try
                 EnsureMusicPlayer()
                 Dim Player = MusicPlayer
-                MusicEventsArmed = False '切换曲目期间忽略上一曲的迟到事件（第 130 轮体检 P2）
+                MusicEventsArmed = False '切换曲目期间忽略上一曲的迟到事件
                 MusicPausedFlag = False
                 MusicEndedFlag = False
                 MusicFailedFlag = False
@@ -245,7 +245,7 @@ Public Module ModMusic
             RunInThread(
             Sub()
                 Logger.Info("已暂停播放")
-                '标志与播放器操作在同一 UI 派发块中完成，避免后台线程置位的竞态（第 130 轮体检 P2）
+                '标志与播放器操作在同一 UI 派发块中完成，避免后台线程置位的竞态
                 RunInUi(Sub()
                             MusicPausedFlag = True
                             MusicPlayer?.Pause()
@@ -304,7 +304,7 @@ Public Module ModMusic
 #End Region
 
     ''' <summary>
-    ''' WPF 自带媒体播放器（在 UI 线程创建与操作；第 130 轮替代 NAudio，减少内嵌体积约 174KB）。
+    ''' WPF 自带媒体播放器（在 UI 线程创建与操作；替代 NAudio，减少内嵌体积约 174KB）。
     ''' </summary>
     Public MusicPlayer As System.Windows.Media.MediaPlayer = Nothing
     ''' <summary>当前播放的音乐地址。</summary>
@@ -314,7 +314,7 @@ Public Module ModMusic
     Private MusicFailedFlag As Boolean = False
     ''' <summary>进度与音量的同步定时器（仅播放期间运行，500ms 一次，UI 线程）。</summary>
     Private MusicSyncTimer As System.Windows.Threading.DispatcherTimer = Nothing
-    ''' <summary>事件闸门：切换曲目期间为 False，迟到的事件直接丢弃（第 130 轮体检 P2）。</summary>
+    ''' <summary>事件闸门：切换曲目期间为 False，迟到的事件直接丢弃。</summary>
     Private MusicEventsArmed As Boolean = False
 
     ''' <summary>确保播放器已创建（必须在 UI 线程调用）。</summary>

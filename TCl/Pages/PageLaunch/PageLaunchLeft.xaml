@@ -6,7 +6,7 @@
              xmlns:local="clr-namespace:TCraft"
              mc:Ignorable="d" x:Name="PanBack"
              d:DesignHeight="417.2" Width="300">
-    <!--第 87 轮：首页内容全部并入右页信息列，左栏留白给壁纸；PanInput 保留为空壳供切页动画引用-->
+    <!--首页内容全部并入右页信息列，左栏留白给壁纸；PanInput 保留为空壳供切页动画引用-->
     <Grid Name="PanInput" RenderTransformOrigin="0.5,0.5">
         <Grid.RenderTransform>
             <ScaleTransform />

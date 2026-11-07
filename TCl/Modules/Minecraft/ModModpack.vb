@@ -10,7 +10,7 @@ Public Module ModModpack
     Public Sub ModpackInstall()
         Dim File As String = Dialogs.SelectFile("选择整合包压缩文件", False, filter:={({"rar", "zip", "mrpack"}, "整合包文件")}).FirstOrDefault() '选择整合包文件
         If String.IsNullOrEmpty(File) Then Return
-        '第 138 轮：与「拖入整合包」走同一套确认弹窗，先让用户看清要装的是哪个游戏版本 / 加载器版本，
+        '与「拖入整合包」走同一套确认弹窗，先让用户看清要装的是哪个游戏版本 / 加载器版本，
         '避免装完才发现版本不对（这个入口原来直接开装，界面上看不到任何版本信息）
         Dim PackInfo As McModpackInfo = McModpackReadInfo(File)
         If PackInfo.IsValid AndAlso MyMsgBoxModpack(PackInfo) <> 1 Then Return
@@ -26,7 +26,7 @@ Public Module ModModpack
     End Sub
     ''' <summary>
     ''' 整合包预读信息：既是拖入压缩包时的确认弹窗数据，也是安装时唯一的版本解析结果。
-    ''' <para/>第 138 轮：预读与安装共用 <see cref="ParsePackInfo"/>，避免「弹窗说一套、安装装另一套」。
+    ''' <para/>预读与安装共用 <see cref="ParsePackInfo"/>，避免「弹窗说一套、安装装另一套」。
     ''' </summary>
     Public Class McModpackInfo
         ''' <summary>是否为可识别的整合包。</summary>
@@ -64,7 +64,7 @@ Public Module ModModpack
 
     ''' <summary>
     ''' 只读地预读一个整合包压缩包的名称、图标、类型、游戏版本与加载器版本，不做任何安装动作。
-    ''' <para/>第 137 轮新增；任何解析失败都不会抛出（返回 IsValid=False 或退化信息），
+    ''' <para/>新增；任何解析失败都不会抛出（返回 IsValid=False 或退化信息），
     ''' 调用方按普通文件流程继续处理即可。
     ''' </summary>
     ''' <param name="File">压缩包路径。</param>
@@ -186,7 +186,7 @@ Public Module ModModpack
     ''' <summary>
     ''' 解析 CurseForge manifest：minecraft.version + modLoaders。
     ''' <para/>modLoaders 可能列多个，只有 primary=true 的那个是该整合包实际使用的（其余多为作者试过但没用的），
-    ''' 之前把所有条目都写进版本信息会导致装出错误的加载器组合，第 138 轮修正。
+    ''' 之前把所有条目都写进版本信息会导致装出错误的加载器组合，修正。
     ''' </summary>
     Private Sub ParseCurseforgeLoaders(Json As JObject, Info As McModpackInfo)
         If Json Is Nothing Then Return
@@ -520,7 +520,7 @@ Public Module ModModpack
         Dim VersionFolder As String = PathUtils.AddSlashSuffix(Path.Combine(McFolderSelected, "versions", InstanceName) & "\")
 
         '获取 Mod API 版本信息
-        '第 138 轮：改用与拖入弹窗同一份解析（ParsePackInfo），避免「弹窗显示的版本」与「实际安装的版本」两套逻辑
+        '改用与拖入弹窗同一份解析（ParsePackInfo），避免「弹窗显示的版本」与「实际安装的版本」两套逻辑
         Dim PackInfo As New McModpackInfo
         ParsePackInfo(Archive, PackInfo)
         If String.IsNullOrWhiteSpace(PackInfo.MinecraftVersion) Then Throw New Exception("CurseForge 整合包未提供 Minecraft 版本信息")
@@ -697,7 +697,7 @@ Public Module ModModpack
         End Try
         If Json("dependencies") Is Nothing OrElse Json("dependencies")("minecraft") Is Nothing Then Throw New Exception("Modrinth 整合包未提供 Minecraft 版本信息")
         '获取 Mod API 版本信息
-        '第 138 轮：与拖入弹窗共用 ParsePackInfo，不再用 "Unknown" 占位再回填
+        '与拖入弹窗共用 ParsePackInfo，不再用 "Unknown" 占位再回填
         Dim PackInfo As New McModpackInfo
         ParsePackInfo(Archive, PackInfo)
         If String.IsNullOrWhiteSpace(PackInfo.MinecraftVersion) Then Throw New Exception("Modrinth 整合包未提供 Minecraft 版本信息")
@@ -943,7 +943,7 @@ Public Module ModModpack
         End Sub) With {.ProgressWeight = FileUtils.GetInfo(FileAddress).Length / 1024 / 1024 / 6, .Block = False}) '每 6M 需要 1s
         '构造版本安装请求
         If PackJson("components") Is Nothing Then Throw New Exception("该 MMC 整合包未提供游戏版本信息，无法安装！")
-        '第 138 轮：与拖入弹窗共用 ParsePackInfo
+        '与拖入弹窗共用 ParsePackInfo
         Dim PackInfo As New McModpackInfo
         ParsePackInfo(Archive, PackInfo)
         If String.IsNullOrWhiteSpace(PackInfo.MinecraftVersion) Then Throw New Exception("该 MMC 整合包未提供游戏版本信息，无法安装！")
@@ -1019,7 +1019,7 @@ Public Module ModModpack
             Addons.Add(Entry("id"), Entry("version"))
         Next
         If Not Addons.ContainsKey("game") Then Throw New Exception("该 MCBBS 整合包未提供游戏版本信息，无法安装！")
-        '第 138 轮：游戏版本与加载器走 ParsePackInfo（与拖入弹窗一致），这里只用 Addons 处理 OptiFine
+        '游戏版本与加载器走 ParsePackInfo（与拖入弹窗一致），这里只用 Addons 处理 OptiFine
         Dim PackInfo As New McModpackInfo
         ParsePackInfo(Archive, PackInfo)
         If String.IsNullOrWhiteSpace(PackInfo.MinecraftVersion) Then Throw New Exception("该 MCBBS 整合包未提供游戏版本信息，无法安装！")
@@ -1058,7 +1058,7 @@ Public Module ModModpack
 
         '启动
         Dim Loader As New LoaderCombo(Of String)(LoaderName, Loaders) With {.OnStateChanged = AddressOf McInstallState}
-        'If Archive IsNot Nothing Then Archive.Dispose() '解除占用，以免在加载器中触发 “正由另一进程使用，因此该进程无法访问此文件”
+        'If Archive IsNot Nothing Then Archive.Dispose '解除占用，以免在加载器中触发 “正由另一进程使用，因此该进程无法访问此文件”
         Loader.Start(VersionFolder)
         LoaderTaskbarAdd(Loader)
         FrmMain.BtnExtraDownload.ShowRefresh()

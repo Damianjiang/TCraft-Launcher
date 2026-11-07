@@ -5,7 +5,8 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d" x:Class="PageInstanceJarInJar"
     PanScroll="{Binding ElementName=PanBack}" Grid.IsSharedSizeScope="True">
-    <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
+    <Grid>
+        <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
         <Grid>
             <local:MyCard HorizontalAlignment="Center" VerticalAlignment="Center" Margin="40" x:Name="PanNoMod">
                 <Grid Margin="20,17">
@@ -44,5 +45,10 @@
                 </local:MyCard>
             </StackPanel>
         </Grid>
-    </local:MyScrollViewer>
+        </local:MyScrollViewer>
+        <!-- 刷新时的镐子加载卡（覆盖层，与内容平级） -->
+        <local:MyCard x:Name="PanLoad" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="40" UseAnimation="False" Visibility="Collapsed">
+            <local:MyLoading Text="正在读取内嵌依赖" x:Name="Load" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False" />
+        </local:MyCard>
+    </Grid>
 </local:MyPageRight>

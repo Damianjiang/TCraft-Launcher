@@ -81,7 +81,7 @@ Public Class MyComboBox
                 Time = 100
             Else
                 ForeColorName = "ColorBrushBg0"
-                BackColorName = "ColorBrushHalfWhite"
+                BackColorName = "ColorBrushFieldBg" '随全局半透明缩放的控件底色（与卡片同族），恒定 HalfWhite 会在壁纸上发闷
                 Time = 100
             End If
         Else

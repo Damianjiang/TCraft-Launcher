@@ -6,7 +6,8 @@
     xmlns:local="clr-namespace:TCraft"
     mc:Ignorable="d" AllowDrop="True"
     PanScroll="PanBack">
-    <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
+    <Grid>
+        <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
         <StackPanel x:Name="PanMain" Margin="25,14,25,25" Grid.IsSharedSizeScope="True">
 
             <StackPanel x:Name="PanLoaderHint" Margin="0,0,0,15">
@@ -47,4 +48,9 @@
 
         </StackPanel>
     </local:MyScrollViewer>
+        <!-- 刷新时的镐子加载卡（覆盖层，与内容平级，避免内容退出时看不到） -->
+        <local:MyCard x:Name="PanLoad" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="40" UseAnimation="False" Visibility="Collapsed">
+            <local:MyLoading Text="正在加载光影包列表" x:Name="Load" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False" />
+        </local:MyCard>
+    </Grid>
 </local:MyPageRight>

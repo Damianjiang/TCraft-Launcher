@@ -4,22 +4,21 @@ Friend Module ModSecret
 
     '标注 TCL 的不同分支，仅用于替换标记
     Public Const VersionBranchMain As String = "OpenSource"
-    '在开源版的注册表与常规版的注册表隔离，以防数据冲突
+    '在源码构建的注册表与内部构建的注册表隔离，以防数据冲突
     Public Const RegFolder As String = "TCLDebug"
     '用于微软登录的 OAuth ClientId（设备码登录流程）。
-    '开源版不内置任何微软凭据；内部版由构建脚本注入 InternalSecrets.vb（密钥文件不进仓库）。
+    '注入文件由本地构建流程生成、不进仓库；此处经反射读取，无注入时返回空串（微软登录入口随之隐藏）。
     '改用反射读取而非条件编译：MSBuild 命令行的逗号会截断 DefineConstants，INTERNAL 常量曾因此失效。
-    '开源版启用方法：注册 Azure 应用后设置环境变量 TCL_MS_CLIENT_ID 为你的 ClientId，重启启动器即可。
     Public OAuthClientId As String = ResolveMsClientId()
 
-    ''' <summary>环境变量优先；否则读取内部版注入的常量，开源版中该类型不存在则返回空串。</summary>
+    ''' <summary>环境变量优先；否则读取构建注入的常量；两者皆无返回空串，微软登录入口隐藏。</summary>
     Private Function ResolveMsClientId() As String
         Dim Env As String = Environment.GetEnvironmentVariable("TCL_MS_CLIENT_ID")
         If Not String.IsNullOrWhiteSpace(Env) Then Return Env.Trim
         Return ReadInternalSecret("MsClientId")
     End Function
 
-    ''' <summary>读取内部版注入的密钥常量；开源版程序集里没有该类型，直接返回空串。</summary>
+    ''' <summary>读取构建期注入的密钥常量；程序集里没有该类型时直接返回空串。</summary>
     Private Function ReadInternalSecret(FieldName As String) As String
         Try
             '项目根命名空间为 TCraft：先按全名找，再退化为按简单类型名遍历
@@ -134,19 +133,27 @@ Friend Module ModSecret
     End Sub
     ''' <summary>
     ''' 按当前的组件半透明程度重新计算表面颜色。
+    ''' 半透明设置只作用于大面积玻璃表面（卡片 ColorBrushCardBg、列表底 ColorBrushBg1）；
+    ''' 按钮填充（ColorBrushHalfWhite）、指向/按压色（ColorBrush6/7）保持 PCL-CE 的恒定强度——
+    ''' 此前它们也被乘了半透明系数（默认 50%），把本来只有 33% 白的按钮底又压掉一半，
+    ''' 按钮变成空心轮廓（「扁」），指向反馈也几乎不可见。
     ''' </summary>
     Public Sub ApplyComponentOpacityToColors()
         If BaseColor7 Is Nothing Then Return
         Dim Factor = ComponentOpacity / 100
-        Color6 = ScaleColor(BaseColor6, Factor)
-        Color7 = ScaleColor(BaseColor7, Factor)
+        Color6 = BaseColor6
+        Color7 = BaseColor7
         ColorBg1 = ScaleColor(BaseColorBg1, Factor)
         '重新赋值资源，动态引用这些资源的控件会自动刷新
         Application.Current.Resources("ColorBrush6") = New SolidColorBrush(Color6)
         Application.Current.Resources("ColorBrush7") = New SolidColorBrush(Color7)
         Application.Current.Resources("ColorBrushBg1") = New SolidColorBrush(ColorBg1)
-        '按钮等控件的半透明白色底
-        Application.Current.Resources("ColorBrushHalfWhite") = New SolidColorBrush(ScaleColor(New MyColor("#55ffffff"), Factor))
+        '输入框/下拉框等小面积控件底色：与卡片同族、随「组件半透明」缩放，再恒定提亮一档
+        '保证叠在卡片上仍有可见边界（否则设置页里输入框会隐入卡片底色）
+        Application.Current.Resources("ColorBrushFieldBg") = New SolidColorBrush(
+            New MyColor(MyColor.ClampToByte(245 * Factor + 25), 255, 255, 255))
+        '按钮/输入框等控件的半透明白色底：恒定 #55ffffff（与 PCL-CE 一致），不随半透明设置变淡
+        Application.Current.Resources("ColorBrushHalfWhite") = New SolidColorBrush(New MyColor("#55ffffff"))
     End Sub
     ''' <summary>
     ''' 按比例缩放颜色的不透明度。
@@ -325,6 +332,18 @@ Friend Module ModSecret
                 Case 13 '曜光彩
                     Dim Rand As New Random()
                     ColorHue = Rand.Next(0, 360) : ColorSat = Rand.Next(55, 100) : ColorLightAdjust = 0 : ColorHueTopbarDelta = 0
+                Case 15 '青柠绿
+                    ColorHue = 80 : ColorSat = 80 : ColorLightAdjust = 0 : ColorHueTopbarDelta = 0
+                Case 16 '薄荷绿
+                    ColorHue = 140 : ColorSat = 50 : ColorLightAdjust = 0 : ColorHueTopbarDelta = 0
+                Case 17 '靛夜蓝
+                    ColorHue = 240 : ColorSat = 65 : ColorLightAdjust = 0 : ColorHueTopbarDelta = 0
+                Case 18 '葡萄紫
+                    ColorHue = 300 : ColorSat = 60 : ColorLightAdjust = 0 : ColorHueTopbarDelta = 0
+                Case 19 '雾霭蓝
+                    ColorHue = 215 : ColorSat = 28 : ColorLightAdjust = 0 : ColorHueTopbarDelta = 0
+                Case 20 '玫瑰金
+                    ColorHue = 350 : ColorSat = 35 : ColorLightAdjust = 0 : ColorHueTopbarDelta = 0
                 Case 14 '自定义
                     ColorHue = Settings.Get(Of Integer)("UiLauncherHue")
                     ColorSat = Settings.Get(Of Integer)("UiLauncherSat")
@@ -396,13 +415,13 @@ Friend Module ModSecret
     Public Sub ThemeRefreshMain()
         RunInUi(
         Sub()
-            '第 103 轮：从 IsLoaded 放宽为 PanTitle/PanForm 非 null。
-            '原 IsLoaded 守卫导致 New() 里调用 ThemeRefreshMain 时早退（IsLoaded 恒 False），
+            '从 IsLoaded 放宽为 PanTitle/PanForm 非 null。
+            '原 IsLoaded 守卫导致 New 里调用 ThemeRefreshMain 时早退（IsLoaded 恒 False），
             '首帧只能显示 XAML StaticResource 里编译时固定的默认蓝背景。
             'PanTitle 在 InitializeComponent 完成后即非 null，可安全访问。
             If FrmMain Is Nothing OrElse FrmMain.PanTitle Is Nothing Then Return
             '顶部条背景
-            '第 89 轮：标题栏文字/图标/徽章一律白色，而黄、青、粉这类高明度色相下白字对比度只有 2~3:1
+            '标题栏文字/图标/徽章一律白色，而黄、青、粉这类高明度色相下白字对比度只有 2~3:1
             '（用户反馈「看不清」）。这里按 WCAG 相对亮度把底色明度压到白字可读的区间，
             '蓝/绿等本来够深的主题不受影响（循环一次都不进）。
             Dim TopL As Double = 54 + ColorLightAdjust

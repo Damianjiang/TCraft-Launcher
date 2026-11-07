@@ -4,7 +4,7 @@ using System.Threading;
 namespace TClKit.Concurrency;
 
 /// <summary>
-/// 自写的重试工具（第 130 轮替代 ThrottleDebounce 包，减少内嵌体积与依赖面）。
+/// 自写的重试工具。
 /// 失败时按 <paramref name="delay"/> 计算等待后重试；超过 <paramref name="maxAttempts"/>
 /// 或 <paramref name="isRetryAllowed"/> 拒绝重试时抛出最后的异常。
 /// </summary>

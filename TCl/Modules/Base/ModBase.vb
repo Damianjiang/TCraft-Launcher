@@ -6,7 +6,7 @@ Public Module ModBase
 #Region "声明"
 
     '下列版本信息由人工修改
-    Public Const VersionBaseName As String = "1.2" '显示用版本名
+    Public Const VersionBaseName As String = "1.3" '显示用版本名
     Public Const CommitHash As String = "" 'Commit Hash，由 GitHub Workflow 自动替换
 #If RELEASE Then
     Public Const VersionCode As Integer = 415 '正式版
@@ -684,14 +684,14 @@ Public Module ModBase
     Public Sub ApplyToolLanguage(value As Object)
         Try
             Dim Lang As Integer = ResolveLanguage()
-            '语言切换自动重启：启动期与 FormMain_Loaded 的应用不触发（AppliedLang 未初始化或值相同），
-            '只有「窗口已加载后用户主动切换语言」才走重启——重启后所有词条按新语言完整重建，杜绝混杂语言
+            '语言切换从「自动重启」改为「实时应用」（对照 PCL-CE，切换即时生效、永不重启）。
+            '原先的重启机制是一串 bug 的总根源：新进程 --wait 等锁竞态、退出标记误报「异常退出」、
+            '旧进程退出时按陈旧缓存全文件重写 Setup.ini 与新进程产生写竞态（语言被写回简中）、
+            '且「界面突然重启」在用户眼里与闪退无异。现在靠活翻译系统完整覆盖：
+            'ApplyToWindow 重套现有可视树 + SetLiveTranslate 钩住之后才实例化的内容 + 各状态文本刷新。
             Static AppliedLang As Integer = -999
-            If AppliedLang <> -999 AndAlso Lang <> AppliedLang AndAlso FrmMain IsNot Nothing AndAlso FrmMain.IsLoaded Then
-                AppliedLang = Lang
-                RestartForLanguageChange()
-                Return
-            End If
+            Dim IsUserSwitch As Boolean = AppliedLang <> -999 AndAlso Lang <> AppliedLang AndAlso
+                                          FrmMain IsNot Nothing AndAlso FrmMain.IsLoaded
             AppliedLang = Lang
             Dim CultureName As String
             Select Case Lang
@@ -707,9 +707,9 @@ Public Module ModBase
             '套一遍界面文案（导航/按钮/卡片/说明），未收录者保持原文
             ModLang.ApplyToWindow()
             '语言切换后的「活翻译」钩子：让切换之后才实例化的内容（虚拟化列表项/下拉框/右键菜单/Tooltip）
-            '加载即套译文，否则会显示 XAML 原文（简中），造成界面语言混杂（第 66 轮修复）
+            '加载即套译文，否则会显示 XAML 原文（简中），造成界面语言混杂
             ModLang.SetLiveTranslate(Lang)
-            '语言切换后的补充刷新（第 68 轮）：这些文本由代码按当前语言设置，树遍历/活翻译覆盖不到
+            '语言切换后的补充刷新：这些文本由代码按当前语言设置，树遍历/活翻译覆盖不到
             Try
                 If FrmLaunchRight IsNot Nothing Then FrmLaunchRight.RefreshAccountSummary()
                 If FrmLoginManager IsNot Nothing AndAlso FrmLoginManager.IsLoaded Then FrmLoginManager.RefreshAccounts()
@@ -719,7 +719,7 @@ Public Module ModBase
             Try
                 If FrmMain IsNot Nothing Then FrmMain.PageNameRefresh(FrmMain.PageCurrent) '子页标题（如「账户管理」）随语言刷新
             Catch ex As Exception
-                Logger.Warn(ex, "语言切换后刷新子页标题失败")
+                Logger.Warn(ex, "刷新子页标题失败")
             End Try
             '启动页的按钮/版本文字由内部状态驱动，翻译树后会残留旧「原文」，按新语言重刷一次
             Try
@@ -727,13 +727,14 @@ Public Module ModBase
             Catch ex As Exception
                 Logger.Warn(ex, "切换语言后刷新启动页按钮失败")
             End Try
+            If IsUserSwitch Then Hint(ModLang.L("界面语言已切换"), HintType.Blue)
         Catch ex As Exception
             Logger.Warn(ex, "应用界面语言失败")
         End Try
     End Sub
 
     ''' <summary>
-    ''' 只应用语言对应的线程文化（第 111 轮启动提速拆分）：设置默认线程与当前线程的 Culture。
+    ''' 只应用语言对应的线程文化：设置默认线程与当前线程的 Culture。
     ''' 启动期 UI 线程调用（几 ms）；词典构建由后台预热（ModLang.Warmup）完成，
     ''' 整套语言应用（套界面文案/活翻译注册）仍在首帧后的 ApplyToolLanguage 中执行。
     ''' </summary>
@@ -756,22 +757,7 @@ Public Module ModBase
         End Try
     End Sub
 
-    ''' <summary>语言已切换并保存，重启启动器使全部词条按新语言重建。</summary>
-    Private Sub RestartForLanguageChange()
-        Try
-            Logger.Info($"语言已切换，重启 TCL 以完整应用（目标语言索引 {ResolveLanguage()}）")
-            '带 --wait：新进程检测到单例互斥锁仍被旧进程持有时，会等待旧进程退出（至多 10 秒）再继续，
-            '否则新进程会按「已有实例运行」逻辑静默退出（Environment.Exit(Cancel)），表现为「切换语言后重启失败」。
-            '重启是「先启动新进程、后退出旧进程」的竞态：新进程启动瞬间旧进程尚未退出，互斥锁仍被占用。
-            Process.Start(New ProcessStartInfo With {
-                .FileName = PathExe, .Arguments = "--wait",
-                .UseShellExecute = True, .WorkingDirectory = Paths.Base})
-        Catch ex As Exception
-            Logger.Warn(ex, "重启 TCL 失败，回退为不重启的实时翻译")
-            Return '重启失败则不退出，交由活翻译系统兜底
-        End Try
-        FormMain.EndProgramForce(ProcessReturnValues.Success)
-    End Sub
+    ''' <summary>语言已切换：实时应用。</summary>
 #End Region
 
 #Region "搜索"
@@ -920,7 +906,7 @@ Public Module ModBase
     ''' Windows 的环境块允许 HTTP_PROXY 与 http_proxy 同时存在（Git Bash、部分代理软件会这么导出），
     ''' 而 .NET 的 ProcessStartInfo.EnvironmentVariables 是大小写不敏感的 StringDictionary：
     ''' 它的 getter 会把当前环境逐个 Add 进去，碰到重复键直接抛 ArgumentException「已添加项」。
-    ''' 只要代码碰一下这个属性，创建进程就整个失败——第 90 轮实测表现是
+    ''' 只要代码碰一下这个属性，创建进程就整个失败——实测表现是
     ''' 「Minecraft 启动失败：启动进程失败 / 已添加项。字典中的关键字:"HTTP_PROXY"所添加的关键字:"http_proxy"」。
     ''' 这里把重复项收敛成一份（保留最先出现的写法，值不变），之后旧 API 就能正常工作。
     ''' </summary>
@@ -1312,7 +1298,7 @@ Public Module ModBase
 #Region "UI"
 
     'DPI 转换
-    '第 112 轮：DPI 惰性化——System.Drawing(GDI+) 初始化在 ModBase cctor 里要 10-40ms，
+    'DPI 惰性化——System.Drawing(GDI+) 初始化在 ModBase cctor 里要 10-40ms，
     '而首个真实消费者（窗口定位）在 FormMain_Loaded 才出现；审计确认此前 cctor 同步付这笔纯属提前
     Private ReadOnly _DPI As New Lazy(Of Integer)(Function() CInt(System.Drawing.Graphics.FromHwnd(IntPtr.Zero).DpiX))
     Public ReadOnly Property DPI As Integer
@@ -1379,6 +1365,17 @@ Public Module ModBase
     End Function
 
     Private ReadOnly UiThreadId As Integer = Thread.CurrentThread.ManagedThreadId
+    ''' <summary>
+    ''' 在 UI 线程上锁定主线程 id。必须在 Application 启动最早期、任何后台任务发车之前调用。
+    ''' <para/>
+    ''' 背景：UiThreadId 由本模块静态构造器初始化，而模块 cctor 在「第一次被任意线程触碰」的线程上
+    ''' 运行。启动提速把预热挪进 Task.Run（StartupWarmup 第一步就是本模块的 GetTimeMs），
+    ''' 后台线程几乎必然抢先触发 cctor，把 UiThreadId 锁成后台线程 id——之后 RunInUi 在真正的
+    ''' UI 线程上恒为 False，点「启动游戏」即抛「McLaunchStart 必须在 UI 线程调用！」。
+    ''' </summary>
+    Public Sub InitUiThread()
+        '空方法体：调用本身会先触发本模块静态构造，从而在调用线程（UI 线程）上初始化 UiThreadId
+    End Sub
     ''' <summary>
     ''' 当前线程是否为主线程。
     ''' </summary>

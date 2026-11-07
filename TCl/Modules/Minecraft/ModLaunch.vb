@@ -2,7 +2,7 @@
 
 #Region "开始"
 
-    ''' <summary>触发「考虑一下正版」提示的启动次数表（第 130 轮提为常量数组）。</summary>
+    ''' <summary>触发「考虑一下正版」提示的启动次数表。</summary>
     Public ReadOnly BuyHintCounts As Integer() = {3, 8, 15, 30, 50, 70, 90, 110, 130, 180, 220, 280, 330, 380, 450, 550, 660, 750, 880, 950, 1100, 1300, 1500, 1700, 1900}
 
     Public CurrentLaunchOptions As McLaunchOptions = Nothing
@@ -396,11 +396,11 @@ NextInner:
         ''' </summary>
         Public SkinName As String
         ''' <summary>
-        ''' 自定义皮肤是否为 Alex（细手臂）模型。按账户独立（第 70 轮）。
+        ''' 自定义皮肤是否为 Alex（细手臂）模型。按账户独立。
         ''' </summary>
         Public SkinSlim As Boolean = False
         ''' <summary>
-        ''' 自定义皮肤文件路径。按账户独立（第 70 轮）。
+        ''' 自定义皮肤文件路径。按账户独立。
         ''' </summary>
         Public SkinFile As String = ""
 
@@ -848,7 +848,7 @@ LoginFinish:
             Settings.Set("Cache" & Data.Input.Token & "Name", Data.Output.Name)
             Settings.Set("Cache" & Data.Input.Token & "Username", Data.Input.UserName)
             Settings.Set("Cache" & Data.Input.Token & "Pass", Data.Input.Password)
-            '缓存角色列表（第 130 轮 B1：供账户页直接切换角色）
+            '缓存角色列表
             Try
                 Dim ProfilesArray As New JArray
                 For Each Profile In LoginJson("availableProfiles")
@@ -921,7 +921,7 @@ LoginFinish:
 
     '微软登录步骤 1，原始登录：获取 DeviceCode 并开启登录网页
     Private Function MsLoginStep1New(Data As LoaderTask(Of McLoginMs, McLoginResult)) As (OAuthAccessToken As String, OAuthRefreshToken As String)
-        '第 71 轮：统一使用「设备码流」——弹窗自动打开验证网页并复制设备码，
+        '统一使用「设备码流」——弹窗自动打开验证网页并复制设备码，
         '后台轮询令牌，无需本地回环服务器。用户点「微软账号」后直接开始登录，无中间页面。
 
         '检查 ClientId 是否可用（#AADSTS900144：缺少 client_id 会导致微软直接拒绝请求）
@@ -1208,7 +1208,7 @@ Retry:
                     Logger.Error(ex, "皮肤信息获取失败，游戏将以无皮肤的方式启动", LogBehavior.Toast)
                 End Try
             Case 4
-                '自定义（按账户独立的 Alex/Steve 模型配置，第 71 轮）
+                '自定义（按账户独立的 Alex/Steve 模型配置，）
                 Do Until McSkinSex(Uuid) = If(SkinSlim, "Alex", "Steve")
                     If Uuid.EndsWithF("FFFFF") Then Uuid = Uuid.Substring(0, 27) & "00000"
                     Uuid = Uuid.Substring(0, 27) & (Long.Parse(Uuid.Substring(27), Globalization.NumberStyles.AllowHexSpecifier) + 1).ToString("X").PadLeft(5, "0")
@@ -1927,7 +1927,7 @@ Retry:
                     End If
                 Next
             Finally
-                If Zip IsNot Nothing Then Zip.Dispose() '异常路径也须释放，防止句柄泄漏（第 128 轮体检防护）
+                If Zip IsNot Nothing Then Zip.Dispose() '异常路径也须释放，防止句柄泄漏
             End Try
         Next
 
@@ -1990,7 +1990,7 @@ Retry:
             End Try
         End If
 
-        '更新 launcher_profiles.json（第 130 轮拆出为独立方法）
+        '更新 launcher_profiles.json
         McLaunchPrerunProfiles()
 
         '更新 options.txt
@@ -2016,7 +2016,7 @@ Retry:
             Dim RequiredLang As String = If(CurrentLang = "none" OrElse Not DirectoryUtils.Exists(McInstanceSelected.PathIndie & "saves"), DefaultLang, CurrentLang.Lower)
             If Not McInstanceSelected.Version.Valid OrElse McInstanceSelected.Version.Vanilla.Major <= 10 Then
                 '将最后两位改为大写，前面的部分保留
-                If RequiredLang.Length >= 2 Then '空串或过短的语言值跳过改写、保持原值，避免下标越界（第 128 轮体检防护）
+                If RequiredLang.Length >= 2 Then '空串或过短的语言值跳过改写、保持原值，避免下标越界
                     RequiredLang = RequiredLang.Substring(0, RequiredLang.Length - 2) & RequiredLang.Substring(RequiredLang.Length - 2).Upper
                 End If
             End If
@@ -2029,8 +2029,8 @@ Retry:
             End If
             ''如果是初次设置，一并修改 forceUnicodeFont
             'If Settings.Get(Of Boolean)("ToolHelpChinese") AndAlso (CurrentLang = "none" OrElse Not DirectoryUtils.Exists(McInstanceSelected.PathIndie & "saves")) Then
-            '    WriteIni(SetupFileAddress, "forceUnicodeFont", "true")
-            '    McLaunchLog("已开启 forceUnicodeFont")
+            ' WriteIni(SetupFileAddress, "forceUnicodeFont", "true")
+            ' McLaunchLog("已开启 forceUnicodeFont")
             'End If
             '窗口
             Select Case Settings.Get(Of Integer)("LaunchArgumentWindowType")
@@ -2044,12 +2044,12 @@ Retry:
             Logger.Error(ex, "更新 options.txt 失败", LogBehavior.Toast)
         End Try
 
-        '离线皮肤 Alex 警告与资源包（第 130 轮拆出为独立方法）
+        '离线皮肤 Alex 警告与资源包
         McLaunchPrerunSkin()
 
     End Sub
 
-    ''' <summary>更新 launcher_profiles.json（第 130 轮自 McLaunchPrerun 拆出）。</summary>
+    ''' <summary>更新 launcher_profiles.json。</summary>
     Private Sub McLaunchPrerunProfiles()
 
         '更新 launcher_profiles.json
@@ -2119,10 +2119,10 @@ Retry:
 
     End Sub
 
-    ''' <summary>离线皮肤 Alex 警告与自定义皮肤资源包构建（第 130 轮自 McLaunchPrerun 拆出）。</summary>
+    ''' <summary>离线皮肤 Alex 警告与自定义皮肤资源包构建。</summary>
     Private Sub McLaunchPrerunSkin()
 
-        '离线皮肤 Alex 警告（第 71 轮：按账户的皮肤配置，取自登录输入）
+        '离线皮肤 Alex 警告
         Dim LegacySkinSetup As ModLegacySkin.SkinConfig = Nothing
         If TypeOf McLoginLoader.Input Is McLoginLegacy Then
             Dim LegacyInput = CType(McLoginLoader.Input, McLoginLegacy)
@@ -2353,7 +2353,7 @@ IgnoreCustomSkin:
         Dim StartInfo As New ProcessStartInfo(McLaunchJavaSelected.JavaExePath) '使用 javaw.exe 会触发控制台句柄问题
 
         '设置环境变量
-        '第 90 轮：这一小段以前没有防护，只要环境里有 HTTP_PROXY / http_proxy 这种仅大小写不同的
+        '这一小段以前没有防护，只要环境里有 HTTP_PROXY / http_proxy 这种仅大小写不同的
         '重复变量，StartInfo.EnvironmentVariables 的 getter 就会抛 ArgumentException「已添加项」，
         '整个启动直接失败（用户看到的是「Minecraft 启动失败：启动进程失败」）。
         '启动入口已经统一清理过一次（EnvironmentSanitize），这里再兜一层：设置失败也照常启动，
@@ -2485,7 +2485,7 @@ IgnoreCustomSkin:
         '启动计数
         Settings.Set("SystemLaunchCount", Settings.Get(Of Integer)("SystemLaunchCount") + 1)
 
-        '游玩会话记录（第 121 轮：对齐 LumilioCL 的游玩记录）
+        '游玩会话记录
         Try
             If McInstanceSelected IsNot Nothing AndAlso McLaunchProcess IsNot Nothing Then
                 Dim PlayerName As String = If(McLoginLoader IsNot Nothing, McLoginLoader.Output.Name, "")

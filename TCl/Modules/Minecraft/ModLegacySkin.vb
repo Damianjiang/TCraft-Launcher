@@ -1,5 +1,5 @@
 ''' <summary>
-''' 离线账户皮肤配置管理（第 70 轮）。
+''' 离线账户皮肤配置管理。
 ''' <para/>
 ''' 背景：原先皮肤设置（LaunchSkinType / LaunchSkinID / LaunchSkinSlim）是全局的，
 ''' 导致所有离线账户共享同一套皮肤——切换一个账户的皮肤会影响到其它全部账户，
@@ -25,7 +25,7 @@ Public Module ModLegacySkin
     End Class
 
     ''' <summary>
-    ''' 皮肤弹窗的入参（第 96 轮）：多账号管理页对微软 / 第三方账户只要「3D 看一眼」，
+    ''' 皮肤弹窗的入参：多账号管理页对微软 / 第三方账户只要「3D 看一眼」，
     ''' 不能改写它们的皮肤配置，因此用 PreviewOnly 区分只读预览。
     ''' </summary>
     Public Class SkinEditorArgs
@@ -128,7 +128,7 @@ Public Module ModLegacySkin
     ''' <summary>
     ''' 内置皮肤（Steve / Alex / Kai …）的**真实文件**路径。
     ''' <para/>
-    ''' 第 97 轮：HMCL 是把内置皮肤复制到自己的资源目录再使用，这里照同样做法——
+    ''' HMCL 是把内置皮肤复制到自己的资源目录再使用，这里照同样做法——
     ''' 内置皮肤在 TCL 里是 pack:// 资源，只有 WPF 自己能读；3D 预览、头像裁切、外部工具
     ''' 都需要普通文件路径，所以首次使用时把资源解出来落盘，之后直接命中缓存。
     ''' 解不出来（磁盘不可写等）时回退到 pack:// 路径，WPF 内部读取仍然可用。

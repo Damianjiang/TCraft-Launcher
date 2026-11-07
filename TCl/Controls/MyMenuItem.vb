@@ -7,7 +7,7 @@ Public Class MyMenuItem
             If IconControl IsNot Nothing Then IconControl.Data = (New GeometryConverter).ConvertFromString(Icon)
         End If
         RefreshSvgIcon()
-        '第 124 轮：不再给 ContextMenu 设 Opacity。
+        '不再给 ContextMenu 设 Opacity。
         '旧做法乘了 UiLauncherTransparent（整窗透明度），底色又是硬编码纯白，结果是「底不透、字先淡」。
         '现在菜单底色由模板引用 ColorBrushCardBg，ModSecret 调整「组件半透明程度」时会同时改菜单，
         '再叠一层整体 Opacity 就会双重变淡，所以这里什么都不做。

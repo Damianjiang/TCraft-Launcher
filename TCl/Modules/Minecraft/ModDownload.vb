@@ -1354,40 +1354,80 @@
 
     ''' <summary>
     ''' 对可能涉及 Mod 镜像源的请求进行处理，返回 JToken。
-    ''' 调用 NetRequest，会进行重试。
+    ''' 官方源与镜像源竞速：按设置的优先级先发一个源，另一源短暂错峰后补发，任一成功立即返回。
+    ''' 原先的串行重试链（官方 10s 超时 → 官方 30s → 镜像 30s）在国内网络下最坏要 60s+——
+    ''' 实测 api.curseforge.com 无 Key 时 TLS+403 要 11s、mcim 镜像 TLS 握手约 5s、Modrinth 官方仅 1.5s，
+    ''' 竞速后总延迟 ≈ 两源中较快者，这是「下载页列表加载特别慢」的主修复。
     ''' </summary>
     Public Function DlModRequest(Url As String, Optional Method As HttpMethod = Nothing,
                                  Optional Content As String = Nothing, Optional ContentType As String = Nothing) As JToken
-        Dim Urls As New List(Of (Url As String, Timeout As Integer))
-        Dim McimUrl As String = DlSourceModGet(Url)
-        If McimUrl <> Url Then
-            Select Case Settings.Get(Of Integer)("ToolDownloadMod")
-                Case 0
-                    Urls.Add((McimUrl, 10))
-                    Urls.Add((McimUrl, 10))
-                    Urls.Add((Url, 30))
-                Case 1
-                    Urls.Add((Url, If(Url.Contains("modrinth"), 20, 10))) '至少 20s，要不然 Modrinth 返回不过来
-                    Urls.Add((McimUrl, 10))
-                    Urls.Add((Url, 30))
-                    Urls.Add((McimUrl, 30))
-                Case Else
-                    Urls.Add((Url, If(Url.Contains("modrinth"), 20, 10)))
-                    Urls.Add((Url, 30))
-                    Urls.Add((McimUrl, 30))
-            End Select
-        Else
-            Urls.Add((Url, If(Url.Contains("modrinth"), 20, 10)))
-            Urls.Add((Url, 30))
-        End If
         Dim Errors As New List(Of Exception)
-        For Each Source In Urls
-            Try
-                Return NetRequestByClient(Source.Url, Method, Content, ContentType, Timeout:=Source.Timeout * 1000, Encoding:=Encoding.UTF8, RequireJson:=True).DeserializeJson()
-            Catch ex As Exception
-                Errors.Add(ex)
-            End Try
-        Next
+        Dim McimUrl As String = DlSourceModGet(Url)
+        If McimUrl = Url Then
+            '无镜像可用：对同一地址做短超时 + 长超时两次尝试
+            For Each Timeout In {10000, 30000}
+                Try
+                    Return NetRequestByClient(Url, Method, Content, ContentType, Timeout:=Timeout, Encoding:=Encoding.UTF8, RequireJson:=True).DeserializeJson()
+                Catch ex As Exception
+                    Errors.Add(ex)
+                End Try
+            Next
+            Throw New AggregateException(Errors)
+        End If
+        If Url.Contains("api.curseforge.com") AndAlso GetCurseForgeAPIKey() = "" Then
+            '未配置 API Key 时官方 CurseForge 必然 403，且该站 TLS 极慢（实测 11s 才返回 403），直接只走镜像
+            For Each Timeout In {20000, 30000}
+                Try
+                    Return NetRequestByClient(McimUrl, Method, Content, ContentType, Timeout:=Timeout, Encoding:=Encoding.UTF8, RequireJson:=True).DeserializeJson()
+                Catch ex As Exception
+                    Errors.Add(ex)
+                End Try
+            Next
+            Throw New AggregateException(Errors)
+        End If
+        Select Case Settings.Get(Of Integer)("ToolDownloadMod")
+            Case 0 '镜像优先
+                Return DlModRequestRace(McimUrl, Url, 1500, Method, Content, ContentType)
+            Case Else '官方优先（含自动）
+                Return DlModRequestRace(Url, McimUrl, 1500, Method, Content, ContentType)
+        End Select
+    End Function
+
+    ''' <summary>
+    ''' 双源竞速 JSON 请求：PreferredUrl 立即发出，SecondaryUrl 延迟 SecondaryDelayMs 补发，
+    ''' 任一先成功即返回其结果。获胜后其余任务只做异常观察（无法中途取消，让其自然超时）。
+    ''' </summary>
+    Private Function DlModRequestRace(PreferredUrl As String, SecondaryUrl As String, SecondaryDelayMs As Integer,
+                                      Method As HttpMethod, Content As String, ContentType As String) As JToken
+        Dim Errors As New List(Of Exception)
+        Dim Finished As Int32 = 0
+        Dim Preferred = System.Threading.Tasks.Task.Run(Function() NetRequestByClient(
+            PreferredUrl, Method, Content, ContentType, Timeout:=20000, Encoding:=Encoding.UTF8, RequireJson:=True))
+        Dim Secondary = System.Threading.Tasks.Task.Run(Function()
+            System.Threading.Thread.Sleep(SecondaryDelayMs)
+            If System.Threading.Interlocked.CompareExchange(Finished, 0, 0) = 1 Then Return Nothing '已有结果，不再补发
+            Return NetRequestByClient(SecondaryUrl, Method, Content, ContentType, Timeout:=20000, Encoding:=Encoding.UTF8, RequireJson:=True)
+        End Function)
+        Dim Pending As New List(Of System.Threading.Tasks.Task(Of String))({Preferred, Secondary})
+        Do While Pending.Any
+            System.Threading.Tasks.Task.WaitAny(Pending.ToArray)
+            For Each Done In Pending.Where(Function(t) t.IsCompleted).ToList
+                Pending.Remove(Done)
+                If Done.Status = System.Threading.Tasks.TaskStatus.RanToCompletion AndAlso Done.Result IsNot Nothing Then
+                    System.Threading.Interlocked.Exchange(Finished, 1)
+                    For Each Rest In Pending '观察未完成任务的异常，避免未观察任务异常刷屏
+                        Rest.ContinueWith(Sub(t)
+                                              Dim Ignored = t.Exception '访问即标记为已观察
+                                          End Sub)
+                    Next
+                    Return Done.Result.DeserializeJson()
+                ElseIf Done.Status = System.Threading.Tasks.TaskStatus.RanToCompletion Then
+                    '补发任务发现自己迟到（Finished=1），返回 Nothing：视作未发生
+                Else
+                    Errors.Add(If(Done.Exception?.GetBaseException(), New Exception($"任务异常退出（{Done.Status}）")))
+                End If
+            Next
+        Loop
         Throw New AggregateException(Errors)
     End Function
 

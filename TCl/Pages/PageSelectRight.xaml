@@ -18,7 +18,7 @@
                     Padding="2" VerticalAlignment="Center" Margin="8,0,0,0">
                 <StackPanel Orientation="Horizontal">
                     <local:MyIconButton x:Name="BtnViewMode" Width="32" Height="32" LogoScale="0.76"
-                                        SvgIcon="lucide/grid-2x2" ToolTip="切换为网格视图" />
+                                        SvgIcon="lucide/grid-2x2" ToolTip="切换为网格视图" Click="BtnViewMode_Click" />
                     <local:MyIconButton x:Name="BtnRefresh" Width="32" Height="32" LogoScale="0.76"
                                         SvgIcon="lucide/refresh-cw" ToolTip="刷新实例列表" Click="BtnRefresh_Click" />
                     <local:MyIconButton x:Name="BtnNew" Width="32" Height="32" LogoScale="0.76"
@@ -74,7 +74,7 @@
             </local:MyCard>
         </Grid>
 
-        <!-- 加载卡必须与内容容器 PanAllBack 平级（第 133 轮修）：
+        <!-- 加载卡必须与内容容器 PanAllBack 平级：
              内容退出动画收尾时会把 PanAllBack 整块 Visibility=Collapsed，
              卡片若还是它的子元素，刷新时镐子动画虽然跑了但完全看不见——
              这就是「点刷新没有加载动画」的真正原因（首次进页面反而能看到）。 -->
@@ -82,7 +82,7 @@
             <local:MyLoading Text="正在获取版本列表" Margin="20,20,20,17" x:Name="Load" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False" AutoRun="False" />
         </local:MyCard>
 
-        <!-- 实例行「更多」动画卡片（第 128 轮）：复刻首页启动按钮菜单的 Popup 卡片与三段入场动画；
+        <!-- 实例行「更多」动画卡片：复刻首页启动按钮菜单的 Popup 卡片与三段入场动画；
              内容按实例动态构建，加入合集 / 颜色标签以二级卡片呈现（替代子菜单） -->
         <Popup x:Name="PopupInstanceMenu" AllowsTransparency="True" StaysOpen="False" PopupAnimation="None" Placement="Custom">
             <Border x:Name="CardInstanceMenu" Background="{DynamicResource ColorBrushCardBg}" CornerRadius="10" Padding="8" Margin="14"

@@ -12,7 +12,7 @@ Public Class PageSpeedLeft
         '如果在页面切换动画的 “上一页消失” 部分已经完成了下载，就直接尝试返回
         TryReturnToHome()
 
-        '监控定时器（第 128 轮：页面卸载时停表，避免离开页面后每 300ms 空醒一次）
+        '监控定时器
         If WatcherTimer Is Nothing Then
             WatcherTimer = New Threading.DispatcherTimer With {.Interval = New TimeSpan(0, 0, 0, 0, WatcherInterval)}
             AddHandler WatcherTimer.Tick, AddressOf Watcher

@@ -146,6 +146,21 @@
   <data name="Transformer" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\gz\Transformer.gz;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
+  <data name="System.Net.Http.WinHttpHandler" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\gz\System.Net.Http.WinHttpHandler.gz;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="System.Buffers" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\gz\System.Buffers.gz;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="System.Memory" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\gz\System.Memory.gz;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="System.Numerics.Vectors" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\gz\System.Numerics.Vectors.gz;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="System.Runtime.CompilerServices.Unsafe" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\gz\System.Runtime.CompilerServices.Unsafe.gz;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
   <data name="TCraft" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\TCraft.webp;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>

@@ -128,7 +128,7 @@ Public Class PageSetupSystem
         End If
     End Sub
 
-#Region "导出 / 导入全部数据（第 129 轮升级：并入实例独立设置与合集，导入带加载动画与即时刷新）"
+#Region "导出 / 导入全部数据"
 
     ''' <summary>导入进行中标记，防止重复点击。</summary>
     Private IsImporting As Boolean = False

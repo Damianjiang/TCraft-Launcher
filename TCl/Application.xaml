@@ -11,7 +11,7 @@
     <Application.Resources>
         <ResourceDictionary>
 
-            <!-- 第 112 轮启动提速：本字典只保留「首帧渲染必需」的资源；
+            <!-- 启动提速：本字典只保留「首帧渲染必需」的资源；
                  转换器/Label/滚动条/输入框/下拉框/右键菜单等已拆到 Resources\DelayedUi.xaml，
                  由 Application.EnsureDelayedUiLoaded() 在首帧后、页面构造前合并加载。 -->
 
@@ -57,6 +57,8 @@
             <SolidColorBrush x:Key="ColorBrushRedLight">#ff4c4c</SolidColorBrush>
             <SolidColorBrush x:Key="ColorBrushRedDark">#ce2111</SolidColorBrush>
             <SolidColorBrush x:Key="ColorBrushHalfWhite" Color="#55ffffff" />
+            <!-- 输入框/下拉框底色：启动后由 ModSecret.ApplyComponentOpacityToColors 按全局半透明重算 -->
+            <SolidColorBrush x:Key="ColorBrushFieldBg" Color="#B4ffffff" />
             <SolidColorBrush x:Key="ColorBrushSemiWhite" Color="#bbffffff" />
             <SolidColorBrush x:Key="ColorBrushWhite" Color="#ffffff" />
             <SolidColorBrush x:Key="ColorBrushTransparent" Color="Transparent" />

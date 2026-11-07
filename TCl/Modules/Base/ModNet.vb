@@ -93,7 +93,7 @@ Public Module ModNet
             End Try
         Loop
         '不可达：循环内所有分支均 Return 或 Throw（含 Continue/Throw 的重试分支）。
-        '此返回语句仅为满足编译器的「所有路径返回值」检查（BC42105），第 71 轮警告清零。
+        '此返回语句仅为满足编译器的「所有路径返回值」检查（BC42105），警告清零。
         Return Nothing
     End Function
 
@@ -259,6 +259,62 @@ Public Module ModNet
         End Try
     End Sub
 
+    ''' <summary>
+    ''' 双源竞速下载小文件：PreferredUrl 立即开始，SecondaryUrl 延迟 SecondDelayMs 后补发，
+    ''' 任一先下载完成即写入 LocalPath 并返回；两个源都失败时抛出聚合异常。
+    ''' 用于列表图标等小文件的快速回退——原先串行换源在慢 CDN 下单图要等 15s+ 才轮到第二源。
+    ''' 落败的后台任务会被观察异常，避免未观察任务异常刷屏；其残留临时文件在 Finally 清理。
+    ''' </summary>
+    Public Sub NetDownloadByRace(PreferredUrl As String, SecondaryUrl As String, LocalPath As String,
+                                 Optional SecondDelayMs As Integer = 1500, Optional SimulateBrowserHeaders As Boolean = False)
+        Dim PathA = LocalPath & ".raceA", PathB = LocalPath & ".raceB"
+        Try
+            Dim Finished As Int32 = 0
+            Dim Errors As New List(Of Exception)
+            Dim Preferred = System.Threading.Tasks.Task.Run(Sub() NetDownloadByLoader(PreferredUrl, PathA, SimulateBrowserHeaders:=SimulateBrowserHeaders))
+            Dim Secondary As System.Threading.Tasks.Task = System.Threading.Tasks.Task.Run(Sub()
+                System.Threading.Thread.Sleep(SecondDelayMs)
+                If System.Threading.Interlocked.CompareExchange(Finished, 0, 0) = 1 Then Return '已有结果，不再补发
+                NetDownloadByLoader(SecondaryUrl, PathB, SimulateBrowserHeaders:=SimulateBrowserHeaders)
+            End Sub)
+            Dim Pending As New List(Of System.Threading.Tasks.Task)({Preferred, Secondary})
+            Do While Pending.Any
+                System.Threading.Tasks.Task.WaitAny(Pending.ToArray)
+                For Each Done In Pending.Where(Function(t) t.IsCompleted).ToList
+                    Pending.Remove(Done)
+                    If Done.Status = System.Threading.Tasks.TaskStatus.RanToCompletion Then
+                        '以实际落盘的临时文件判定胜者，优先首选源；补发任务若因迟到跳过，对应文件不存在。
+                        '只检查已完成任务的对应文件，避免把另一任务尚在写入的半截文件误判为胜者。
+                        Dim WinPath As String = If(IO.File.Exists(PathA), PathA, If(IO.File.Exists(PathB), PathB, Nothing))
+                        If WinPath IsNot Nothing Then
+                            System.Threading.Interlocked.Exchange(Finished, 1)
+                            IO.File.Copy(WinPath, LocalPath, True) '缓存刷新场景 LocalPath 可能已存在旧文件，覆盖
+                            For Each Rest In Pending '观察未完成任务的异常
+                                Rest.ContinueWith(Sub(t)
+                                                      Dim Ignored = t.Exception '访问即标记为已观察
+                                                  End Sub)
+                            Next
+                            Return
+                        End If
+                    Else
+                        Errors.Add(If(Done.Exception?.GetBaseException(), New Exception($"下载任务异常退出（{Done.Status}）")))
+                    End If
+                Next
+            Loop
+            If Not Errors.Any Then Errors.Add(New Exception("竞速下载双源均未完成"))
+            Throw New AggregateException(Errors)
+        Finally
+            Try
+                If IO.File.Exists(PathA) Then FileUtils.Delete(PathA)
+            Catch
+            End Try
+            Try
+                If IO.File.Exists(PathB) Then FileUtils.Delete(PathB)
+            Catch
+            End Try
+        End Try
+    End Sub
+
 #End Region
 
 #Region "基础请求引擎"
@@ -273,16 +329,12 @@ Public Module ModNet
             '构建 RequestClient
             SyncLock RequestClientLock
                 If RequestClient Is Nothing Then '延迟初始化
-                    RequestClient = New HttpClient(New HttpClientHandler With {
-                        .AutomaticDecompression = DecompressionMethods.Deflate Or DecompressionMethods.Gzip,
-                        .UseCookies = False, '不设为 False 就不能从 Header 手动传入 Cookies
-                        .Proxy = HttpProxyManager.Instance
-                    }, False)
+                    RequestClient = New HttpClient(ModProxy.CreateHandler(), False)
                 End If
             End SyncLock
             '构建请求
             Url = SecretCdnSign(Url)
-            Request = New HttpRequestMessage(Method, Url)
+            Request = New HttpRequestMessage(Method, Url) With {.Version = Http2Version}
             If Content IsNot Nothing AndAlso Request.Method <> HttpMethod.Get AndAlso Request.Method <> HttpMethod.Head Then '写入 Content
                 If TypeOf Content Is HttpContent Then
                     Request.Content = DirectCast(Content, HttpContent).Clone()
@@ -351,10 +403,12 @@ Public Module ModNet
 
 #Region "多线程下载引擎"
 
-    Private ThreadClient As New HttpClient(New HttpClientHandler With {
-        .AutomaticDecompression = DecompressionMethods.Deflate Or DecompressionMethods.GZip,
-        .Proxy = HttpProxyManager.Instance
-    })
+    ''' <summary>HTTP 请求目标版本：2.0。WinHttpHandler（Win10+）据此启用 HTTP/2 多路复用；
+    ''' 不支持 h2 的源由 ALPN / 明文回退自动降级到 1.1；Win7 回退的 HttpClientHandler 忽略该值。</summary>
+    Private ReadOnly Http2Version As New Version(2, 0)
+
+    '下载引擎线程共用一个客户端：Win10+ 走 WinHttpHandler（HTTP/2 多路复用），Win7 回退 HttpClientHandler
+    Private ThreadClient As New HttpClient(ModProxy.CreateHandler())
 
     ''' <summary>
     ''' 根据设置刷新全局 HTTP 代理。
@@ -884,7 +938,7 @@ Public Module ModNet
             Try
 
                 Dim StartPosition As Long, StartSource As NetSource = Nothing
-                Dim Th As Thread, ThreadInfo As NetThread, OnceSource As NetSource = Nothing '单线程源缓存（第 128 轮体检防护：避免对空 SourcesOnce 取 First）
+                Dim Th As Thread, ThreadInfo As NetThread, OnceSource As NetSource = Nothing '单线程源缓存
                 '条件检测
                 SyncLock LockSource
                     If NetTaskThreadCount >= NetTaskThreadLimit OrElse Not HasAvailableSource() OrElse
@@ -899,7 +953,7 @@ Public Module ModNet
                     If IsNoSplit Then GoTo StartSingleThreadDownload
                     '只剩下单线程可用点
                     If Not HasAvailableSource(False) Then
-                        OnceSource = SourcesOnce.FirstOrDefault '第 128 轮体检防护：SourcesOnce 可能在并发中被清空，先取值判空，避免对空集合取 First；为空时直接继续调度
+                        OnceSource = SourcesOnce.FirstOrDefault '体检防护：SourcesOnce 可能在并发中被清空，先取值判空，避免对空集合取 First；为空时直接继续调度
                         If OnceSource IsNot Nothing AndAlso OnceSource.SingleThread IsNot Nothing AndAlso OnceSource.SingleThread.State <> NetState.Canceled Then Return Nothing
 StartSingleThreadDownload:
                         Reset()
@@ -971,7 +1025,7 @@ StartThread:
                 Interlocked.Increment(NetTaskThreadCount)
                 SyncLock LockSource
                     If Not HasAvailableSource(False) Then
-                        OnceSource = SourcesOnce.FirstOrDefault '第 128 轮体检防护：SourcesOnce 可能为空，判空后再登记单线程占用；无法登记时跳过赋值，本次调度照常继续
+                        OnceSource = SourcesOnce.FirstOrDefault '体检防护：SourcesOnce 可能为空，判空后再登记单线程占用；无法登记时跳过赋值，本次调度照常继续
                         If OnceSource IsNot Nothing Then OnceSource.SingleThread = ThreadInfo
                     End If
                 End SyncLock
@@ -998,7 +1052,7 @@ StartThread:
             Try
                 Dim HttpDataCount As Integer = 0
                 If SourcesOnce.Contains(Th.Source) AndAlso Th <> Th.Source.SingleThread Then GoTo SourceBreak
-                HttpRequest = New HttpRequestMessage(HttpMethod.Get, Th.Source.Url)
+                HttpRequest = New HttpRequestMessage(HttpMethod.Get, Th.Source.Url) With {.Version = Http2Version}
                 SecretHeadersSign(Th.Source.Url, HttpRequest, SimulateBrowserHeaders)
                 CancelToken = New CancellationTokenSource(Timeout)
                 If Not Th.IsFirstThread Then HttpRequest.Headers.Range = New Headers.RangeHeaderValue(Th.DownloadStart, Nothing)
@@ -1703,7 +1757,7 @@ SourceBreak:
                 '获取实际失败的文件
                 For Each File In Files
                     If File.State <> NetState.Canceled Then Continue For
-                    's.Ex 可能为 Nothing（多源场景下尚未尝试过的源没有异常对象），必须先判空（第 128 轮 P0 修复）
+                    's.Ex 可能为 Nothing（多源场景下尚未尝试过的源没有异常对象），必须先判空
                     If File.Sources.All(Function(s) s.Ex Is Nothing OrElse s.Ex.IsCanceled OrElse TypeOf s.Ex Is TimeoutException) Then Continue For
                     Dim Detail As String = File.Sources.Select(Function(s) $"{If(s.Ex Is Nothing, "无错误信息。", s.Ex.GetDisplay(False))}（{s.Url}）").Join(vbCrLf)
                     [Error] = New Exception(ModLang.L("文件下载失败：") & File.LocalPath & vbCrLf &
@@ -1753,7 +1807,7 @@ SourceBreak:
 
         ''' <summary>
         ''' 下载管理线程空闲时的唤醒事件：新任务注册（AllFiles 写入）时 Set 一次即可立即开工，
-        ''' 避免空闲时双线程 20ms + 统计线程 100ms 的固定轮询空转（第 127 轮）。
+        ''' 避免空闲时双线程 20ms + 统计线程 100ms 的固定轮询空转。
         ''' </summary>
         Private ReadOnly NetIdleWake As New EventWaitHandle(False, EventResetMode.AutoReset)
 
@@ -1836,7 +1890,7 @@ SourceBreak:
             Sub(Id As Integer) '0 或 1
                 Try
                     While True
-                        '第 127 轮：完全空闲时事件等待代替固定 20ms 轮询（双线程各 50 次/秒的空转）；
+                        '完全空闲时事件等待代替固定 20ms 轮询（双线程各 50 次/秒的空转）；
                         '有任务时保持原节拍，保证追加线程/限速逻辑不受影响
                         If AllFiles.IsEmpty Then
                             NetIdleWake.WaitOne(1000)
@@ -1893,7 +1947,7 @@ SourceBreak:
                 Try
                     Dim NextTick As Long = GetTimeMs()
                     While True
-                        '第 127 轮：无下载任务时低频等待，新任务注册时被 NetIdleWake 唤醒
+                        '无下载任务时低频等待，新任务注册时被 NetIdleWake 唤醒
                         If FileRemain = 0 Then
                             NetIdleWake.WaitOne(1000)
                             NextTick = GetTimeMs()
@@ -1953,7 +2007,7 @@ SourceBreak:
                     AllFiles(File.LocalPath) = File
                     NewFiles.Add(File)
                     Interlocked.Increment(FileRemain)
-                    NetIdleWake.Set() '唤醒空闲中的管理线程与统计线程（第 127 轮）
+                    NetIdleWake.Set() '唤醒空闲中的管理线程与统计线程
                 End If
                 NewFilesList.Add(File)
                 File.Tasks.Add(Task)

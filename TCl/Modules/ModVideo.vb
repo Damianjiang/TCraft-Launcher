@@ -64,7 +64,7 @@ Public Module ModVideo
     ''' <summary>重载播放列表并尝试开始播放背景视频。ShowHint=True 时给出提示。</summary>
     Public Sub VideoRefreshPlay(ShowHint As Boolean, Optional IsFirstLoad As Boolean = False)
         Try
-            '图片/视频二选一（UiBackgroundType，第 67 轮）：非视频模式时一律停播并隐藏视频层，
+            '图片/视频二选一（UiBackgroundType，）：非视频模式时一律停播并隐藏视频层，
             '把展示权交还给背景图片，避免「有视频就自动压过图片」的隐式优先级。
             If Settings.Get(Of Integer)("UiBackgroundType") <> 1 Then
                 VideoStopAndHide()
@@ -150,7 +150,7 @@ Public Module ModVideo
 
     ''' <summary>
     ''' 窗口隐藏时暂停背景视频。MediaElement 的解码独立于渲染管线，
-    ''' 窗口 Visibility=Hidden 后仍会持续解码，必须显式暂停（第 127 轮，后台占用排查）。
+    ''' 窗口 Visibility=Hidden 后仍会持续解码，必须显式暂停。
     ''' </summary>
     Public Sub VideoPauseForHidden()
         RunInUi(Sub()
@@ -234,7 +234,7 @@ Public Module ModVideo
 
     ''' <summary>
     ''' 立即应用背景类型设置（UiBackgroundType：0=图片，1=视频）：按需启停视频层并刷新主界面背景。
-    ''' 由设置页的类型切换与设置项 OnChanged 共同调用（第 67 轮，图片/视频二选一）。
+    ''' 由设置页的类型切换与设置项 OnChanged 共同调用。
     ''' </summary>
     Public Sub ApplyBackgroundType()
         Try

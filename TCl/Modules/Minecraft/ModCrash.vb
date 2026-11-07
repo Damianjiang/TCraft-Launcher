@@ -871,7 +871,7 @@ Public Class CrashAnalyzer
         Select Case MyMsgBox(Detail, If(IsManualAnalyze, ModLang.L("错误报告分析结果"), ModLang.L("Minecraft 出现错误")),
             ModLang.L("确定"), ModLang.L("复制报告"), If(IsManualAnalyze, "", ModLang.L("导出错误报告")),
             Button2Action:=Sub()
-                '弹窗选择：复制报告（脱敏分析文本 + 系统信息，只进剪贴板，不联网上传；第 130 轮 H7）
+                '弹窗选择：复制报告（脱敏分析文本 + 系统信息，只进剪贴板，不联网上传；H7）
                 Try
                     Dim Report As String = Detail & vbCrLf & vbCrLf &
                         ModLang.L("—— 系统信息 ——") & vbCrLf &
@@ -879,7 +879,7 @@ Public Class CrashAnalyzer
                         ModLang.L("操作系统：") & My.Computer.Info.OSFullName & vbCrLf &
                         ModLang.L("剩余内存：") & Int(My.Computer.Info.AvailablePhysicalMemory / 1024 / 1024) & " M / " & Int(My.Computer.Info.TotalPhysicalMemory / 1024 / 1024) & " M" & vbCrLf &
                         ModLang.L("MC 文件夹：") & If(McFolderSelected, "Nothing")
-                    ClipboardSet(Report, False) '走重试版剪贴板写入（第 130 轮体检 P3），成功提示由下方自行给出
+                    ClipboardSet(Report, False) '走重试版剪贴板写入，成功提示由下方自行给出
                     Hint(ModLang.L("报告已复制到剪贴板，可粘贴给他人协助定位（不会自动上传）。"), HintType.Green)
                 Catch ex As Exception
                     Logger.Warn(ex, "复制崩溃报告失败")

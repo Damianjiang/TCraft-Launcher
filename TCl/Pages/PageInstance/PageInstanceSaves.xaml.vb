@@ -36,30 +36,63 @@
     End Sub
 
     ''' <summary>
-    ''' 刷新存档列表。
+    ''' 刷新存档列表（扫描放后台线程，期间显示镐子加载卡）。
     ''' </summary>
-    Public Sub Refresh()
-        Try
-            AllSaves.Clear()
-            SizeCache.Clear()
-            Dim Folder As String = SavesFolder
-            If Folder Is Nothing Then
-                PanSaves.Children.Clear()
-                PanSaves.Children.Add(New TextBlock With {.Text = ModLang.L("请先选择一个 Minecraft 版本。"), .Margin = New Thickness(0, 0, 0, 10), .Opacity = 0.6})
-                Return
-            End If
-            DirectoryUtils.Create(Folder)
-            For Each SaveFolder In DirectoryUtils.EnumerateDirectories(Folder, False)
-                Try
-                    AllSaves.Add(DirectoryUtils.GetInfo(SaveFolder))
-                Catch ex As Exception
-                    Logger.Warn(ex, $"获取存档文件夹信息失败：{SaveFolder}")
-                End Try
-            Next
-            Rebuild()
-        Catch ex As Exception
-            Logger.Error(ex, "刷新存档列表失败")
-        End Try
+    Public Sub Refresh(Optional OnFinished As Action = Nothing)
+        If IsRefreshing Then Return
+        Dim CurrentInstance = Instance
+        If CurrentInstance Is Nothing Then
+            PanSaves.Children.Clear()
+            PanSaves.Children.Add(New TextBlock With {.Text = ModLang.L("请先选择一个 Minecraft 版本。"), .Margin = New Thickness(0, 0, 0, 10), .Opacity = 0.6})
+            If OnFinished IsNot Nothing Then OnFinished()
+            Return
+        End If
+        IsRefreshing = True
+        PanLoad.Visibility = Visibility.Visible
+        RunInNewThread(
+        Sub()
+            Try
+                Dim Folder As String = SavesFolder
+                Dim Infos As New List(Of DirectoryInfo)
+                If Folder IsNot Nothing Then
+                    DirectoryUtils.Create(Folder)
+                    For Each SaveFolder In DirectoryUtils.EnumerateDirectories(Folder, False)
+                        Try
+                            Infos.Add(DirectoryUtils.GetInfo(SaveFolder))
+                        Catch ex As Exception
+                            Logger.Warn(ex, $"获取存档文件夹信息失败：{SaveFolder}")
+                        End Try
+                    Next
+                End If
+                RunInUi(Sub()
+                            Try
+                                AllSaves.Clear()
+                                SizeCache.Clear()
+                                If Folder Is Nothing Then
+                                    PanSaves.Children.Clear()
+                                    PanSaves.Children.Add(New TextBlock With {.Text = ModLang.L("请先选择一个 Minecraft 版本。"), .Margin = New Thickness(0, 0, 0, 10), .Opacity = 0.6})
+                                    Return
+                                End If
+                                AllSaves.AddRange(Infos)
+                                Rebuild()
+                            Catch ex As Exception
+                                Logger.Error(ex, "刷新存档列表失败")
+                            Finally
+                                FinishRefresh(OnFinished)
+                            End Try
+                        End Sub)
+            Catch ex As Exception
+                Logger.Error(ex, "刷新存档列表失败")
+                RunInUi(Sub() FinishRefresh(OnFinished))
+            End Try
+        End Sub, "Saves Refresh")
+    End Sub
+
+    Private IsRefreshing As Boolean = False
+    Private Sub FinishRefresh(OnFinished As Action)
+        PanLoad.Visibility = Visibility.Collapsed
+        IsRefreshing = False
+        If OnFinished IsNot Nothing Then OnFinished()
     End Sub
 
     ''' <summary>
@@ -220,8 +253,7 @@
         OpenExplorer(Folder)
     End Sub
     Private Sub BtnRefresh_Click(sender As Object, e As MouseButtonEventArgs) Handles BtnRefresh.Click
-        Refresh()
-        Hint(ModLang.L("存档列表已刷新！"), HintType.Green)
+        Refresh(Sub() Hint(ModLang.L("存档列表已刷新！"), HintType.Green))
     End Sub
 
     ''' <summary>

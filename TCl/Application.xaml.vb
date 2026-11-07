@@ -9,7 +9,7 @@ Public Class Application
     Friend Shared BootStartupTime As Date
 
     ''' <summary>
-    ''' 命令行 --launch-instance "&lt;实例名&gt;" 指定的启动目标（第 125 轮）。
+    ''' 命令行 --launch-instance "&lt;实例名&gt;" 指定的启动目标。
     ''' 由桌面快捷方式写入；启动器在首帧后解析并自动选中、自动启动，成功后清空。
     ''' 若启动器已在运行，单例检查会把已有窗口拉到前台并退出，不会重复开进程。
     ''' </summary>
@@ -18,6 +18,10 @@ Public Class Application
     '开始
     Private Sub Application_Startup(sender As Object, e As StartupEventArgs) Handles Me.Startup
         BootStartupTime = Date.Now
+        '最先在 UI 线程上锁定 ModBase 的 UiThreadId（见 InitUiThread 注释）：
+        '必须在下方 Task.Run(StartupWarmup) 发车之前，否则预热线程抢先触发模块 cctor，
+        'UiThreadId 锁错线程，RunInUi 在 UI 线程上恒为 False（「McLaunchStart 必须在 UI 线程调用」崩溃）。
+        InitUiThread()
         '解析 --launch-instance "<名称>"：只取第一个，后面多余的忽略
         Try
             If e.Args IsNot Nothing Then
@@ -32,23 +36,49 @@ Public Class Application
             '参数解析失败不影响正常启动
         End Try
         Try
-            '单例检查提前到 TClKit 初始化之前（第 111 轮）：第二实例完全不必白花
+            '单例检查提前到 TClKit 初始化之前：第二实例完全不必白花
             'gz 解压 + 库初始化（约 450ms）就能退出；异常路径所需的最小能力（Win32/Beep）不依赖任何库
             If Not (e.Args.Contains("--gpu") OrElse e.Args.Contains("--memory")) Then '若是通过命令行调用，则不检查单例、不轮换日志
                 WaitingMutex(e)
             End If
             '核心初始化
             TClKit.Main.Init("TCL")
-            'TClKit.Wpf.Main.Init 移到 FormMain 构造前（第 112 轮，审计确认其全部工作是
+            'TClKit.Wpf.Main.Init 移到 FormMain 构造前（审计确认其全部工作是
             'ModernTooltipService 的 DP 注册与 7 个类处理器注册，5-30ms，而 Tooltip 最早也只会在
             '窗口存在后出现——首帧前无窗口，天然满足时序约束；App 构造函数的注释约束不变）
             If Not (e.Args.Contains("--gpu") OrElse e.Args.Contains("--memory")) Then
                 Logger.Instance = New TclLogger With {.logFolder = Paths.BaseThenName, .MinLevel = If(ModeDebug, LogLevel.Trace, LogLevel.Info)}
             End If
+            '后台线程异常兜底：DispatcherUnhandledException 只覆盖 UI 线程，.NET Framework 下
+            '任意后台线程的未处理异常会直接静默杀掉整个进程（无报错窗口、日志戛然而止）。
+            '「取消启动闪退」正是这种形态——取消链路上某个后台线程抛了异常，进程无声死亡，
+            '此前连崩溃原因都无法留下。这里至少把异常与完整堆栈写进日志，让闪退可被诊断。
+            AddHandler AppDomain.CurrentDomain.UnhandledException,
+                Sub(snd As Object, evt As UnhandledExceptionEventArgs)
+                    Try
+                        Dim Ex = TryCast(evt.ExceptionObject, Exception)
+                        Logger.Error(If(Ex IsNot Nothing, Ex, New Exception(If(evt.ExceptionObject?.ToString(), "未知异常对象"))),
+                                     $"后台线程发生未处理异常（{(If(evt.IsTerminating, "进程即将退出", "已拦截，进程继续运行"))}）")
+                    Catch
+                        '日志系统自身不可用时的保底：直接落一份崩溃现场文件
+                        Try
+                            IO.File.WriteAllText(IO.Path.Combine(IO.Path.GetTempPath(), "TCL\CrashLast.txt"), evt.ExceptionObject?.ToString())
+                        Catch
+                        End Try
+                    End Try
+                End Sub
+            AddHandler TaskScheduler.UnobservedTaskException,
+                Sub(snd As Object, evt As UnobservedTaskExceptionEventArgs)
+                    Try
+                        Logger.Error(evt.Exception, "后台任务存在未观察的异常（已拦截，不影响运行）")
+                        evt.SetObserved() '阻止 .NET 在最终化时因未观察任务异常终止进程
+                    Catch
+                    End Try
+                End Sub
             '清理环境变量里仅大小写不同的重复项（HTTP_PROXY / http_proxy 这种）：
             '不清理的话，任何 ProcessStartInfo.EnvironmentVariables 访问都会抛「已添加项」，
             '启动游戏、安装 OptiFine 都会直接失败（见 ModBase.EnvironmentSanitize 注释）。
-            '第 111 轮移入后台预热：首个此类访问在游戏启动（远晚于首帧），无需占用 UI 线程。
+            '移入后台预热：首个此类访问在游戏启动（远晚于首帧），无需占用 UI 线程。
             '启动性能：进程→App 构造→Startup 入口（含 Application.xaml 的 BAML 解析）
             Try
                 Dim ProcStart As Date = Diagnostics.Process.GetCurrentProcess().StartTime
@@ -59,7 +89,7 @@ Public Class Application
                 '仅日志
             End Try
             Dim Seg = GetTimeMs() '启动性能分段计时（仅日志）
-            '第 111 轮启动提速——后台预热池：
+            '启动提速——后台预热池：
             '把「与首帧渲染无数据依赖」的重初始化移出 UI 线程，由后台任务顺序完成（StartupWarmup）：
             'ModLang 词典构建(~97ms) / ServicePointManager+HTTP 代理(~120ms) / .NET 版本检查 /
             '渲染模式注册表 / 环境变量清理 / 默认背景释放。UI 线程只在真正需要结果处等待
@@ -175,7 +205,7 @@ RetryCacheCheck:
             '写入 WPF 渲染模式注册表已移入后台预热（该值重启才生效，当前进程不读它）
             '（启动画面已提前到日志就绪后立即显示，见上）
             LogStartupSegment("创建启动画面", Seg)
-            '基础信息日志已移入后台预热（StartupWarmup，第 112 轮）：这 5 行里
+            '基础信息日志已移入后台预热（StartupWarmup，）：这 5 行里
             '「系统编码」行会触碰 Encoding.Default.HeaderName（物化 ANSI 编码表，实测数十毫秒），
             'Identify/HasAdminRole 也有可观的注册表与 CPU 开销，且均不在首帧渲染依赖上。
             '检测异常环境（依赖日志已就绪的弹窗判断）仍留在 UI 线程：
@@ -187,7 +217,7 @@ RetryCacheCheck:
                 MyMsgBox(ModLang.L("TCL 和新版 Minecraft 均不再支持 32 位系统，请重装为 64 位系统后再进行游戏！"), "环境警告", "我知道了", IsWarn:=True, ForceWait:=True)
                 FormMain.EndProgramForce(ProcessReturnValues.Cancel)
             End If
-            'Windows 7 兼容（第 116 轮）：.NET Framework 4.8 只能装在 Win7 SP1（6.1.7601+）上，
+            'Windows 7 兼容：.NET Framework 4.8 只能装在 Win7 SP1（6.1.7601+）上，
             'RTM（7600）装不上，急救安装器会永远失败，这里提前拦截并给出明确指引。
             '在 Win8+ 系统上此分支恒不触发；先于单例互斥后的所有初始化执行。
             Try
@@ -222,12 +252,12 @@ RetryCacheCheck:
     ''' </summary>
     Private Shared StartupWarmupTask As Task
 
-    '延迟 UI 资源是否已合并（第 112 轮启动提速）
+    '延迟 UI 资源是否已合并
     Private Shared DelayedUiLoaded As Boolean = False
 
     ''' <summary>
     ''' 合并延迟 UI 资源字典（Resources\DelayedUi.xaml：转换器/Label/滚动条/输入框/下拉框/右键菜单）。
-    ''' 第 112 轮：这些资源原先随 Application.xaml 在 Startup 前同步解析（实测占 BAML 段的主要部分），
+    ''' 这些资源原先随 Application.xaml 在 Startup 前同步解析（实测占 BAML 段的主要部分），
     ''' 而首帧可视树（FormMain 自身）根本用不到——全部消费方都在页面/弹窗里。
     ''' 改为首帧后、任何页面构造前合并；所有可能构造内容的入口都必须先调用本方法：
     ''' EnsureLaunchLeftCreated / EnsureLaunchRightCreated / PageChangeActual / MyMsgBox / Hint / RunDeferredStartupWork。
@@ -263,7 +293,7 @@ RetryCacheCheck:
     End Sub
 
     ''' <summary>
-    ''' 启动后台预热（第 111 轮）：把与首帧渲染无数据依赖的重初始化移出 UI 线程。
+    ''' 启动后台预热：把与首帧渲染无数据依赖的重初始化移出 UI 线程。
     ''' 顺序执行；每段独立 Try/Catch，任何一段失败不影响其余段与 UI 线程。
     ''' </summary>
     Private Shared Sub StartupWarmup()
@@ -290,7 +320,7 @@ RetryCacheCheck:
             If CInt(RegistryUtils.TryRead("HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full", "Release", 999999)) < 528040 Then OldEnvironmentAssert()
             '写入 WPF 渲染模式设置（重启生效，当前进程不读它）
             FormMain.ApplyHardwareAcceleration(False)
-            '基础信息日志（第 112 轮从 Startup 挪来）：VersionDisplay/Identify/PathExe/编码表/HasAdminRole
+            '基础信息日志：VersionDisplay/Identify/PathExe/编码表/HasAdminRole
             Logger.Info($"程序版本：{VersionDisplay} ({VersionCode}{If(CommitHash = "", "", $"，#{CommitHash}")})")
             If BuildType = BuildTypes.Snapshot Then
                 Logger.Info($"识别码：{Identify}{If(ThemeCheckOne(9), "，已解锁反馈主题", "，未解锁反馈主题")}")
@@ -304,7 +334,7 @@ RetryCacheCheck:
             '清理环境变量里仅大小写不同的重复项（首个 ProcessStartInfo 访问在游戏启动，远晚于首帧）
             EnvironmentSanitize()
             '写入默认背景图片（真正被读取在 FormMain_Loaded 的 UpdateBackgroundAndTitleBar）。
-            '第 111 轮：背景由 1920×1080 的 JPEG（旧 TCraft.png，196.7KB）改为 WebP q85（94KB），
+            '背景由 1920×1080 的 JPEG（旧 TCraft.png，196.7KB）改为 WebP q85（94KB），
             '加载端 MyBitmap 按 RIFF 文件头自动识别 WebP，与扩展名无关（MyBitmap.vb:141）。
             If Not DirectoryUtils.EnumerateFiles(Paths.Base & "TCL\Pictures\").Any() Then
                 ExtractResources(Paths.Base & "TCL\Pictures\TCraft.webp", "TCraft")
@@ -362,7 +392,7 @@ RetryCacheCheck:
     '结束
     Private Sub Application_SessionEnding(sender As Object, e As SessionEndingCancelEventArgs) Handles Me.SessionEnding
         'Windows 关机 / 注销：系统随时会强杀进程，EndProgram 里的关闭动画、联机退出判断都可能来不及走完
-        '（TryExit 甚至会直接 Return）。先把「正常退出」标记落盘，避免下次开机误报「异常退出」（第 132 轮）
+        '（TryExit 甚至会直接 Return）。先把「正常退出」标记落盘，避免下次开机误报「异常退出」
         Try
             Settings.Set("SystemLastExitClean", True)
         Catch ex As Exception
@@ -403,7 +433,7 @@ RetryCacheCheck:
            Detail.Contains(".NET Framework") Then ' “自动错误判断” 的结果分析
             OldEnvironmentAssert(e.Exception)
         Else
-            '第 71 轮：未处理的 UI 线程异常仅记录日志，不强制退出程序。
+            '未处理的 UI 线程异常仅记录日志，不强制退出程序。
             '此前使用 AlertThenCrash，一次动画强转异常（MyListItem.RefreshColor）就会直接退出整个启动器。
             Logger.Error(e.Exception, "程序出现未知错误")
         End If
@@ -458,11 +488,19 @@ RetryCacheCheck:
         Catch
         End Try
         EnableUnsafeHeaderParsing()
-        Static Prefixes As String() = {"Newtonsoft.Json", "Imazen.WebP", "Microsoft.Win32.Registry", "TClCS", "TClKit.Wpf", "TClKit"}
+        Static Prefixes As String() = {"Newtonsoft.Json", "Imazen.WebP", "Microsoft.Win32.Registry", "System.Net.Http.WinHttpHandler",
+                                       "System.Buffers", "System.Memory", "System.Numerics.Vectors", "System.Runtime.CompilerServices.Unsafe",
+                                       "TClCS", "TClKit.Wpf", "TClKit"}
         Static LoadedAssemblies As New ConcurrentDictionary(Of String, Lazy(Of Assembly))(StringComparer.Ordinal) '缓存
         AddHandler AppDomain.CurrentDomain.AssemblyResolve,
         Function(sender As Object, Args As ResolveEventArgs) As Assembly
-            Dim Prefix As String = Prefixes.FirstOrDefault(Function(p) Args.Name.StartsWith(p, StringComparison.Ordinal))
+            '只按完整名匹配（前缀后必须紧跟逗号）。卫星资源探测的请求名形如
+            '"System.Net.Http.WinHttpHandler.resources, Culture=zh-CN, ..."，旧写法裸 StartsWith 会
+            '把探测请求误匹配进来、拿中性主程序集冒充 zh-CN 卫星 → 运行时因文化不匹配硬抛
+            'FileNotFoundException（System.SR 只捕获 MissingManifestResourceException 拦不住它），
+            '每次网络请求失败/取消都变成未观察异常刷屏。改后探测请求被跳过、走优雅回退链
+            '（zh-CN→zh-CHS→zh-Hans→zh→中性），最终由 SR 内置英文默认文案兜底，零异常。
+            Dim Prefix As String = Prefixes.FirstOrDefault(Function(p) Args.Name.StartsWith(p & ",", StringComparison.Ordinal) OrElse Args.Name = p)
             If Prefix Is Nothing Then Return Nothing
             Dim LazyAssembly = LoadedAssemblies.GetOrAdd(Prefix, Function(p) New Lazy(Of Assembly)(
             Function()
@@ -476,14 +514,14 @@ RetryCacheCheck:
 
     ''' <summary>
     ''' 从内嵌 gz 资源加载程序集：解压 → 落盘缓存 → Assembly.LoadFrom。
-    ''' 第 111 轮：原先直接 Assembly.Load(字节)。内存程序集被多核 JIT（ProfileOptimization）明确排除，
+    ''' 原先直接 Assembly.Load(字节)。内存程序集被多核 JIT（ProfileOptimization）明确排除，
     ''' 改为落盘 + LoadFrom 后即可进入预编译范围，且非首次启动直接读缓存、免重复解压。
     ''' 缓存放 %AppData%\TCL\Cache\Assemblies（此处只能用 BCL：AssemblyResolve 最早期，ModBase/Paths 尚不可用）。
     ''' 文件名带内容指纹（长度+FNV-1a）：exe 更新后 DLL 内容变化 → 文件名变化 → 自动重建缓存。
     ''' 落盘/加载任一步失败都回退 Assembly.Load(字节)，保证行为与原先完全一致。
     ''' </summary>
     ''' <remarks>
-    ''' **绝对禁止在本函数内调用 Logger/任何会触发其他程序集解析的 API**（第 112 轮实锤）：
+    ''' **绝对禁止在本函数内调用 Logger/任何会触发其他程序集解析的 API**：
     ''' 本函数运行在 AssemblyResolve 处理器内、持有当前前缀的 Lazy 锁——此时触碰 TCl 侧类型会递归
     ''' 解析其他程序集、最终再次请求本前缀，同线程重入 ExecutionAndPublication 的 Lazy 直接死锁
     ''' （症状：启动器进程静默挂死，连 Log1.txt 都不会创建）。诊断信息只允许写入文件。
@@ -493,7 +531,7 @@ RetryCacheCheck:
         Try
             Dim Dir = IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TCL", "Cache", "Assemblies")
             IO.Directory.CreateDirectory(Dir)
-            'FNV-1a 内容指纹。第 112 轮实锤：VB 的 UInteger 乘法默认带溢出检查（与 C# 不同，无
+            'FNV-1a 内容指纹。VB 的 UInteger 乘法默认带溢出检查（与 C# 不同，无
             '/removeintchecks 时溢出直接抛 OverflowException），原先的 UInteger 版本每次都在这里炸、
             '被外层 Catch 吞掉后回退内存加载——缓存自 r111 起从未真正生效。改用 ULong 掩码运算：
             '2^32 × 16777619 < 2^64 不可能溢出，结果与 32 位 FNV 完全一致。

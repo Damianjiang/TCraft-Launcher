@@ -85,7 +85,7 @@
     Private Sub Init()
         UserCode = Data("user_code")
         DeviceCode = Data("device_code")
-        '第 71 轮：优先使用 verification_uri_complete（验证码已预填在网址中，
+        '优先使用 verification_uri_complete（验证码已预填在网址中，
         '用户打开网页后无需再手动输入验证码，只需确认登录即可）
         If Data("verification_uri_complete") IsNot Nothing AndAlso Data("verification_uri_complete").ToString <> "" Then
             Website = Data("verification_uri_complete").ToString
@@ -161,7 +161,7 @@
                         Thread.Sleep(PollInterval * 1000)
                         Continue Do
                     ElseIf Response.Contains("slow_down") Then
-                        '第 71 轮：微软要求放慢轮询，间隔 +5 秒（RFC 8628 §3.5）
+                        '微软要求放慢轮询，间隔 +5 秒（RFC 8628 §3.5）
                         PollInterval += 5
                         Thread.Sleep(PollInterval * 1000)
                         Continue Do

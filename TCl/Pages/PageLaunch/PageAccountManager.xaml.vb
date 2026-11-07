@@ -2,11 +2,11 @@
 Imports Microsoft.VisualBasic.FileIO
 
 ''' <summary>
-''' 账户管理页（第 69 轮：布局与 HMCL AccountListPage 对齐，组件/动画仍是 TCL 自己的）。
+''' 账户管理页。
 ''' 右区 = HMCL 的账户卡片列表：圆点单选钮（TCL MyRadioBox）+ 32×32 头像（TCL MyImage，脸部截图缓存）
 ''' + 名称/类型两行（HMCL title/subtitle）+ 右侧操作按钮（HMCL：刷新/复制UUID/皮肤/删除，鼠标移入显现）。
 ''' 卡片间距 10（HMCL card-list spacing）。
-''' 添加离线账户走 MyMsgOffline 弹窗；添加微软账户直接开始登录（第 71 轮起，无中间页面）。
+''' 添加离线账户走 MyMsgOffline 弹窗；添加微软账户直接开始登录。
 ''' </summary>
 Public Class PageAccountManager
 
@@ -18,7 +18,7 @@ Public Class PageAccountManager
         RefreshAccounts()
     End Sub
 
-    ''' <summary>「添加账户」入口（第 72 轮：自侧边栏迁入本页）：弹窗选择微软账号 / 离线账号。</summary>
+    ''' <summary>「添加账户」入口：弹窗选择微软账号 / 离线账号。</summary>
     Private Sub BtnAddAccount_Click(sender As Object, e As MouseButtonEventArgs) Handles BtnAddAccount.MouseLeftButtonUp
         Dim Choice = MyMsgBoxAddAccount()
         If Choice Is Nothing Then Return
@@ -32,7 +32,7 @@ Public Class PageAccountManager
                 AddMsAccountDirect()
             Case 2 '离线账号
                 AddOfflineAccount()
-            Case 3 'LittleSkin / 第三方 Yggdrasil 外置登录（第 75 轮：改为表单弹窗）
+            Case 3 'LittleSkin / 第三方 Yggdrasil 外置登录
                 AddLittleSkinAccount()
         End Select
     End Sub
@@ -91,7 +91,7 @@ Public Class PageAccountManager
             Return
         End If
         Try
-            '第 71 轮修复：卡片是 Loaded 后动态添加行的，会触发 MyCard 高度动画（StartHeightAnimation
+            '修复：卡片是 Loaded 后动态添加行的，会触发 MyCard 高度动画（StartHeightAnimation
             '会把 Height 钉在旧值、依赖动画收尾块恢复 NaN）。若收尾块被页面切换动画打断，卡片高度
             '会永久卡在标题栏高度，导致行全部被裁剪（用户实测：列表空白）。禁用动画并强制自适应。
             CardAccounts.UseAnimation = False
@@ -116,7 +116,7 @@ Public Class PageAccountManager
                     AddOfflineRow(N, CurrentType = McLoginType.Legacy AndAlso GetCurrentLegacyName() = N)
                 Next
             End If
-            '第三方 / LittleSkin 账号（第 75 轮）
+            '第三方 / LittleSkin 账号
             Try
                 Dim AuthJson As JObject = Settings.Get(Of String)("LoginAuthAccounts").DeserializeJson()
                 For Each Account As KeyValuePair(Of String, JToken) In CType(AuthJson, JObject)
@@ -136,7 +136,7 @@ Public Class PageAccountManager
                 Empty.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrush1")
                 PanAccounts.Children.Add(Empty)
             End If
-            '第 97 轮：给还没有头像缓存的离线账户补生成头像。
+            '给还没有头像缓存的离线账户补生成头像。
             '头像是皮肤加载完才裁出来的，而皮肤加载只跑「当前账户」，非当前账户会一直显示默认脸。
             Try
                 Dim LegacyNames As New List(Of String)
@@ -149,11 +149,11 @@ Public Class PageAccountManager
             End Try
             '强制卡片高度瞬间自适应内容（禁用高度动画后双保险）
             CardAccounts.TriggerForceResize()
-            '第 133 轮：正版皮肤与披风卡片跟随当前账户类型显示
+            '正版皮肤与披风卡片跟随当前账户类型显示
             RefreshSkinCard()
-            '第 71 轮补丁 4：行入场级联动画（对齐下载页版本列表的加载效果：从上方落下、逐个级联入场）
+            '补丁 4：行入场级联动画（对齐下载页版本列表的加载效果：从上方落下、逐个级联入场）
             PlayRowsEnterAnimation()
-            '第 71 轮：左栏「已添加」摘要列表已删除，无需同步 FrmAccountLeft
+            '左栏「已添加」摘要列表已删除，无需同步 FrmAccountLeft
         Catch ex As Exception
             Logger.Error(ex, "刷新账户列表失败")
         End Try
@@ -221,7 +221,7 @@ Public Class PageAccountManager
         LabInfo.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrush1")
         Texts.Children.Add(LabTitle) : Texts.Children.Add(LabInfo)
         Grid.SetColumn(Texts, 2)
-        '右侧操作按钮（第 71 轮：常显——hover 才显现难以被发现，用户要求一眼可见）
+        '右侧操作按钮
         Dim BtnPanel As New StackPanel With {
             .Orientation = Orientation.Horizontal, .HorizontalAlignment = HorizontalAlignment.Right,
             .VerticalAlignment = VerticalAlignment.Center, .Opacity = 1, .Margin = New Thickness(0, 0, 2, 0)}
@@ -233,7 +233,7 @@ Public Class PageAccountManager
         Next
         Grid.SetColumn(BtnPanel, 3)
         Layout.Children.Add(Radio) : Layout.Children.Add(FaceBorder) : Layout.Children.Add(Texts) : Layout.Children.Add(BtnPanel)
-        '第 71 轮修复：阴影与内容必须是兄弟节点（MyCard 同款模式）。
+        '修复：阴影与内容必须是兄弟节点（MyCard 同款模式）。
         '此前把整行内容塞进 Shadow.Child，而 WPF 的 Opacity 作用于整个子树，
         '导致行内容以 5% 透明度渲染（用户实测：卡片看起来是空的，只有幽灵残影）。
         Shadow.Child = Nothing
@@ -263,7 +263,7 @@ Public Class PageAccountManager
         If IsCurrent Then
             Border.SetResourceReference(Border.BorderBrushProperty, "ColorBrush2")
         End If
-        '第 71 轮补丁 4：鼠标悬停动画（对齐下载页列表项的手感：背景平滑过渡 + 阴影加深，移出反向恢复）
+        '补丁 4：鼠标悬停动画（对齐下载页列表项的手感：背景平滑过渡 + 阴影加深，移出反向恢复）
         Dim HoverId = GetUuid()
         AddHandler Row.MouseEnter,
             Sub(sender, e)
@@ -292,7 +292,7 @@ Public Class PageAccountManager
 
     ''' <summary>微软账户卡片行：上传皮肤 / 刷新 / 复制UUID / 删除（HMCL AccountListItemSkin 对齐）。</summary>
     Private Sub AddMsRow(Name As String, RefreshToken As String, IsCurrent As Boolean)
-        '第 96 轮：3D 查看该账户的皮肤（复刻 HMCL 的账号皮肤预览）
+        '3D 查看该账户的皮肤（复刻 HMCL 的账号皮肤预览）
         Dim BtnViewSkin As New MyIconButton With {.SvgIcon = "lucide/scan-face", .ToolTip = ModLang.L("3D 查看该账户的皮肤")}
         AddHandler BtnViewSkin.Click,
             Sub(sender, e)
@@ -435,7 +435,7 @@ Public Class PageAccountManager
     ''' <summary>
     ''' 用户明确选择了某账户：同步版本的登录方式设置，避免 RefreshPage 用旧的
     ''' VersionServerLogin（如曾设置过 LittleSkin 预设=4）把 LoginType 顶回去，
-    ''' 导致首页永远显示「未登录」、启动报「账号不能为空」（第 75 轮后用户实测）。
+    ''' 导致首页永远显示「未登录」、启动报「账号不能为空」。
     ''' 无选中版本时同步全局 LoginPageType（RefreshPage 无版本时读它）。
     ''' </summary>
     Private Sub SyncVersionLogin(Type As McLoginType)
@@ -584,7 +584,7 @@ Public Class PageAccountManager
     End Sub
 
     ''' <summary>
-    ''' 添加微软账户（第 71 轮）：不打开任何中间页面，
+    ''' 添加微软账户：不打开任何中间页面，
     ''' 直接启动微软登录加载器 → 弹出设备码登录弹窗（自动打开验证网页 + 复制设备码）→ 登录成功后自动落库。
     ''' </summary>
     Public Sub AddMsAccountDirect()
@@ -631,7 +631,7 @@ Public Class PageAccountManager
     End Sub
 
     ''' <summary>
-    ''' 添加 LittleSkin / 第三方登录账号（第 75 轮，对齐离线账号的表单模式）：
+    ''' 添加 LittleSkin / 第三方登录账号：
     ''' 弹窗填写 玩家名 + 密码 + 认证服务器（可把 LittleSkin「外置登录」按钮拖进来自动识别），
     ''' 提交即登记进账户列表（LoginAuthAccounts）并写入全局缓存；
     ''' 若当前已选版本，顺带配置该版本的第三方登录。不强制先下载游戏。
@@ -689,7 +689,7 @@ Public Class PageAccountManager
     End Sub
 
     ''' <summary>
-    ''' 选择某第三方账号为当前登录账号（第 75 轮修复，完整交接，避免「选了账号却显示未登录 / 启动失败」）：
+    ''' 选择某第三方账号为当前登录账号：
     ''' 1) 全局缓存：当前账号凭据（让登录 / 皮肤加载器立即可用，并让首页立即显示玩家名）；
     ''' 2) 登录页「记住」列表：让登录页下拉框显示该账号；
     ''' 3) 当前版本的第三方登录配置：让 RefreshPage 不再把 LoginType 顶回旧登录方式；
@@ -811,7 +811,7 @@ Public Class PageAccountManager
     End Sub
 
     ''' <summary>
-    ''' 切换第三方账户的角色（第 130 轮 B1）：从登录时缓存的角色列表中选择并写入当前缓存，
+    ''' 切换第三方账户的角色：从登录时缓存的角色列表中选择并写入当前缓存，
     ''' 下次登录该账号时生效。仅多角色账号需要，MS 账户无多角色概念。
     ''' </summary>
     Private Sub SwitchAuthProfile(UserName As String)
@@ -839,7 +839,7 @@ Public Class PageAccountManager
 
 #End Region
 
-#Region "正版皮肤与披风（第 133 轮）"
+#Region "正版皮肤与披风"
 
     Private _SkinCardHooked As Boolean = False
 

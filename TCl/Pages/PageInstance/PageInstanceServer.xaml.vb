@@ -209,7 +209,7 @@ Public Class PageInstanceServer
         AddHandler BtnPing.Click, Sub(sender As Object, e As RouteEventArgs) PingSingle(Server, StatusText)
         PanBtn.Children.Add(BtnPing)
 
-        '第 121 轮：进入服务器（对齐 LumilioCL 世界页的服务器操作）
+        '进入服务器（对齐 LumilioCL 世界页的服务器操作）
         Dim BtnLaunch As New MyIconTextButton With {.Text = ModLang.L("进入"), .LogoScale = 0.8, .SvgIcon = "lucide/play"}
         AddHandler BtnLaunch.Click, Sub(sender As Object, e As RouteEventArgs) LaunchServer(Server)
         PanBtn.Children.Add(BtnLaunch)
@@ -218,7 +218,7 @@ Public Class PageInstanceServer
         Dim BtnMore As New MyIconButton With {.LogoScale = 1.0, .SvgIcon = "lucide/more-vertical", .ToolTip = ModLang.L("更多操作")}
         AddHandler BtnMore.Click,
             Sub(sender As Object, e As EventArgs)
-                '第 131 轮：改用动画菜单卡片（原 Separator 分组以行距体现）
+                '改用动画菜单卡片（原 Separator 分组以行距体现）
                 MenuCard.Show(BtnMore, {
                     New MenuCard.MenuCardRow("复制服务器地址", "lucide/copy", Sub() CopyServerAddress(Server)),
                     New MenuCard.MenuCardRow("上移", "lucide/arrow-up", Sub() MoveServer(Server, -1)),

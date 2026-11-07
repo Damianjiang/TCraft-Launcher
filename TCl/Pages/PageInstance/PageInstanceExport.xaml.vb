@@ -731,7 +731,7 @@ Public Class PageInstanceExport
 
     ''' <summary>
     ''' 把文件全路径转换成 overrides 内的相对路径（modrinth.index.json 的 path 字段）。
-    ''' <para/>第 138 轮：原先用 <c>AfterFirst(OverridesFolder)</c> 做字符串截取，一旦大小写或分隔符与拼接口径
+    ''' <para/>原先用 <c>AfterFirst(OverridesFolder)</c> 做字符串截取，一旦大小写或分隔符与拼接口径
     ''' 不一致就会返回整条绝对路径，导出的包在别的启动器里会被当成相对路径从而装到错误位置。
     ''' </summary>
     Private Shared Function GetOverridesRelativePath(FullPath As String, OverridesFolder As String) As String

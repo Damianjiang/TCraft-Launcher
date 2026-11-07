@@ -454,21 +454,16 @@ Public Class PageDownloadResourceDetail
                         End If
                     End If
                 End If
-                '第 126 轮 C3：必需前置检查（仅 Mod）。找出目标文件夹中缺失的前置，并解析其适用版本
+                'C3：必需前置检查（仅 Mod）。C：递归化（对照 PCL-CE ModDependencyResolver）——
+                '前置的前置也会被解析补全（深度 32、按平台+ID 访问去重、已装即视为满足），不再只查一层
                 Dim DepFiles As New List(Of Tuple(Of String, ResourceVersion)) '(前置显示名, 版本)
+                Dim UnresolvedNames As New List(Of String) '无法自动解析的前置名（弹窗里提示手动下载）
                 If File.ResourceType = ResourceTypes.Mod AndAlso File.Dependencies.Any Then
                     Try
-                        Dim DepProjects = ResourceProject.FromProjectIds(File.Dependencies, Project.Platform).
-                            Where(Function(Dep) Not IsDependencyInstalled(DefaultFolder, Dep)).ToList
-                        For Each Dep In DepProjects
-                            Try
-                                Dim DepVersion = SelectDependencyVersion(Dep, File, DefaultFolder)
-                                If DepVersion IsNot Nothing Then DepFiles.Add(Tuple.Create(Dep.TranslatedName, DepVersion))
-                            Catch ex As Exception
-                                Logger.Warn(ex, $"解析前置的适用版本失败，已跳过：{Dep.RawName}")
-                            End Try
-                        Next
-                        If DepProjects.Any Then Logger.Info($"必需前置检查完成：{DepProjects.Count} 个缺失，其中 {DepFiles.Count} 个可自动下载")
+                        CollectMissingDependencies(File, Project, DefaultFolder, New HashSet(Of String), DepFiles, UnresolvedNames, 0)
+                        If DepFiles.Any OrElse UnresolvedNames.Any Then
+                            Logger.Info($"必需前置检查完成：{DepFiles.Count} 个可自动下载，{UnresolvedNames.Count} 个无法解析")
+                        End If
                     Catch ex As Exception
                         Logger.Warn(ex, "检查 Mod 必需前置失败，跳过检查")
                     End Try
@@ -503,13 +498,25 @@ Public Class PageDownloadResourceDetail
                         If(PathUtils.GetExtension(File.FileName) = "mrpack", "mrpack", "zip"))
                     Target = Dialogs.SaveFile("选择保存位置", FileName, DefaultFolder, {(Ext, Desc & "文件")})
                     If Target Is Nothing Then Return
-                    '发现缺失前置时询问是否一并下载（第 126 轮 C3）
+                    '发现缺失前置时询问是否一并下载
                     If DepFiles.Any Then
                         Dim DepListText = DepFiles.Select(Function(D) D.Item1).Join("、")
-                        If MyMsgBox(ModLang.L("该资源需要以下前置，但在目标文件夹中未发现它们：") & vbCrLf & DepListText & vbCrLf & ModLang.L("是否一并下载这些前置？"),
-                                    ModLang.L("发现缺失的前置"), ModLang.L("一并下载"), ModLang.L("仅下载原资源")) <> 1 Then
-                            DepFiles = New List(Of Tuple(Of String, ResourceVersion))
-                        End If
+                        Dim UnresolvedText = If(UnresolvedNames.Any,
+                            ModLang.L("；另有以下前置无法自动解析，需要手动下载：") & UnresolvedNames.Join("、"), "")
+                        Dim DepChoice = MyMsgBox(
+                            ModLang.L("该资源需要以下前置，但在目标文件夹中未发现它们：") & vbCrLf & DepListText & UnresolvedText & vbCrLf &
+                            ModLang.L("是否一并下载这些前置？"),
+                            ModLang.L("发现缺失的前置"), ModLang.L("一并下载"), ModLang.L("仅下载原资源"), ModLang.L("取消"))
+                        Select Case DepChoice
+                            Case 1 '一并下载
+                            Case 2 '仅下载原资源
+                                DepFiles = New List(Of Tuple(Of String, ResourceVersion))
+                            Case Else '取消整个下载
+                                Return
+                        End Select
+                    ElseIf UnresolvedNames.Any Then
+                        '只有无法解析的前置：提示但不阻塞下载本体
+                        Hint(ModLang.L("以下前置无法自动解析，游戏可能无法运行，请手动下载：") & UnresolvedNames.Join("、"), HintType.Red)
                     End If
                     '构造步骤加载器
                     Dim LoaderName As String = Desc & "下载：" & PathUtils.GetFileNameWithoutExtension(Target) & " "
@@ -594,7 +601,7 @@ Public Class PageDownloadResourceDetail
         PageLoaderRestart(IsForceRestart:=True)
     End Sub
 
-    '第 126 轮 C3：前置依赖检查
+    'C3：前置依赖检查
     ''' <summary>
     ''' 通过文件名相似度判断前置是否已存在于目标文件夹（宽松匹配：宁可漏判，不误杀）。
     ''' </summary>
@@ -620,7 +627,9 @@ Public Class PageDownloadResourceDetail
     End Function
 
     ''' <summary>
-    ''' 为缺失的前置挑选一个适用版本（正式版优先，取发布时间最新者）。
+    ''' 为缺失的前置挑选一个适用版本（C 对齐 PCL-CE SelectBestFile：
+    ''' 发行类型分级 Release &gt; Beta &gt; Alpha，同级别取发布时间最新者；
+    ''' 之前只认正式版，导致不少前置解析失败被跳过）。
     ''' 已知目标实例时按实例的游戏版本与加载器筛选；否则退化为要求与主文件支持同一游戏版本。
     ''' </summary>
     Private Shared Function SelectDependencyVersion(Dep As ResourceProject, MainFile As ResourceVersion, TargetFolder As String) As ResourceVersion
@@ -638,7 +647,6 @@ Public Class PageDownloadResourceDetail
         '没有实例时退化为按主文件声明的加载器过滤
         Dim EffectiveLoaders = If(InstanceLoaders <> ModLoaders.None, InstanceLoaders, MainFile.ModLoaders)
         Return Versions.Where(Function(V) V.DownloadAvailable).
-            Where(Function(V) V.ReleaseType = ResourceVersion.ReleaseTypes.Release).
             Where(Function(V) V.ModLoaders = ModLoaders.None OrElse V.ModLoaders.Flags.Intersect(EffectiveLoaders.Flags).Any).
             Where(Function(V)
                       If InstanceVanilla Is Nothing Then
@@ -647,8 +655,57 @@ Public Class PageDownloadResourceDetail
                           Return ResourceKit.IsVersionCompatible(V.GameVersions, InstanceVanilla, InstanceDrop)
                       End If
                   End Function).
-            OrderByDescending(Function(V) V.ReleaseDate).
+            OrderBy(Function(V) ReleaseTypeRank(V.ReleaseType)). '发行类型分级（对照 PCL-CE NormalizeReleaseType）
+            ThenByDescending(Function(V) V.ReleaseDate).
             FirstOrDefault()
     End Function
+
+    ''' <summary>发行类型分级：Release=0 &lt; Beta=1 &lt; Alpha=2 &lt; 其他（对照 PCL-CE NormalizeReleaseType）。</summary>
+    Private Shared Function ReleaseTypeRank(Type As ResourceVersion.ReleaseTypes) As Integer
+        Select Case Type
+            Case ResourceVersion.ReleaseTypes.Release : Return 0
+            Case ResourceVersion.ReleaseTypes.Beta : Return 1
+            Case ResourceVersion.ReleaseTypes.Alpha : Return 2
+            Case Else : Return 3
+        End Select
+    End Function
+
+    ''' <summary>
+    ''' 递归收集缺失的必需前置（C，对照 PCL-CE ModDependencyResolver.Resolve：
+    ''' 深度上限 32、按「平台:ID」访问去重、已装即视为满足、命中后继续递归其前置的前置）。
+    ''' 结果写入 <paramref name="DepFiles"/>（可自动下载，按发现顺序）与 <paramref name="UnresolvedNames"/>（仅记录名称）。
+    ''' </summary>
+    Private Shared Sub CollectMissingDependencies(Version As ResourceVersion, Project As ResourceProject, TargetFolder As String,
+                                                  Visited As HashSet(Of String), DepFiles As List(Of Tuple(Of String, ResourceVersion)),
+                                                  UnresolvedNames As List(Of String), Depth As Integer)
+        If Depth > 32 Then Return '对照 PCL-CE MaxDepth，防循环依赖
+        For Each DepId In Version.Dependencies
+            If String.IsNullOrWhiteSpace(DepId) Then Continue For
+            Dim Key = $"{Project.Platform}:{DepId}"
+            If Not Visited.Add(Key) Then Continue For '访问去重（递归链 + 跨分支共享）
+            Try
+                Dim DepProject = ResourceProject.FromProjectId(DepId, Project.Platform)
+                If DepProject Is Nothing Then
+                    Logger.Warn($"前置项目 {DepId} 无法获取，视为无法解析")
+                    UnresolvedNames.Add(DepId)
+                    Continue For
+                End If
+                If IsDependencyInstalled(TargetFolder, DepProject) Then Continue For '已装即视为满足（对照 PCL-CE IsInstalledCompatible）
+                Dim DepVersion = SelectDependencyVersion(DepProject, Version, TargetFolder)
+                If DepVersion Is Nothing Then
+                    Logger.Info($"前置 {If(DepProject.TranslatedName, DepProject.RawName)} 没有适用于目标的版本，视为无法解析")
+                    UnresolvedNames.Add(If(DepProject.TranslatedName, DepProject.RawName))
+                    Continue For
+                End If
+                If Not DepFiles.Any(Function(D) D.Item2.Id = DepVersion.Id) Then
+                    DepFiles.Add(Tuple.Create(If(DepProject.TranslatedName, DepProject.RawName), DepVersion))
+                End If
+                '递归解析该前置自己的必需前置
+                CollectMissingDependencies(DepVersion, DepProject, TargetFolder, Visited, DepFiles, UnresolvedNames, Depth + 1)
+            Catch ex As Exception
+                Logger.Warn(ex, $"解析前置失败，已跳过：{DepId}")
+            End Try
+        Next
+    End Sub
 
 End Class

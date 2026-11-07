@@ -6,7 +6,7 @@
 
 **轻一点，快一点。**
 
-一个单文件的 Minecraft 启动器：3.5 MB，冷启动约 2 秒，开源、免费、无广告。
+一个单文件的 Minecraft 启动器：约 3.6 MB，冷启动约 2 秒，开源、免费、无广告。
 
 [![Release](https://img.shields.io/github/v/release/Damianjiang/TCraft-Launcher?style=flat-square&color=f2b632)](https://github.com/Damianjiang/TCraft-Launcher/releases)
 [![Downloads](https://img.shields.io/github/downloads/Damianjiang/TCraft-Launcher/total?style=flat-square&color=5eead4)](https://github.com/Damianjiang/TCraft-Launcher/releases)
@@ -24,26 +24,70 @@
 ## 这是什么
 
 TCraft Launcher（简称 **TCL**）是一个用 VB.NET / WPF 写的 Minecraft 启动器。
-它没有安装向导、没有捆绑、也没有任何统计上报：整个程序就是一个 3.5 MB 的 exe，
+它没有安装向导、没有捆绑、也没有任何统计上报：整个程序就是一个 3.6 MB 的 exe，
 拷到哪儿都能跑，删掉就是卸载。
 
-- **单文件发布**：启动核心与工具库以压缩快照内嵌进 exe，无需运行库依赖。
-- **快**：延迟初始化 + 汇编缓存 + UI 资源按需加载，冷启动约 2 秒，空闲占用接近 0。
-- **好看、可换**：Win11 风格半透明界面，支持自定义壁纸、背景视频、音乐与主题色。
-- **多语言**：内置中英文，运行时可热更新语言表。
+- **单文件发布**：启动核心与第三方库以压缩快照内嵌进 exe，无需运行库依赖。
+- **快**：延迟初始化 + 多核 JIT 预编译 + UI 资源按需加载，冷启动约 2 秒，空闲占用接近 0。
+- **快的不只是启动**：下载走 HTTP/2 多路复用（Win10 1607+），最高 64 线程并发 + 可调限速 + 断点续传。
+- **好看、可换**：Win11 风格半透明玻璃界面，支持壁纸自动取色、背景视频、背景音乐、21 种主题色。
+- **多语言**：简体中文 / English / 繁體中文 / 文言文 / 自动识别，全部文案可通过 `TCL\i18n.json` 自行修改。
+- **支持 Windows 7**：SP1 及以上均可运行（老系统自动回退兼容的网络栈）。
 
-## 核心功能
+## 功能总览
 
 | 模块 | 能力 |
 | --- | --- |
-| 启动 | 多版本选择、JVM / 游戏参数、内存分配、进程优先级、窗口模式、启动前命令 |
-| 账户 | 微软设备码正版登录 / 离线登录 / 外置 Authlib 登录，账户卡片切换与导入导出 |
-| 实例 | 多实例隔离、版本独立设置、Mod / 存档 / 数据包 / 截图 / 服务器管理、整合包导出 |
+| 启动 | 多文件夹多实例、版本列表 / 收藏夹 / 颜色标签 / 合集筛选、列表与网格双视图 |
+| 账户 | 微软设备码正版登录 / 离线登录 / 外置 Authlib 登录（LittleSkin 等），账户卡片切换与导入导出 |
+| 实例 | 版本独立设置、Mod / 存档 / 数据包 / 截图 / 服务器管理、整合包导出、Jar-in-Jar 内嵌依赖查看与导出 |
 | 整合包 | CurseForge、Modrinth、MCBBS、MultiMC、HMCL 五种格式解析，安装前预览图标与版本 |
-| 下载 | 原版与 Forge / NeoForge / Fabric / OptiFine / LiteLoader，CurseForge / Modrinth 资源搜索、断点续传 |
-| 联机 | 基于 EasyTier 的虚拟局域网，创建 / 加入房间，直接联机单人存档 |
-| 皮肤 | 2D 正视图 + WPF 3D 模型预览，自动识别经典 / 纤细模型 |
-| 其他 | 崩溃分析（中文人话）、分类缓存清理、完整日志 |
+| 下载 | 原版与 Forge / NeoForge / Fabric / OptiFine / LiteLoader 一键安装；CurseForge / Modrinth 资源搜索；前置 Mod 自动补全 |
+| 联机 | 基于 EasyTier 的虚拟局域网：创建 / 加入房间、自定义中转节点、启动后自动进服 |
+| 皮肤 | 2D 正视图 + WPF 3D 模型预览，自动识别经典 / 纤细模型，离线皮肤上传 |
+| 其他 | 崩溃分析（中文人话）、缓存清理、设置导入导出、全局搜索、完整日志 |
+
+## 各页面详细功能
+
+### 启动
+
+- **版本管理**：多文件夹扫描，收藏夹置顶，颜色标签与合集筛选；F11 查看隐藏版本。
+- **内存分配**：自动 / 手动 / 按版本独立；可选「锁定初始内存」（-Xms = -Xmx，降低延迟抖动，利于 ZGC）。
+- **Java 管理**：按版本范围自动选择（如 `[21.0, 25)`），列表可排序，支持手动指定路径、版本内嵌 Java 自动识别、没有合适 Java 时自动下载。
+- **参数与命令**：JVM 参数 / 游戏参数 / 启动前命令均支持 Minecraft 版本 JSON 字符串标记与 TCL 替换标记（`{verpath}`、`{java}` 等）。
+- **高级修复**：mesa-loader 自定义渲染器注入、LWJGL Unsafe Agent、Java Launch Wrapper（中文路径修复）、高性能显卡自动设置。
+- **其他**：进程优先级、窗口标题与大小自定义、启动脚本导出、愚人节彩蛋、游戏启动后自动隐藏 / 关闭启动器。
+
+### 下载
+
+- **版本安装**：原版、Forge、NeoForge、Fabric、OptiFine、LiteLoader 一键下载并自动组装。
+- **资源搜索**：Mod / 资源包 / 光影 / 整合包 / 世界，来自 CurseForge 与 Modrinth，支持 API Key 配置。
+- **前置补全**：下载 Mod 时自动解析并补齐缺失的前置依赖（递归解析、已装检查、无法解析时明确提示）。
+- **下载引擎**：HTTP/2 多路复用（自动回退）、最高 64 线程、全局限速、断点续传、失败自动换源重试。
+
+### 实例管理
+
+- **Mod 管理**：启用 / 禁用 / 收藏 / 搜索 / 全选，拖入 zip 安装，Jar-in-Jar 内嵌依赖一览并可单个或全部导出。
+- **资源包 / 光影包**：列表即预览（自动提取 pack.png 图标），单击切换当前启用项，直接打开文件夹。
+- **存档管理**：备份 / 重命名 / 复制 / 导出 / 删除，自动识别世界图标与游戏规则。
+- **服务器**：局域网与联机房间状态查询（MOTD / 延迟 / 人数），一键带当前实例进入服务器。
+- **整合包导出**：CurseForge / Modrinth / MCBBS / MultiMC / HMCL 格式，可选打包资源文件（供弱网环境）。
+- **版本独立设置**：每个实例可独立设置内存、Java、隔离模式、窗口标题等，支持保存为预设并套用到其他实例。
+
+### 设置
+
+- **个性化**：21 种主题色（含随机与自定义 HSL）、壁纸自动取色、背景模糊 / 视频 / 音乐、组件与弹出菜单双半透明滑杆。
+- **系统**：界面语言切换（含文言文风格）、下载线程与限速、缓存位置、软件渲染开关、设置导入导出（.tcl）。
+- **启动**：全局默认内存、窗口模式、默认隔离策略、Java 选择规则、正版支持提示开关。
+
+## 使用技巧
+
+- **全局搜索**：`Ctrl+K` 或标题栏放大镜，搜索所有设置项，点击直达。
+- **替换标记**：在窗口标题、启动命令等文本里写 `{verpath}`、`{java}` 等，运行时自动填入真实值——详见「更多 → 帮助」。
+- **隐藏版本**：在版本设置中隐藏后，版本列表按 `F11` 可查看全部隐藏版本。
+- **改文案**：所有界面文案在 `TCL\i18n.json`，文本编辑器改完点「重载」即时生效，无需重启。
+- **静默内存优化**：使用 `--memory` 参数启动 TCL，可直接执行一次内存优化。
+- **导入整合包 / 存档 / Mod**：直接把 zip / jar 拖进对应页面即可。
 
 ## 界面
 
@@ -60,16 +104,12 @@ TCraft Launcher（简称 **TCL**）是一个用 VB.NET / WPF 写的 Minecraft �
 该链接始终指向最新版本，页面无需随版本更新。
 
 - **系统**：Windows 7 SP1 及以上（推荐 Windows 10 / 11），64 位
-- **体积**：约 3.5 MiB（单文件，< 4 MB）
+- **体积**：约 3.6 MiB（单文件，< 4 MB）
 - **校验值**：见最新 Release 页面（随发布同步更新）
 - **更新日志**：[CHANGELOG.md](CHANGELOG.md)，中英双语，按版本记录每次改动
 
 > 项目未购买代码签名证书，SmartScreen 可能提示「未知发布者」。
 > 可在 Release 页面核对校验值，或直接从源码构建。
-
-> 微软正版登录在开源版中**默认未启用**：程序不内置任何微软凭据。
-> 如需使用，注册一个 Azure 应用后设置环境变量 `TCL_MS_CLIENT_ID` 为你的 ClientId，重启启动器即可；
-> 也可以加入 [TCraft Launcher 启动器交流群](https://qm.qq.com/q/WaG64YE9uo)（群号 **1131373915**）获取内置正版登录的完整版。
 
 ## 从源码构建
 
@@ -85,7 +125,8 @@ cd TCraft-Launcher
 powershell -ExecutionPolicy Bypass -File scripts\build.ps1
 ```
 
-构建产物在 `TCl\bin\TCraft Launcher.exe`。也可以直接用 Visual Studio 打开 `TCl.sln` 编译。
+`build.ps1` 会依次编译 TClKit / TClCS、重打内嵌 gz 快照，产出单文件 `TCl\bin\TCraft Launcher.exe`。
+也可以直接用 Visual Studio 打开 `TCl.sln` 编译。
 
 ## 项目结构
 
@@ -94,12 +135,19 @@ powershell -ExecutionPolicy Bypass -File scripts\build.ps1
 │   ├── Pages/        各功能页面
 │   ├── Controls/     自研控件（列表项、卡片、消息框、滚动条等）
 │   ├── Modules/      启动、下载、整合包、联机、皮肤等业务模块
-│   └── Resources/    内嵌资源（第三方 DLL 压缩快照、字体、贴图）
+│   └── Resources/    内嵌资源（第三方 DLL 压缩快照、译表、贴图）
 ├── TClCS/        启动核心（C#）：Java 管理、游戏启动、Minecraft 数据
 ├── TClKit/       共享工具库（JSON 解析、基础类型、WPF 辅助）
 ├── docs/         官网（GitHub Pages）
-└── scripts/      构建脚本
+└── scripts/      构建脚本（build.ps1 / regen_gz.ps1 / gen_langtables.py）
 ```
+
+## 性能与工程说明
+
+- **冷启动**：SplashScreen 前置 + 后台预热池（语言词典 / 网络栈 / 注册表预热与首帧并行）+ 多核 JIT 配置档案，目标 2 秒内完成首帧。
+- **下载引擎**：Win10 1607+ 使用 WinHTTP 的 HTTP/2 多路复用（几十个并发共用少量连接），Win7 自动回退兼容栈；64 线程令牌桶限速；失败自动换源。
+- **UI**：全部控件自绘，无第三方 UI 框架；页面切换、按钮、列表均为增量动画，无整页重绘。
+- **健壮性**：后台线程异常全局兜底记录（崩溃可从日志定位）、取消启动全程可中断、加载器状态机防重入。
 
 ## 参考与致谢
 
@@ -114,7 +162,7 @@ TCL 站在前人的肩膀上，这里把每一个来源都写清楚：
 
 关于 PCL 的[分发许可](https://github.com/Meloong-Git/PCL/blob/main/LICENCE)：TCL 属于「参考实现思路后自行开发、且未与 PCL 混淆」的情形，因此按其中的「轻度使用」条款处理——给出署名、不暗示与 PCL 有关，也不使用 PCL 相关名称。如果权利人认为需要调整，请提 Issue，我们会第一时间配合。
 
-同时感谢 Newtonsoft.Json、NAudio、Ookii.Dialogs 等开源组件，
+同时感谢 Newtonsoft.Json、libwebp 等开源组件，
 完整清单见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
 
 ## 社区

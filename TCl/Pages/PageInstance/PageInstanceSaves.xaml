@@ -61,5 +61,10 @@
             </local:MyCard>
         </Grid>
 
+        <!-- 刷新时的镐子加载卡（覆盖层，与内容平级） -->
+        <local:MyCard x:Name="PanLoad" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="40" UseAnimation="False" Visibility="Collapsed">
+            <local:MyLoading Text="正在加载存档列表" x:Name="Load" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False" />
+        </local:MyCard>
+
     </Grid>
 </local:MyPageRight>

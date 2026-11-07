@@ -16,7 +16,7 @@ Public Class MyListItem
     Public ReadOnly Property RectBack As Border
         Get
             If _RectBack Is Nothing Then
-                'hover 深色底一律圆角（第 131 轮用户要求：原先行高 ≤40 时圆角为 0，弹出菜单行悬停是直角）
+                'hover 深色底一律圆角
                 Dim Rect As New Border With {
                     .Name = "RectBack",
                     .CornerRadius = New CornerRadius(6),
@@ -323,7 +323,7 @@ Public Class MyListItem
     End Sub
 
     '图片
-    ''' <summary>取缓存位图。第 136 轮：缓存本体收进 MyLogoCache，与网格卡片共用同一份，
+    ''' <summary>取缓存位图。缓存本体收进 MyLogoCache，与网格卡片共用同一份，
     ''' 不再各自维护一个 256 条的字典（两处逻辑原本逐行相同）。</summary>
     Private Shared Function GetCachedLogoBitmap(FilePath As String) As MyBitmap
         Return MyLogoCache.Get(FilePath)
@@ -641,7 +641,7 @@ Public Class MyListItem
                 Else
                     '由有变无
                     If Not IsNothing(RectCheck) Then
-                        'Anim.Add(AaWidth(RectCheck, -RectCheck.Width, 120,, New AniEaseInFluent))
+                        'Anim.Add(AaWidth(RectCheck, -RectCheck.Width, 120, New AniEaseInFluent))
                         Anim.Add(AaHeight(RectCheck, -RectCheck.ActualHeight, 120,, New AniEaseInFluent(AniEasePower.Weak)))
                         Anim.Add(AaOpacity(RectCheck, -RectCheck.Opacity, 70, 40))
                         RectCheck.VerticalAlignment = VerticalAlignment.Center
@@ -772,7 +772,7 @@ Public Class MyListItem
                              AaColor(RectBack, Border.BackgroundProperty, If(IsMouseDown, "ColorBrush6", "ColorBrushBg1"), Time),
                              AaOpacity(RectBack, 1 - RectBack.Opacity, Time,, New AniEaseOutFluent)
                          })
-                '第 71 轮修复：MyPageLeft 入场动画会把 RenderTransform 换成 TranslateTransform 且不还原，
+                '修复：MyPageLeft 入场动画会把 RenderTransform 换成 TranslateTransform 且不还原，
                 '此时强转 ScaleTransform 会抛 InvalidCastException（曾在账户页 hover 直接导致程序退出）。
                 '变换类型不符时跳过缩放动画，仅保留颜色/透明度过渡，视觉几乎无差别。
                 If IsScaleAnimationEnabled AndAlso TypeOf RenderTransform Is ScaleTransform Then
@@ -791,7 +791,7 @@ Public Class MyListItem
                                      MinPaddingRight - ColumnPaddingRight.Width.Value, Time * 0.4))
                 End If
                 Ani.Add(AaOpacity(RectBack, -RectBack.Opacity, Time))
-                '第 71 轮修复：同上——RenderTransform 为 TranslateTransform（入场动画遗留）时不做缩放
+                '修复：同上——RenderTransform 为 TranslateTransform（入场动画遗留）时不做缩放
                 If IsScaleAnimationEnabled AndAlso TypeOf RenderTransform Is ScaleTransform Then
                     Ani.AddRange({
                         AaColor(RectBack, Border.BackgroundProperty, If(IsMouseDown, "ColorBrush6", "ColorBrush7"), Time),

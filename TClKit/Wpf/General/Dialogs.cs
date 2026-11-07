@@ -68,14 +68,14 @@ public static class Dialogs {
 
     /// <summary>
     /// 上一次 <see cref="SelectFolder"/> 的失败原因；成功或用户取消时为空字符串。
-    /// <para/>第 137 轮：以前对话框创建失败只写日志并返回空数组，调用方无法区分「用户取消」，
+    /// <para/>以前对话框创建失败只写日志并返回空数组，调用方无法区分「用户取消」，
     /// 表现为按钮点了完全没反应。调用方可据此给出可见提示。
     /// </summary>
     public static string LastFolderError => VistaFolderPicker.ErrorMessage ?? "";
 
     /// <summary>
     /// 弹出 “选择文件夹” 弹窗，返回用户选择的文件夹路径（以分隔符结尾），若取消则返回空数组。
-    /// <para/>第 130 轮：改为自写的 IFileDialog COM 封装（VistaFolderPicker）替代 Ookii.Dialogs.Wpf，
+    /// <para/>改为自写的 IFileDialog COM 封装（VistaFolderPicker）替代 Ookii.Dialogs.Wpf，
     /// 减少内嵌体积约 42KB；项目内全部调用均为 multiselect:=False，多选签名保留但不展开。
     /// </summary>
     public static List<string> SelectFolder(string title, bool multiselect, string? defaultDirectory = null) {

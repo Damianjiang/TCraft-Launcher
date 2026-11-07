@@ -27,7 +27,7 @@ Public Module ModServer
 
 #Region "NBT 读写"
 
-    ''' <summary>第 130 轮：读取复用 ModWorldData.NbtReader（删除本文件原先的 118 行重复实现），写入仍用下方 NbtWriter。</summary>
+    ''' <summary>读取复用 ModWorldData.NbtReader（删除本文件原先的 118 行重复实现），写入仍用下方 NbtWriter。</summary>
 
     Private Class NbtWriter
         Private ReadOnly S As Stream

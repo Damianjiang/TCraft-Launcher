@@ -122,6 +122,13 @@
       <HintPath>Resources\Imazen.WebP.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <!-- WinHttpHandler：编译期引用 TClCS\bin 下的 dll（运行时由内嵌 gz 单文件加载，见 Application.xaml.vb Prefixes）。
+         Windows 10 1607+ 用它启用 HTTP/2 多路复用（下载提速），Win7 回退 HttpClientHandler。 -->
+    <Reference Include="System.Net.Http.WinHttpHandler">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\TClCS\bin\System.Net.Http.WinHttpHandler.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <!-- Newtonsoft.Json：由 Resources\Newtonsoft.Json.dll（标准 OSS）提供，WPF 标记编译器临时工程需要此引用做类型解析；
          Core\TClJson.vb 保留在磁盘作参考，不再参与编译（避免与 DLL 类型重复）。 -->
     <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
@@ -497,6 +504,10 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Page Include="Controls\MyToast.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="Controls\MyLoading.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -579,6 +590,9 @@
     </Compile>
     <Compile Include="Controls\MyIconButton.xaml.vb">
       <DependentUpon>MyIconButton.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Controls\MyToast.xaml.vb">
+      <DependentUpon>MyToast.xaml</DependentUpon>
     </Compile>
     <Compile Include="Controls\MyMsg\MyMsgText.xaml.vb">
       <DependentUpon>MyMsgText.xaml</DependentUpon>
@@ -1078,6 +1092,10 @@
     <None Include="..\TClCS\bin\Microsoft.Win32.Registry.dll">
       <LogicalName>Microsoft.Win32.Registry.dll</LogicalName>
       <Link>Resources\Microsoft.Win32.Registry.dll</Link>
+    </None>
+    <None Include="..\TClCS\bin\System.Net.Http.WinHttpHandler.dll">
+      <LogicalName>System.Net.Http.WinHttpHandler.dll</LogicalName>
+      <Link>Resources\System.Net.Http.WinHttpHandler.dll</Link>
     </None>
   </ItemGroup>
   <ItemGroup>

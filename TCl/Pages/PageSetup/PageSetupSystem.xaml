@@ -220,7 +220,7 @@
                         <local:MyButton Grid.Column="1" x:Name="BtnSystemSettingImp" MinWidth="140" Text="导入全部数据" Padding="13,0" Margin="0,0,20,0"
                                         ToolTip="从 .tcl 导出文件恢复全部数据。多数设置导入后立即生效，少数（如缓存文件夹路径）将在重启 TCL 后完全生效。" />
                         <local:MyButton Grid.Column="2" x:Name="BtnSystemIdentify" MinWidth="140" Text="复制识别码" Padding="13,0" Margin="0,0,20,0" />
-                        <!-- 第 129 轮：导入在后台线程执行，期间显示加载动画并禁用按钮 -->
+                        <!-- 导入在后台线程执行，期间显示加载动画并禁用按钮 -->
                         <local:MyLoading Grid.Column="3" x:Name="LoadingImport" Visibility="Collapsed" Text="正在导入数据…" Height="30" HorizontalAlignment="Left" Margin="4,0,0,0" />
                     </Grid>
                     <Grid Height="40" Grid.Row="6" Grid.ColumnSpan="5" Margin="0,16,0,0" x:Name="PanDonate">

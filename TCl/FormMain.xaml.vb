@@ -10,7 +10,7 @@ Public Class FormMain
     Private IsWindowLoadFinished As Boolean = False
     '首帧后的收尾工作（翻译/界面语言）是否已执行，防止 ContentRendered 与兜底计时器重复跑
     Private _DeferredStartupDone As Boolean = False
-    '第 104 轮：主窗口首帧是否已渲染。首帧前暂缓高成本渲染（如背景高斯模糊），首帧后补齐。
+    '主窗口首帧是否已渲染。首帧前暂缓高成本渲染（如背景高斯模糊），首帧后补齐。
     Private HasRenderedFirstFrame As Boolean = False
     ''' <summary>
     ''' 当前是否处于 WPF 软件渲染（RenderCapability.Tier = 0）。远程桌面会话、无独立 GPU 的虚拟机上恒为 True。
@@ -24,7 +24,7 @@ Public Class FormMain
     End Property
     Private Shared _IsSoftwareRendering As Boolean? = Nothing
 
-    '背景视频层（第 112 轮惰性构造）：原先在 XAML 中即构造 MediaElement，首个实例会初始化
+    '背景视频层：原先在 XAML 中即构造 MediaElement，首个实例会初始化
     'WPF 媒体栈（实测数十至百余毫秒），而默认 Collapsed、多数用户不用背景视频——纯浪费。
     '改为首次真正需要时创建，并插入 PanForm 的 ImgBack(索引 0) 之后，保持原 XAML 层级。
     Private _VidBack As MediaElement = Nothing
@@ -54,13 +54,13 @@ Public Class FormMain
     Public Sub New()
         ApplicationStartTick = GetTimeMs()
         Dim Seg = GetTimeMs() '启动性能分段计时（仅日志）
-        'TClKit.Wpf 初始化从 Application_Startup 挪来（第 112 轮）：其全部内容是 ModernTooltipService
+        'TClKit.Wpf 初始化从 Application_Startup 挪来：其全部内容是 ModernTooltipService
         '的 DP 注册与类处理器注册，必须在任何带 ToolTip 的控件实例化之前完成——本窗口的控件
         '在下方 InitializeComponent 才创建，此处调用正好卡在最后可行时刻，把 5-30ms 移出更早的关键路径
         TClKit.Wpf.Main.Init()
         '窗体参数初始化
         FrmMain = Me
-        '左栏与右栏对称（第 105 轮启动提速）：都不在 New 里构造，改到窗口首帧之后（EnsureLaunchLeftCreated / EnsureLaunchRightCreated）。
+        '左栏与右栏对称：都不在 New 里构造，改到窗口首帧之后（EnsureLaunchLeftCreated / EnsureLaunchRightCreated）。
         'New 阶段仍保留日志占位，便于分段计时。
         LogStartupSegment("左/右栏延迟到首帧后构造", Seg)
         '版本号改变
@@ -84,16 +84,16 @@ Public Class FormMain
                 Logger.Info("全新的 TCL，使用新的版本隔离默认值")
                 Settings.Set("LaunchArgumentIndieV2", Settings.GetDefault("LaunchArgumentIndieV2"))
                 'Settings.Set 对「与当前值相同」会早退且不落盘，导致 HasSaved 永远为 False、
-                '本分支每次启动都重跑（第 111 轮审计确认）；这里直接写 ini 落盘标记，下次启动即跳过
+                '本分支每次启动都重跑；这里直接写 ini 落盘标记，下次启动即跳过
                 WriteIni("Setup", "LaunchArgumentIndieV2", Settings.GetDefault("LaunchArgumentIndieV2"))
             End If
         End If
         LogStartupSegment("版本/隔离迁移", Seg)
-        '刷新主题（第 103 轮：ThemeRefresh 保留在 InitializeComponent 之前，
+        '刷新主题（ThemeRefresh 保留在 InitializeComponent 之前，
         '此时 Application.Current.Resources 已可用，先把正确的主题色写进资源字典；
-        'ThemeRefreshMain 的守卫已在第 103 轮放宽为 PanTitle 非 null，
+        'ThemeRefreshMain 的守卫已在放宽为 PanTitle 非 null，
         '所以 InitializeComponent 之后调用它即可让首帧直接渲染用户主题色，不再闪默认蓝）
-        '（第 112 轮清理：ThemeCheckAll 已是空方法，删除死调用）
+        '
         ThemeRefresh(Settings.Get(Of Integer)("UiLauncherTheme"))
         LogStartupSegment("主题检查与刷新", Seg)
         '注册拖拽事件（不能直接加 Handles，否则没用）
@@ -102,7 +102,7 @@ Public Class FormMain
         '加载 UI
         InitializeComponent()
         LogStartupSegment("InitializeComponent(FormMain)", Seg)
-        '第 103 轮：XAML 中 PanTitle 背景用的是 StaticResource ColorObject4（编译时固定为默认蓝），
+        'XAML 中 PanTitle 背景用的是 StaticResource ColorObject4（编译时固定为默认蓝），
         '运行时改字典不会让已解析的 StaticResource 控件变色。
         'ThemeRefreshMain 直接给 PanTitle/PanForm 赋 Background，首帧前就能覆盖掉默认蓝。
         'InitializeComponent 完成后 PanTitle 已存在，直接调用，无需第二次 ThemeRefresh（会命中 ThemeNow 早退）。
@@ -134,14 +134,14 @@ Public Class FormMain
             AddHandler Closing, Sub() Helper.RemoveDragHook()
             AddHandler Helper.DragDrop, Sub() FileDrag(Helper.DropFilePaths)
         End If
-        '切换到首页（第 112 轮首帧观感重构，用户反馈「要非常快地显示完整主页，不会蓝色一下再加载」）：
+        '切换到首页：
         '主页左右栏改回 Show 之前同步构造。r105 曾为缩短「窗口出现」把它们推迟到首帧后，
         '但代价是首帧是「空壳」、内容随后分批弹入，体感反而更差。现在 r111/r112 的 JIT 档案
         '与预热已把建页成本压低，同步构造后首帧即完整主页（一次到位）。
         '两个 Ensure 均幂等，Loaded 里原有的 Background 队列调用保留为兜底（会直接早退）。
         EnsureLaunchLeftCreated()
         EnsureLaunchRightCreated()
-        '背景图 + 壁纸取色同样提前（消「蓝一下」，第 112 轮首帧观感重构）：
+        '背景图 + 壁纸取色同样提前（消「蓝一下」，首帧观感重构）：
         'BackgroundRefresh 会从 TCL\Pictures 随机选图加载（WebP 解码）并经 ApplyWallpaperTheme
         '把整套主题色染成壁纸色——原先这一步在首帧后的 Background 队列里，导致首帧是
         '「无壁纸 + 默认主题色」的空壳（用户反馈的「蓝色一下再完全加载」）。
@@ -160,7 +160,7 @@ Public Class FormMain
 
         LogStartupSegment("主页构造+背景+启动加载池", Seg)
         Logger.Info($"第二阶段加载用时：{GetTimeMs() - ApplicationStartTick} ms")
-        '第 112 轮插桩：New 结束 → SourceInitialized 的空档（此前实测 ~670ms 无人认领），
+        '插桩：New 结束 → SourceInitialized 的空档（此前实测 ~670ms 无人认领），
         '用 Style/Template 应用时机把它拆成可归因的段
         NewEndTick = GetTimeMs()
     End Sub
@@ -178,7 +178,7 @@ Public Class FormMain
         MyBase.OnTemplateChanged(oldTemplate, newTemplate)
     End Sub
     ''' <summary>
-    ''' 巨型 Logo 几何延迟赋值（第 112 轮启动提速）：从 FormMain.xaml 挪来的 4 条 Path 数据，
+    ''' 巨型 Logo 几何延迟赋值：从 FormMain.xaml 挪来的 4 条 Path 数据，
     ''' 原先在 BAML 解析时经 GeometryConverter 同步解析。这些按钮（关闭 Minecraft/返回顶部/
     ''' 任务管理/投降）默认 Collapsed，首帧不可见，解析纯属启动关键路径上的白花。
     ''' 在窗口 Loaded 后、页面构造前的 Background 队列中调用。
@@ -196,14 +196,14 @@ Public Class FormMain
 
     ''' <summary>
     ''' 构造并挂载启动页左栏。幂等，可在任意时刻调用。
-    ''' 之所以延迟到窗口首帧之后（与右栏对称，第 105 轮）：
+    ''' 之所以延迟到窗口首帧之后（与右栏对称，）：
     ''' 主页左栏的 BAML 解析 + 控件树构造 + 启动加载池首次跑，原同步占 FormMain.New 约 291ms；
-    ''' 右栏（PageLaunchRight）自第 65 轮起就用同样手法延迟到首帧后，零副作用，
+    ''' 右栏（PageLaunchRight）自起就用同样手法延迟到首帧后，零副作用，
     ''' 左栏对称化即可把这段成本移出「窗口显示」关键路径。首屏观感与之前一致（首帧渲染
     ''' 时左右栏都在，只是从 XAML 解析到窗口可见的时间被拆到两帧）。
     ''' </summary>
     Public Sub EnsureLaunchLeftCreated()
-        Application.EnsureDelayedUiLoaded() '页面内容需要延迟字典里的滚动条/文本框等样式（第 112 轮）
+        Application.EnsureDelayedUiLoaded() '页面内容需要延迟字典里的滚动条/文本框等样式
         If _FrmLaunchLeft IsNot Nothing Then Return
         Try
             _FrmLaunchLeft = New PageLaunchLeft
@@ -223,7 +223,7 @@ Public Class FormMain
     ''' 但能把这部分 XAML 解析与控件构造移出「窗口显示」的关键路径（约 430ms）。
     ''' </summary>
     Public Sub EnsureLaunchRightCreated()
-        Application.EnsureDelayedUiLoaded() '页面内容需要延迟字典里的滚动条/文本框等样式（第 112 轮）
+        Application.EnsureDelayedUiLoaded() '页面内容需要延迟字典里的滚动条/文本框等样式
         If _FrmLaunchRight IsNot Nothing Then Return
         Try
             _FrmLaunchRight = New PageLaunchRight
@@ -231,7 +231,7 @@ Public Class FormMain
             PageRight = _FrmLaunchRight
             _FrmLaunchRight.PageState = MyPageRight.PageStates.ContentStay
             '延迟构造的页面必须立刻套一遍当前语言：FormMain_Loaded 的 ApplyToWindow 跑在本方法之前，
-            '若上次会话保存了非简中语言，此处不套会让主页一直停在简中（第 66 轮修复）
+            '若上次会话保存了非简中语言，此处不套会让主页一直停在简中
             ModLang.ApplyTo(_FrmLaunchRight)
             FrmLaunchRight.RefreshAccountSummary() '初始化标题栏账号徽章
         Catch ex As Exception
@@ -270,7 +270,7 @@ Public Class FormMain
         Dim Seg = GetTimeMs() '启动性能分段计时（仅日志）
         Logger.Info($"[启动耗时] 窗口 Loaded 触发（自进程启动 {MsSinceProcessStart()} ms）")
         '等待启动预热（词典/网络默认值/代理/默认背景释放等）完成。预热通常早已完成，此处近零开销；
-        '冷盘极端情况下最多等待数百毫秒——等价于这些工作原本就在 UI 线程同步执行（第 111 轮前的行为）
+        '冷盘极端情况下最多等待数百毫秒——等价于这些工作原本就在 UI 线程同步执行
         Application.WaitStartupWarmup()
         LogStartupSegment("等待启动预热", Seg)
         Handle = New WindowInteropHelper(Me).Handle
@@ -283,13 +283,13 @@ Public Class FormMain
             Logger.Error(ex, "清除页面隐藏锁定失败")
         End Try
         LogStartupSegment("清除隐藏锁定", Seg)
-        '异常退出检测（第 130 轮 H5）：上次非正常退出（断电/强杀/崩溃）时提示一次，不影响启动流程
+        '异常退出检测：上次非正常退出（断电/强杀/崩溃）时提示一次，不影响启动流程
         Try
             If Not Settings.Get(Of Boolean)("SystemLastExitClean") AndAlso Settings.Get(Of Integer)("SystemCount") > 2 Then
                 RunInNewThread(
                 Sub()
                     Dim Result As Integer = MyMsgBox(ModLang.L("上次启动器可能异常退出（如断电、强制结束进程或崩溃）。") & vbCrLf & ModLang.L("如果游戏或启动器出现问题，可以打开日志查看原因。"), ModLang.L("异常退出提示"), ModLang.L("打开日志"), ModLang.L("知道了"))
-                    '用户已经看过并确认过这条提示：立刻记成「正常」，同一件事不要每次启动都再弹（第 132 轮）
+                    '用户已经看过并确认过这条提示：立刻记成「正常」，同一件事不要每次启动都再弹
                     Try
                         Settings.Set("SystemLastExitClean", True)
                     Catch ex As Exception
@@ -308,8 +308,8 @@ Public Class FormMain
         Catch ex As Exception
             Logger.Warn(ex, "异常退出检测失败")
         End Try
-        '搜索索引空闲预热（第 130 轮体检 P1）：启动 8 秒后按子页分片构建，每个分片间隔 150ms，
-        '避免一次性实例化 9 个设置子页造成 UI 集中冻结（第 131 轮分片化）
+        '搜索索引空闲预热：启动 8 秒后按子页分片构建，每个分片间隔 150ms，
+        '避免一次性实例化 9 个设置子页造成 UI 集中冻结
         RunInNewThread(
         Sub()
             Thread.Sleep(8000)
@@ -329,7 +329,7 @@ Public Class FormMain
             Next
         End Sub, "Search Index Warmup")
         '读取设置
-        '第 96 轮：个性化页新增项，必须在首次布局前套上，否则会看到一帧「旧圆角/旧标题栏高度」
+        '个性化页新增项，必须在首次布局前套上，否则会看到一帧「旧圆角/旧标题栏高度」
         ApplyWindowRadius(Settings.Get(Of Integer)("UiWindowRadius"))
         ApplyTitleBarHeight(Settings.Get(Of Integer)("UiTitleBarHeight"))
         ApplyTitleAccountBadge(Settings.Get(Of Boolean)("UiTitleAccountBadge"))
@@ -348,12 +348,12 @@ Public Class FormMain
                 End Try
             End Sub))
         LogStartupSegment("注册 HiddenRefresh 延迟执行", Seg)
-        '（第 112 轮：原先这里的 BackgroundRefresh 已提前到 FormMain.New 首帧前执行——
-        '  首帧即有壁纸与壁纸主题色；这里不再二次随机选图，避免窗口出现后背景换一张）
+        '（原先这里的 BackgroundRefresh 已提前到 FormMain.New 首帧前执行——
+        ' 首帧即有壁纸与壁纸主题色；这里不再二次随机选图，避免窗口出现后背景换一张）
         '背景音乐/视频的扫描与初始化很贵（MusicListInit 要枚举 Musics 目录并读标签、VideoRefreshPlay 要探测
         '媒体源），原来同步跑在 Loaded 里会直接推迟「启动画面 → 主界面」的渲染（实测约 300~450ms）。
         '这里只保留事件注册，真正的初始化丢到首帧之后的 Background 优先级，音频/视频晚几十毫秒起播无感。
-        '（VidBack.MediaEnded 已随惰性构造接线，第 112 轮）
+        '（VidBack.MediaEnded 已随惰性构造接线，）
         Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, New Action(
             Sub()
                 Try
@@ -399,7 +399,7 @@ Public Class FormMain
         Topmost = False
         '主界面即将显示，直接关闭启动画面（不再使用淡出动画，避免淡出被界面渲染阻塞而残留）
         StartSplashFallbackTimer()
-        '更改窗口（第 96 轮：可选记住上次位置；坐标失效时退回居中）
+        '更改窗口
         Dim Centered As Boolean = True
         If Settings.Get(Of Boolean)("UiRememberWindowPos") Then
             Try
@@ -421,7 +421,7 @@ Public Class FormMain
             End Try
         End If
         If Centered Then
-            '第 112 轮：My.Computer.Screen(WinForms) 首触会加载 System.Windows.Forms（10-20ms），
+            'My.Computer.Screen(WinForms) 首触会加载 System.Windows.Forms（10-20ms），
             'SystemParameters.WorkArea 同为主屏工作区且已是 WPF 单位，直接等价替换
             Top = (SystemParameters.WorkArea.Height - Height) / 2
             Left = (SystemParameters.WorkArea.Width - Width) / 2
@@ -431,8 +431,8 @@ Public Class FormMain
         Dim HwndSource As Interop.HwndSource = PresentationSource.FromVisual(Me)
         HwndSource.AddHook(New Interop.HwndSourceHook(AddressOf WndProc))
         '入场动画：透明度 + 位移 + 旋转 + Logo 淡入，全部保留（用户明确要求不能被裁剪）。
-        '第 106 轮：软件渲染（RenderCapability.Tier = 0：远程桌面/无 GPU）机自动走终态支路——
-        '入场动画在这类机器上由 CPU 逐帧合成，460ms 的动画实测被拖成 ~2s（日志「两个动画帧间隔 1454 ms」实锤），
+        '软件渲染（RenderCapability.Tier = 0：远程桌面/无 GPU）机自动走终态支路——
+        '入场动画在这类机器上由 CPU 逐帧合成，460ms 的动画实测被拖成 ~2s（日志「两个动画帧间隔 1454 ms」），
         '会把「窗口可见」整体后推 1.5~2s。跳过只省时间、终态与动画播完时完全一致（观感等价）。
         '硬件加速机（Tier>0）不受任何影响，全程播放原动画；「跳过入场动画」设置仍可手动强制开启。
         Dim SkipIntroAnim As Boolean = Settings.Get(Of Boolean)("UiSkipIntroAnim")
@@ -473,7 +473,7 @@ Public Class FormMain
         'Timer 启动
         AniStart()
         TimerMainStart()
-        '巨型 Logo 几何延迟赋值（第 112 轮）：4 条 1.2~2.5KB 的 Path 字符串原先在 BAML 解析时经
+        '巨型 Logo 几何延迟赋值：4 条 1.2~2.5KB 的 Path 字符串原先在 BAML 解析时经
         'GeometryConverter 解析（InitializeComponent 内），这些按钮默认 Collapsed，纯白花——
         '挪到首帧后的 Background 队列，排在页面构造之前，按钮不会出现空图标
         Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, New Action(AddressOf ApplyExtraButtonLogos))
@@ -519,11 +519,11 @@ Public Class FormMain
         _DeferredStartupDone = True
         Dim Seg = GetTimeMs()
         '等待启动预热（ModLang 词典构建等）完成——下方的界面语言应用需要词典就绪；
-        '预热在 Startup 入口即启动，到首帧此时点早已完成，此处近零开销（第 111 轮）
+        '预热在 Startup 入口即启动，到首帧此时点早已完成，此处近零开销
         Application.WaitStartupWarmup()
         LogStartupSegment("等待启动预热（首帧后）", Seg)
         '首帧后立刻合并延迟 UI 资源：覆盖 EnsureLaunch* 之外的构造入口（如 Hint/弹窗），
-        '与下方各处的守卫调用幂等（第 112 轮）
+        '与下方各处的守卫调用幂等
         Application.EnsureDelayedUiLoaded()
         '首帧之后补标题栏 SVG 图标：首次解析要解压 TClCS.dll（内嵌 gz）+ 解析 svg path，
         '放在 FormMain.xaml 里会让 InitializeComponent 多花数百毫秒，直接推迟窗口上屏。
@@ -559,7 +559,7 @@ Public Class FormMain
             If FileUtils.Exists(Paths.Base & "TCL\.devshot") Then RunDevSnapshot()
         Catch ex As Exception
         End Try
-        '桌面快捷方式：--launch-instance "<实例名>"（第 125 轮）
+        '桌面快捷方式：--launch-instance "<实例名>"
         TryStartupInstance()
     End Sub
 
@@ -663,13 +663,13 @@ Public Class FormMain
                                     Enc.Save(Fs)
                                 End Using
                                 Logger.Info($"已输出界面快照：TCL\devshot.png（{SnapshotW}×{SnapshotH}）")
-                                '顺带拍一张「启动中」弹窗（第 90 轮改成「今日人品」弹窗样式后需要目视确认排版）
+                                '顺带拍一张「启动中」弹窗
                                 Try
                                     FrmLaunchRight?.RunDevLaunchingSnapshot()
                                 Catch ex As Exception
                                     Logger.Warn(ex, "渲染启动弹窗快照失败")
                                 End Try
-                                '顺带拍一张启动按钮的展开菜单（第 90 轮改成图标+文字的大卡片）
+                                '顺带拍一张启动按钮的展开菜单
                                 Try
                                     If FileUtils.Exists(Paths.Base & "TCL\.devshot-menu") Then FrmLaunchRight?.RunDevMenuSnapshot()
                                 Catch ex As Exception
@@ -686,7 +686,7 @@ Public Class FormMain
                                     Logger.Warn(ex, "开发快照切页失败")
                                 End Try
                                 '存在 TCL\.devshot-pages 时依次切到各主页面并各拍一张：
-                                '用来核对英文界面下还有哪些文案没翻译（第 92 轮，正式运行不执行）
+                                '用来核对英文界面下还有哪些文案没翻译
                                 Try
                                     If FileUtils.Exists(Paths.Base & "TCL\.devshot-pages") Then
                                         Dim ShotPages() As PageType = {PageType.Launch, PageType.Download, PageType.Link, PageType.Setup, PageType.InstanceSelect}
@@ -709,7 +709,7 @@ Public Class FormMain
                                     Logger.Warn(ex, "开发快照多页截图失败")
                                 End Try
                                 '存在 TCL\.devshot-server 时切到第一个实例的「服务器」页并截图：
-                                '用来复现/回归「点服务器卡死」（第 123 轮，正式运行不执行）
+                                '用来复现/回归「点服务器卡死」
                                 Try
                                     If FileUtils.Exists(Paths.Base & "TCL\.devshot-server") Then
                                         RunInNewThread(
@@ -745,13 +745,13 @@ Public Class FormMain
                                     Logger.Warn(ex, "开发快照服务器页分支失败")
                                 End Try
                                 '存在 TCL\.devshot-launchgame 时真的点一次「启动游戏」：
-                                '沙箱里合成点击进不了 WPF，只能这样端到端验证启动链路（第 90 轮修环境变量后验证用）
+                                '沙箱里合成点击进不了 WPF，只能这样端到端验证启动链路
                                 Try
                                     If FileUtils.Exists(Paths.Base & "TCL\.devshot-launchgame") Then
                                         Logger.Info("开发快照：触发一次启动游戏，验证启动链路")
                                         FrmLaunchRight?.LaunchButtonClick()
                                         '1.3s 后再拍一张全窗口：确认启动侧边栏是从窗口最左边展开、带阴影；
-                                        '12s 再拍一张：确认启动成功后侧边栏会自动收起（第 91 轮）
+                                        '12s 再拍一张：确认启动成功后侧边栏会自动收起
                                         RunInNewThread(
                                             Sub()
                                                 Try
@@ -800,10 +800,10 @@ Public Class FormMain
     Private Sub FormMain_ContentRendered(sender As Object, e As EventArgs) Handles Me.ContentRendered
         Logger.Info($"[启动耗时] 首帧渲染完成（ContentRendered，自进程启动 {MsSinceProcessStart()} ms）")
         CloseStartSplash()
-        '第 104 轮：首帧已渲染，标记置位。按渲染模式决定背景高斯模糊：
-        '  - 硬件加速（Tier>0）：首帧前已暂缓，这里补齐（观感与最终一致，只是晚了半拍）。
-        '  - 软件渲染（Tier 0，远程桌面/无 GPU）：模糊走 CPU 逐像素卷积且每次重绘都要算，
-        '    代价远超视觉收益，彻底跳过，保证主界面流畅（有日志可溯；改回无条件 ApplyBackgroundBlur 即回退）。
+        '首帧已渲染，标记置位。按渲染模式决定背景高斯模糊：
+        ' - 硬件加速（Tier>0）：首帧前已暂缓，这里补齐（观感与最终一致，只是晚了半拍）。
+        ' - 软件渲染（Tier 0，远程桌面/无 GPU）：模糊走 CPU 逐像素卷积且每次重绘都要算，
+        ' 代价远超视觉收益，彻底跳过，保证主界面流畅（有日志可溯；改回无条件 ApplyBackgroundBlur 即回退）。
         HasRenderedFirstFrame = True
         If IsSoftwareRendering Then
             ImgBack.Effect = Nothing
@@ -1000,7 +1000,7 @@ Public Class FormMain
             Catch ex As Exception
                 Logger.Warn(ex, "写入正常退出标记失败")
             End Try
-            '第 96 轮：关闭动画会把 Top 改成 -10000，所以位置必须在动画之前存
+            '关闭动画会把 Top 改成 -10000，所以位置必须在动画之前存
             If Settings.Get(Of Boolean)("UiRememberWindowPos") Then
                 Try
                     Settings.Set("UiWindowPosX", CInt(Left))
@@ -1043,7 +1043,7 @@ Public Class FormMain
         '多核 JIT（ProfileOptimization）档案的落盘时机是「CLR 正常关机」：StartProfile 后无需也无法
         '显式 StopProfile（该 API 为 .NET Core 3.0+ 才有），Environment.Exit 触发的优雅关机会自动写回
         '%TEMP%\TCL-JIT\Startup.profile；下一次启动时 CLR 读取该档案，并行预编译这些程序集。
-        '第 111 轮：正常退出原先用 Process.Kill 强杀——CLR 没有关机流程，档案永远不落盘，
+        '正常退出原先用 Process.Kill 强杀——CLR 没有关机流程，档案永远不落盘，
         '多核 JIT 实际全程失效（实测 %TEMP%\TCL-JIT 长期为空）。改用 Environment.Exit 后档案
         '在每次正常退出时更新；另加 3 秒看门狗兜底，若优雅关机被终结器卡死仍会强制退出。
         IsProgramEnding = True
@@ -1067,7 +1067,7 @@ Public Class FormMain
         End If
         Logger.Info($"程序已退出，返回值：{ReturnCode}")
         '兜底：不是异常退出码就补写「正常退出」标记。代码里还有直接调 EndProgramForce 的退出路径
-        '（不走 FormClosing），漏写会让下次启动误报「异常退出」（第 132 轮）
+        '（不走 FormClosing），漏写会让下次启动误报「异常退出」
         If ReturnCode <> ProcessReturnValues.Exception Then
             Try
                 Settings.Set("SystemLastExitClean", True)
@@ -1125,14 +1125,14 @@ Public Class FormMain
         PanForm.Height = BorderForm.ActualHeight + 0.001
         PanMain.Width = PanForm.Width
         '用显式 Height 而不是 ActualHeight：标题栏高度可由设置修改，首帧布局前 ActualHeight 还是 0，
-        '那会让主体区按「没有标题栏」算一次高度（第 96 轮）。
+        '那会让主体区按「没有标题栏」算一次高度。
         PanMain.Height = Math.Max(0, PanForm.Height - If(PanTitle.Height > 0, PanTitle.Height, PanTitle.ActualHeight))
         If WindowState = WindowState.Maximized Then WindowState = WindowState.Normal '修复最大化状态下重算布局的问题
-        '第 95 轮：窗口尺寸变化时重算标题栏标签字号/间距（自适应，任何语言、任意宽度都不压右侧图标）
+        '窗口尺寸变化时重算标题栏标签字号/间距（自适应，任何语言、任意宽度都不压右侧图标）
         AdaptTitleTabsToWidth()
     End Sub
 
-#Region "外观设置应用（第 96 轮：个性化页新增项）"
+#Region "外观设置应用"
 
     ''' <summary>窗口圆角半径（px）。0 = 直角。同时改裁剪几何与边框，否则会出现「圆角边 + 方角内容」。</summary>
     Public Sub ApplyWindowRadius(Value As Object)
@@ -1218,7 +1218,7 @@ Public Class FormMain
     End Sub
 
     ''' <summary>
-    ''' 标题栏 5 个页面切换按钮自适应（第 95 轮）：先按默认字号 13 量出标签组自然宽度，
+    ''' 标题栏 5 个页面切换按钮自适应：先按默认字号 13 量出标签组自然宽度，
     ''' 若超出「账号徽章右缘 → 右侧图标区（语言/最小化/关闭）」的可用带，就按比例缩小
     ''' 标签字号与药丸间距，使按钮组严格居中且永不压到右侧图标。随窗口 resize 与
     ''' 语言切换重算，幂等。
@@ -1240,7 +1240,7 @@ Public Class FormMain
             If BtnTitleAccount IsNot Nothing AndAlso BtnTitleAccount.Visibility = Visibility.Visible Then
                 LeftUsed += BtnTitleAccount.ActualWidth
             End If
-            Dim GridW As Double = If(PanTitleMain.ActualWidth > 0, PanTitleMain.ActualWidth, BorderForm.ActualWidth - 152) '与 PanTitleMain 右 margin 一致（第 130 轮 112→152）
+            Dim GridW As Double = If(PanTitleMain.ActualWidth > 0, PanTitleMain.ActualWidth, BorderForm.ActualWidth - 152) '与 PanTitleMain 右 margin 一致
             Dim Gap As Double = 24 ' 按钮组与「左侧徽章 / 右侧图标」各留的最小空隙
             Dim Available As Double = GridW - LeftUsed - 2 * Gap
             '③ 超出则按可用比缩小字号（下限 9）；未超出保持 13
@@ -1303,7 +1303,7 @@ Public Class FormMain
     End Sub
 
     ''' <summary>
-    ''' 标题栏账号徽章（第 88 轮）：显示玩家头像与名字，点击进入账户管理页。
+    ''' 标题栏账号徽章：显示玩家头像与名字，点击进入账户管理页。
     ''' </summary>
     Private Sub BtnTitleAccount_Click(sender As Object, e As MouseButtonEventArgs) Handles BtnTitleAccount.MouseLeftButtonUp
         If McLaunchLoader.State = LoadState.Loading Then Return
@@ -1326,7 +1326,7 @@ Public Class FormMain
                             ImgTitleAccount.Source = FacePath
                         Else
                             '没有头像缓存时必须退回一张「脸」，不能拿整张皮肤图顶着：
-                            '18px 的方框会把 64×64 皮肤缩成一团花屏（第 132 轮用户反馈）
+                            '18px 的方框会把 64×64 皮肤缩成一团花屏
                             ImgTitleAccount.Source = PageLaunchLeft.GetAccountFaceOrDefault(Name)
                         End If
                         BtnTitleAccount.ToolTip = If(String.IsNullOrEmpty(Name),
@@ -1395,7 +1395,7 @@ Public Class FormMain
         FrmMain.UpdateBackgroundAndTitleBar()
     End Sub
     ''' <summary>
-    ''' 第 104 轮：把背景图的高斯模糊单独抽出来，供首帧渲染后补齐调用。
+    ''' 把背景图的高斯模糊单独抽出来，供首帧渲染后补齐调用。
     ''' 首帧前（HasRenderedFirstFrame=False）暂缓，让主窗口先快速上屏、启动画面早点消失。
     ''' 若用户没开背景模糊（UiBackgroundBlur=0），BlurRadius=1，Effect 仍为 Nothing，无副作用。
     ''' </summary>
@@ -1418,7 +1418,7 @@ Public Class FormMain
         ImgBack.Opacity = Settings.Get(Of Integer)("UiBackgroundOpacity") / 1000
         '背景视频层：跟随同一不透明度，让半透明组件可透出动态背景
         If _VidBack IsNot Nothing Then _VidBack.Opacity = Settings.Get(Of Integer)("UiBackgroundOpacity") / 1000
-        '背景图片模糊（第 104 轮：首帧前暂缓，避免整幅高斯模糊卷积拖慢首帧渲染、延长启动画面停留；
+        '背景图片模糊（首帧前暂缓，避免整幅高斯模糊卷积拖慢首帧渲染、延长启动画面停留；
         '首帧渲染完成（FormMain_ContentRendered）后由 ApplyBackgroundBlur 补齐，最终观感一致）
         If HasRenderedFirstFrame Then
             ApplyBackgroundBlur()
@@ -1542,7 +1542,7 @@ Public Class FormMain
         '标题栏文本（无自定义内容时默认显示 TCL）
         LabTitleLogo.Text = If(String.IsNullOrEmpty(Settings.Get(Of String)("UiLogoText")), "TCL", Settings.Get(Of String)("UiLogoText"))
         '标题栏文本是否居左
-        '第 89 轮：不再把整组导航居中——居左时账号徽章左边会空出一大块（用户反馈）。
+        '不再把整组导航居中——居左时账号徽章左边会空出一大块（用户反馈）。
         '第 0 列改为 Auto，宽度正好贴合 Logo，导航紧跟其后。
         '（原 UiLogoLeft 分支写的是 0*/1*，靠 0 宽列溢出摆放，该开关的复选框已隐藏，一并废弃）
         PanTitleMain.ColumnDefinitions(0).Width = GridLength.Auto
@@ -1773,7 +1773,7 @@ Public Class FormMain
             Dim FilePath As String = FilePathList.First
             Logger.Warn($"接受文件拖拽：{FilePath}{If(FilePathList.Any, $" 等 {FilePathList.Count} 个文件", "")}")
             '基础检查
-            '第 137 轮：拖入文件夹不再直接拒绝——识别为 Minecraft 目录就加进左侧列表并跳到实例页
+            '拖入文件夹不再直接拒绝——识别为 Minecraft 目录就加进左侧列表并跳到实例页
             If DirectoryUtils.Exists(FilePath) AndAlso Not FileUtils.Exists(FilePath) Then
                 DragFolderAdd(FilePath)
                 Return
@@ -1795,7 +1795,7 @@ Public Class FormMain
             Dim Extension As String = PathUtils.GetExtension(FilePath)
             '安装 Mod
             If PageInstanceMod.InstallMods(PathList) Then Return
-            '安装整合包（第 137 轮：先预读包名与图标，弹窗确认后再装）
+            '安装整合包
             If {"zip", "rar", "mrpack"}.Any(Function(t) t = Extension) Then '部分压缩包是 zip 格式但后缀为 rar，总之试一试
                 Hint(ModLang.L("正在读取压缩包……"))
                 Dim PackInfo As McModpackInfo = Nothing
@@ -1847,7 +1847,7 @@ Public Class FormMain
 
     ''' <summary>
     ''' 处理「把文件夹拖进窗口」：识别成 Minecraft 目录就加入左侧文件夹列表，并跳到实例页。
-    ''' <para/>第 137 轮新增。运行在后台线程（由 FileDrag 调度）。
+    ''' <para/>新增。运行在后台线程（由 FileDrag 调度）。
     ''' </summary>
     Private Sub DragFolderAdd(Source As String)
         Try
@@ -1904,7 +1904,7 @@ Public Class FormMain
                 Left -= 10000
                 ShowInTaskbar = False
                 Visibility = Visibility.Hidden
-                ModVideo.VideoPauseForHidden() '窗口不可见后 MediaElement 仍会解码背景视频，必须显式暂停（第 127 轮）
+                ModVideo.VideoPauseForHidden() '窗口不可见后 MediaElement 仍会解码背景视频，必须显式暂停
                 Logger.Info($"窗口已隐藏，位置：({Left},{Top})")
             Else
                 '取消隐藏
@@ -1980,7 +1980,7 @@ Public Class FormMain
         ''' </summary>
         ResourceDetail = 8
         ''' <summary>
-        ''' 账户管理。这是一个副页面（第 68 轮新增，HMCL 式账户页）。
+        ''' 账户管理。这是一个副页面。
         ''' </summary>
         Login = 9
     End Enum
@@ -2012,7 +2012,7 @@ Public Class FormMain
         SetupMore = 6
         SetupCache = 7
         ''' <summary>
-        ''' 网络（代理与下载源测速）。第 125 轮新增。
+        ''' 网络（代理与下载源测速）。新增。
         ''' </summary>
         SetupNetwork = 8
         LinkMain = 0
@@ -2033,23 +2033,23 @@ Public Class FormMain
         InstanceCompResource = 10
         InstanceSavesDatapack = 12
         ''' <summary>
-        ''' 诊断（日志阅读器）。第 120 轮新增，对齐 LumilioCL 的游戏页诊断。
+        ''' 诊断（日志阅读器）。新增，对齐 LumilioCL 的游戏页诊断。
         ''' </summary>
         InstanceDiagnostics = 13
         ''' <summary>
-        ''' 游戏选项（options.txt 编辑）。第 120 轮新增，对齐 LumilioCL 的「设置 › 选项」。
+        ''' 游戏选项（options.txt 编辑）。新增，对齐 LumilioCL 的「设置 › 选项」。
         ''' </summary>
         InstanceOptions = 14
         ''' <summary>
-        ''' 历史（游玩记录 / 快照 / 变更）。第 121 轮新增，对齐 LumilioCL 的游戏页历史。
+        ''' 历史（游玩记录 / 快照 / 变更）。新增，对齐 LumilioCL 的游戏页历史。
         ''' </summary>
         InstanceHistory = 15
         ''' <summary>
-        ''' 资源包管理（实例 resourcepacks）。第 125 轮新增，对齐 HMCL / SJMCL 的实例内容管理。
+        ''' 资源包管理（实例 resourcepacks）。新增，对齐 HMCL / SJMCL 的实例内容管理。
         ''' </summary>
         InstanceResourcePack = 16
         ''' <summary>
-        ''' 光影包管理（实例 shaderpacks）。第 125 轮新增。
+        ''' 光影包管理（实例 shaderpacks）。新增。
         ''' </summary>
         InstanceShader = 17
     End Enum
@@ -2067,7 +2067,7 @@ Public Class FormMain
             Case PageType.ResourceDetail
                 Return CType(Stack.Additional(0), ResourceProject).TranslatedName
             Case PageType.Login
-                Return "账户管理" '第 72 轮：改为 HMCL 式全屏子页面（标题栏返回键返回）
+                Return "账户管理" '改为 HMCL 式全屏子页面（标题栏返回键返回）
             Case Else
                 Return ""
         End Select
@@ -2184,7 +2184,7 @@ Public Class FormMain
                 FrmDownloadLeft.ItemGet(SubType)?.SetChecked(True, True, Stack = PageCurrent)
                 Case PageType.Setup
                     If FrmSetupLeft Is Nothing Then FrmSetupLeft = New PageSetupLeft
-                    '第 113 轮：侧边栏「清理缓存」上移、「返回」固定为最后一项，物理索引不再等于 SubType，
+                    '侧边栏「清理缓存」上移、「返回」固定为最后一项，物理索引不再等于 SubType，
                     '故高亮改按 Tag 匹配（ItemGet），与 PageOtherLeft 一致；匹配不到则跳过，不影响切页。
                     Dim _setupItem As MyListItem = FrmSetupLeft.ItemGet(SubType)
                     If _setupItem IsNot Nothing Then _setupItem.SetChecked(True, True, Stack = PageCurrent)
@@ -2226,7 +2226,7 @@ Public Class FormMain
     ''' 切换现有页面的实际方法。
     ''' </summary>
     Private Sub PageChangeActual(Stack As PageStackData, Optional SubType As PageSubType = -1)
-        Application.EnsureDelayedUiLoaded() '页面构造依赖延迟字典里的样式（第 112 轮）
+        Application.EnsureDelayedUiLoaded() '页面构造依赖延迟字典里的样式
         If PageCurrent = Stack AndAlso (PageCurrentSub = SubType OrElse SubType = -1) Then Return
         If Stack.Page = PageType.InstanceSetup AndAlso PageInstanceLeft.Instance IsNot Nothing AndAlso McInstanceLock.IsLocked(PageInstanceLeft.Instance) Then
             Hint(ModLang.L("该版本正在被修改，暂时无法进入版本设置！"), HintType.Red)
@@ -2309,7 +2309,7 @@ Public Class FormMain
                 Case PageType.ResourceDetail '社区资源详情
                     If FrmDownloadResourceDetail Is Nothing Then FrmDownloadResourceDetail = New PageDownloadResourceDetail
                     PageChangeAnim(New MyPageLeft, FrmDownloadResourceDetail)
-                Case PageType.Login '账户管理（第 72 轮，HMCL 式全屏：无侧边栏，标题栏返回键返回）
+                Case PageType.Login '账户管理
                     If FrmLoginManager Is Nothing Then FrmLoginManager = New PageAccountManager
                     PageChangeAnim(New MyPageLeft, FrmLoginManager)
             End Select
@@ -2338,7 +2338,7 @@ Public Class FormMain
         PageLeft = TargetLeft
         PageRight = TargetRight
         '触发页面通用动画
-        '第 89 轮：这里原本是盲 CType，Child 为空时抛异常会让整个 PageChangeActual 中断，
+        '这里原本是盲 CType，Child 为空时抛异常会让整个 PageChangeActual 中断，
         '而标题栏此时已经被置为 IsHitTestVisible=False，于是「所有顶部按钮都点不动」。
         Dim OldLeft = TryCast(PanMainLeft.Child, MyPageLeft)
         If OldLeft IsNot Nothing Then OldLeft.TriggerHideAnimation()
@@ -2420,7 +2420,7 @@ Public Class FormMain
     ''' 目标左栏是否真的是一块内容栏。
     ''' 联机、社区资源详情、账户管理等页面传的是空的 New MyPageLeft 占位（本来就没有侧边栏），
     ''' 这种页面不能再画左边栏罩子——否则罩子会先按旧页面的宽度展开、再随空栏宽度归零收起，
-    ''' 表现就是「侧边栏突然出现又消失」的无用动画（第 90 轮用户反馈：进账户管理页时出现）。
+    ''' 表现就是「侧边栏突然出现又消失」的无用动画。
     ''' </summary>
     Private ReadOnly Property HasRealLeftPanel As Boolean
         Get
@@ -2573,7 +2573,7 @@ Public Class FormMain
         lastMouseArg = e
     End Sub
 
-#Region "全局聚合搜索（第 130 轮 G1，Ctrl+K / 标题栏放大镜）"
+#Region "全局聚合搜索"
 
     ''' <summary>结果行对应的动作（回车触发第一条）。</summary>
     Private GlobalSearchActions As New List(Of Action)

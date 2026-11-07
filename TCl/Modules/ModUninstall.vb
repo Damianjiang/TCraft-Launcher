@@ -565,7 +565,7 @@ Public Module ModUninstall
         If Name Is Nothing Then Return Nothing
         Using Stream As IO.Stream = Asm.GetManifestResourceStream(Name)
             If Stream Is Nothing Then Return Nothing
-            '第 111 轮：模板以 gzip 嵌入（19.7KB → 5.9KB），ModGzip.Unwrap 兼容未压缩旧数据
+            '模板以 gzip 嵌入（19.7KB → 5.9KB），ModGzip.Unwrap 兼容未压缩旧数据
             Using Ms As New IO.MemoryStream()
                 Stream.CopyTo(Ms)
                 Using Reader As New StreamReader(New IO.MemoryStream(ModGzip.Unwrap(Ms.ToArray())), Encoding.UTF8, True)

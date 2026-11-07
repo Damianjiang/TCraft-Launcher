@@ -8,7 +8,7 @@ Public Class PageLinkMain
     Private Const INVITE_CODE_VERSION As Integer = 2
 
     '===============================
-    '  状态机与前端页面
+    ' 状态机与前端页面
     '===============================
 
 #Region "状态管理"
@@ -90,7 +90,7 @@ Public Class PageLinkMain
     End Sub
 
     '===============================
-    '  页面 UI
+    ' 页面 UI
     '===============================
 
     ''' <summary>
@@ -104,7 +104,7 @@ Public Class PageLinkMain
             Try
                 '带 --wait 与工作目录：提权重启是「先启动新进程、后退出旧进程」的竞态——
                 '新进程启动瞬间旧进程仍持有单例互斥锁，不带 --wait 会被当作重复实例静默退出
-                '（与语言切换重启 RestartForLanguageChange 同因，表现为「重启失败」）。
+                '（语言切换自起已改为实时应用不再重启；此处提权重启仍需 --wait）。
                 'Verb=runas 走 UAC 同意框；用户取消同意时走 Catch 分支提示。
                 StartProcess(New ProcessStartInfo(PathExe) With {.UseShellExecute = True, .Verb = "runas", .Arguments = "--wait", .WorkingDirectory = Paths.Base})
                 FormMain.EndProgramForce()
@@ -273,7 +273,7 @@ Public Class PageLinkMain
     End Sub
 
     '===============================
-    '  页面 UI
+    ' 页面 UI
     '===============================
 
     Private Sub UpdateLoadingPage(Title As String, FailBrief As String)
@@ -361,7 +361,7 @@ Public Class PageLinkMain
     End Sub
 
     '===============================
-    '  页面 UI
+    ' 页面 UI
     '===============================
 
     '退出
@@ -410,7 +410,7 @@ Public Class PageLinkMain
 #End Region
 
     '===============================
-    '  后端
+    ' 后端
     '===============================
 
     ''' <summary>
@@ -678,9 +678,9 @@ Public Class PageLinkMain
     ''' <summary>
     ''' 从在线配置和 API 获取需要连接的节点列表，并更新发现节点 ID。
     ''' 根据发现节点 ID，会有以下行为变化：
-    '''   -1：作为房主，根据负载均衡选择一个发现节点。
-    '''   0：作为加入者，但邀请码未提供发现节点 ID，使用回退发现节点。
-    '''   >0：作为加入者，根据 ID 选择对应的发现节点；如果没有，使用回退发现节点。
+    ''' -1：作为房主，根据负载均衡选择一个发现节点。
+    ''' 0：作为加入者，但邀请码未提供发现节点 ID，使用回退发现节点。
+    ''' >0：作为加入者，根据 ID 选择对应的发现节点；如果没有，使用回退发现节点。
     ''' </summary>
     Private Function GetTargetPeers() As List(Of String)
         Dim FinalPeers As New List(Of String), FinalDiscoverID As Integer = -1
@@ -1125,7 +1125,7 @@ Public Class PageLinkMain
                 '人数显示
                 LabFinishPlayer.Text = PeopleCount & ModLang.L("  人")
                 '------------------------
-                '  提示条
+                ' 提示条
                 '------------------------
                 HintFinish.Visibility = Visibility.Collapsed
                 If IsServerSide Then Return '服务端没有需要显示的提示

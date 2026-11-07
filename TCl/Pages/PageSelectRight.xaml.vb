@@ -143,7 +143,9 @@ Public Class PageSelectRight
             Logger.Warn(ex, "恢复实例视图模式失败")
             _ViewMode = ViewModeList
         End Try
-        If BtnViewMode IsNot Nothing Then AddHandler BtnViewMode.Click, AddressOf BtnViewMode_Click
+        'Click 由 XAML 挂接（与其他四个工具栏按钮一致）。
+        '不能再在这里 AddHandler：本页是缓存页，每次切回都会重触发 Loaded → InitViewMode，
+        '订阅会不断叠加，点一次视图切换就被执行偶数次 = 状态变回去 = 看起来「点了没用」。
         RefreshViewModeButton()
         ApplyViewMode()
     End Sub
@@ -242,7 +244,7 @@ Public Class PageSelectRight
                 BuildList()
             End Sub
 
-        '合集标签（不含「全部」）支持改名与删除（第 131 轮：改用动画菜单卡片）
+        '合集标签（不含「全部」）支持改名与删除
         If Value <> "" Then
             AddHandler Box.MouseRightButtonUp,
                 Sub(sender, e)
@@ -477,7 +479,7 @@ Public Class PageSelectRight
         Dim Key As String = If(_Search, "").Trim()
         If Key.Length = 0 Then Return True
         If Key.StartsWithF("regex:", True) Then
-            '第 134 轮：原来每个实例都 New Regex 一次（列表 200 个实例 = 每次重建编译 200 次正则，
+            '原来每个实例都 New Regex 一次（列表 200 个实例 = 每次重建编译 200 次正则，
             '而正则编译是这套搜索里最贵的一步）。现在按「模式串」缓存一份，只在模式变化时重编译。
             Dim Pattern As String = Key.Substring(6)
             If _SearchRegex Is Nothing OrElse _SearchRegexPattern <> Pattern Then
@@ -631,7 +633,7 @@ Public Class PageSelectRight
         Dim BtnSetup As New MyIconButton With {.LogoScale = 1.05, .SvgIcon = "lucide/settings", .ToolTip = ModLang.L("实例设置")}
         AddHandler BtnSetup.Click, Sub() OpenInstanceSetup(Instance)
 
-        '更多：首页启动按钮同款的 Popup 动画卡片（第 128 轮），右键菜单保留不动
+        '更多：首页启动按钮同款的 Popup 动画卡片，右键菜单保留不动
         Dim BtnMore As New MyIconButton With {.LogoScale = 1.05, .SvgIcon = "lucide/more-vertical", .ToolTip = ModLang.L("更多操作")}
         AddHandler BtnMore.Click,
             Sub()
@@ -647,7 +649,7 @@ Public Class PageSelectRight
 
         Item.Buttons = {BtnStar, BtnSetup, BtnMore}
 
-        '右键菜单（第 131 轮：与「更多」按钮同一动画卡片）
+        '右键菜单
         AddHandler Item.MouseRightButtonUp,
             Sub(sender, e)
                 OpenInstanceMenu(Instance, Item, e.GetPosition(Item), False)
@@ -802,7 +804,7 @@ Public Class PageSelectRight
         '单击：选中并返回启动页（与列表模式同一套逻辑）
         AddHandler Card.MouseLeftButtonUp, Sub(snd, args) SelectItem(Instance)
 
-        '右键菜单（第 131 轮：与「更多」按钮同一动画卡片）
+        '右键菜单
         AddHandler Card.MouseRightButtonUp,
             Sub(snd, args)
                 OpenInstanceMenu(Instance, Card, args.GetPosition(Card), False)
@@ -812,7 +814,7 @@ Public Class PageSelectRight
         Return Card
     End Function
 
-    ''' <summary>网格图标：走共享的 MyLogoCache（第 136 轮：原先这里与 MyListItem 各存一份同样的缓存）。</summary>
+    ''' <summary>网格图标：走共享的 MyLogoCache。</summary>
     Private Shared Function GetCachedLogo(LogoPath As String) As MyBitmap
         Dim Bmp As MyBitmap = MyLogoCache.Get(LogoPath)
         If Bmp Is Nothing Then Logger.Warn($"缓存实例图标失败：{LogoPath}")
@@ -921,7 +923,7 @@ Public Class PageSelectRight
 
 #End Region
 
-#Region "更多动画卡片（第 128 轮，首页启动按钮菜单同款 Popup + 三段入场动画）"
+#Region "更多动画卡片"
 
     ''' <summary>当前卡片对应的实例（卡片内容全部围绕它构建）。</summary>
     Private MenuInstance As McInstance = Nothing
@@ -940,9 +942,9 @@ Public Class PageSelectRight
         TransformInstanceMenuScale.ScaleX = 0.94
         TransformInstanceMenuScale.ScaleY = 0.94
         TransformInstanceMenuPos.Y = 10
-        '定位按锚点算（第 132 轮：以前靠 HorizontalOffset=-210 硬掰，卡片宽度一变就偏）
+        '定位按锚点算
         MenuCard.ApplyAnchor(PopupInstanceMenu, Target, Anchor, AlignRight, 14)
-        '条目多时按锚点这一侧的可用高度封顶，超出用 TCL 滚动条（第 135 轮）
+        '条目多时按锚点这一侧的可用高度封顶，超出用 TCL 滚动条
         ScrollInstanceMenu.MaxHeight = MenuCard.CalcMaxMenuHeight(Target)
         PopupInstanceMenu.IsOpen = True
     End Sub
@@ -1259,7 +1261,7 @@ Public Class PageSelectRight
                 WriteIni(McFolderSelected & "TCL.ini", "Version", NewName)
             End If
             FrmSelectRight?.RefreshList(True)
-            FrmLaunchRight?.RefreshButtonsUI() '首页当前版本名联动（第 128 轮体检 C3）
+            FrmLaunchRight?.RefreshButtonsUI() '首页当前版本名联动
         Catch ex As Exception
             Logger.Error(ex, "重命名实例失败", LogBehavior.Alert)
         End Try

@@ -78,11 +78,52 @@ Public Class PageInstanceShader
         Refresh()
     End Sub
 
-    ''' <summary>重新读取磁盘列表与光影加载器状态。</summary>
-    Public Sub Refresh()
+    ''' <summary>重新读取磁盘列表与光影加载器状态（扫描放后台线程，期间显示镐子加载卡）。</summary>
+    Public Sub Refresh(Optional OnFinished As Action = Nothing)
+        If IsRefreshing Then Return
+        Dim CurrentInstance = Instance
+        If CurrentInstance Is Nothing Then
+            PanList.Children.Clear()
+            ApplyRefresh(False, Nothing, Nothing)
+            If OnFinished IsNot Nothing Then OnFinished()
+            Return
+        End If
+        IsRefreshing = True
+        PanList.Children.Clear()
+        PanLoad.Visibility = Visibility.Visible
+        RunInNewThread(
+        Sub()
+            Try
+                Dim HasLoader As Boolean = ModInstanceContent.HasShaderLoader(CurrentInstance)
+                Dim Folder As String = Nothing
+                Try : Folder = ModInstanceContent.GetPacksFolder(CurrentInstance, "shaderpacks") : Catch : End Try
+                Dim Entries As List(Of ModInstanceContent.PackEntry) = Nothing
+                If Folder IsNot Nothing Then Entries = ModInstanceContent.ListPacks(Folder)
+                RunInUi(Sub()
+                            ApplyRefresh(HasLoader, Folder, Entries)
+                            FinishRefresh(OnFinished)
+                        End Sub)
+            Catch ex As Exception
+                Logger.Error(ex, "刷新光影包列表失败")
+                RunInUi(Sub()
+                            ApplyRefresh(False, Nothing, Nothing)
+                            FinishRefresh(OnFinished)
+                        End Sub)
+            End Try
+        End Sub, "Shader Refresh")
+    End Sub
+
+    Private IsRefreshing As Boolean = False
+    Private Sub FinishRefresh(OnFinished As Action)
+        PanLoad.Visibility = Visibility.Collapsed
+        IsRefreshing = False
+        If OnFinished IsNot Nothing Then OnFinished()
+    End Sub
+
+    ''' <summary>把扫描结果应用到界面（只在 UI 线程调用）。</summary>
+    Private Sub ApplyRefresh(HasLoader As Boolean, Folder As String, Entries As List(Of ModInstanceContent.PackEntry))
         Try
             AllShaders.Clear()
-            PanList.Children.Clear()
             If Instance Is Nothing Then
                 PanLoaderHint.Visibility = Visibility.Collapsed
                 CardShaders.Title = ModLang.L("光影包")
@@ -91,29 +132,25 @@ Public Class PageInstanceShader
                 AddNotice(ModLang.L("请先选择一个 Minecraft 版本。"))
                 Return
             End If
-            '光影加载器检测
-            Dim HasLoader As Boolean = ModInstanceContent.HasShaderLoader(Instance)
-            PanLoaderHint.Visibility = If(HasLoader, Visibility.Collapsed, Visibility.Visible)
-            '列表
-            Dim Folder As String = PackFolder
-            If Folder Is Nothing Then
+            If Folder Is Nothing OrElse Entries Is Nothing Then
+                PanLoaderHint.Visibility = Visibility.Collapsed
                 CardShaders.Title = ModLang.L("光影包")
                 LabCurrent.Text = ""
                 LabPath.Text = ""
                 AddNotice(ModLang.L("无法定位这个实例的 shaderpacks 文件夹，请检查版本隔离设置。"))
                 Return
             End If
+            PanLoaderHint.Visibility = If(HasLoader, Visibility.Collapsed, Visibility.Visible)
             LabPath.Text = Folder
-            AllShaders.AddRange(ModInstanceContent.ListPacks(Folder))
+            AllShaders.AddRange(Entries)
             Rebuild()
         Catch ex As Exception
-            Logger.Error(ex, "刷新光影包列表失败")
+            Logger.Error(ex, "应用光影包列表失败")
         End Try
     End Sub
 
     Private Sub RefreshWithHint()
-        Refresh()
-        Hint(ModLang.L("光影包列表已刷新。"), HintType.Green)
+        Refresh(Sub() Hint(ModLang.L("光影包列表已刷新。"), HintType.Green))
     End Sub
 
     ''' <summary>按搜索词重建列表。</summary>
@@ -208,6 +245,10 @@ Public Class PageInstanceShader
             .IsScaleAnimationEnabled = False,
             .Tag = Entry
         }
+        '光影预览图：zip 根部有 pack.png 就显示，
+        '没有或读取失败时保持默认 Sparkles 图标
+        Dim ShaderLogoPath = GetShaderLogo(Entry)
+        If ShaderLogoPath IsNot Nothing Then Item.Logo = ShaderLogoPath
         Dim BtnShow As New MyIconButton With {
             .SvgIcon = "lucide/folder-open",
             .ToolTip = ModLang.L("在文件夹中显示")
@@ -224,6 +265,48 @@ Public Class PageInstanceShader
         If InUse Then Item.Checked = True
         AddHandler Item.Click, Sub(snd, args) SetCurrent(Entry)
         Return Item
+    End Function
+
+    ''' <summary>
+    ''' 获取光影包预览图：
+    ''' 优先取 zip 根部的 pack.png（Iris 光影规范）；zip 内嵌一层文件夹时取其中最浅的 pack.png
+    ''' （忽略 shaders/ 内部，避免误把光影贴图当预览）。结果缓存到 Temp\Cache\Images，
+    ''' 缓存键只读元数据（路径+大小+修改时间），重进页面不再解压。失败或没有预览图返回 Nothing（走默认图标）。
+    ''' </summary>
+    Private Function GetShaderLogo(Entry As ModInstanceContent.PackEntry) As String
+        Try
+            If Entry Is Nothing OrElse Entry.IsFolder Then Return Nothing '文件夹包不提取（与 PCL-CE 一致）
+            If Not FileUtils.Exists(Entry.FullPath) Then Return Nothing
+            '缓存键：路径 + 大小 + 修改时间（只读元数据，不打开 zip）
+            Dim Key As String = Entry.FullPath & "|" & Entry.SizeBytes & "|" & Entry.Modified.Ticks
+            Dim HashBytes As Byte() = System.Security.Cryptography.MD5.Create().ComputeHash(Encoding.UTF8.GetBytes(Key))
+            Dim CacheDir As String = PathTemp & "Cache\Images\"
+            Dim CachePath As String = CacheDir & BitConverter.ToString(HashBytes).Replace("-", "").ToLower & ".png"
+            If FileUtils.Exists(CachePath) Then Return CachePath
+            DirectoryUtils.Create(CacheDir)
+            Using Zip As IO.Compression.ZipArchive = IO.Compression.ZipFile.OpenRead(Entry.FullPath)
+                '根部 pack.png 优先；否则取内嵌一层文件夹里的 pack.png
+                Dim PackPng As IO.Compression.ZipArchiveEntry = Zip.GetEntry("pack.png")
+                If PackPng Is Nothing Then
+                    PackPng = Zip.Entries.
+                        Where(Function(E) E.FullName.EndsWithF("/pack.png", True) AndAlso
+                                          Not E.FullName.ToLower.Contains("/shaders/")).
+                        OrderBy(Function(E) E.FullName.Length).
+                        FirstOrDefault()
+                End If
+                If PackPng Is Nothing Then Return Nothing
+                Using Es As IO.Stream = PackPng.Open()
+                    Using Fs As IO.FileStream = IO.File.Create(CachePath)
+                        Es.CopyTo(Fs)
+                    End Using
+                End Using
+                Logger.Trace($"已提取光影预览图：{Entry.Name} → {CachePath}")
+            End Using
+            Return CachePath
+        Catch ex As Exception
+            Logger.Warn(ex, $"提取光影预览图失败（{If(Entry?.FullPath, "")}）")
+            Return Nothing
+        End Try
     End Function
 
 #End Region

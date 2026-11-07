@@ -38,7 +38,7 @@
                     <TextBlock x:Name="LabNote"
                                Text="只清理可重新生成或重新下载的内容；不会删除你的配置、背景与音乐、皮肤、翻译文件或游戏数据。"
                                TextWrapping="Wrap" LineHeight="22" Opacity="0.65" FontSize="13" Margin="0,0,0,18" />
-                    <!-- 第 113 轮：按钮补齐项目标准 Padding="13,0" + Height="35"（与其余设置页一致），
+                    <!-- 按钮补齐项目标准 Padding="13,0" + Height="35"（与其余设置页一致），
                          修复原先无内边距导致的"压扁"外观。 -->
                     <WrapPanel>
                         <local:MyButton Height="35" MinWidth="150" Text="清理所选缓存" ColorType="Red" Padding="13,0" Margin="0,0,15,0"

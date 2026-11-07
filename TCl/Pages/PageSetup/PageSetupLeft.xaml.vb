@@ -103,7 +103,7 @@ Public Class PageSetupLeft
     End Function
 
     ''' <summary>
-    ''' 按 Tag（即 SubType 数值）查找侧边栏项。第 113 轮：侧边栏顺序已调整
+    ''' 按 Tag（即 SubType 数值）查找侧边栏项。侧边栏顺序已调整
     ''' （「清理缓存」上移、「返回」固定为最后一项），高亮不再依赖 Children 的物理索引，
     ''' 故 FormMain 改用此函数按 Tag 匹配，与 PageOtherLeft.ItemGet 保持一致。
     ''' </summary>
@@ -229,7 +229,7 @@ Public Class PageSetupLeft
         FrmMain.PageChange(FrmMain.PageLast)
     End Sub
 
-#Region "设置搜索（第 129 轮）"
+#Region "设置搜索"
 
     ''' <summary>搜索索引条目：一个带 SettingService.Key 的控件对应一条。</summary>
     Private Class SetupSearchEntry
@@ -334,7 +334,7 @@ Public Class PageSetupLeft
                     End Sub)
     End Sub
 
-    ''' <summary>空闲预热搜索索引：补齐所有尚未构建的子页（第 130 轮体检 P1）。</summary>
+    ''' <summary>空闲预热搜索索引：补齐所有尚未构建的子页。</summary>
     Public Sub WarmSearchIndex()
         If SearchIndex Is Nothing Then SearchIndex = New List(Of SetupSearchEntry)
         For Each PageId In SearchPages
@@ -342,7 +342,7 @@ Public Class PageSetupLeft
         Next
     End Sub
 
-    ''' <summary>单个子页的索引预热：分片调用，避免一次性实例化全部子页造成 UI 冻结（第 131 轮）。</summary>
+    ''' <summary>单个子页的索引预热：分片调用，避免一次性实例化全部子页造成 UI 冻结。</summary>
     Public Sub WarmSearchIndexPage(PageId As FormMain.PageSubType)
         If SearchIndex Is Nothing Then SearchIndex = New List(Of SetupSearchEntry)
         If SearchIndex.Any(Function(E) E.Page = PageId) Then Return

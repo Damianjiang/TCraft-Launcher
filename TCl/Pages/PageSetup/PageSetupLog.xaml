@@ -25,7 +25,7 @@
                     <local:MyButton MinWidth="120" Text="清理历史日志" ColorType="Red" Click="BtnClean_Click" />
                 </WrapPanel>
             </local:MyCard>
-            <!-- 第 130 轮（D4）：启动器自身日志实时查看器。仅页面可见时以 600ms 轮询增量读取 Log1.txt，
+            <!-- （D4）：启动器自身日志实时查看器。仅页面可见时以 600ms 轮询增量读取 Log1.txt，
                  Unloaded 即停（性能纪律：无页面外驻留）；级别过滤 + 内容搜索 + 自动滚动。 -->
             <local:MyCard DockPanel.Dock="Top" Title="实时日志" Margin="32,24,32,0">
                 <StackPanel Margin="24,44,24,20">

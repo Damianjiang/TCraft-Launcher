@@ -6,7 +6,7 @@
 
 **Lighter. Faster.**
 
-A single-file Minecraft launcher: 3.5 MB, ~2 s cold start. Open source, free, no ads.
+A single-file Minecraft launcher: ~3.6 MB, ~2 s cold start. Open source, free, no ads.
 
 [![Release](https://img.shields.io/github/v/release/Damianjiang/TCraft-Launcher?style=flat-square&color=f2b632)](https://github.com/Damianjiang/TCraft-Launcher/releases)
 [![Downloads](https://img.shields.io/github/downloads/Damianjiang/TCraft-Launcher/total?style=flat-square&color=5eead4)](https://github.com/Damianjiang/TCraft-Launcher/releases)
@@ -25,25 +25,69 @@ A single-file Minecraft launcher: 3.5 MB, ~2 s cold start. Open source, free, no
 
 TCraft Launcher (short **TCL**) is a Minecraft launcher written in VB.NET / WPF.
 There is no installer, no bundle, and no telemetry: the whole program is one
-3.5 MB exe. Copy it anywhere and run; delete it to uninstall.
+3.6 MB exe. Copy it anywhere and run; delete it to uninstall.
 
-- **Single file**: the launch core and utility libraries are embedded as compressed snapshots — no runtime dependencies.
-- **Fast**: lazy initialization, assembly caching and on-demand UI resources give a ~2 s cold start.
-- **Good looking**: Win11-style translucent UI with custom wallpaper, background video, music and theme colors — all optional.
-- **Bilingual**: built-in Chinese & English, hot-reloadable language table.
+- **Single file**: the launch core and third-party libraries are embedded as compressed snapshots — no runtime dependencies.
+- **Fast**: lazy initialization, multi-core JIT profiles and on-demand UI resources give a ~2 s cold start.
+- **Fast downloads too**: HTTP/2 multiplexing (Win10 1607+), up to 64 concurrent threads, adjustable speed cap and resumable downloads.
+- **Good looking**: Win11-style translucent glass UI with wallpaper color extraction, background video, music and 21 theme colors.
+- **Multilingual**: Simplified Chinese / English / Traditional Chinese / Classical Chinese / auto-detect; every string is editable via `TCL\i18n.json`.
+- **Windows 7 supported**: SP1 and above (falls back to a compatibility network stack on old systems).
 
 ## Features
 
 | Module | What you get |
 | --- | --- |
-| Launch | Multi-version, JVM / game arguments, memory allocation, process priority, window mode, pre-launch commands |
-| Accounts | Microsoft device-code login / offline / external Authlib servers, account cards with import & export |
-| Instances | Fully isolated instances, per-version settings, mod / saves / datapacks / screenshots / servers management, modpack export |
+| Launch | Multi-folder multi-instance, favorites / color tags / collections, list & grid views |
+| Accounts | Microsoft device-code login / offline / external Authlib servers (LittleSkin etc.), account cards with import & export |
+| Instances | Per-version settings, mod / saves / datapacks / screenshots / servers management, modpack export, Jar-in-Jar embedded dependency viewer & export |
 | Modpacks | Parses CurseForge, Modrinth, MCBBS, MultiMC and HMCL formats; shows name, icon, game version and loader before installing |
-| Downloads | Vanilla + Forge / NeoForge / Fabric / OptiFine / LiteLoader, CurseForge & Modrinth search, resumable downloads |
-| Multiplayer | Virtual LAN sessions powered by EasyTier — play your single-player worlds with friends |
-| Skins | 2D front view + real WPF 3D model preview (classic / slim auto-detected) |
-| Extras | Chinese crash analysis, categorized cache cleaner, full logs |
+| Downloads | Vanilla + Forge / NeoForge / Fabric / OptiFine / LiteLoader one-click install; CurseForge & Modrinth search; automatic missing-dependency completion for mods |
+| Multiplayer | Virtual LAN sessions powered by EasyTier — create / join rooms, custom relay nodes, auto-join a server after launch |
+| Skins | 2D front view + real WPF 3D model preview (classic / slim auto-detected), offline skin upload |
+| Extras | Human-readable Chinese crash analysis, categorized cache cleaner, settings import/export (.tcl), global search, full logs |
+
+## Page by page
+
+### Launch
+
+- **Versions**: multi-folder scan, favorites pinned on top, color tags and collection filters; press F11 to reveal hidden versions.
+- **Memory**: auto / manual / per-instance; optional locked initial heap (-Xms = -Xmx) for lower latency spikes (great with ZGC).
+- **Java**: auto-select by version range (e.g. `[21.0, 25)`), sortable priority list, manual path, bundled-Java detection, auto-download when nothing fits.
+- **Arguments & commands**: JVM args, game args and pre-launch commands support Minecraft version JSON markers and TCL replacement tags (`{verpath}`, `{java}`, ...).
+- **Advanced fixes**: mesa-loader custom renderer injection, LWJGL Unsafe Agent, Java Launch Wrapper (CJK path fix), automatic high-performance GPU preference.
+- **Extras**: process priority, window title & size customization, launch-script export, auto-hide / auto-close after the game starts.
+
+### Downloads
+
+- **Versions**: Vanilla, Forge, NeoForge, Fabric, OptiFine, LiteLoader — downloaded and assembled automatically.
+- **Resources**: mods / resource packs / shaders / modpacks / worlds from CurseForge and Modrinth, with optional CurseForge API key.
+- **Dependency completion**: missing prerequisites are resolved recursively and offered for download together with the mod.
+- **Engine**: HTTP/2 multiplexing with automatic fallback, up to 64 threads, global speed cap, resumable downloads, automatic source failover.
+
+### Instance management
+
+- **Mods**: enable / disable / favorite / search / select-all, drag-and-drop zip install, Jar-in-Jar embedded dependency list with single or bulk export.
+- **Resource packs & shaders**: in-list preview icons (pack.png extracted automatically), one-click switch, direct folder access.
+- **Saves**: backup / rename / copy / export / delete with world icon detection.
+- **Servers**: MOTD / latency / player-count queries and one-click join with the selected instance.
+- **Modpack export**: CurseForge / Modrinth / MCBBS / MultiMC / HMCL formats, optional resource-file bundling for weak networks.
+- **Per-version settings**: independent memory, Java, isolation mode, window title etc., savable as presets and applicable to other instances.
+
+### Settings
+
+- **Personalization**: 21 theme colors (incl. random & custom HSL), wallpaper color extraction, background blur / video / music, separate translucency sliders for cards and pop-up menus.
+- **System**: UI language (incl. Classical Chinese style), download threads & speed cap, cache location, software rendering, settings import/export (.tcl).
+- **Launch**: global default memory, window mode, default isolation policy, Java selection rules, genuine-game reminder toggle.
+
+## Tips
+
+- **Global search**: `Ctrl+K` or the magnifier in the title bar finds any setting and jumps to it.
+- **Replacement tags**: write `{verpath}`, `{java}` etc. in window titles, commands and arguments — values fill in automatically. See More → Help.
+- **Hidden versions**: hide a version in its settings, then press F11 in the version list to see them all.
+- **Edit every string**: all UI text lives in `TCL\i18n.json` — edit it with any text editor and click Reload; no restart needed.
+- **Silent memory optimization**: start TCL with `--memory`.
+- **Import modpacks / saves / mods**: drag the zip / jar straight onto the matching page.
 
 ## Download
 
@@ -51,16 +95,12 @@ Grab `TCraft-Launcher.exe` from the [latest release](https://github.com/Damianji
 That link always resolves to the newest build — no version number is hardcoded.
 
 - **OS**: Windows 7 SP1+ (Windows 10 / 11 recommended), 64-bit
-- **Size**: about 3.5 MiB (single file, under 4 MB)
+- **Size**: about 3.6 MiB (single file, under 4 MB)
 - **Checksum**: listed on the latest release page (updated with every build)
 - **Changelog**: [CHANGELOG.md](CHANGELOG.md), bilingual, organised by version
 
 > The project does not purchase a code-signing certificate, so SmartScreen may
 > show an "unknown publisher" warning. Verify the checksum on the release page, or build from source.
-
-> Microsoft (genuine) login ships **disabled** in the open-source build: no
-> Microsoft credentials are embedded. To enable it, register your own Azure app
-> and set the `TCL_MS_CLIENT_ID` environment variable — or join the [TCraft Launcher 启动器交流群](https://qm.qq.com/q/WaG64YE9uo) (QQ **1131373915**) to get the full edition with built-in Microsoft login.
 
 ## Build from source
 
@@ -76,7 +116,7 @@ cd TCraft-Launcher
 powershell -ExecutionPolicy Bypass -File scripts\build.ps1
 ```
 
-Output: `TCl\bin\TCraft Launcher.exe`. You can also open `TCl.sln` in Visual Studio.
+Output: a single-file `TCl\bin\TCraft Launcher.exe`. You can also open `TCl.sln` in Visual Studio.
 
 ## Project structure
 

@@ -169,7 +169,7 @@ Public Class MyBitmap
     Public Function Clip(X As Integer, Y As Integer, Width As Integer, Height As Integer) As MyBitmap
         '固定 32bpp ARGB：索引色位图（8bpp 调色板 PNG，内置皮肤 Steve/Alex 就是这种）
         '无法创建 Graphics，会直接抛「A Graphics object cannot be created from an image
-        'that has an indexed pixel format」，头像裁切因此从未成功过（第 132 轮修复）。
+        'that has an indexed pixel format」，头像裁切因此从未成功过。
         Dim bmp As New System.Drawing.Bitmap(Width, Height, System.Drawing.Imaging.PixelFormat.Format32bppArgb)
         bmp.SetResolution(Pic.HorizontalResolution, Pic.VerticalResolution)
         Using g As System.Drawing.Graphics = System.Drawing.Graphics.FromImage(bmp)

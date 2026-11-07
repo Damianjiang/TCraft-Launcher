@@ -1,5 +1,5 @@
 ''' <summary>
-''' 自写的重试工具（第 130 轮替代 ThrottleDebounce.Retrier，减少内嵌体积约 13KB）。
+''' 自写的重试工具。
 ''' 失败时按 delay 计算等待后重试；超过 maxAttempts 或 isRetryAllowed 拒绝重试时抛出最后异常。
 ''' </summary>
 Public Module Retrier

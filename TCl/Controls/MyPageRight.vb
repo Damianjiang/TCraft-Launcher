@@ -49,7 +49,7 @@ Public Class MyPageRight
     Private PanAlways As FrameworkElement
     Private PageLoaderAutoRun As Boolean
     ''' <summary>
-    ''' 下一次进入加载环时是否跳过 400ms 等待、立刻显示（第 132 轮）。
+    ''' 下一次进入加载环时是否跳过 400ms 等待、立刻显示。
     ''' <para/>
     ''' 400ms 等待原本是为了「进页面时加载器很快完成就别闪一下加载卡」；但光标已经停在页面上、
     ''' 用户主动点刷新时，加载器往往在 400ms 内就跑完，结果加载卡一次都不出现，看起来像没反应。
@@ -207,7 +207,7 @@ Public Class MyPageRight
                 If ShowLoaderNow Then
                     '刷新触发的重新加载：内容本来就在显示，用户点了刷新就该看到加载卡。
                     '即使加载器在退出动画期间已经跑完（本地列表几十毫秒就扫完了），也照样给一段加载卡反馈，
-                    '由 LoaderStayForce 保证它至少停留 400ms（第 132 轮）
+                    '由 LoaderStayForce 保证它至少停留 400ms
                     PageState = PageStates.LoaderEnter
                     TriggerEnterAnimation(PanLoader)
                 ElseIf PageLoader Is Nothing OrElse PageLoader.State = LoadState.Finished OrElse PageLoader.State = LoadState.Waiting OrElse PageLoader.State = LoadState.Canceled Then
@@ -291,7 +291,7 @@ Public Class MyPageRight
             Case PageStates.LoaderWait
                 PageOnEnter()
             Case PageStates.Empty
-                '可能是在离开页面后，其他后台线程调用了本函数，此时不应触发 PageOnEnter()
+                '可能是在离开页面后，其他后台线程调用了本函数，此时不应触发 PageOnEnter
                 '例如：在加入联机房间后，切换到其他页面，然后联机房间被解散
                 If IsLoaded Then PageOnEnter()
         End Select
@@ -383,7 +383,7 @@ Public Class MyPageRight
                 Select Case PageState
                     Case PageStates.ContentEnter, PageStates.ContentStay
                         '内容已经在显示（含刚进页面、入场动画还没收尾）时重新加载 = 用户点了刷新 / 数据变更：
-                        '标记为「立刻显示加载卡」，退出动画结束后不再等 400ms（第 132 轮）。
+                        '标记为「立刻显示加载卡」，退出动画结束后不再等 400ms。
                         'ContentEnter 也认：页面刚切过来就点刷新是很常见的操作，此时同样要看到镐子。
                         LoaderShowImmediately = True
                         PageState = PageStates.ContentExit
@@ -467,7 +467,7 @@ Public Class MyPageRight
                     AniList.Add(AaOpacity(Control, -1, 110, Delay, New AniEaseInFluent(AniEasePower.Middle)))
                     AniList.Add(AaTranslateY(Control, -18, 110, Delay, New AniEaseInFluent(AniEasePower.Middle)))
                     '级联延迟封顶 200ms：长列表（几十行 × 每行多个文本块）原来会把收尾 AaCode 一路推到 1~2 秒后，
-                    '刷新时要等整块列表逐行淡出才轮到加载卡，看起来就跟「没有加载动画」一样（第 133 轮）
+                    '刷新时要等整块列表逐行淡出才轮到加载卡，看起来就跟「没有加载动画」一样
                     If Delay < 200 Then Delay += 12
                 End If
             Next

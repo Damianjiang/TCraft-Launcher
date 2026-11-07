@@ -63,7 +63,7 @@ Public Class PageLoginMsSkin
         BtnSkin.ContextMenu.IsOpen = True
     End Sub
 
-    '修改皮肤（第 133 轮：上传逻辑抽到 ModMsSkin，账户管理页与本页共用一份实现）
+    '修改皮肤
     Private IsChanging As Boolean = False
     Public Sub BtnSkinEdit_Click(sender As Object, e As RoutedEventArgs)
         '检查条件，获取新皮肤

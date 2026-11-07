@@ -56,6 +56,8 @@ Public Class PageInstanceJarInJar
         LoadJars()
     End Sub
 
+    Private IsLoadingJars As Boolean = False
+
     Private Sub LoadJars()
         PanJars.Children.Clear()
         BtnExportAll.Visibility = Visibility.Collapsed
@@ -63,50 +65,77 @@ Public Class PageInstanceJarInJar
             LabTip.Text = ModLang.L("请选择一个 Mod。")
             Return
         End If
+        If IsLoadingJars Then Return
+        IsLoadingJars = True
+        PanLoad.Visibility = Visibility.Visible
+        Dim ModPath As String = CurrentMod
+        RunInNewThread(
+        Sub()
+            Dim ErrorText As String = Nothing
+            Dim Jars As New List(Of Tuple(Of String, Long, String, String)) 'FullName, Length, Name, Version
+            Try
+                Using Archive As New ZipArchive(New FileStream(ModPath, FileMode.Open, FileAccess.Read), ZipArchiveMode.Read)
+                    For Each Entry In Archive.Entries
+                        If Not (Entry.FullName.StartsWith("META-INF/jars/") AndAlso Entry.FullName.EndsWith(".jar")) Then Continue For
+                        Dim Info = ReadNestedInfo(Entry)
+                        Jars.Add(Tuple.Create(Entry.FullName, Entry.Length, Info.Name, Info.Version))
+                    Next
+                End Using
+            Catch ex As Exception
+                Logger.Error(ex, "读取 Jar-in-Jar 失败", LogBehavior.Toast)
+                ErrorText = ex.Message
+            End Try
+            RunInUi(Sub() ApplyJars(ModPath, ErrorText, Jars))
+        End Sub, "JarInJar Refresh")
+    End Sub
+
+    ''' <summary>把读取结果构建为界面卡片（只在 UI 线程调用）。</summary>
+    Private Sub ApplyJars(ModPath As String, ErrorText As String, Jars As List(Of Tuple(Of String, Long, String, String)))
         Try
-            Using Archive As New ZipArchive(New FileStream(CurrentMod, FileMode.Open, FileAccess.Read), ZipArchiveMode.Read)
-                Dim Jars = Archive.Entries.Where(Function(entry) entry.FullName.StartsWith("META-INF/jars/") AndAlso entry.FullName.EndsWith(".jar")).ToList()
-                If Jars.Count = 0 Then
-                    LabTip.Text = ModLang.L("该 Mod 不包含内嵌依赖（Jar-in-Jar）。")
-                    Return
-                End If
-                LabTip.Text = ModLang.L("共找到 ") & Jars.Count & ModLang.L(" 个内嵌依赖：")
-                For Each Entry In Jars
-                    Dim Info = ReadNestedInfo(Entry)
-                    Dim Card As New MyCard With {.Margin = New Thickness(0, 0, 0, 8)}
-                    Dim Grid As New Grid With {.Margin = New Thickness(15, 10, 15, 10)}
-                    Grid.ColumnDefinitions.Add(New ColumnDefinition)
-                    Grid.ColumnDefinitions.Add(New ColumnDefinition With {.Width = GridLength.Auto})
-                    Card.Children.Add(Grid)
+            PanLoad.Visibility = Visibility.Collapsed
+            IsLoadingJars = False
+            If ErrorText IsNot Nothing Then
+                LabTip.Text = ModLang.L("读取失败：") & ErrorText
+                Return
+            End If
+            If Jars.Count = 0 Then
+                LabTip.Text = ModLang.L("该 Mod 不包含内嵌依赖（Jar-in-Jar）。")
+                Return
+            End If
+            LabTip.Text = ModLang.L("共找到 ") & Jars.Count & ModLang.L(" 个内嵌依赖：")
+            For Each Jar In Jars
+                Dim Card As New MyCard With {.Margin = New Thickness(0, 0, 0, 8)}
+                Dim Grid As New Grid With {.Margin = New Thickness(15, 10, 15, 10)}
+                Grid.ColumnDefinitions.Add(New ColumnDefinition)
+                Grid.ColumnDefinitions.Add(New ColumnDefinition With {.Width = GridLength.Auto})
+                Card.Children.Add(Grid)
 
-                    Dim PanText As New StackPanel
-                    Grid.Children.Add(PanText)
-                    PanText.Children.Add(New TextBlock With {
-                        .Text = If(Info.Name, IO.Path.GetFileName(Entry.FullName)),
-                        .FontWeight = FontWeights.Bold,
-                        .TextTrimming = TextTrimming.CharacterEllipsis
-                    })
-                    PanText.Children.Add(New TextBlock With {
-                        .Text = $"{IO.Path.GetFileName(Entry.FullName)} · {Entry.Length \ 1024} KB" &
-                                If(String.IsNullOrEmpty(Info.Version), "", $" · v{Info.Version}"),
-                        .Opacity = 0.65,
-                        .FontSize = 11,
-                        .Margin = New Thickness(0, 3, 0, 0)
-                    })
+                Dim PanText As New StackPanel
+                Grid.Children.Add(PanText)
+                PanText.Children.Add(New TextBlock With {
+                    .Text = If(Jar.Item3, IO.Path.GetFileName(Jar.Item1)),
+                    .FontWeight = FontWeights.Bold,
+                    .TextTrimming = TextTrimming.CharacterEllipsis
+                })
+                PanText.Children.Add(New TextBlock With {
+                    .Text = $"{IO.Path.GetFileName(Jar.Item1)} · {Jar.Item2 \ 1024} KB" &
+                            If(String.IsNullOrEmpty(Jar.Item4), "", $" · v{Jar.Item4}"),
+                    .Opacity = 0.65,
+                    .FontSize = 11,
+                    .Margin = New Thickness(0, 3, 0, 0)
+                })
 
-                    Dim BtnExport As New MyButton With {.Text = ModLang.L("导出"), .MinWidth = 90, .Padding = New Thickness(13, 0, 13, 0)}
-                    Grid.SetColumn(BtnExport, 1)
-                    Dim TargetEntry = Entry
-                    AddHandler BtnExport.Click, Sub(sender2 As Object, e2 As MouseButtonEventArgs) ExportEntry(TargetEntry)
-                    Grid.Children.Add(BtnExport)
+                Dim BtnExport As New MyButton With {.Text = ModLang.L("导出"), .MinWidth = 90, .Padding = New Thickness(13, 0, 13, 0)}
+                Grid.SetColumn(BtnExport, 1)
+                Dim TargetName As String = Jar.Item1
+                AddHandler BtnExport.Click, Sub(sender2 As Object, e2 As MouseButtonEventArgs) ExportEntryByName(ModPath, TargetName)
+                Grid.Children.Add(BtnExport)
 
-                    PanJars.Children.Add(Card)
-                Next
-                BtnExportAll.Visibility = Visibility.Visible
-            End Using
+                PanJars.Children.Add(Card)
+            Next
+            BtnExportAll.Visibility = Visibility.Visible
         Catch ex As Exception
-            Logger.Error(ex, "读取 Jar-in-Jar 失败", LogBehavior.Toast)
-            LabTip.Text = ModLang.L("读取失败：") & ex.Message
+            Logger.Error(ex, "显示内嵌依赖列表失败")
         End Try
     End Sub
 
@@ -143,6 +172,31 @@ Public Class PageInstanceJarInJar
             End Using
             Hint(ModLang.L("已导出：") & IO.Path.GetFileName(Target), HintType.Green)
             OpenExplorer(Folder)
+        Catch ex As Exception
+            Logger.Error(ex, "导出内嵌依赖失败", LogBehavior.Toast)
+        End Try
+    End Sub
+
+    ''' <summary>按条目名从当前 Mod 导出（列表卡片跨线程后不再持有 ZipArchiveEntry，改用此重载）。</summary>
+    Private Sub ExportEntryByName(ModPath As String, EntryFullName As String)
+        Try
+            Using Archive As New ZipArchive(New FileStream(ModPath, FileMode.Open, FileAccess.Read), ZipArchiveMode.Read)
+                Dim Entry = Archive.GetEntry(EntryFullName)
+                If Entry Is Nothing Then
+                    Hint(ModLang.L("导出失败：条目已不存在。"), HintType.Red)
+                    Return
+                End If
+                Dim Folder = IO.Path.Combine(IO.Path.GetDirectoryName(ModPath), "JiJ导出", IO.Path.GetFileNameWithoutExtension(ModPath))
+                If Not Directory.Exists(Folder) Then Directory.CreateDirectory(Folder)
+                Dim Target = IO.Path.Combine(Folder, IO.Path.GetFileName(Entry.FullName))
+                Using Source = Entry.Open()
+                    Using Dest As New FileStream(Target, FileMode.Create, FileAccess.Write)
+                        Source.CopyTo(Dest)
+                    End Using
+                End Using
+                Hint(ModLang.L("已导出：") & IO.Path.GetFileName(Target), HintType.Green)
+                OpenExplorer(Folder)
+            End Using
         Catch ex As Exception
             Logger.Error(ex, "导出内嵌依赖失败", LogBehavior.Toast)
         End Try

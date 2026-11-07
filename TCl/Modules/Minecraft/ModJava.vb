@@ -61,7 +61,7 @@ Public Module ModJava
         Sub()
             FrmSetupLaunch?.UpdateJavaList()
             FrmInstanceSetup?.UpdateJavaList()
-            FrmSetupJava?.LoadList() 'Java 管理页打开时同步刷新列表（第 126 轮）
+            FrmSetupJava?.LoadList() 'Java 管理页打开时同步刷新列表
         End Sub)
     End Sub
 

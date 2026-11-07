@@ -17,7 +17,7 @@
                 </local:MyCard>
             </StackPanel>
         </local:MyScrollViewer>
-        <!--右下角：问候语 + 启动按钮（第 88 轮：HMCL 式简洁布局，仅一个启动按钮 + 连体下拉）-->
+        <!--右下角：问候语 + 启动按钮-->
         <StackPanel HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,30,25" Width="330" x:Name="PanLaunchButtons">
             <!--问候语-->
             <StackPanel Orientation="Vertical" Margin="0,0,0,10">
@@ -70,7 +70,7 @@
                 </Grid>
             </Grid>
         </StackPanel>
-        <!--启动按钮的展开菜单（第 90 轮）：原来的 ContextMenu 换成图标+文字的大卡片，
+        <!--启动按钮的展开菜单：原来的 ContextMenu 换成图标+文字的大卡片，
             带「缩放+上浮」展开动画；StaysOpen=False 负责点外面收起。-->
         <Popup x:Name="PopupLaunchMenu" PlacementTarget="{Binding ElementName=BtnLaunchMenu}" Placement="Top"
                VerticalOffset="-6" AllowsTransparency="True" StaysOpen="False" PopupAnimation="None">
@@ -93,7 +93,7 @@
                 </StackPanel>
             </Border>
         </Popup>
-        <!--启动侧边栏（第 91 轮）：改成从窗口最左边向右展开的侧边栏，展开后显示启动动画，
+        <!--启动侧边栏：改成从窗口最左边向右展开的侧边栏，展开后显示启动动画，
             启动成功（或失败、取消）再收回去。为了能盖住左边栏、真正做到"从最左边展开"，
             Init 里会把这个 PanLaunching 从本页移交给 FormMain.HostLaunchSide（窗口层）。
             内部控件名保持不变（LabLaunching* / ProgressLaunching* / PanLaunchingInfo…），

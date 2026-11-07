@@ -97,8 +97,8 @@
         Buttons.Add(OpenButton)
         '从列表移除 / 卸载
         Dim IsOfficial As Boolean = PathUtils.IsParentOf($"{Paths.AppData}.minecraft\runtime\", JavaEntry.Folder)
-        '第 72 轮修复：原用「停止」图标表示移除，语义不符 → 统一为删除图标
-        '第 126 轮：官方运行时支持卸载（连同删除文件），本地 Java 仍仅从列表移除
+        '修复：原用「停止」图标表示移除，语义不符 → 统一为删除图标
+        '官方运行时支持卸载（连同删除文件），本地 Java 仍仅从列表移除
         Dim DeleteButton As New MyIconButton With {.SvgIcon = "lucide/trash-2", .Height = 30, .Width = 30}
         DeleteButton.ToolTip = If(IsOfficial, ModLang.L("卸载并删除该官方 Java"), ModLang.L("从列表中移除"))
         AddHandler DeleteButton.Click,

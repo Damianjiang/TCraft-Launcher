@@ -121,7 +121,7 @@ Public Class PageOtherTest
         Dim Rand As New Random(GetDailySeed())
         Dim LuckValue As Integer = Rand.Next(0, 101)
         Dim Rating As String = GetLuckRating(LuckValue)
-        '日期按当前界面语言的文化显示（zh-CN: 2026/10/28，en-US: 10/28/2026），避免硬编码「年月日」只出现简中（第 67 轮）
+        '日期按当前界面语言的文化显示（zh-CN: 2026/10/28，en-US: 10/28/2026），避免硬编码「年月日」只出现简中
         Dim Title As String = ModLang.L("今日人品") & " · " & Date.Today.ToString("d", Globalization.CultureInfo.CurrentCulture) & " (◕‿◕)"
         If LuckValue >= 60 Then
             MyMsgBox(ModLang.L("今日人品：") & LuckValue & " " & ModLang.L("分！") & vbCrLf & ModLang.L("评价：") & Rating, Title)

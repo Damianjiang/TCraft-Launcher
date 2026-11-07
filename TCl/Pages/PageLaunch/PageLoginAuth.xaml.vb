@@ -29,7 +29,7 @@
     Public Shared Function GetLoginData() As McLoginServer
         Dim Server As String = If(IsNothing(McInstanceSelected), Settings.Get(Of String)("CacheAuthServerServer"), Settings.Get(Of String)("VersionServerAuthServer", Instance:=McInstanceSelected)) & "/authserver"
         ' 优先读登录表单；表单为空时（如从账户管理页「选择账号」直接启动）回退到全局缓存凭据，
-        ' 否则 IsVaild 会因账号名为空报「账号不能为空」导致启动失败（第 75 轮修复）
+        ' 否则 IsVaild 会因账号名为空报「账号不能为空」导致启动失败
         Dim UserName As String, Pass As String
         If FrmLoginAuth IsNot Nothing AndAlso Not FrmLoginAuth.ComboName.Text.Replace("¨", "").Trim = "" Then
             UserName = FrmLoginAuth.ComboName.Text.Replace("¨", "").Trim

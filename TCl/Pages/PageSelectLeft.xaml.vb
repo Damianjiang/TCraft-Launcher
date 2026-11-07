@@ -31,7 +31,7 @@
             '文件夹列表
             FrmSelectLeft.PanList.Children.Add(New TextBlock With {.Text = ModLang.L("文件夹列表"), .Margin = New Thickness(13, 18, 5, 4), .Opacity = 0.6, .FontSize = 12})
             For Each Folder As McFolder In McFolderList.ToArray
-                '构建框架与图表按钮（第 131 轮：操作菜单改为动画卡片，替代裸 ContextMenu）
+                '构建框架与图表按钮
                 Dim NewItem As New MyListItem With {.IsScaleAnimationEnabled = False, .Type = MyListItem.CheckType.RadioBox, .MinPaddingRight = 30, .Title = Folder.Name, .Info = Folder.Location, .Height = 40, .Tag = Folder}
                 AddHandler NewItem.Changed, AddressOf FrmSelectLeft.Folder_Change
                 '右键：菜单开在光标处（与原来的 ContextMenu 手感一致）
@@ -114,7 +114,7 @@
             Return
         End If
         Try
-            '获取输入（第 137 轮：区分「用户取消」与「对话框打开失败」，失败时给出可见提示，不再静默无反应）
+            '获取输入
             Dim Selected As List(Of String) = Dialogs.SelectFolder(ModLang.L("选择 Minecraft 文件夹"), False)
             If Selected Is Nothing OrElse Not Selected.Any() Then
                 Dim Reason As String = Dialogs.LastFolderError
@@ -141,7 +141,7 @@
     End Sub
     ''' <summary>
     ''' 判断拖入的目录是否是（或包含）一个 Minecraft 游戏文件夹，返回真正的 .minecraft 目录（带分隔符）。
-    ''' 找不到时返回空字符串。第 137 轮：供「把文件夹拖进窗口」的自动识别使用。
+    ''' 找不到时返回空字符串。供「把文件夹拖进窗口」的自动识别使用。
     ''' </summary>
     Public Shared Function DetectMinecraftFolder(Source As String) As String
         Try
@@ -283,7 +283,7 @@
         AddFolder(McFolderSelected, PathUtils.GetLastPart(Paths.Base), False)
     End Sub
 
-    '文件夹操作动画卡片（第 131 轮，与首页「更多」/实例页同款 Popup + 三段动画，替代裸 ContextMenu）
+    '文件夹操作动画卡片
     ''' <summary>当前菜单对应的文件夹。</summary>
     Private MenuFolder As McFolder = Nothing
     ''' <summary>上次关闭时间，250ms 重点守卫。</summary>
@@ -317,7 +317,7 @@
             TransformFolderMenuPos.Y = 10
             '定位按锚点算：卡片 Border 的 14px 投影留白要扣掉，否则本体整整偏 14px
             MenuCard.ApplyAnchor(PopupFolderMenu, Target, Anchor, AlignRight, 14)
-            '条目多时按锚点这一侧的可用高度封顶，超出用 TCL 滚动条（第 135 轮）
+            '条目多时按锚点这一侧的可用高度封顶，超出用 TCL 滚动条
             ScrollFolderMenu.MaxHeight = MenuCard.CalcMaxMenuHeight(Target)
             PopupFolderMenu.IsOpen = True
         Catch ex As Exception
