@@ -91,7 +91,7 @@ Public Class Application
             Dim Seg = GetTimeMs() '启动性能分段计时（仅日志）
             '启动提速——后台预热池：
             '把「与首帧渲染无数据依赖」的重初始化移出 UI 线程，由后台任务顺序完成（StartupWarmup）：
-            'ModLang 词典构建(~97ms) / ServicePointManager+HTTP 代理(~120ms) / .NET 版本检查 /
+            'ModLang 词典构建(~97ms) / HTTP 代理初始化 / .NET 版本检查 /（ServicePointManager 已上移到同步段）
             '渲染模式注册表 / 环境变量清理 / 默认背景释放。UI 线程只在真正需要结果处等待
             '（FormMain_Loaded / RunDeferredStartupWork / 初始化加载池），彼时预热早已完成。
             StartupWarmupTask = Task.Run(New Action(AddressOf StartupWarmup))
@@ -199,7 +199,7 @@ RetryCacheCheck:
             LogStartupSegment("缓存目录校验", Seg)
             '设置 ToolTipService 默认值（几 ms，保留 UI 线程：必须在任何 Tooltip 展示前生效）
             ToolTipService.InitialShowDelayProperty.OverrideMetadata(GetType(DependencyObject), New FrameworkPropertyMetadata(100))
-            'ServicePointManager 全局网络默认值与 HTTP 代理初始化已移入后台预热（StartupWarmup）——
+            'HTTP 代理初始化已移入后台预热（StartupWarmup）；ServicePointManager 在 Startup 同步段（2026-11-07 起）——
             '首个网络请求在首帧后的加载池线程上，彼时预热早已完成（初始化线程会先等待预热结束）
             LogStartupSegment("网络/工具提示默认值", Seg)
             '写入 WPF 渲染模式注册表已移入后台预热（该值重启才生效，当前进程不读它）
@@ -235,6 +235,16 @@ RetryCacheCheck:
             '计时
             Logger.Info($"第一阶段加载用时：{GetTimeMs() - ApplicationStartTick} ms")
             ApplicationStartTick = GetTimeMs()
+            'ServicePointManager 全局网络默认值（同步段，必须在预热线程与任何网络请求之前——
+            'Win7 的系统默认协议栈不含 TLS 1.2，首发请求竞态输掉就会 TLS 握手失败）
+            ServicePointManager.Expect100Continue = False
+            ServicePointManager.DefaultConnectionLimit = 10000
+            ServicePointManager.UseNagleAlgorithm = False
+            ServicePointManager.EnableDnsRoundRobin = True
+            ServicePointManager.ReusePort = True
+            If Environment.OSVersion.Version < New Version(6, 2) Then 'Windows 7 兼容：显式启用 TLS 1.2 等
+                ServicePointManager.SecurityProtocol = SecurityProtocolType.Ssl3 Or SecurityProtocolType.Tls Or SecurityProtocolType.Tls11 Or SecurityProtocolType.Tls12
+            End If
             AniControlEnabled += 1
         Catch ex As Exception
             Dim FilePath As String = Nothing
@@ -303,15 +313,9 @@ RetryCacheCheck:
             'ModLang 词典构建（~85-97ms 纯 CPU）：预热后任何线程首次触碰 ModLang 均零等待
             ModLang.Warmup()
             LogStartupSegment("预热:ModLang 词典", Seg)
-            'ServicePointManager 全局网络默认值（必须在首个网络请求前）
-            ServicePointManager.Expect100Continue = False
-            ServicePointManager.DefaultConnectionLimit = 10000
-            ServicePointManager.UseNagleAlgorithm = False
-            ServicePointManager.EnableDnsRoundRobin = True
-            ServicePointManager.ReusePort = True
-            If Environment.OSVersion.Version < New Version(6, 2) Then 'Windows 7 兼容：旧系统默认协议栈过老，显式启用 TLS 1.2 等
-                ServicePointManager.SecurityProtocol = SecurityProtocolType.Ssl3 Or SecurityProtocolType.Tls Or SecurityProtocolType.Tls11 Or SecurityProtocolType.Tls12
-            End If
+            '（ServicePointManager 全局网络默认值已上移到 Startup 同步段：预热是后台线程，
+            '  与首个网络请求存在竞态——Win7 上竞态输掉的首发请求会用 Ssl3|Tls 老协议栈，
+            '  TLS 1.2-only 的 CDN 全挂，表现为图标/图片不显示）
             '初始化全局 HTTP 代理
             WebRequest.DefaultWebProxy = HttpProxyManager.Instance
             ModNet.UpdateHttpProxy()

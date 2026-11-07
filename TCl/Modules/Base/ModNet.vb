@@ -334,7 +334,7 @@ Public Module ModNet
             End SyncLock
             '构建请求
             Url = SecretCdnSign(Url)
-            Request = New HttpRequestMessage(Method, Url) With {.Version = Http2Version}
+            Request = New HttpRequestMessage(Method, Url) With {.Version = RequestHttpVersion.Value}
             If Content IsNot Nothing AndAlso Request.Method <> HttpMethod.Get AndAlso Request.Method <> HttpMethod.Head Then '写入 Content
                 If TypeOf Content Is HttpContent Then
                     Request.Content = DirectCast(Content, HttpContent).Clone()
@@ -403,9 +403,9 @@ Public Module ModNet
 
 #Region "多线程下载引擎"
 
-    ''' <summary>HTTP 请求目标版本：2.0。WinHttpHandler（Win10+）据此启用 HTTP/2 多路复用；
-    ''' 不支持 h2 的源由 ALPN / 明文回退自动降级到 1.1；Win7 回退的 HttpClientHandler 忽略该值。</summary>
-    Private ReadOnly Http2Version As New Version(2, 0)
+    ''' <summary>请求使用的 HTTP 版本：HTTP/2 可用（Win10 1607+ 的 WinHttpHandler）时为 2.0 以启用多路复用，
+    ''' 不支持 h2 的源由 ALPN / 明文回退自动降级到 1.1；Win7/8 的 HttpClientHandler 固定 1.1（对 Version=2.0 行为未定义，不能赌）。</summary>
+    Private ReadOnly RequestHttpVersion As New Lazy(Of Version)(Function() If(ModProxy.Http2Available, New Version(2, 0), New Version(1, 1)))
 
     '下载引擎线程共用一个客户端：Win10+ 走 WinHttpHandler（HTTP/2 多路复用），Win7 回退 HttpClientHandler
     Private ThreadClient As New HttpClient(ModProxy.CreateHandler())
@@ -730,6 +730,7 @@ Public Module ModNet
         ''' 这一策略可以兼容多个下载源中的一部分返回错误的文件的情况，以及部分在多线程下载时会抽风的源。
         ''' </summary>
         Private Retried As Boolean = False
+        Private RetriedTwice As Boolean = False '第二轮整体自动重试（网络抖动兜底，2026-11-07）
         ''' <summary>
         ''' 获取从某个源开始，第一个可用的源。
         ''' </summary>
@@ -1052,7 +1053,7 @@ StartThread:
             Try
                 Dim HttpDataCount As Integer = 0
                 If SourcesOnce.Contains(Th.Source) AndAlso Th <> Th.Source.SingleThread Then GoTo SourceBreak
-                HttpRequest = New HttpRequestMessage(HttpMethod.Get, Th.Source.Url) With {.Version = Http2Version}
+                HttpRequest = New HttpRequestMessage(HttpMethod.Get, Th.Source.Url) With {.Version = RequestHttpVersion.Value}
                 SecretHeadersSign(Th.Source.Url, HttpRequest, SimulateBrowserHeaders)
                 CancelToken = New CancellationTokenSource(Timeout)
                 If Not Th.IsFirstThread Then HttpRequest.Headers.Range = New Headers.RangeHeaderValue(Th.DownloadStart, Nothing)
@@ -1248,6 +1249,23 @@ SourceBreak:
                         '若所有源均不支持 Range，也会走到这里重试
                         If Not IsRangeNotSupported Then Logger.Warn($"{LocalName}：文件下载失败，正在自动重试……")
                         Retried = True
+                        SyncLock LockSource
+                            SourcesOnce.Clear()
+                            For Each Source In Sources
+                                SourcesOnce.Add(Source)
+                                Source.IsFailed = True
+                            Next
+                        End SyncLock
+                        Reset()
+                        SyncLock LockState
+                            State = NetState.WaitingToDownload
+                        End SyncLock
+                    ElseIf Not RetriedTwice Then
+                        '第二轮整体重试（2026-11-07）：第一轮自动重试仍全部失败，延迟 1.5 秒后再试最后一轮
+                        '（弱网/Win7 下常见「两源恰好同时抖动」的场景，隔一小段时间重试命中率不低）
+                        RetriedTwice = True
+                        Logger.Warn($"{LocalName}：自动重试仍失败，1.5 秒后进行最后一轮重试")
+                        System.Threading.Thread.Sleep(1500)
                         SyncLock LockSource
                             SourcesOnce.Clear()
                             For Each Source In Sources

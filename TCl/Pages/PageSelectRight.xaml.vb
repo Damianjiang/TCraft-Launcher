@@ -305,6 +305,10 @@ Public Class PageSelectRight
     Private Const ItemIconSize As Integer = 34
 
     Private _IsBuilding As Boolean = False
+    ''' <summary>实例列表分页：每页渲染的实例数。</summary>
+    Private Const InstancePageSize As Integer = 50
+    ''' <summary>当前页码（0 起）。</summary>
+    Private _CurrentPage As Integer = 0
     ''' <summary>实例路径 → 最后游玩时间（本地时间）。由后台线程算好后整体替换，读取端不加锁。</summary>
     Private Shared _LastPlay As Dictionary(Of String, Date) = Nothing
     Private Shared _LastPlayFolder As String = ""
@@ -357,8 +361,8 @@ Public Class PageSelectRight
         BuildList()
     End Sub
 
-    ''' <summary>按当前搜索词与排序方式重建整个列表。</summary>
-    Private Sub BuildList()
+    ''' <summary>按当前搜索词与排序方式重建列表（分页渲染：每页 50 个，防大量实例卡死 UI）。</summary>
+    Private Sub BuildList(Optional ResetPage As Boolean = True)
         If FrmSelectRight Is Nothing OrElse PanMain Is Nothing Then Return
         If _IsBuilding Then Return
         _IsBuilding = True
@@ -366,8 +370,13 @@ Public Class PageSelectRight
             RefreshCollectionBar()
             PanMain.Children.Clear()
             If PanGrid IsNot Nothing Then PanGrid.Children.Clear()
+            If ResetPage Then _CurrentPage = 0
             Dim GridMode As Boolean = (_ViewMode = ViewModeGrid AndAlso PanGrid IsNot Nothing)
-            Dim Total As Integer = 0
+            '先扁平化出完整有序列表（组序 → 组内筛选排序），再按页切片渲染：
+            '实例很多时只构建当前页的卡片，避免一次建上百个控件把 UI 线程卡死
+            Dim Flat As New List(Of KeyValuePair(Of McInstanceCardType, McInstance))
+            Dim GroupCounts As New Dictionary(Of McInstanceCardType, Integer)
+            Dim GroupTitles As New Dictionary(Of McInstanceCardType, String)
             For Each Kind In GroupOrder()
                 If Kind = McInstanceCardType.Hidden AndAlso Not ShowHidden Then Continue For
                 Dim Bucket As List(Of McInstance) = Nothing
@@ -376,25 +385,41 @@ Public Class PageSelectRight
                 Dim Shown As List(Of McInstance) = Bucket.Where(Function(One) Not McInstanceLock.IsLocked(One) AndAlso MatchSearch(One)).ToList()
                 If Not Shown.Any() Then Continue For
                 Shown = SortInstances(Shown)
-                Dim GroupHost As Panel = PanMain
-                If GridMode Then
-                    '网格视图：标题照旧，卡片放进本组独立的 WrapPanel，换行不会串组
-                    PanGrid.Children.Add(BuildGroupHeader(GroupTitle(Kind, Bucket), Shown.Count))
-                    Dim Wrap As New WrapPanel With {.Orientation = Orientation.Horizontal, .Margin = New Thickness(0, 0, 0, 4)}
-                    PanGrid.Children.Add(Wrap)
-                    GroupHost = Wrap
-                Else
-                    GroupHost.Children.Add(BuildGroupHeader(GroupTitle(Kind, Bucket), Shown.Count))
-                End If
+                GroupCounts(Kind) = Shown.Count
+                GroupTitles(Kind) = GroupTitle(Kind, Bucket)
                 For Each One In Shown
-                    If GridMode Then
-                        GroupHost.Children.Add(BuildCard(One))
-                    Else
-                        GroupHost.Children.Add(BuildListItemWrapped(One))
-                    End If
+                    Flat.Add(New KeyValuePair(Of McInstanceCardType, McInstance)(Kind, One))
                 Next
-                Total += Shown.Count
             Next
+            Dim Total As Integer = Flat.Count
+            Dim TotalPages As Integer = Math.Max(1, CInt(Math.Ceiling(Total / CDbl(InstancePageSize))))
+            If _CurrentPage >= TotalPages Then _CurrentPage = TotalPages - 1
+            If _CurrentPage < 0 Then _CurrentPage = 0
+            '渲染当前页切片；组头带全组数量（切片内同组成员必然连续，按组变化切换组头）
+            Dim LastKind As McInstanceCardType? = Nothing
+            Dim GroupHost As Panel = PanMain
+            For Each Pair In Flat.Skip(_CurrentPage * InstancePageSize).Take(InstancePageSize)
+                If LastKind Is Nothing OrElse Pair.Key <> LastKind Then
+                    LastKind = Pair.Key
+                    If GridMode Then
+                        PanGrid.Children.Add(BuildGroupHeader(GroupTitles(Pair.Key), GroupCounts(Pair.Key)))
+                        GroupHost = New WrapPanel With {.Orientation = Orientation.Horizontal, .Margin = New Thickness(0, 0, 0, 4)}
+                        PanGrid.Children.Add(GroupHost)
+                    Else
+                        PanMain.Children.Add(BuildGroupHeader(GroupTitles(Pair.Key), GroupCounts(Pair.Key)))
+                        GroupHost = PanMain
+                    End If
+                End If
+                If GridMode Then
+                    GroupHost.Children.Add(BuildCard(Pair.Value))
+                Else
+                    GroupHost.Children.Add(BuildListItemWrapped(Pair.Value))
+                End If
+            Next
+            '页脚翻页条：只有一页时不显示
+            If TotalPages > 1 Then
+                GroupHost.Children.Add(BuildPageBar(_CurrentPage, TotalPages, Total))
+            End If
 
             If Total = 0 Then
                 PanEmpty.Visibility = Visibility.Visible
@@ -421,6 +446,28 @@ Public Class PageSelectRight
         Finally
             _IsBuilding = False
         End Try
+        If Not ResetPage AndAlso PanBack IsNot Nothing Then PanBack.ScrollToHome() '翻页后回到列表顶部
+    End Sub
+
+    ''' <summary>构建页脚翻页条：上一页 / 页码 / 下一页。</summary>
+    Private Function BuildPageBar(CurrentPage As Integer, TotalPages As Integer, Total As Integer) As FrameworkElement
+        Dim Bar As New StackPanel With {.Orientation = Orientation.Horizontal, .HorizontalAlignment = HorizontalAlignment.Center, .Margin = New Thickness(0, 10, 0, 4)}
+        Dim BtnPrev As New MyButton With {.Text = ModLang.L("上一页"), .MinWidth = 84, .Height = 28, .Padding = New Thickness(10, 0, 10, 0), .IsEnabled = CurrentPage > 0}
+        AddHandler BtnPrev.Click, Sub() GoPage(-1)
+        Dim Lab As New TextBlock With {.Text = $"{CurrentPage + 1} / {TotalPages} · {Total}", .VerticalAlignment = VerticalAlignment.Center, .Margin = New Thickness(14, 0, 14, 0), .Opacity = 0.7}
+        Lab.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrush1")
+        Dim BtnNext As New MyButton With {.Text = ModLang.L("下一页"), .MinWidth = 84, .Height = 28, .Padding = New Thickness(10, 0, 10, 0), .IsEnabled = CurrentPage < TotalPages - 1}
+        AddHandler BtnNext.Click, Sub() GoPage(1)
+        Bar.Children.Add(BtnPrev)
+        Bar.Children.Add(Lab)
+        Bar.Children.Add(BtnNext)
+        Return Bar
+    End Function
+
+    ''' <summary>翻页并回到列表顶部。</summary>
+    Private Sub GoPage(Delta As Integer)
+        _CurrentPage += Delta
+        BuildList(False)
     End Sub
 
     ''' <summary>分组标题：小号半透明文字 + 数量，替代原先可折叠的大卡片。</summary>

@@ -12,6 +12,26 @@ The website and download link always resolve to the newest build, so no version 
 
 ---
 
+## v1.3.1 (1.3.1.0) — 2026-11-07 / 中文
+
+（灰度预览更新；资产 `TCraft-Launcher.exe`，校验值见 Release 页面）
+
+- 修复网络任务超时后异常未被观察导致的「后台任务存在未观察的异常」日志刷屏（根源修复，覆盖全部网络调用）。
+- Windows 7 兼容：TLS 1.2 等协议设置移至启动同步段（消除与首发网络请求的竞态）；HTTP/2 仅在 Windows 10 1607+ 启用，请求版本按系统能力自动选择。
+- 下载引擎新增第二轮延迟自动重试：全部下载源失败后延迟 1.5 秒再整体重试一次，弱网下更可靠。
+- 实例列表分页：每页 50 个实例，多页时显示翻页条，大量实例不再卡顿；搜索 / 排序 / 视图 / 合集切换自动回到第一页。
+
+## v1.3.1 (1.3.1.0) — 2026-11-07 / English
+
+(Gray preview update; asset `TCraft-Launcher.exe`, checksum on the Release page)
+
+- Fixed the root cause of "unobserved task exception" log spam: abandoned network tasks are now observed on timeout (applies to every network call).
+- Windows 7 compatibility: TLS 1.2 protocol setup moved to the synchronous startup phase (removes the race with the first network request); HTTP/2 is only enabled on Windows 10 1607+, request version follows OS capability.
+- Download engine gains a second delayed automatic retry (1.5 s after all sources fail) for flaky networks.
+- Instance list pagination: 50 instances per page with a page bar, so large instance collections no longer stall the UI; search / sort / view / collection changes return to page 1.
+
+---
+
 ## v1.3 (1.3.0.0) — 2026-11-07 / 中文
 
 （资产 `TCraft-Launcher.exe`，校验值见 Release 页面）

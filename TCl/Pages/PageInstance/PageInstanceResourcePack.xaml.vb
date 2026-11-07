@@ -1,4 +1,4 @@
-''' <summary>
+﻿''' <summary>
 ''' 实例的资源包管理页：列出 resourcepacks 文件夹里的内容，并通过 options.txt 的 resourcePacks 行控制启用状态。
 ''' </summary>
 Public Class PageInstanceResourcePack
@@ -75,7 +75,6 @@ Public Class PageInstanceResourcePack
         Refresh()
     End Sub
 
-    ''' <summary>重新读取磁盘列表。</summary>
     ''' <summary>重新读取磁盘列表（扫描放后台线程，期间显示镐子加载卡）。</summary>
     Public Sub Refresh(Optional OnFinished As Action = Nothing)
         If IsRefreshing Then Return

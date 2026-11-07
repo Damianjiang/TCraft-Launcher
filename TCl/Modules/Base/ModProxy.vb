@@ -217,6 +217,13 @@ Public Module ModProxy
         End Try
         Return Handler
     End Function
+    ''' <summary>当前环境是否可用 HTTP/2（Win10 1607+ 且非 SOCKS5）。请求版本据此选择，
+    ''' 避免 Win7/8 的 HttpClientHandler 收到 Version=2.0 请求时行为未定义。</summary>
+    Public ReadOnly Property Http2Available As Boolean
+        Get
+            Return Environment.OSVersion.Version >= New Version(10, 0, 14393) AndAlso GetMode() <> ModeSocks5
+        End Get
+    End Property
 
     ''' <summary>
     ''' 创建已套好代理的 HTTP 消息处理器（新代码统一用这个）。
@@ -224,11 +231,11 @@ Public Module ModProxy
     ''' （对齐 PCL-CE（net10）SocketsHttpHandler 的连接行为），省掉每线程独立的 TCP+TLS 握手与慢启动开销；
     ''' HTTP/1.1-only 的源由 ALPN 自动回退、明文 http:// 自动回退，行为不变。
     ''' Win7/8 的 WinHTTP 不支持 HTTP/2 且默认未启用 TLS 1.2，回退 HttpClientHandler
-    ''' （TLS 版本由 .NET 4.8 自行管理，预热已显式开启 TLS 1.2），保证 Win7 完整兼容；
+    ''' （TLS 版本由 .NET 4.8 自行管理，启动同步段已显式开启 TLS 1.2），保证 Win7 完整兼容；
     ''' SOCKS5 同样走 HttpClientHandler（WinHTTP 不支持 socks 方案，维持原栈的尽力而为行为）。
     ''' </summary>
     Public Function CreateHandler() As HttpMessageHandler
-        If Environment.OSVersion.Version >= New Version(10, 0, 14393) AndAlso GetMode() <> ModeSocks5 Then 'Win10 1607+ 才有支持 HTTP/2 的 WinHTTP
+        If Http2Available Then 'Win10 1607+ 才有支持 HTTP/2 的 WinHTTP
             Try
                 Return ApplyWinHttp(New WinHttpHandler With {
                     .AutomaticDecompression = DecompressionMethods.Deflate Or DecompressionMethods.GZip,

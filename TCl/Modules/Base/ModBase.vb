@@ -6,7 +6,7 @@ Public Module ModBase
 #Region "声明"
 
     '下列版本信息由人工修改
-    Public Const VersionBaseName As String = "1.3" '显示用版本名
+    Public Const VersionBaseName As String = "1.3.1" '显示用版本名
     Public Const CommitHash As String = "" 'Commit Hash，由 GitHub Workflow 自动替换
 #If RELEASE Then
     Public Const VersionCode As Integer = 415 '正式版
@@ -757,7 +757,7 @@ Public Module ModBase
         End Try
     End Sub
 
-    ''' <summary>语言已切换：实时应用。</summary>
+    '语言已切换：实时应用（不再重启）
 #End Region
 
 #Region "搜索"
@@ -956,6 +956,7 @@ Public Module ModBase
         Dim DelayTask = Task.Delay(TimeoutMs)
         If Task.WhenAny(TargetTask, DelayTask).ConfigureAwait(False).GetAwaiter().GetResult() Is DelayTask Then
             TokenSource.Cancel()
+            ObserveAbandonedTask(TargetTask)
             Throw New TimeoutException($"任务超时（{TimeoutMs} ms）")
         End If
         Return TargetTask.Run()
@@ -967,9 +968,22 @@ Public Module ModBase
         Dim DelayTask = Task.Delay(TimeoutMs)
         If Task.WhenAny(TargetTask, DelayTask).ConfigureAwait(False).GetAwaiter().GetResult() Is DelayTask Then
             TokenSource.Cancel()
+            ObserveAbandonedTask(TargetTask)
             Throw New TimeoutException($"任务超时（{TimeoutMs} ms）")
         End If
         TargetTask.Run()
+    End Sub
+
+    ''' <summary>
+    ''' 观察一个即将被弃置的任务的异常（超时/取消路径专用）。
+    ''' 弃置的任务在取消后会以 TaskCanceledException / 网络错误（如 WinHTTP 12002）收场，
+    ''' 不主动观察就会在终结器线程变成「后台任务存在未观察的异常」刷屏。
+    ''' </summary>
+    Private Sub ObserveAbandonedTask(TargetTask As Task)
+        If TargetTask Is Nothing Then Return
+        TargetTask.ContinueWith(Sub(tt)
+                                    Dim Ignored = tt.Exception '访问即标记为已观察
+                                End Sub, TaskContinuationOptions.ExecuteSynchronously)
     End Sub
 
     ''' <summary>
