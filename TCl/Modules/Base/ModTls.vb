@@ -256,10 +256,16 @@ Public Module ModTls
         Dim Tcp As TcpClient
         If Addr IsNot Nothing Then
             Tcp = New TcpClient
-            Dim Ar = Tcp.BeginConnect(Addr, 443, Nothing, Nothing)
+            ' 修复：加回调观察异步连接异常，避免超时后 Close Tcp 导致后台未观察异常
+            Dim Ar = Tcp.BeginConnect(Addr, 443, Sub(iar)
+                                                     Try
+                                                         Tcp.EndConnect(iar)
+                                                     Catch
+                                                         ' 忽略超时后 Close 导致的异常
+                                                     End Try
+                                                 End Sub, Nothing)
             If Not Ar.AsyncWaitHandle.WaitOne(TimeoutMs) Then
-                ' 修复：超时后先 EndConnect 结束异步操作，再 Close，避免后台线程抛出未观察异常
-                Try : Tcp.EndConnect(Ar) : Catch : End Try
+                ' 超时：直接 Close Tcp，回调里会处理 EndConnect 的异常
                 Try : Tcp.Close() : Catch : End Try
                 Throw New Exception($"TLS 连接 {Host} 超时（{TimeoutMs} ms）")
             End If
