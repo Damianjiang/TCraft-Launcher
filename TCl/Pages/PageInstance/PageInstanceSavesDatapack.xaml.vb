@@ -105,23 +105,18 @@ Public Class PageInstanceSavesDatapack
     End Sub
 
     Private Sub TogglePack(Entry As String)
+        Dim WasDisabled = Entry.EndsWith(".disabled", StringComparison.OrdinalIgnoreCase)
+        Dim Target = If(WasDisabled, Entry.Substring(0, Entry.Length - ".disabled".Length), Entry & ".disabled")
         Try
-            If Entry.EndsWith(".disabled", StringComparison.OrdinalIgnoreCase) Then
-                Dim Target = Entry.Substring(0, Entry.Length - ".disabled".Length)
-                If Directory.Exists(Entry) Then
-                    Directory.Move(Entry, Target)
-                Else
-                    File.Move(Entry, Target)
-                End If
+            If Directory.Exists(Entry) Then
+                Directory.Move(Entry, Target)
             Else
-                Dim Target = Entry & ".disabled"
-                If Directory.Exists(Entry) Then
-                    Directory.Move(Entry, Target)
-                Else
-                    File.Move(Entry, Target)
-                End If
+                File.Move(Entry, Target)
             End If
             LoadPacks()
+            '显示名统一用未禁用形态（启用后 Target 已无后缀；禁用前的 Entry 本就没有）
+            Hint(If(WasDisabled, ModLang.L("已启用："), ModLang.L("已禁用：")) &
+                 IO.Path.GetFileName(If(WasDisabled, Target, Entry)), HintType.Green)
         Catch ex As Exception
             Logger.Error(ex, "切换数据包状态失败", LogBehavior.Toast)
         End Try

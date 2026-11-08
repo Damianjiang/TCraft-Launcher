@@ -20,14 +20,14 @@
                                Text="TCL 需要 Java 才能启动游戏。列表中的第一个可用 Java 将被默认使用，可用右侧箭头调整优先级。" />
                     <TextBlock x:Name="LabStatus" TextWrapping="Wrap" FontSize="12" Margin="0,10,0,0"
                                Foreground="{DynamicResource ColorBrushGray4}" Text="" />
-                    <WrapPanel ItemHeight="35" Margin="0,18,0,0">
-                        <local:MyButton MinWidth="130" Text="导入 Java…" ColorType="Highlight" Margin="0,0,15,0"
+                    <WrapPanel Margin="0,18,0,4">
+                        <local:MyButton MinWidth="130" Text="导入 Java…" ColorType="Highlight" Margin="0,0,15,12"
                                         Click="BtnImport_Click" />
-                        <local:MyButton x:Name="BtnDownload" MinWidth="110" Text="下载 Java…" ColorType="Normal" Margin="0,0,15,0"
+                        <local:MyButton x:Name="BtnDownload" MinWidth="110" Text="下载 Java…" ColorType="Normal" Margin="0,0,15,12"
                                         Click="BtnDownload_Click" />
-                        <local:MyButton x:Name="BtnSearch" MinWidth="110" Text="重新搜索" ColorType="Normal" Margin="0,0,15,0"
+                        <local:MyButton x:Name="BtnSearch" MinWidth="110" Text="重新搜索" ColorType="Normal" Margin="0,0,15,12"
                                         Click="BtnSearch_Click" />
-                        <local:MyButton MinWidth="110" Text="打开数据文件夹" ColorType="Normal" Margin="0,0,15,0"
+                        <local:MyButton MinWidth="110" Text="打开数据文件夹" ColorType="Normal" Margin="0,0,15,12"
                                         Click="BtnOpenFolder_Click" />
                         <local:MyButton MinWidth="110" Text="初始化此项" ColorType="Red" Click="BtnReset_Click" />
                     </WrapPanel>

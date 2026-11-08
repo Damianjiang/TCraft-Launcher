@@ -6,12 +6,12 @@ Public Module ModBase
 #Region "声明"
 
     '下列版本信息由人工修改
-    Public Const VersionBaseName As String = "1.3.3" '显示用版本名
+    Public Const VersionBaseName As String = "1.3.4" '显示用版本名
     Public Const CommitHash As String = "" 'Commit Hash，由 GitHub Workflow 自动替换
 #If RELEASE Then
-    Public Const VersionCode As Integer = 415 '正式版
+    Public Const VersionCode As Integer = 416 '正式版
 #Else
-    Public Const VersionCode As Integer = 416 '快照版
+    Public Const VersionCode As Integer = 417 '快照版
 #End If
 
     '版本信息
@@ -955,7 +955,10 @@ Public Module ModBase
     <Extension> Public Function GetResultWithTimeout(Of T)(TargetTask As Task(Of T), TokenSource As CancellationTokenSource, TimeoutMs As Integer) As T
         Dim DelayTask = Task.Delay(TimeoutMs)
         If Task.WhenAny(TargetTask, DelayTask).ConfigureAwait(False).GetAwaiter().GetResult() Is DelayTask Then
-            TokenSource.Cancel()
+            Try
+                TokenSource.Cancel() 'CTS 可能在竞态下已被释放：Cancel 抛出也不能跳过下面的异常观察
+            Catch
+            End Try
             ObserveAbandonedTask(TargetTask)
             Throw New TimeoutException($"任务超时（{TimeoutMs} ms）")
         End If
@@ -967,7 +970,10 @@ Public Module ModBase
     <Extension> Public Sub GetResultWithTimeout(TargetTask As Task, TokenSource As CancellationTokenSource, TimeoutMs As Integer)
         Dim DelayTask = Task.Delay(TimeoutMs)
         If Task.WhenAny(TargetTask, DelayTask).ConfigureAwait(False).GetAwaiter().GetResult() Is DelayTask Then
-            TokenSource.Cancel()
+            Try
+                TokenSource.Cancel() 'CTS 可能在竞态下已被释放：Cancel 抛出也不能跳过下面的异常观察
+            Catch
+            End Try
             ObserveAbandonedTask(TargetTask)
             Throw New TimeoutException($"任务超时（{TimeoutMs} ms）")
         End If

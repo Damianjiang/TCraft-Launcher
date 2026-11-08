@@ -10,21 +10,8 @@
         <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
             <StackPanel x:Name="PanMain" Margin="25,10" Grid.IsSharedSizeScope="True">
 
-                <!-- 快速操作 -->
-                <local:MyCard Margin="0,15" Title="快速操作">
-                    <WrapPanel Margin="25,40,21,5" ItemHeight="50">
-                        <local:MyButton x:Name="BtnOpenFolder" MinWidth="140" Text="打开存档文件夹"
-                                        Margin="0,0,15,15" ColorType="Highlight" />
-                        <local:MyButton x:Name="BtnImport" MinWidth="140" Text="导入存档" Margin="0,0,15,15"
-                                        ToolTip="从本地文件夹复制一个存档到当前版本。" />
-                        <local:MyButton x:Name="BtnImportZip" MinWidth="140" Text="导入 .zip" Margin="0,0,15,15"
-                                        ToolTip="从压缩包导入世界：自动识别包含 level.dat 的目录。" />
-                        <local:MyButton x:Name="BtnRefresh" MinWidth="140" Text="刷新列表" Margin="0,0,15,15" />
-                    </WrapPanel>
-                </local:MyCard>
-
                 <!-- 存档列表 -->
-                <local:MyCard x:Name="CardList" Margin="0,0,0,15" Title="存档列表">
+                <local:MyCard x:Name="CardList" Margin="0,5,0,15" Title="存档列表">
                     <StackPanel Margin="25,44,20,15">
                         <Grid Margin="0,0,5,12">
                             <Grid.ColumnDefinitions>
@@ -40,6 +27,16 @@
                                 <local:MyComboBoxItem Content="名称" />
                             </local:MyComboBox>
                         </Grid>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                            <local:MyButton x:Name="BtnOpenFolder" Height="32" MinWidth="132" Padding="13,0"
+                                            Text="打开存档文件夹" ColorType="Highlight" />
+                            <local:MyButton x:Name="BtnImport" Height="32" MinWidth="96" Padding="13,0" Margin="8,0,0,0"
+                                            Text="导入存档" ToolTip="从本地文件夹复制一个存档到当前版本。" />
+                            <local:MyButton x:Name="BtnImportZip" Height="32" MinWidth="92" Padding="13,0" Margin="8,0,0,0"
+                                            Text="导入 .zip" ToolTip="从压缩包导入世界：自动识别包含 level.dat 的目录。" />
+                            <local:MyButton x:Name="BtnRefresh" Height="32" MinWidth="96" Padding="13,0" Margin="8,0,0,0"
+                                            Text="刷新列表" />
+                        </StackPanel>
                         <StackPanel Name="PanSaves" VerticalAlignment="Top" />
                     </StackPanel>
                 </local:MyCard>

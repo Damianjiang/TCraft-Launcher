@@ -386,7 +386,9 @@ Public Module ModNet
             '构建 RequestClient
             SyncLock RequestClientLock
                 If RequestClient Is Nothing Then '延迟初始化
-                    RequestClient = New HttpClient(ModProxy.CreateHandler(), False)
+                    'Timeout 无限化：超时全部由请求侧 CTS 管理。HttpClient 自带的隐式取消者在超时触发时
+                    '会丢弃内层 WinHttpHandler 任务，若该任务恰好 FAULT（原生 12002 等）就成为无法观察的垃圾
+                    RequestClient = New HttpClient(ModProxy.CreateHandler(), False) With {.Timeout = System.Threading.Timeout.InfiniteTimeSpan}
                 End If
             End SyncLock
             '构建请求
@@ -465,7 +467,8 @@ Public Module ModNet
     Private ReadOnly RequestHttpVersion As New Lazy(Of Version)(Function() If(ModProxy.Http2Available, New Version(2, 0), New Version(1, 1)))
 
     '下载引擎线程共用一个客户端：Win10+ 走 WinHttpHandler（HTTP/2 多路复用），Win7 回退 HttpClientHandler
-    Private ThreadClient As New HttpClient(ModProxy.CreateHandler())
+    'Timeout 无限化：超时由各下载线程的 CTS 管理，禁掉 HttpClient 的隐式取消者（会丢弃 FAULT 的内层任务）
+    Private ThreadClient As New HttpClient(ModProxy.CreateHandler()) With {.Timeout = System.Threading.Timeout.InfiniteTimeSpan}
 
     ''' <summary>
     ''' 根据设置刷新全局 HTTP 代理。

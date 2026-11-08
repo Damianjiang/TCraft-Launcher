@@ -15,12 +15,12 @@
                 <TextBlock Text="查看、导出与清理运行日志。" FontSize="13" Opacity="0.55" Margin="0,6,0,0" Foreground="{DynamicResource ColorBrush1}" />
             </StackPanel>
             <local:MyCard DockPanel.Dock="Top" Title="日志操作" Margin="32,24,32,0">
-                <WrapPanel ItemHeight="35" Margin="32,44,24,26">
-                    <local:MyButton MinWidth="100" Text="导出当前日志" ColorType="Highlight" Margin="0,0,15,0"
+                <WrapPanel Margin="32,44,24,20">
+                    <local:MyButton MinWidth="100" Text="导出当前日志" ColorType="Highlight" Margin="0,0,15,12"
                                     Click="BtnExport_Click" />
-                    <local:MyButton MinWidth="120" Text="导出全部日志" ColorType="Normal" Margin="0,0,15,0"
+                    <local:MyButton MinWidth="120" Text="导出全部日志" ColorType="Normal" Margin="0,0,15,12"
                                     Click="BtnExportAll_Click" />
-                    <local:MyButton MinWidth="120" Text="打开日志文件夹" ColorType="Normal" Margin="0,0,15,0"
+                    <local:MyButton MinWidth="120" Text="打开日志文件夹" ColorType="Normal" Margin="0,0,15,12"
                                     Click="BtnOpenDir_Click" />
                     <local:MyButton MinWidth="120" Text="清理历史日志" ColorType="Red" Click="BtnClean_Click" />
                 </WrapPanel>

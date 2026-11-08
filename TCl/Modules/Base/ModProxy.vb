@@ -238,12 +238,16 @@ Public Module ModProxy
     Public Function CreateHandler() As HttpMessageHandler
         If Http2Available Then 'Win10 1607+ 才有支持 HTTP/2 的 WinHTTP
             Try
+                '原生超时只是最后防线，必须远大于应用侧超时（≤30s）：停滞请求由应用侧先取消；
+                '若原生超时与应用侧同一量级，取消与原生 12002 在临界点同刻触发时，HttpClient 的
+                '取消路径会把已 FAULT 的内层任务直接丢弃（我们拿不到内层引用，无法观察），
+                '终结器线程就会报「未观察的异常」；原生永不触发则该竞态不存在。
                 Return ApplyWinHttp(New WinHttpHandler With {
                     .AutomaticDecompression = DecompressionMethods.Deflate Or DecompressionMethods.GZip,
                     .CookieUsePolicy = CookieUsePolicy.IgnoreCookies, '不存 Cookie，从 Header 手动传入（等价原 UseCookies=False）
-                    .SendTimeout = TimeSpan.FromSeconds(30),
-                    .ReceiveHeadersTimeout = TimeSpan.FromSeconds(60),
-                    .ReceiveDataTimeout = TimeSpan.FromSeconds(60),
+                    .SendTimeout = TimeSpan.FromSeconds(120),
+                    .ReceiveHeadersTimeout = TimeSpan.FromSeconds(120),
+                    .ReceiveDataTimeout = TimeSpan.FromSeconds(120),
                     .TcpKeepAliveEnabled = True, 'TCP 保活：跨文件/分片复用池内连接，避免空闲被掐后重新握手
                     .EnableMultipleHttp2Connections = True '单条 h2 连接的流配额不足时自动开新连接，64 并发不排队
                 })

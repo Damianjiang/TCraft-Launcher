@@ -16,17 +16,18 @@
                 <StackPanel Margin="25,44,20,16">
                     <Grid Margin="0,0,5,12">
                         <Grid.ColumnDefinitions>
+                            <!-- 搜索框可随窗口收窄，保证按钮单行不换行 -->
+                            <ColumnDefinition Width="*" MinWidth="150" MaxWidth="230" />
                             <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <local:MySearchBox x:Name="TxtSearch" Grid.Column="0" Height="32" Width="230"
+                        <local:MySearchBox x:Name="TxtSearch" Height="32"
                                            HorizontalAlignment="Left" HintText="搜索资源包" />
-                        <WrapPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
-                            <local:MyButton x:Name="BtnRefresh" Height="32" MinWidth="86" Padding="13,0" Margin="10,5,0,5" />
-                            <local:MyButton x:Name="BtnOpen" Height="32" MinWidth="106" Padding="13,0" Margin="10,5,0,5" />
-                            <local:MyButton x:Name="BtnEnableAll" Height="32" MinWidth="96" Padding="13,0" Margin="10,5,0,5" />
-                            <local:MyButton x:Name="BtnDisableAll" Height="32" MinWidth="96" Padding="13,0" Margin="10,5,0,5" />
-                        </WrapPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+                            <local:MyButton x:Name="BtnRefresh" Height="32" MinWidth="86" Padding="13,0" />
+                            <local:MyButton x:Name="BtnOpen" Height="32" MinWidth="106" Padding="13,0" Margin="8,0,0,0" />
+                            <local:MyButton x:Name="BtnEnableAll" Height="32" MinWidth="96" Padding="13,0" Margin="8,0,0,0" />
+                            <local:MyButton x:Name="BtnDisableAll" Height="32" MinWidth="96" Padding="13,0" Margin="8,0,0,0" />
+                        </StackPanel>
                     </Grid>
 
                     <StackPanel x:Name="PanList" VerticalAlignment="Top" />

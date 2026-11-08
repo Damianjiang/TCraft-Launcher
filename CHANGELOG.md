@@ -12,6 +12,28 @@ The website and download link always resolve to the newest build, so no version 
 
 ---
 
+## v1.3.4 (1.3.4.0) — 2026-11-08 / 中文
+
+（灰度预览更新；资产 `TCraft-Launcher.exe`，校验值见 Release 页面）
+
+- Mod 启用 / 禁用（单个与批量）操作完成后弹出提示：单个显示文件名，批量显示数量，与安装 / 更新 / 删除的提示风格一致。
+- 存档数据包的启用 / 禁用同样补上提示。
+- 同页安装 / 更新 / 删除提示的计数文案补齐英文翻译（此前这些拼接文案在非简中语言下显示简中）。
+- 资源包 / 光影页工具栏压缩为单行（搜索框自动适配宽度，按钮不再换行堆叠）；存档页取消独立的「快速操作」卡片，按钮并入存档列表，整体高度明显降低。
+- 根除弱网下偶发的「后台任务存在未观察的异常（12002）」日志：这是 .NET HttpClient 取消路径丢弃内层任务与原生超时同刻撞车所致——原生超时改为远大于应用侧超时的最后防线（120s），HttpClient 隐式超时禁用、超时统一由请求侧管理，竞态不再可能发生。
+
+## v1.3.4 (1.3.4.0) — 2026-11-08 / English
+
+(Gray preview update; asset `TCraft-Launcher.exe`, checksum on the Release page)
+
+- Enabling / disabling mods (single or bulk) now shows a toast when done: file name for a single mod, count for bulk, matching the style of the install / update / delete toasts.
+- The same feedback was added to enabling / disabling save datapacks.
+- Count-related toast fragments on the same page (install / update / delete) are now translated for non-Chinese languages instead of falling back to Simplified Chinese.
+- The resource pack and shader toolbars now fit on a single row (the search box adapts its width; buttons no longer wrap); the saves page drops the separate quick-actions card, with the buttons merged into the saves list card.
+- Root-caused the occasional "unobserved task exception (12002)" log on slow networks: .NET's HttpClient cancellation path drops the inner handler task, and when the native timeout coincided with the app-side timeout the dropped task carried a fault. Native timeouts are now a 120s last resort far above every app-side timeout, and HttpClient's implicit timeout is disabled in favor of per-request cancellation, so the race can no longer occur.
+
+---
+
 ## v1.3.3 (1.3.3.0) — 2026-11-07 / 中文
 
 （灰度预览更新；资产 `TCraft-Launcher.exe`，校验值见 Release 页面）

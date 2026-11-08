@@ -457,6 +457,8 @@ Install:
     End Sub
     Private Sub EDMods(ModList As IEnumerable(Of LocalResourceFile), IsEnable As Boolean)
         Dim IsSuccessful As Boolean = True
+        Dim ChangedCount As Integer = 0
+        Dim ChangedName As String = Nothing
         For Each ModE In ModList.ToList
             Dim ModEntity = ModE '仅用于去除迭代变量无法修改的限制
             Dim NewPath As String = Nothing
@@ -485,6 +487,8 @@ Install:
                     End If
                 End If
                 FileUtils.Move(ModEntity.File.FullName, NewPath)
+                ChangedCount += 1
+                ChangedName = ModEntity.EnabledName
             Catch ex As FileNotFoundException
                 Logger.Error(ex, $"未找到需要重命名的 Mod（{If(ModEntity.File.FullName, "null")}）")
                 ReloadModList(True)
@@ -515,6 +519,14 @@ Install:
             PanList.Children.Insert(IndexOfUi, NewItem)
             NewItem.UpdateLayout()
         Next
+        If ChangedCount > 0 Then
+            If ChangedCount = 1 Then
+                Hint(If(IsEnable, ModLang.L("已启用："), ModLang.L("已禁用：")) & ChangedName, HintType.Green)
+            Else
+                Hint(If(IsEnable, ModLang.L("已批量启用 ") & ChangedCount & ModLang.L(" 个 Mod！"),
+                        ModLang.L("已批量禁用 ") & ChangedCount & ModLang.L(" 个 Mod！")), HintType.Green)
+            End If
+        End If
         If IsSuccessful Then
             RefreshBars()
         Else

@@ -2536,6 +2536,13 @@ options.txt 存在，但没有包含可编辑的常用选项。可以在游戏�
 已启用全部资源包。	All resource packs enabled.	已啓用全部資源包。	已啓用全部資源包。
 已停用全部资源包。	All resource packs disabled.	已停用全部資源包。	已停用全部資源包。
 批量修改失败：	Bulk change failed: 	批量修改失敗：	批量修改失敗：
+已禁用：	Disabled: 	已禁用：	已禁用：
+已批量启用	Enabled 	已批量啟用	已批量啟用
+已批量禁用	Disabled 	已批量禁用	已批量禁用
+个 Mod！	 mods!	個 Mod！	個 Mod！
+已安装	Installed 	已安裝	已安裝
+已成功更新	Updated 	已成功更新	已成功更新
+个文件！	 files!	個檔案！	個檔案！
 文件夹不存在！	Folder does not exist!	文件夾不存在！	文件夾不存在！
 文件不存在！	File does not exist!	文件不存在！	文件不存在！
 确定要删除资源包「	Delete resource pack "	確定要刪除資源包「	確定要刪除資源包「

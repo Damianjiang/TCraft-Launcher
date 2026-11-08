@@ -38,6 +38,17 @@ $map = @(
 $totR = 0; $totG = 0
 # host safety hooks block Remove-Item (fail-closed trash). Archive stale blobs instead of deleting.
 $oldDir = Join-Path $gzDir '.old'
+Add-Type -Language CSharp -TypeDefinition @'
+public class TClGzipGen {
+  public static void GzipFile(string src, string dst) {
+    using (var inFs = System.IO.File.OpenRead(src))
+    using (var outMs = new System.IO.FileStream(dst, System.IO.FileMode.Create))
+    using (var gz = new System.IO.Compression.GZipStream(outMs, System.IO.Compression.CompressionMode.Compress, true)) {
+      inFs.CopyTo(gz);
+    }
+  }
+}
+'@
 foreach ($m in $map) {
     $n = $m[0]; $src = $m[1]
     if (-not (Test-Path $src)) { Write-Output ("MISSING " + $n + " : " + $src); continue }
@@ -52,23 +63,29 @@ foreach ($m in $map) {
         & $sevenZip a -tgzip -mx9 -mfb=258 -mpass=15 $dst $src 2>$null | Out-Null
         if (-not (Test-Path $dst) -or (Get-Item $dst).Length -eq 0) { Write-Output ("7Z FAILED for " + $n) }
     } else {
-        Add-Type -Language CSharp -TypeDefinition @'
-public class TClGzipGen {
-  public static void GzipFile(string src, string dst) {
-    using (var inFs = System.IO.File.OpenRead(src))
-    using (var outMs = new System.IO.FileStream(dst, System.IO.FileMode.Create))
-    using (var gz = new System.IO.Compression.GZipStream(outMs, System.IO.Compression.CompressionMode.Compress, true)) {
-      inFs.CopyTo(gz);
-    }
-  }
-}
-'@
         [TClGzipGen]::GzipFile($src, $dst)
     }
     $r = (Get-Item $src).Length
     $g = (Get-Item $dst).Length
     $totR += $r; $totG += $g
     Write-Output ('{0,-24} {1,8} -> {2,8} bytes  (save {3})' -f $n, $r, $g, ($r-$g))
+}
+# LangTables.txt.gz: the embedded translation table. LangTables.txt is the editable source;
+# without this step any txt edit silently ships stale translations in the built exe.
+$lt = Join-Path $res 'LangTables.txt'
+$ltg = Join-Path $res 'LangTables.txt.gz'
+if (Test-Path $lt) {
+    if ($use7z) {
+        if (Test-Path $ltg) {
+            New-Item -ItemType Directory -Force -Path $oldDir | Out-Null
+            Move-Item -LiteralPath $ltg -Destination (Join-Path $oldDir 'LangTables.txt.gz') -Force
+        }
+        & $sevenZip a -tgzip -mx9 -mfb=258 -mpass=15 $ltg $lt 2>$null | Out-Null
+        if (-not (Test-Path $ltg) -or (Get-Item $ltg).Length -eq 0) { Write-Output '7Z FAILED for LangTables.txt' }
+    } else {
+        [TClGzipGen]::GzipFile($lt, $ltg)
+    }
+    Write-Output ('{0,-24} {1,8} -> {2,8} bytes' -f 'LangTables', (Get-Item $lt).Length, (Get-Item $ltg).Length)
 }
 Write-Output '-----'
 Write-Output ('raw: {0}   gz: {1}   save: {2}   (7z={3})' -f $totR, $totG, ($totR-$totG), $use7z)
