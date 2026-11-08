@@ -39,7 +39,7 @@
         </Border>-->
     </StackPanel>
     <TextBlock x:Name="LabInfo" Grid.Row="2" Grid.Column="4" VerticalAlignment="Bottom" Margin="0,0,3,0.5"
-               TextTrimming="CharacterEllipsis" FontSize="12" Foreground="{StaticResource ColorBrushGray3}"
+               TextTrimming="CharacterEllipsis" FontSize="12" Foreground="{DynamicResource ColorBrush1}" Opacity="0.7"
                IsHitTestVisible="True" SnapsToDevicePixels="False" UseLayoutRounding="False"
                ToolTipService.InitialShowDelay="100">
         <TextBlock.ToolTip>

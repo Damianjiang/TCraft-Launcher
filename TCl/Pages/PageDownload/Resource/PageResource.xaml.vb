@@ -234,6 +234,7 @@ Public Class PageResource
 #Region "搜索"
 
     '搜索按钮
+    Private IsResetting As Boolean = False '重置标志：重置下拉框时不触发自动搜索
     Private Sub StartNewSearch() Handles BtnSearchRun.Click
         Page = 0
         If Loader.ShouldStart(LoaderInput()) Then Storage = New ResourceSearcher.SearchResult '避免连续搜索两次导致 ProjectStorage 引用丢失
@@ -243,15 +244,25 @@ Public Class PageResource
         If e.Key = Key.Enter Then StartNewSearch()
     End Sub
 
+    '分类、来源、加载器改变时自动搜索（对齐 PCL-CE 体验）
+    Private Sub FilterChanged_AutoSearch() Handles ComboSearchTag.SelectionChanged, ComboSearchSource.SelectionChanged, ComboSearchLoader.SelectionChanged
+        If IsResetting Then Return
+        If Not IsLoaded Then Return
+        StartNewSearch()
+    End Sub
+
     '重置按钮
     Private Sub ResetFilter() Handles BtnSearchReset.Click
+        IsResetting = True
         TextSearchName.Text = ""
         TextSearchVersion.Text = ModLang.L("全部 (也可自行输入)")
         TextSearchVersion.SelectedIndex = 0
         ComboSearchSource.SelectedIndex = 0
         ComboSearchTag.SelectedIndex = 0
         ComboSearchLoader.SelectedIndex = 0
+        IsResetting = False
         Loader.LastFinishedTime = 0 '要求强制重新开始
+        StartNewSearch()
     End Sub
 
     '版本选择

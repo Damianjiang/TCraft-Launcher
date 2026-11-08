@@ -232,6 +232,8 @@ Public Class PageAccountManager
             BtnPanel.Children.Add(Btn)
         Next
         Grid.SetColumn(BtnPanel, 3)
+        '修复：点击右侧按钮时不要冒泡到整行的选中事件，避免误触发"已切换启动账户"
+        AddHandler BtnPanel.PreviewMouseLeftButtonUp, Sub(sender, e) e.Handled = True
         Layout.Children.Add(Radio) : Layout.Children.Add(FaceBorder) : Layout.Children.Add(Texts) : Layout.Children.Add(BtnPanel)
         '修复：阴影与内容必须是兄弟节点（MyCard 同款模式）。
         '此前把整行内容塞进 Shadow.Child，而 WPF 的 Opacity 作用于整个子树，

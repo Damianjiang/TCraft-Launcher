@@ -6,7 +6,7 @@ Imports Newtonsoft.Json.Linq
 Public Module ModLang
 
     ''' <summary>
-    ''' 界面多语言。索引：0=简体中文（原文，空表），1=English，2=繁體中文，3=文言文。
+    ''' 界面多语言。索引：0=简体中文（原文，空表），1=English，2=繁體中文。
     ''' <para/>L(text)：把 text 归一化（换行统一为 LF、去首尾空白）后查译文；命中返回译文，否则原样返回。
     ''' <para/>说明：TCL 原为纯简体中文构建，本模块在运行时对界面控件套用译文。
     ''' 静态文案（导航、按钮、卡片标题、设置项、语言项等）通过字典覆盖；
@@ -49,11 +49,11 @@ Public Module ModLang
         Return s.Replace(vbCrLf, vbLf).Replace(vbCr, vbLf)
     End Function
 
-    '语言选项的「母体名」：简体中文/English/繁體中文/文言文 这 4 个词本身就是语言标识，
+    '语言选项的「母体名」：简体中文/English/繁體中文 这 3 个词本身就是语言标识，
     '任何界面语言下都必须保持原样显示，否则用户切到某语言后就找不到其他语言选项（"找不到回家的路"）。
     'L 命中即原样返回。注意：这些词无首尾空白/换行，Norm(x)=x，故与 L 里 Norm 后的 Key 可比。
     Private ProtectedLanguageNames As New HashSet(Of String) From {
-        "简体中文", "English", "繁體中文", "文言文"
+        "简体中文", "English", "繁體中文"
     }
 
     '外置翻译文件（用户可编辑，重启后生效）。与内置字典同源，格式见 ExportBuiltinTranslations。

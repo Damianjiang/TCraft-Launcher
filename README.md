@@ -13,7 +13,7 @@
 [![License](https://img.shields.io/github/license/Damianjiang/TCraft-Launcher?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%207%20SP1%2B-blue?style=flat-square)](https://github.com/Damianjiang/TCraft-Launcher/releases)
 
-[下载最新版](https://github.com/Damianjiang/TCraft-Launcher/releases) · [官网](https://damianjiang.github.io/TCraft-Launcher/) · [更新日志](CHANGELOG.md) · [English](README.en.md) · [反馈问题](https://github.com/Damianjiang/TCraft-Launcher/issues) · [TCraft Launcher 启动器交流群](https://qm.qq.com/q/WaG64YE9uo)（群号 1131373915）
+[下载最新版](https://github.com/Damianjiang/TCraft-Launcher/releases) · [官网](https://damianjiang.github.io/TCraft-Launcher/) · [更新日志](CHANGELOG.md) · [English](README.en.md) · [反馈问题](https://github.com/Damianjiang/TCraft-Launcher/issues) · [TCraft Launcher 启动器交流群](https://qm.qq.com/q/UONlv4VgwE)（群号 1131373915）
 
 <img src="docs/assets/shot-home.png" width="820" alt="TCraft Launcher 启动台界面">
 
@@ -31,7 +31,7 @@ TCraft Launcher（简称 **TCL**）是一个用 VB.NET / WPF 写的 Minecraft �
 - **快**：延迟初始化 + 多核 JIT 预编译 + UI 资源按需加载，冷启动约 2 秒，空闲占用接近 0。
 - **快的不只是启动**：下载走 HTTP/2 多路复用（Win10 1607+），最高 64 线程并发 + 可调限速 + 断点续传。
 - **好看、可换**：Win11 风格半透明玻璃界面，支持壁纸自动取色、背景视频、背景音乐、21 种主题色。
-- **多语言**：简体中文 / English / 繁體中文 / 文言文 / 自动识别，全部文案可通过 `TCL\i18n.json` 自行修改。
+- **多语言**：简体中文 / English / 繁體中文 / 自动识别，全部文案可通过 `TCL\i18n.json` 自行修改。
 - **支持 Windows 7**：SP1 及以上均可运行（老系统自动回退兼容的网络栈）。
 
 ## 功能总览
@@ -77,7 +77,7 @@ TCraft Launcher（简称 **TCL**）是一个用 VB.NET / WPF 写的 Minecraft �
 ### 设置
 
 - **个性化**：21 种主题色（含随机与自定义 HSL）、壁纸自动取色、背景模糊 / 视频 / 音乐、组件与弹出菜单双半透明滑杆。
-- **系统**：界面语言切换（含文言文风格）、下载线程与限速、缓存位置、软件渲染开关、设置导入导出（.tcl）。
+- **系统**：界面语言切换、下载线程与限速、缓存位置、软件渲染开关、设置导入导出（.tcl）。
 - **启动**：全局默认内存、窗口模式、默认隔离策略、Java 选择规则、正版支持提示开关。
 
 ## 使用技巧
@@ -167,7 +167,7 @@ TCL 站在前人的肩膀上，这里把每一个来源都写清楚：
 
 ## 社区
 
-- **TCraft Launcher 启动器交流群**：[点击加入](https://qm.qq.com/q/WaG64YE9uo)（群号 1131373915，更新通知、问题反馈、交流，本项目唯一即时通讯渠道）
+- **TCraft Launcher 启动器交流群**：[点击加入](https://qm.qq.com/q/UONlv4VgwE)（群号 1131373915，更新通知、问题反馈、交流，本项目唯一即时通讯渠道）
 - **Issue**：[提交问题反馈](https://github.com/Damianjiang/TCraft-Launcher/issues)
 - **讨论区**：[GitHub Discussions](https://github.com/Damianjiang/TCraft-Launcher/discussions)
 

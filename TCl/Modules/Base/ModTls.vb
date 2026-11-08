@@ -258,10 +258,17 @@ Public Module ModTls
             Tcp = New TcpClient
             Dim Ar = Tcp.BeginConnect(Addr, 443, Nothing, Nothing)
             If Not Ar.AsyncWaitHandle.WaitOne(TimeoutMs) Then
+                ' 修复：超时后先 EndConnect 结束异步操作，再 Close，避免后台线程抛出未观察异常
+                Try : Tcp.EndConnect(Ar) : Catch : End Try
                 Try : Tcp.Close() : Catch : End Try
                 Throw New Exception($"TLS 连接 {Host} 超时（{TimeoutMs} ms）")
             End If
-            Tcp.EndConnect(Ar)
+            Try
+                Tcp.EndConnect(Ar)
+            Catch ex As Exception
+                Try : Tcp.Close() : Catch : End Try
+                Throw New Exception($"TLS 连接 {Host} 失败：{ex.Message}", ex)
+            End Try
         Else
             Tcp = New TcpClient(Host, 443)
         End If

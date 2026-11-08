@@ -162,11 +162,10 @@ Public Class MyComboBox
         End Try
     End Sub
 
-    Private RealWidth As Double '由于下拉框 Popup 宽度与 Width 一致，故不能为 NaN（Auto）
+    Private RealWidth As Double
     Private Sub MyComboBox_DropDownOpened(sender As Object, e As EventArgs) Handles Me.DropDownOpened
-        RealWidth = Width
-        Width = ActualWidth
-        '将下拉菜单透明度与主窗口同步
+        '修复：不要强制把下拉列表宽度设为下拉框本身宽度，让它可以根据内容自动调整
+        '原来的逻辑导致长选项文字被截断（比如"矿物与资源"变成"矿物与..."）
         Try
             CType(Template.FindName("PanPopup", Me), Grid).Opacity = FrmMain.Opacity
         Catch ex As Exception
@@ -180,9 +179,6 @@ Public Class MyComboBox
         End Try
         '兜底：若模板替换导致 Popup.Opened 未挂上，仍由这里播放动画
         PlayDropDownAnimation()
-    End Sub
-    Private Sub MyComboBox_DropDownClosed(sender As Object, e As EventArgs) Handles Me.DropDownClosed
-        Width = RealWidth
     End Sub
 
     '修复 WPF Bug：下拉框文本修改后，依然误认为还选择着此前的选项，导致再次点击该选项时内容不变

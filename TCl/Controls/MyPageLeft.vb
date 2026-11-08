@@ -71,28 +71,21 @@ Public Class MyPageLeft
                     If TypeOf Element Is MyListItem Then CType(Element, MyListItem).IsMouseOverAnimationEnabled = True
                 Else
                     Element.Opacity = 0
-                    Element.RenderTransform = New TranslateTransform(-15, 0)
+                    Element.RenderTransform = New TranslateTransform(-12, 0)
                     If TypeOf Element Is MyListItem Then CType(Element, MyListItem).IsMouseOverAnimationEnabled = False
-                    If UseSimpleAnimation Then
-                        '简单模式：只有 Opacity 和一次平移，动画更短
-                        AniList.Add(AaOpacity(Element, If(TypeOf Element Is TextBlock, 0.6, 1), 80, Delay, New AniEaseOutFluent(AniEasePower.Weak)))
-                        AniList.Add(AaTranslateX(Element, 15, 150, Delay, New AniEaseOutFluent))
-                    Else
-                        '完整模式：原来的动画
-                        AniList.Add(AaOpacity(Element, If(TypeOf Element Is TextBlock, 0.6, 1), 100, Delay, New AniEaseOutFluent(AniEasePower.Weak)))
-                        AniList.Add(AaTranslateX(Element, 5, 200, Delay, New AniEaseOutFluent))
-                        AniList.Add(AaTranslateX(Element, 20, 300, Delay, New AniEaseOutBack(AniEasePower.Weak)))
-                    End If
+                    '统一简单动画：只有 Opacity + 一次平移，无回弹甩尾，流畅不卡顿
+                    AniList.Add(AaOpacity(Element, If(TypeOf Element Is TextBlock, 0.6, 1), 80, Delay, New AniEaseOutFluent(AniEasePower.Weak)))
+                    AniList.Add(AaTranslateX(Element, 12, 160, Delay, New AniEaseOutFluent))
                     If TypeOf Element Is MyListItem Then
                         AniList.Add(AaCode(
                         Sub()
                             CType(Element, MyListItem).IsMouseOverAnimationEnabled = True
                             CType(Element, MyListItem).RefreshColor(Me, New EventArgs)
-                        End Sub, Delay + If(UseSimpleAnimation, 150, 280)))
+                        End Sub, Delay + 160))
                     End If
-                    '延迟上限：最多 150ms，避免控件太多时动画太长
-                    Delay += Math.Min(10, Math.Max(8, 15 - Id))
-                    If Delay > 150 Then Delay = 150
+                    '延迟上限：最多 120ms，避免控件太多时动画太长
+                    Delay += Math.Min(8, Math.Max(6, 12 - Id))
+                    If Delay > 120 Then Delay = 120
                     Id += 1
                 End If
             Next

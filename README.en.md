@@ -31,7 +31,7 @@ There is no installer, no bundle, and no telemetry: the whole program is one
 - **Fast**: lazy initialization, multi-core JIT profiles and on-demand UI resources give a ~2 s cold start.
 - **Fast downloads too**: HTTP/2 multiplexing (Win10 1607+), up to 64 concurrent threads, adjustable speed cap and resumable downloads.
 - **Good looking**: Win11-style translucent glass UI with wallpaper color extraction, background video, music and 21 theme colors.
-- **Multilingual**: Simplified Chinese / English / Traditional Chinese / Classical Chinese / auto-detect; every string is editable via `TCL\i18n.json`.
+- **Multilingual**: Simplified Chinese / English / Traditional Chinese / auto-detect; every string is editable via `TCL\i18n.json`.
 - **Windows 7 supported**: SP1 and above (falls back to a compatibility network stack on old systems).
 
 ## Features

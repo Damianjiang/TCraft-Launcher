@@ -164,11 +164,10 @@
                     <TextBlock VerticalAlignment="Center" Grid.Row="4" HorizontalAlignment="Left" Text="正版购买提示" Margin="0,0,25,0" />
                     <local:MyCheckBox Text="不再提示「考虑一下正版」" Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="5" Height="22" x:Name="CheckHintBuy" local:SettingService.Key="HintBuy" ToolTip="取消勾选后，启动游戏达到一定次数时会弹窗建议你支持正版。&#xa;勾选后不再提示（登录一次正版账号也会自动停止提示）。" />
                     <TextBlock VerticalAlignment="Center" Grid.Row="6" HorizontalAlignment="Left" Text="语言" Margin="0,0,25,0" />
-                    <local:MyComboBox x:Name="ComboLanguage" Grid.Row="6" Grid.Column="1" local:SettingService.Key="ToolLanguage" ToolTip="设置界面语言与部分日期、数字等文化相关显示。&#xa;「自动识别」按系统当前语言就近选择简中 / 繁中 / 英文。&#xa;「文言文」为一种文风选项，采用半文半白、雅致工整的表达。">
+                    <local:MyComboBox x:Name="ComboLanguage" Grid.Row="6" Grid.Column="1" local:SettingService.Key="ToolLanguage" ToolTip="设置界面语言与部分日期、数字等文化相关显示。&#xa;「自动识别」按系统当前语言就近选择简中 / 繁中 / 英文。">
                         <local:MyComboBoxItem Content="简体中文" local:SettingService.Value="0" IsSelected="True" />
                         <local:MyComboBoxItem Content="English" local:SettingService.Value="1" />
                         <local:MyComboBoxItem Content="繁體中文" local:SettingService.Value="2" />
-                        <local:MyComboBoxItem Content="文言文" local:SettingService.Value="3" />
                         <local:MyComboBoxItem Content="自动识别系统语言" local:SettingService.Value="4" />
                     </local:MyComboBox>
                     <TextBlock VerticalAlignment="Center" Grid.Row="8" HorizontalAlignment="Left" Text="翻译文件" Margin="0,0,25,0" ToolTip="所有界面文案统一由单个文件 i18n.json（TCL\i18n.json）管理，启动时自动生成。直接用文本编辑器修改该文件后点「重载」即可即时生效（无需重启）。" />

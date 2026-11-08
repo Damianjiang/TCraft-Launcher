@@ -110,7 +110,7 @@ Namespace My.Resources
                 Return CType(obj,Byte())
             End Get
         End Property
-        
+
         '''<summary>
         '''  查找 System.Byte[] 类型的本地化资源。
         '''</summary>
@@ -150,8 +150,7 @@ Namespace My.Resources
                 Return CType(obj,Byte())
             End Get
         End Property
-        
-        
+
         '''<summary>
         '''  查找 System.Byte[] 类型的本地化资源。
         '''</summary>
@@ -161,8 +160,7 @@ Namespace My.Resources
                 Return CType(obj,Byte())
             End Get
         End Property
-        
-        
+
         '''<summary>
         '''  查找 System.Byte[] 类型的本地化资源。
         '''</summary>

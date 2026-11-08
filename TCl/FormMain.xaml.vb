@@ -2198,7 +2198,10 @@ Public Class FormMain
             Select Case Stack.Page
                 Case PageType.InstanceSetup
                     If FrmInstanceLeft Is Nothing Then FrmInstanceLeft = New PageInstanceLeft
-                    CType(FrmInstanceLeft.PanItem.Children(SubType), MyListItem).SetChecked(True, True, Stack = PageCurrent)
+                    '修复：不能直接用索引访问 PanItem.Children，因为侧边栏顺序和 SubType 编号不对应
+                    '否则跳转到诊断页（SubType=13）时会错误选中索引 13 对应的「服务器」按钮
+                    Dim _instanceItem As MyListItem = FrmInstanceLeft.ItemGet(SubType)
+                    If _instanceItem IsNot Nothing Then _instanceItem.SetChecked(True, True, Stack = PageCurrent)
             End Select
             PageChangeActual(Stack, SubType)
         End If

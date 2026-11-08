@@ -6,6 +6,16 @@ Public Class PageInstanceLeft
     ''' </summary>
     Public Shared Instance As McInstance = Nothing
 
+    ''' <summary>根据 SubType 编号找到对应的侧边栏项（修复：不能直接用索引访问，因为侧边栏顺序和编号不对应）。</summary>
+    Public Function ItemGet(SubType As FormMain.PageSubType) As MyListItem
+        For Each Item In PanItem.Children
+            If TypeOf Item Is MyListItem AndAlso Item.Tag IsNot Nothing AndAlso Val(Item.Tag) = CInt(SubType) Then
+                Return CType(Item, MyListItem)
+            End If
+        Next
+        Return Nothing
+    End Function
+
     Private Sub PageInstanceLeft_Loaded(sender As Object, e As RoutedEventArgs) Handles Me.Loaded
         PageSetupUI.HiddenRefresh()
     End Sub

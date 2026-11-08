@@ -33,13 +33,22 @@
                     <local:MyCheckBox x:Name="ChkInfo" Text="信息" Checked="True" Margin="0,0,8,0" Change="Check_Changed" />
                     <local:MyCheckBox x:Name="ChkDebug" Text="调试" Checked="True" Margin="0,0,8,0" Change="Check_Changed" />
                 </WrapPanel>
-                <WrapPanel ItemHeight="32" Margin="0,10,0,0">
-                    <local:MyButton x:Name="BtnRefresh" MinWidth="92" Text="刷新" ColorType="Highlight" Margin="0,0,10,0" Click="BtnRefresh_Click" />
-                    <local:MyButton x:Name="BtnCopy" MinWidth="92" Text="复制" ColorType="Normal" Margin="0,0,10,0" Click="BtnCopy_Click" />
-                    <local:MyButton x:Name="BtnExport" MinWidth="92" Text="导出…" ColorType="Normal" Margin="0,0,10,0" Click="BtnExport_Click" />
-                    <local:MyButton x:Name="BtnAnalyze" MinWidth="110" Text="崩溃分析…" ColorType="Normal" Margin="0,0,10,0" Click="BtnAnalyze_Click" />
-                    <local:MyButton x:Name="BtnBottom" MinWidth="100" Text="回到底部" ColorType="Normal" Click="BtnBottom_Click" />
-                </WrapPanel>
+                <Grid Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <local:MyButton x:Name="BtnRefresh" Grid.Row="0" Grid.Column="0" Width="120" Height="32" Text="刷新" ColorType="Highlight" Margin="0,0,10,10" Click="BtnRefresh_Click" />
+                    <local:MyButton x:Name="BtnCopy" Grid.Row="0" Grid.Column="1" Width="120" Height="32" Text="复制" ColorType="Normal" Margin="0,0,10,10" Click="BtnCopy_Click" />
+                    <local:MyButton x:Name="BtnExport" Grid.Row="0" Grid.Column="2" Width="120" Height="32" Text="导出…" ColorType="Normal" Margin="0,0,10,10" Click="BtnExport_Click" />
+                    <local:MyButton x:Name="BtnAnalyze" Grid.Row="1" Grid.Column="0" Width="140" Height="32" Text="崩溃分析…" ColorType="Normal" Margin="0,0,10,10" Click="BtnAnalyze_Click" />
+                    <local:MyButton x:Name="BtnBottom" Grid.Row="1" Grid.Column="1" Width="120" Height="32" Text="回到底部" ColorType="Normal" Margin="0,0,10,10" Click="BtnBottom_Click" />
+                </Grid>
             </StackPanel>
         </local:MyCard>
 

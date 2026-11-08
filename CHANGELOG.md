@@ -12,6 +12,38 @@ The website and download link always resolve to the newest build, so no version 
 
 ---
 
+## v1.3.6 (1.3.6.0) — 2026-11-08 / 中文
+
+（正式版更新；资产 `TCraft-Launcher.exe`，校验值见 Release 页面）
+
+- 修复账户管理页面点击刷新、复制、笑脸、删除按钮时，误弹出"已切换启动账户"提示的问题。
+- 修复实例诊断页面日志按钮换行时上下粘连、被压缩导致文字显示不全的问题，改为固定两行三列布局。
+- 修复自研 TLS 客户端在网络超时后，后台异步连接仍在运行导致的未观察 NullReferenceException 崩溃。
+- 修复从历史快照页跳转到诊断页时，侧边栏选中状态与实际页面不匹配的问题。
+- 修复 Mod 卡片描述文字颜色太浅、在浅色主题下看不清的问题。
+- 修复下拉框弹出列表宽度被强制等于下拉框本身宽度，导致长选项文字被截断的问题。
+- 资源下载页分类、来源、加载器下拉框改变时，现在会自动触发搜索，无需手动点击搜索按钮。
+- 优化侧边栏切换动画，去掉回弹甩尾效果，减少控件较多时的卡顿。
+- 优化后台资源占用，降低空闲时的 CPU 和内存消耗。
+- 移除文言文语言选项，仅保留简体中文、English、繁體中文三种语言。
+- 更新 QQ 交流群链接，同步更新 README 与页脚说明。
+
+## v1.3.6 (1.3.6.0) — 2026-11-08 / English
+
+(Stable release; asset `TCraft-Launcher.exe`, checksum on the Release page)
+
+- Fixed a bug where clicking refresh, copy, emoji, or delete buttons on the account management page would incorrectly show a "Switched launch account" toast.
+- Fixed the log buttons on the instance diagnostics page sticking together and being compressed when wrapping, now using a fixed two-row three-column layout.
+- Fixed an unobserved NullReferenceException crash in the self-developed TLS client caused by background async connections still running after a network timeout.
+- Fixed the sidebar selection state not matching the actual page when navigating from the history snapshot page to the diagnostics page.
+- Fixed Mod card description text being too light and hard to read in light themes.
+- Fixed the dropdown popup width being forced to match the combobox width, causing long option text to be truncated.
+- Resource download page now automatically triggers search when category, source, or loader dropdowns change, no need to manually click the search button.
+- Optimized sidebar transition animations, removed the bounce effect to reduce lag when there are many controls.
+- Optimized background resource usage, reducing idle CPU and memory consumption.
+- Removed the Classical Chinese language option, now only Simplified Chinese, English, and Traditional Chinese are available.
+- Updated the QQ group link, synchronized updates to README and footer text.
+
 ## v1.3.4 (1.3.4.0) — 2026-11-08 / 中文
 
 （灰度预览更新；资产 `TCraft-Launcher.exe`，校验值见 Release 页面）
