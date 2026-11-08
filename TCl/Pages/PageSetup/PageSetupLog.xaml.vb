@@ -32,7 +32,7 @@
     End Sub
 
     '调试模式开关：开了就记全量日志，平时关着省磁盘
-    Private Sub CheckDebugMode_Changed(sender As Object, e As RoutedEventArgs)
+    Private Sub CheckDebugMode_Changed(sender As Object, user As Boolean)
         Dim IsDebug As Boolean = CheckDebugMode.Checked
         Settings.Set("SystemDebugMode", IsDebug)
         If Logger.Instance IsNot Nothing Then
