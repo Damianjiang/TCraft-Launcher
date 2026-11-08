@@ -188,7 +188,7 @@ Public Class PageAccountManager
         Dim Row As New Grid With {.Height = 56, .Margin = New Thickness(0, 0, 0, 10), .Background = Brushes.Transparent}
         Dim Shadow As New MyDropShadow With {.CornerRadius = New CornerRadius(6), .ShadowRadius = 2, .Opacity = 0.05, .IsHitTestVisible = False}
         Shadow.SetResourceReference(MyDropShadow.ColorProperty, "ColorObject1")
-        Dim Border As New Border With {.CornerRadius = New CornerRadius(6), .BorderThickness = New Thickness(GetWPFSize(1)), .SnapsToDevicePixels = True}
+        Dim Border As New Border With {.CornerRadius = New CornerRadius(6), .BorderThickness = New Thickness(GetWPFSize(1)), .SnapsToDevicePixels = True, .Padding = New Thickness(12, 8, 12, 8)}
         Border.SetResourceReference(Border.BackgroundProperty, "ColorBrushCardBg")
         Border.SetResourceReference(Border.BorderBrushProperty, "ColorBrush6")
         Dim Layout As New Grid
