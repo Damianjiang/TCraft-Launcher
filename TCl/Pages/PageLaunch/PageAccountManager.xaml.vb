@@ -232,8 +232,6 @@ Public Class PageAccountManager
             BtnPanel.Children.Add(Btn)
         Next
         Grid.SetColumn(BtnPanel, 3)
-        '修复：点击右侧按钮时不要冒泡到整行的选中事件，避免误触发"已切换启动账户"
-        AddHandler BtnPanel.PreviewMouseLeftButtonUp, Sub(sender, e) e.Handled = True
         Layout.Children.Add(Radio) : Layout.Children.Add(FaceBorder) : Layout.Children.Add(Texts) : Layout.Children.Add(BtnPanel)
         '修复：阴影与内容必须是兄弟节点（MyCard 同款模式）。
         '此前把整行内容塞进 Shadow.Child，而 WPF 的 Opacity 作用于整个子树，
@@ -244,7 +242,15 @@ Public Class PageAccountManager
         Row.Children.Add(Border)
 
         '整行点击 = 选中：先做全量单选互斥（各行圆点不是兄弟节点，MyRadioBox 自带互斥不适用），再触发选择逻辑
+        '修复：如果点击的是右侧按钮区域，不触发选中逻辑，避免误弹出"已切换启动账户"提示
         AddHandler Row.PreviewMouseLeftButtonUp, Sub(sender, e)
+            '判断点击位置是否在按钮面板内，如果是则不执行选中逻辑
+            Dim HitElement As DependencyObject = e.OriginalSource
+            Do While HitElement IsNot Nothing
+                If TypeOf HitElement Is Grid AndAlso DirectCast(HitElement, Grid).Equals(BtnPanel) Then Return
+                HitElement = VisualTreeHelper.GetParent(HitElement)
+            Loop
+
             If Not Radio.Checked Then
                 For Each Other As MyRadioBox In _RowRadios
                     If Not Other.Equals(Radio) AndAlso Other.Checked Then Other.SetChecked(False, False)
