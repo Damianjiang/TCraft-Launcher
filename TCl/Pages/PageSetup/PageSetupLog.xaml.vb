@@ -228,6 +228,7 @@
     Private Sub BtnOpenDir_Click(sender As Object, e As MouseButtonEventArgs)
         If Not Directory.Exists(LogFolder) Then Directory.CreateDirectory(LogFolder)
         OpenExplorer(LogFolder)
+        Hint("已打开日志文件夹", HintType.Blue)
     End Sub
 
     Private Sub BtnClean_Click(sender As Object, e As MouseButtonEventArgs)

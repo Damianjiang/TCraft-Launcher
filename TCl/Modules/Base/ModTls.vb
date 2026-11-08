@@ -414,7 +414,8 @@ Public Module ModTls
 
     Private Function ServerNameExt(Host As String) As Byte()
         Dim NameBytes = Encoding.ASCII.GetBytes(Host)
-        Dim Entry(1 + NameBytes.Length) As Byte
+        'VB 数组 Dim X(n) 是 0~n 共 n+1 个元素；要放 type(1) + len(2) + name(N) = 3+N 字节，最大索引是 2+N
+        Dim Entry(2 + NameBytes.Length) As Byte
         Entry(0) = 0 'host_name
         Entry(1) = CByte(NameBytes.Length >> 8) : Entry(2) = CByte(NameBytes.Length And 255)
         NameBytes.CopyTo(Entry, 3)
