@@ -224,7 +224,7 @@ Public Class PageAccountManager
         '右侧操作按钮
         Dim BtnPanel As New StackPanel With {
             .Orientation = Orientation.Horizontal, .HorizontalAlignment = HorizontalAlignment.Right,
-            .VerticalAlignment = VerticalAlignment.Center, .Opacity = 1, .Margin = New Thickness(0, 0, 2, 0)}
+            .VerticalAlignment = VerticalAlignment.Center, .Opacity = 1, .Margin = New Thickness(0, 0, 10, 0)}
         For Each Btn In Buttons
             If Btn.Width.Equals(Double.NaN) Then Btn.Width = 28
             If Btn.Height.Equals(Double.NaN) Then Btn.Height = 28
