@@ -247,7 +247,7 @@ Public Class PageAccountManager
             '判断点击位置是否在按钮面板内，如果是则不执行选中逻辑
             Dim HitElement As DependencyObject = e.OriginalSource
             Do While HitElement IsNot Nothing
-                If TypeOf HitElement Is Grid AndAlso DirectCast(HitElement, Grid).Equals(BtnPanel) Then Return
+                If HitElement.Equals(BtnPanel) Then Return
                 HitElement = VisualTreeHelper.GetParent(HitElement)
             Loop
 
