@@ -1,5 +1,5 @@
 ﻿''' <summary>
-''' 实例的资源包管理页：列出 resourcepacks 文件夹里的内容，并通过 options.txt 的 resourcePacks 行控制启用状态。
+''' 实例的资源包管理页：和 Mod 管理页同款布局，支持多选、筛选、底部操作面板，通过改后缀控制启用状态。
 ''' </summary>
 Public Class PageInstanceResourcePack
 
@@ -18,10 +18,40 @@ Public Class PageInstanceResourcePack
         End Get
     End Property
 
-    ''' <summary>当前列出的全部资源包（未筛选）。</summary>
-    Private ReadOnly AllPacks As New List(Of ModInstanceContent.PackEntry)
+    ''' <summary>当前列出的全部资源包（未筛选、未搜索）。</summary>
+    Private AllPacks As New List(Of ModInstanceContent.PackEntry)
+
+    ''' <summary>当前选中的资源包（用于批量操作）。</summary>
+    Private SelectedPacks As New List(Of ModInstanceContent.PackEntry)
+
+    ''' <summary>当前筛选类型</summary>
+    Private _Filter As FilterType = FilterType.All
+    Public Property Filter As FilterType
+        Get
+            Return _Filter
+        End Get
+        Set(value As FilterType)
+            If _Filter = value Then Return
+            _Filter = value
+            Select Case value
+                Case FilterType.All
+                    BtnFilterAll.Checked = True
+                Case FilterType.Enabled
+                    BtnFilterEnabled.Checked = True
+                Case FilterType.Disabled
+                    BtnFilterDisabled.Checked = True
+            End Select
+            Rebuild()
+        End Set
+    End Property
+    Public Enum FilterType As Integer
+        All = 0
+        Enabled = 1
+        Disabled = 2
+    End Enum
 
     Private IsInit As Boolean = False
+    Private IsRefreshing As Boolean = False
 
 #End Region
 
@@ -46,15 +76,28 @@ Public Class PageInstanceResourcePack
         BtnEnableAll.Text = ModLang.L("全部启用")
         BtnDisableAll.Text = ModLang.L("全部停用")
         TxtSearch.HintText = ModLang.L("搜索资源包")
-        CardPacks.Title = ModLang.L("资源包")
+        BtnFilterEnabled.Text = ModLang.L("已启用")
+        BtnFilterDisabled.Text = ModLang.L("已禁用")
+        LabSelect.Text = ModLang.L("已选择 0 个文件")
+        BtnSelectEnable.Text = ModLang.L("启用")
+        BtnSelectDisable.Text = ModLang.L("禁用")
+        BtnSelectDelete.Text = ModLang.L("删除")
+        BtnSelectCancel.Text = ModLang.L("取消选择")
     End Sub
 
     Private Sub InitEvents()
+        '搜索
         AddHandler TxtSearch.TextChanged, Sub(snd, args) Rebuild()
+        '顶部按钮
         AddHandler BtnRefresh.Click, Sub(snd, args) RefreshWithHint()
         AddHandler BtnOpen.Click, Sub(snd, args) OpenPackFolder()
         AddHandler BtnEnableAll.Click, Sub(snd, args) SetAllPacks(True)
         AddHandler BtnDisableAll.Click, Sub(snd, args) SetAllPacks(False)
+        '底部操作面板按钮
+        AddHandler BtnSelectEnable.Click, Sub(snd, args) BatchSetEnabled(True)
+        AddHandler BtnSelectDisable.Click, Sub(snd, args) BatchSetEnabled(False)
+        AddHandler BtnSelectDelete.Click, Sub(snd, args) BatchDelete()
+        AddHandler BtnSelectCancel.Click, Sub(snd, args) ClearSelection()
     End Sub
 
     ''' <summary>整页接受 .zip 拖入安装。</summary>
@@ -75,6 +118,12 @@ Public Class PageInstanceResourcePack
         Refresh()
     End Sub
 
+    ''' <summary>带提示的刷新。</summary>
+    Private Sub RefreshWithHint()
+        Hint(ModLang.L("正在刷新……"), Log:=False)
+        Refresh()
+    End Sub
+
     ''' <summary>重新读取磁盘列表（扫描放后台线程，期间显示镐子加载卡）。</summary>
     Public Sub Refresh(Optional OnFinished As Action = Nothing)
         If IsRefreshing Then Return
@@ -86,8 +135,11 @@ Public Class PageInstanceResourcePack
             Return
         End If
         IsRefreshing = True
+        SelectedPacks.Clear()
+        HideSelectCard()
         PanList.Children.Clear()
         PanLoad.Visibility = Visibility.Visible
+        Load.State.LoadingState = MyLoading.MyLoadingState.Run
         RunInNewThread(
         Sub()
             Try
@@ -100,166 +152,224 @@ Public Class PageInstanceResourcePack
                             FinishRefresh(OnFinished)
                         End Sub)
             Catch ex As Exception
-                Logger.Error(ex, "刷新资源包列表失败")
                 RunInUi(Sub()
-                            ApplyRefresh(Nothing, Nothing)
-                            FinishRefresh(OnFinished)
+                            Logger.Error(ex, "刷新资源包列表失败")
+                            Load.State.LoadingState = MyLoading.MyLoadingState.Stop
+                            PanLoad.Visibility = Visibility.Collapsed
+                            IsRefreshing = False
+                            Hint(ModLang.L("刷新失败：") & ex.Message, HintType.Red)
                         End Sub)
             End Try
-        End Sub, "ResourcePack Refresh")
+        End Sub)
     End Sub
 
-    Private IsRefreshing As Boolean = False
     Private Sub FinishRefresh(OnFinished As Action)
+        Load.State.LoadingState = MyLoading.MyLoadingState.Stop
         PanLoad.Visibility = Visibility.Collapsed
         IsRefreshing = False
         If OnFinished IsNot Nothing Then OnFinished()
     End Sub
 
-    ''' <summary>把扫描结果应用到界面（只在 UI 线程调用）。</summary>
+    ''' <summary>刷新完成后应用数据。</summary>
     Private Sub ApplyRefresh(Folder As String, Entries As List(Of ModInstanceContent.PackEntry))
-        Try
-            AllPacks.Clear()
-            If Instance Is Nothing Then
-                CardPacks.Title = ModLang.L("资源包")
-                LabPath.Text = ""
-                AddNotice(ModLang.L("请先选择一个 Minecraft 版本。"))
-                Return
-            End If
-            If Folder Is Nothing OrElse Entries Is Nothing Then
-                CardPacks.Title = ModLang.L("资源包")
-                LabPath.Text = ""
-                AddNotice(ModLang.L("无法定位这个实例的 resourcepacks 文件夹，请检查版本隔离设置。"))
-                Return
-            End If
-            LabPath.Text = Folder
-            AllPacks.AddRange(Entries)
-            Rebuild()
-        Catch ex As Exception
-            Logger.Error(ex, "应用资源包列表失败")
-        End Try
+        AllPacks = If(Entries, New List(Of ModInstanceContent.PackEntry))
+        Rebuild()
     End Sub
 
-    Private Sub RefreshWithHint()
-        Refresh(Sub() Hint(ModLang.L("资源包列表已刷新。"), HintType.Green))
+#End Region
+
+#Region "列表重建与筛选"
+
+    ''' <summary>点击筛选项触发的改变，和 Mod 页逻辑完全一致</summary>
+    Private Sub ChangeFilter(sender As MyRadioButton, raiseByMouse As Boolean) Handles BtnFilterAll.Check, BtnFilterDisabled.Check, BtnFilterEnabled.Check
+        Filter = CType(sender.Tag, FilterType)
     End Sub
 
-    ''' <summary>按搜索词重建列表。</summary>
+    ''' <summary>根据筛选、搜索条件重新生成列表。</summary>
     Private Sub Rebuild()
-        Try
-            If PanList Is Nothing Then Return
-            PanList.Children.Clear()
-            If Instance Is Nothing Then Return
-            Dim Keyword As String = If(TxtSearch Is Nothing, "", If(TxtSearch.Text, "")).Trim()
-            If AllPacks.Count = 0 Then
-                AddNotice(ModLang.L("这个实例还没有资源包。把 .zip 拖进来或放到 resourcepacks 文件夹。"))
-                CardPacks.Title = ModLang.L("资源包")
-                Return
-            End If
-            Dim Shown As List(Of ModInstanceContent.PackEntry) = AllPacks
-            If Keyword.Length > 0 Then
-                Shown = AllPacks.Where(Function(One) One.Name.IndexOf(Keyword, StringComparison.OrdinalIgnoreCase) >= 0).ToList()
-            End If
-            If Shown.Count = 0 Then
-                AddNotice(ModLang.L("没有匹配当前搜索的资源包。"))
-                CardPacks.Title = ModLang.L("资源包（") & AllPacks.Count & ModLang.L(" 个）")
-                Return
-            End If
-            Dim EnabledNames As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
-            For Each One In ModInstanceContent.GetEnabledResourcePacks(Instance)
-                EnabledNames.Add(One)
-            Next
-            For Each PackOne In Shown
-                PanList.Children.Add(BuildRow(PackOne, EnabledNames.Contains(PackOne.Name)))
-            Next
-            CardPacks.Title = ModLang.L("资源包（") & Shown.Count & ModLang.L(" 个）")
-        Catch ex As Exception
-            Logger.Error(ex, "重建资源包列表失败")
-        End Try
-    End Sub
-
-    ''' <summary>在列表里放一条灰色说明文本。</summary>
-    Private Sub AddNotice(Text As String)
-        Dim Block As New TextBlock With {
-            .Text = Text,
-            .FontSize = 13,
-            .Margin = New Thickness(4, 4, 0, 10),
-            .Opacity = 0.6,
-            .TextWrapping = TextWrapping.Wrap
-        }
-        Block.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrush1")
-        PanList.Children.Add(Block)
+        If PanList Is Nothing Then Return
+        PanList.Children.Clear()
+        '先按筛选过滤
+        Dim Query = AllPacks.AsEnumerable()
+        Select Case Filter
+            Case FilterType.Enabled
+                Query = Query.Where(Function(p) p.IsEnabled)
+            Case FilterType.Disabled
+                Query = Query.Where(Function(p) Not p.IsEnabled)
+        End Select
+        '再按搜索过滤
+        Dim Keyword = TxtSearch.Text?.Trim()
+        If Not String.IsNullOrEmpty(Keyword) Then
+            Query = Query.Where(Function(p) p.Name.IndexOf(Keyword, StringComparison.OrdinalIgnoreCase) >= 0)
+        End If
+        Dim Shown = Query.ToList()
+        For Each PackOne In Shown
+            PanList.Children.Add(BuildRow(PackOne))
+        Next
+        '更新选中状态，移除已经不显示的选中项
+        SelectedPacks = SelectedPacks.Where(Function(p) Shown.Contains(p)).ToList()
+        UpdateSelectCard()
     End Sub
 
 #End Region
 
 #Region "列表项"
 
-    ''' <summary>生成一行：条目信息 + 右侧启用勾选。</summary>
-    Private Function BuildRow(Entry As ModInstanceContent.PackEntry, IsEnabled As Boolean) As UIElement
-        Dim Row As New Grid With {.Margin = New Thickness(0, 0, 0, 2)}
-        Row.ColumnDefinitions.Add(New ColumnDefinition With {.Width = New GridLength(1, GridUnitType.Star)})
-        Row.ColumnDefinitions.Add(New ColumnDefinition With {.Width = GridLength.Auto})
-
-        Dim TypeText As String = If(Entry.IsFolder, ModLang.L("文件夹"), "zip")
-        Dim Item As New MyListItem With {
-            .Type = MyListItem.CheckType.Clickable,
-            .Height = 46,
-            .Title = Entry.Name,
-            .Info = ModInstanceContent.FormatSize(Entry.SizeBytes) & " · " &
-                    Entry.Modified.ToString("yyyy'/'MM'/'dd HH':'mm") & " · " & TypeText,
-            .SvgIcon = If(Entry.IsFolder, "lucide/folder-open", "lucide/package"),
-            .IsScaleAnimationEnabled = False,
-            .Tag = Entry
+    ''' <summary>生成一行：和 Mod 管理页完全同款的 MyLocalPackItem。</summary>
+    Private Function BuildRow(Entry As ModInstanceContent.PackEntry) As MyLocalPackItem
+        Dim NewItem As New MyLocalPackItem With {
+            .SnapsToDevicePixels = True,
+            .Entry = Entry,
+            .Checked = SelectedPacks.Contains(Entry)
         }
-        Dim BtnShow As New MyIconButton With {
-            .SvgIcon = "lucide/folder-open",
-            .ToolTip = ModLang.L("在文件夹中显示")
-        }
-        AddHandler BtnShow.Click, Sub(snd, args) ShowInFolder(Entry)
-        Dim BtnDelete As New MyIconButton With {
-            .SvgIcon = "lucide/trash-2",
-            .Theme = MyIconButton.Themes.Red,
-            .ToolTip = ModLang.L("删除")
-        }
-        AddHandler BtnDelete.Click, Sub(snd, args) DeletePack(Entry)
-        Item.Buttons = New MyIconButton() {BtnShow, BtnDelete}
-
-        Dim Cb As New MyCheckBox With {
-            .Width = 32,
-            .Height = 30,
-            .VerticalAlignment = VerticalAlignment.Center,
-            .Margin = New Thickness(10, 0, 6, 0),
-            .Checked = IsEnabled
-        }
-        AddHandler Cb.Change, Sub(snd, user) TogglePack(Entry, CType(snd, MyCheckBox).Checked, user)
-        '点整行也能切换
-        AddHandler Item.Click, Sub(snd, args) Cb.SetChecked(Not Cb.Checked, True)
-
-        Grid.SetColumn(Item, 0)
-        Grid.SetColumn(Cb, 1)
-        Row.Children.Add(Item)
-        Row.Children.Add(Cb)
-        Return Row
+        NewItem.ButtonHandler = AddressOf SetupPackItemButtons
+        Return NewItem
     End Function
+
+    ''' <summary>给列表项绑定事件和右侧按钮，和 Mod 页 McModContent 逻辑一致。</summary>
+    Private Sub SetupPackItemButtons(sender As MyLocalPackItem, e As EventArgs)
+        Dim Entry = sender.Entry
+        '点击切换选中
+        AddHandler sender.Changed, Sub(snd, args)
+                                      If sender.Checked Then
+                                          If Not SelectedPacks.Contains(Entry) Then SelectedPacks.Add(Entry)
+                                      Else
+                                          SelectedPacks.Remove(Entry)
+                                      End If
+                                      UpdateSelectCard()
+                                  End Sub
+        AddHandler sender.Click, Sub(ss As MyLocalPackItem, ee As EventArgs) ss.Checked = Not ss.Checked
+        '打开位置按钮
+        Dim BtnOpen As New MyIconButton With {.LogoScale = 1.05, .SvgIcon = "lucide/folder-open", .Tag = sender}
+        BtnOpen.ToolTip = ModLang.L("打开文件位置")
+        AddHandler BtnOpen.Click, Sub(snd, args) ShowInFolder(Entry)
+        '删除按钮
+        Dim BtnDelete As New MyIconButton With {.LogoScale = 1, .SvgIcon = "lucide/trash-2", .Tag = sender}
+        BtnDelete.ToolTip = ModLang.L("删除")
+        AddHandler BtnDelete.Click, Sub(snd, args) DeleteSinglePack(Entry)
+        sender.Buttons = {BtnOpen, BtnDelete}
+    End Sub
 
 #End Region
 
-#Region "操作"
+#Region "底部操作面板"
 
-    ''' <summary>切换单个资源包的启用状态，并立即写回 options.txt。</summary>
-    Private Sub TogglePack(Entry As ModInstanceContent.PackEntry, NewValue As Boolean, user As Boolean)
-        If Not user Then Return
-        Try
-            ModInstanceContent.SetResourcePackEnabled(Instance, Entry.Name, NewValue)
-            Hint(If(NewValue, ModLang.L("已启用："), ModLang.L("已停用：")) & Entry.Name, HintType.Green)
-        Catch ex As Exception
-            Logger.Error(ex, "切换资源包启用状态失败")
-            Hint(ModLang.L("切换资源包状态失败：") & ex.Message, HintType.Red)
-        End Try
+    ''' <summary>更新底部操作面板的显示状态和文字。</summary>
+    Private Sub UpdateSelectCard()
+        If SelectedPacks.Count > 0 Then
+            LabSelect.Text = ModLang.L("已选择 ") & SelectedPacks.Count & ModLang.L(" 个文件")
+            ShowSelectCard()
+        Else
+            HideSelectCard()
+        End If
     End Sub
 
-    ''' <summary>批量启用 / 停用全部资源包。</summary>
+    Private Sub ShowSelectCard()
+        If CardSelect.Visibility = Visibility.Visible Then Return
+        CardSelect.Visibility = Visibility.Visible
+        '简单淡入+上移动画，和 Mod 页一致
+        Dim AniOpacity As New Animation.DoubleAnimation(0, 1, New Duration(TimeSpan.FromMilliseconds(150)))
+        Dim AniY As New Animation.DoubleAnimation(10, 0, New Duration(TimeSpan.FromMilliseconds(150)))
+        CardSelect.BeginAnimation(OpacityProperty, AniOpacity)
+        TransSelect.BeginAnimation(TranslateTransform.YProperty, AniY)
+    End Sub
+
+    Private Sub HideSelectCard()
+        If CardSelect.Visibility = Visibility.Collapsed Then Return
+        Dim AniOpacity As New Animation.DoubleAnimation(1, 0, New Duration(TimeSpan.FromMilliseconds(100)))
+        Dim AniY As New Animation.DoubleAnimation(0, 10, New Duration(TimeSpan.FromMilliseconds(100)))
+        AddHandler AniOpacity.Completed, Sub()
+                                             CardSelect.Visibility = Visibility.Collapsed
+                                         End Sub
+        CardSelect.BeginAnimation(OpacityProperty, AniOpacity)
+        TransSelect.BeginAnimation(TranslateTransform.YProperty, AniY)
+    End Sub
+
+    Private Sub ClearSelection()
+        SelectedPacks.Clear()
+        Rebuild()
+    End Sub
+
+#End Region
+
+#Region "批量操作"
+
+    ''' <summary>批量启用/禁用选中的包。</summary>
+    Private Sub BatchSetEnabled(NewEnabled As Boolean)
+        If SelectedPacks.Count = 0 Then Return
+        Dim Targets = SelectedPacks.ToList()
+        RunInNewThread(Sub()
+                           Dim Failed = 0
+                           For Each Entry In Targets
+                               Try
+                                   ModInstanceContent.SetPackEnabledByRename(Entry, NewEnabled)
+                               Catch
+                                   Failed += 1
+                               End Try
+                           Next
+                           RunInUi(Sub()
+                                       Refresh()
+                                       If Failed = 0 Then
+                                           Hint(If(NewEnabled, ModLang.L("已启用选中的资源包"), ModLang.L("已禁用选中的资源包")), HintType.Green)
+                                       Else
+                                           Hint(ModLang.L("部分操作失败，失败数量：") & Failed, HintType.Red)
+                                       End If
+                                   End Sub)
+                       End Sub)
+    End Sub
+
+    ''' <summary>批量删除选中的包。</summary>
+    Private Sub BatchDelete()
+        If SelectedPacks.Count = 0 Then Return
+        If MyMsgBox(ModLang.L("确定要删除选中的 ") & SelectedPacks.Count & ModLang.L(" 个资源包吗？此操作不可恢复。"),
+                        ModLang.L("确认删除"), ModLang.L("删除"), ModLang.L("取消"), True) <> 1 Then Return
+        Dim Targets = SelectedPacks.ToList()
+        RunInNewThread(Sub()
+                           Dim Failed = 0
+                           For Each Entry In Targets
+                               Try
+                                   If Entry.IsFolder Then
+                                       DirectoryUtils.Delete(Entry.FullPath)
+                                   Else
+                                       FileUtils.Delete(Entry.FullPath)
+                                   End If
+                               Catch
+                                   Failed += 1
+                               End Try
+                           Next
+                           RunInUi(Sub()
+                                       Refresh()
+                                       If Failed = 0 Then
+                                           Hint(ModLang.L("已删除选中的资源包"), HintType.Green)
+                                       Else
+                                           Hint(ModLang.L("部分删除失败，失败数量：") & Failed, HintType.Red)
+                                       End If
+                                   End Sub)
+                       End Sub)
+    End Sub
+
+    ''' <summary>删除单个包。</summary>
+    Private Sub DeleteSinglePack(Entry As ModInstanceContent.PackEntry)
+        If MyMsgBox(ModLang.L("确定要删除这个资源包吗？此操作不可恢复。"),
+                        ModLang.L("确认删除"), ModLang.L("删除"), ModLang.L("取消"), True) <> 1 Then Return
+        RunInNewThread(Sub()
+                           Try
+                               If Entry.IsFolder Then
+                                   DirectoryUtils.Delete(Entry.FullPath)
+                               Else
+                                   FileUtils.Delete(Entry.FullPath)
+                               End If
+                               RunInUi(Sub()
+                                           Refresh()
+                                           Hint(ModLang.L("已删除资源包"), HintType.Green)
+                                       End Sub)
+                           Catch ex As Exception
+                               RunInUi(Sub() Hint(ModLang.L("删除失败：") & ex.Message, HintType.Red))
+                           End Try
+                       End Sub)
+    End Sub
+
+    ''' <summary>全部启用/禁用。</summary>
     Private Sub SetAllPacks(Enabled As Boolean)
         If Instance Is Nothing Then
             Hint(ModLang.L("请先选择一个 Minecraft 版本！"), HintType.Red)
@@ -269,17 +379,30 @@ Public Class PageInstanceResourcePack
             Hint(ModLang.L("这个实例还没有资源包。"), HintType.Blue)
             Return
         End If
-        Try
-            For Each One In AllPacks
-                ModInstanceContent.SetResourcePackEnabled(Instance, One.Name, Enabled)
-            Next
-            Rebuild()
-            Hint(If(Enabled, ModLang.L("已启用全部资源包。"), ModLang.L("已停用全部资源包。")), HintType.Green)
-        Catch ex As Exception
-            Logger.Error(ex, "批量修改资源包状态失败")
-            Hint(ModLang.L("批量修改失败：") & ex.Message, HintType.Red)
-        End Try
+        RunInNewThread(Sub()
+                           Dim Failed = 0
+                           For Each Entry In AllPacks
+                               If Entry.IsEnabled = Enabled Then Continue For
+                               Try
+                                   ModInstanceContent.SetPackEnabledByRename(Entry, Enabled)
+                               Catch
+                                   Failed += 1
+                               End Try
+                           Next
+                           RunInUi(Sub()
+                                       Refresh()
+                                       If Failed = 0 Then
+                                           Hint(If(Enabled, ModLang.L("已启用全部资源包。"), ModLang.L("已停用全部资源包。")), HintType.Green)
+                                       Else
+                                           Hint(ModLang.L("部分操作失败，失败数量：") & Failed, HintType.Red)
+                                       End If
+                                   End Sub)
+                       End Sub)
     End Sub
+
+#End Region
+
+#Region "其他操作"
 
     ''' <summary>在资源管理器中定位。</summary>
     Private Sub ShowInFolder(Entry As ModInstanceContent.PackEntry)
@@ -296,94 +419,87 @@ Public Class PageInstanceResourcePack
                     Hint(ModLang.L("文件不存在！"), HintType.Red)
                     Return
                 End If
-                OpenExplorer(Entry.FullPath)
+                OpenExplorer("/select," & Entry.FullPath)
             End If
         Catch ex As Exception
-            Logger.Warn(ex, "在文件夹中显示资源包失败")
+            Logger.Error(ex, "打开资源包位置失败")
+            Hint(ModLang.L("打开失败：") & ex.Message, HintType.Red)
         End Try
     End Sub
 
-    ''' <summary>删除资源包（二次确认，移入回收站）。</summary>
-    Private Sub DeletePack(Entry As ModInstanceContent.PackEntry)
-        If Entry Is Nothing Then Return
-        Try
-            If MyMsgBox(ModLang.L("确定要删除资源包「") & Entry.Name & ModLang.L("」吗？") & vbCrLf &
-                        ModLang.L("删除后会被移入回收站，可以自行恢复。"),
-                        ModLang.L("删除资源包"), ModLang.L("删除"), ModLang.L("取消"), IsWarn:=True) <> 1 Then Return
-            If Entry.IsFolder Then
-                DirectoryUtils.Delete(Entry.FullPath, True)
-            Else
-                FileUtils.Delete(Entry.FullPath, True)
-            End If
-            Hint(ModLang.L("已删除：") & Entry.Name, HintType.Green)
-            Refresh()
-        Catch ex As Exception
-            Logger.Error(ex, "删除资源包失败")
-            Hint(ModLang.L("删除失败：") & ex.Message, HintType.Red)
-        End Try
-    End Sub
-
+    ''' <summary>打开资源包文件夹。</summary>
     Private Sub OpenPackFolder()
-        Dim Folder As String = PackFolder
-        If Folder Is Nothing Then
-            Hint(ModLang.L("请先选择一个 Minecraft 版本！"), HintType.Red)
-            Return
-        End If
-        OpenExplorer(Folder)
+        Try
+            Dim Folder = PackFolder
+            If Folder Is Nothing Then
+                Hint(ModLang.L("请先选择一个 Minecraft 版本！"), HintType.Red)
+                Return
+            End If
+            OpenExplorer(PathUtils.AddSlashSuffix(Folder))
+        Catch ex As Exception
+            Logger.Error(ex, "打开资源包文件夹失败")
+            Hint(ModLang.L("打开失败：") & ex.Message, HintType.Red)
+        End Try
     End Sub
 
 #End Region
 
-#Region "拖入安装"
+#Region "拖放安装"
 
     Private Sub HandleDragOver(sender As Object, e As DragEventArgs)
-        Try
-            If Instance Is Nothing Then Return
-            If e.Data.GetDataPresent(DataFormats.FileDrop) Then
-                Dim Files As String() = TryCast(e.Data.GetData(DataFormats.FileDrop), String())
-                If Files IsNot Nothing AndAlso Files.Any(Function(One) One.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)) Then
-                    e.Effects = DragDropEffects.Copy
-                    e.Handled = True
-                    Return
-                End If
-            End If
-        Catch ex As Exception
-            Logger.Warn(ex, "判断拖入内容失败")
-        End Try
+        e.Effects = If(e.Data.GetDataPresent(DataFormats.FileDrop), DragDropEffects.Copy, DragDropEffects.None)
+        e.Handled = True
     End Sub
 
     Private Sub HandleDrop(sender As Object, e As DragEventArgs)
         Try
-            If Instance Is Nothing Then Return
-            If Not e.Data.GetDataPresent(DataFormats.FileDrop) Then Return
-            Dim Files As String() = TryCast(e.Data.GetData(DataFormats.FileDrop), String())
-            If Files Is Nothing Then Return
-            Dim Zips As List(Of String) = Files.Where(Function(One) One.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)).ToList()
-            If Zips.Count = 0 Then Return
+            Dim Files = CType(e.Data.GetData(DataFormats.FileDrop), String())
+            If Files Is Nothing OrElse Files.Length = 0 Then Return
+            Dim Folder = PackFolder
+            If Folder Is Nothing Then
+                Hint(ModLang.L("请先选择一个 Minecraft 版本！"), HintType.Red)
+                Return
+            End If
+            InstallFiles(Files, Folder)
             e.Handled = True
-            Dim Folder As String = PackFolder
-            If Folder Is Nothing Then Return
-            RunInNewThread(
-            Sub()
-                Dim Copied As Integer = 0
-                For Each One In Zips
-                    Try
-                        DirectoryUtils.Create(Folder)
-                        FileUtils.Copy(One, PathUtils.AddSlashSuffix(Folder) & IO.Path.GetFileName(One))
-                        Copied += 1
-                    Catch ex As Exception
-                        Logger.Warn(ex, $"复制资源包失败：{One}")
-                    End Try
-                Next
-                RunInUi(
-                Sub()
-                    Hint(ModLang.L("已导入 ") & Copied & ModLang.L(" 个资源包。"), HintType.Green)
-                    Refresh()
-                End Sub)
-            End Sub, "Import ResourcePack", ThreadPriority.BelowNormal)
         Catch ex As Exception
-            Logger.Error(ex, "拖入安装资源包失败")
+            Logger.Error(ex, "拖放安装资源包失败")
+            Hint(ModLang.L("安装失败：") & ex.Message, HintType.Red)
         End Try
+    End Sub
+
+    ''' <summary>把文件/文件夹安装到资源包目录。</summary>
+    Private Sub InstallFiles(Files As String(), TargetFolder As String)
+        RunInNewThread(Sub()
+                           Dim Success = 0
+                           Dim Failed = 0
+                           For Each SourcePath In Files
+                               Try
+                                   Dim Name = IO.Path.GetFileName(SourcePath)
+                                   Dim TargetPath = PathUtils.AddSlashSuffix(TargetFolder) & Name
+                                   If DirectoryUtils.Exists(SourcePath) Then
+                                       DirectoryUtils.Copy(SourcePath, TargetPath)
+                                   ElseIf FileUtils.Exists(SourcePath) Then
+                                       FileUtils.Copy(SourcePath, TargetPath)
+                                   Else
+                                       Failed += 1
+                                       Continue For
+                                   End If
+                                   Success += 1
+                               Catch
+                                   Failed += 1
+                               End Try
+                           Next
+                           RunInUi(Sub()
+                                       Refresh()
+                                       If Success > 0 Then
+                                           Hint(ModLang.L("已安装 ") & Success & ModLang.L(" 个资源包"), HintType.Green)
+                                       End If
+                                       If Failed > 0 Then
+                                           Hint(ModLang.L("安装失败 ") & Failed & ModLang.L(" 个"), HintType.Red)
+                                       End If
+                                   End Sub)
+                       End Sub)
     End Sub
 
 #End Region

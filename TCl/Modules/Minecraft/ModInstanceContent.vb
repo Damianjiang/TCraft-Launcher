@@ -1,4 +1,5 @@
 Imports System.IO
+Imports System.IO.Compression
 Imports System.Text
 
 ''' <summary>
@@ -13,7 +14,7 @@ Public Module ModInstanceContent
     ''' 一个资源包 / 光影包条目（.zip 文件或文件夹）。
     ''' </summary>
     Public Class PackEntry
-        ''' <summary>显示名称（文件不带 .zip 后缀）。</summary>
+        ''' <summary>显示名称（文件不带 .zip / .disabled 后缀）。</summary>
         Public Name As String
         ''' <summary>完整路径。</summary>
         Public FullPath As String
@@ -23,6 +24,10 @@ Public Module ModInstanceContent
         Public Modified As DateTime
         ''' <summary>是否为文件夹（否则为 .zip）。</summary>
         Public IsFolder As Boolean
+        ''' <summary>是否已启用（禁用的文件带 .disabled 后缀）。</summary>
+        Public IsEnabled As Boolean
+        ''' <summary>图标路径，提取失败则为 Nothing 用默认图标。</summary>
+        Public LogoPath As String
     End Class
 
 #End Region
@@ -64,7 +69,7 @@ Public Module ModInstanceContent
     End Function
 
     ''' <summary>
-    ''' 列出文件夹内的全部资源包 / 光影包（文件与文件夹都算），按名称排序。
+    ''' 列出文件夹内的全部资源包 / 光影包（文件与文件夹都算，带 .disabled 后缀的为禁用状态），按名称排序。
     ''' </summary>
     Public Function ListPacks(Folder As String) As List(Of PackEntry)
         Dim Result As New List(Of PackEntry)
@@ -75,13 +80,22 @@ Public Module ModInstanceContent
             For Each DirPath In DirectoryUtils.EnumerateDirectories(Folder, False)
                 Try
                     Dim Info As DirectoryInfo = DirectoryUtils.GetInfo(DirPath)
-                    Result.Add(New PackEntry With {
-                        .Name = PathUtils.GetLastPart(DirPath),
+                    Dim DirName = PathUtils.GetLastPart(DirPath)
+                    Dim IsEnabled = True
+                    If DirName.EndsWith(".disabled", StringComparison.OrdinalIgnoreCase) Then
+                        IsEnabled = False
+                        DirName = DirName.Substring(0, DirName.Length - ".disabled".Length)
+                    End If
+                    Dim NewEntry As New PackEntry With {
+                        .Name = DirName,
                         .FullPath = DirPath,
                         .SizeBytes = GetFolderSize(DirPath),
                         .Modified = Info.LastWriteTime,
-                        .IsFolder = True
-                    })
+                        .IsFolder = True,
+                        .IsEnabled = IsEnabled
+                    }
+                    NewEntry.LogoPath = GetPackLogo(NewEntry)
+                    Result.Add(NewEntry)
                 Catch ex As Exception
                     Logger.Warn(ex, $"读取内容文件夹信息失败：{DirPath}")
                 End Try
@@ -89,15 +103,25 @@ Public Module ModInstanceContent
             '压缩包
             For Each FilePath In DirectoryUtils.EnumerateFiles(Folder, False)
                 Try
-                    If Not FilePath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) Then Continue For
+                    Dim FileName = Path.GetFileName(FilePath)
+                    Dim IsEnabled = True
+                    If FileName.EndsWith(".zip.disabled", StringComparison.OrdinalIgnoreCase) Then
+                        IsEnabled = False
+                        FileName = FileName.Substring(0, FileName.Length - ".disabled".Length)
+                    ElseIf Not FileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)
+                        Continue For
+                    End If
                     Dim Info As FileInfo = FileUtils.GetInfo(FilePath)
-                    Result.Add(New PackEntry With {
-                        .Name = Path.GetFileNameWithoutExtension(FilePath),
+                    Dim NewEntry As New PackEntry With {
+                        .Name = Path.GetFileNameWithoutExtension(FileName),
                         .FullPath = FilePath,
                         .SizeBytes = Info.Length,
                         .Modified = Info.LastWriteTime,
-                        .IsFolder = False
-                    })
+                        .IsFolder = False,
+                        .IsEnabled = IsEnabled
+                    }
+                    NewEntry.LogoPath = GetPackLogo(NewEntry)
+                    Result.Add(NewEntry)
                 Catch ex As Exception
                     Logger.Warn(ex, $"读取内容文件信息失败：{FilePath}")
                 End Try
@@ -137,6 +161,61 @@ Public Module ModInstanceContent
         If Bytes < 1024L * 1024 Then Return (Bytes / 1024.0).ToString("0.#", Globalization.CultureInfo.InvariantCulture) & " KB"
         If Bytes < 1024L * 1024 * 1024 Then Return (Bytes / 1024.0 / 1024.0).ToString("0.#", Globalization.CultureInfo.InvariantCulture) & " MB"
         Return (Bytes / 1024.0 / 1024.0 / 1024.0).ToString("0.##", Globalization.CultureInfo.InvariantCulture) & " GB"
+    End Function
+
+    ''' <summary>
+    ''' 提取资源包/光影包图标，兼容多种可能的图标位置，zip 自动解压缓存。
+    ''' </summary>
+    Private Function GetPackLogo(Entry As PackEntry) As String
+        Try
+            '候选图标路径，按优先级排列
+            Dim CandidatePaths = New String() {
+                "pack.png",
+                Path.Combine("shaders", "pack.png"),
+                Path.Combine("shaders", "icon.png"),
+                Path.Combine("shaders", "logo.png")
+            }
+            '文件夹：直接查找文件，找到就返回
+            If Entry.IsFolder Then
+                For Each RelativePath In CandidatePaths
+                    Dim LogoFile = Path.Combine(Entry.FullPath, RelativePath)
+                    If File.Exists(LogoFile) Then Return LogoFile
+                Next
+                Return Nothing
+            End If
+            'zip：先准备缓存目录
+            Dim CacheDir = Path.Combine(PathTemp, "Cache", "Images")
+            Directory.CreateDirectory(CacheDir)
+            Using Zip = ZipFile.OpenRead(Entry.FullPath)
+                '找到第一个存在的候选图标
+                Dim LogoEntry As ZipArchiveEntry = Nothing
+                For Each RelativePath In CandidatePaths
+                    LogoEntry = Zip.GetEntry(RelativePath.Replace("\", "/"))
+                    If LogoEntry IsNot Nothing Then Exit For
+                Next
+                If LogoEntry Is Nothing Then Return Nothing
+                '用条目大小+压缩后大小+路径算 MD5 作为缓存文件名
+                Dim RawKey = Encoding.UTF8.GetBytes(LogoEntry.Length & LogoEntry.CompressedLength & Entry.FullPath)
+                Dim CacheKey As String
+                Using Md5Alg = Security.Cryptography.MD5.Create()
+                    Dim HashBytes = Md5Alg.ComputeHash(RawKey)
+                    CacheKey = BitConverter.ToString(HashBytes).Replace("-", "").ToLowerInvariant()
+                End Using
+                Dim CacheFile = Path.Combine(CacheDir, CacheKey & ".png")
+                '缓存已存在直接返回
+                If File.Exists(CacheFile) Then Return CacheFile
+                '解压写入缓存
+                Using Stream = LogoEntry.Open()
+                    Using FileStream = File.Create(CacheFile)
+                        Stream.CopyTo(FileStream)
+                    End Using
+                End Using
+                Return CacheFile
+            End Using
+        Catch ex As Exception
+            Logger.Warn(ex, "提取资源包图标失败：" & Entry.FullPath)
+            Return Nothing
+        End Try
     End Function
 
 #End Region
@@ -311,6 +390,89 @@ Public Module ModInstanceContent
         Next
         Return "[" & String.Join(",", Parts) & "]"
     End Function
+
+    ''' <summary>
+    ''' 通过重命名加/去掉 .disabled 后缀来启用/禁用资源包，然后同步 options.txt。
+    ''' </summary>
+    Public Sub SetPackEnabledByRename(Entry As PackEntry, NewEnabled As Boolean)
+        If Entry Is Nothing Then Return
+        If Entry.IsEnabled = NewEnabled Then Return
+        Try
+            Dim OldPath As String = Entry.FullPath
+            Dim NewPath As String
+            If NewEnabled Then
+                '启用：去掉 .disabled 后缀
+                If Not OldPath.EndsWith(".disabled", StringComparison.OrdinalIgnoreCase) Then Return
+                NewPath = OldPath.Substring(0, OldPath.Length - ".disabled".Length)
+            Else
+                '禁用：加上 .disabled 后缀
+                NewPath = OldPath & ".disabled"
+            End If
+            If FileUtils.Exists(NewPath) OrElse DirectoryUtils.Exists(NewPath) Then
+                Throw New IOException("目标路径已存在文件：" & IO.Path.GetFileName(NewPath))
+            End If
+            If Entry.IsFolder Then
+                Directory.Move(OldPath, NewPath)
+            Else
+                File.Move(OldPath, NewPath)
+            End If
+            Entry.FullPath = NewPath
+            Entry.IsEnabled = NewEnabled
+            SyncResourcePacksToOptions(Entry)
+        Catch ex As Exception
+            Logger.Error(ex, "通过重命名修改资源包状态失败")
+            Throw
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' 把文件夹里所有启用的资源包同步到 options.txt，保证游戏正常识别。
+    ''' </summary>
+    Public Sub SyncResourcePacksToOptions(Optional AnyEntry As PackEntry = Nothing)
+        '先找到对应的实例
+        Dim Instance As McInstance = Nothing
+        Dim Folder As String = Nothing
+        If AnyEntry IsNot Nothing Then
+            Dim ParentFolder = PathUtils.AddSlashSuffix(IO.Path.GetDirectoryName(AnyEntry.FullPath))
+            Folder = ParentFolder
+            '反推实例：从路径里找 resourcepacks 的位置
+            Dim Marker = "resourcepacks" & IO.Path.DirectorySeparatorChar
+            Dim Idx = ParentFolder.IndexOf(Marker, StringComparison.OrdinalIgnoreCase)
+            If Idx > 0 Then
+                Dim IndiePath = ParentFolder.Substring(0, Idx)
+                '从全局实例列表找匹配的
+                For Each Group In McInstanceList.Values
+                    For Each One In Group
+                        If PathUtils.AddSlashSuffix(One.PathIndie).TrimEnd("\"c, "/"c).Equals(IndiePath.TrimEnd("\"c, "/"c), StringComparison.OrdinalIgnoreCase) Then
+                            Instance = One
+                            Exit For
+                        End If
+                    Next
+                    If Instance IsNot Nothing Then Exit For
+                Next
+            End If
+        End If
+        If Instance Is Nothing Then Return
+        If String.IsNullOrEmpty(Folder) Then Folder = GetPacksFolder(Instance, "resourcepacks")
+        If Folder Is Nothing Then Return
+        Try
+            Dim AllEntries = ListPacks(Folder)
+            Dim EnabledItems As New List(Of String)
+            For Each Entry In AllEntries.Where(Function(e) e.IsEnabled)
+                If Entry.IsFolder Then
+                    EnabledItems.Add("file/" & Entry.Name)
+                Else
+                    EnabledItems.Add("file/" & Entry.Name & ".zip")
+                End If
+            Next
+            '判断是否为旧版格式
+            Dim RawValue = ReadOption(Instance, "resourcePacks").Trim()
+            Dim IsLegacy = RawValue.Length > 2 AndAlso Not RawValue.Contains("""")
+            WriteOption(Instance, "resourcePacks", FormatPackList(EnabledItems, IsLegacy))
+        Catch ex As Exception
+            Logger.Warn(ex, "同步资源包到 options.txt 失败")
+        End Try
+    End Sub
 
 #End Region
 

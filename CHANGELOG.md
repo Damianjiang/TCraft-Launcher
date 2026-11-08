@@ -12,6 +12,26 @@ The website and download link always resolve to the newest build, so no version 
 
 ---
 
+## v1.3.7 (1.3.7.0) — 2026-11-08 / 中文
+
+（正式版更新；资产 `TCraft-Launcher.exe`，校验值见 Release 页面）
+
+- 资源包、光影包管理页面完全对齐 Mod 管理页面布局与交互，支持滑动多选、底部批量操作面板、带图标的全部/已启用/已禁用筛选。
+- 资源包、光影包启用/禁用统一通过修改文件后缀实现，操作后自动同步 options.txt，不影响游戏正常识别。
+- 支持读取资源包/光影包内置 pack.png 图标，兼容多路径查找，自动缓存图标。
+- 修复滑动多选时空引用崩溃、布局重叠、控件无响应、筛选按钮位置错误等问题。
+- 列表刷新加载动画统一为镐子旋转动画，与下载页面完全一致。
+
+## v1.3.7 (1.3.7.0) — 2026-11-08 / English
+
+(Stable release; asset `TCraft-Launcher.exe`, checksum on the Release page)
+
+- Resource pack and shader pack management pages now fully match the Mod management page layout and interaction, supporting swipe multi-select, bottom batch action panel, and icon-enabled All/Enabled/Disabled filters.
+- Enabling/disabling resource packs and shader packs now works uniformly by modifying file extensions, automatically syncing options.txt after operations without affecting game recognition.
+- Added support for reading built-in pack.png icons from resource/shader packs, with multi-path compatibility and automatic icon caching.
+- Fixed null reference crashes on swipe multi-select, layout overlap, unresponsive controls, and incorrect filter button position issues.
+- List refresh loading animation is now unified to the pickaxe rotation animation, fully consistent with the download page.
+
 ## v1.3.6 (1.3.6.0) — 2026-11-08 / 中文
 
 （正式版更新；资产 `TCraft-Launcher.exe`，校验值见 Release 页面）
