@@ -38,18 +38,22 @@
                     <TextBlock x:Name="LabNote"
                                Text="只清理可重新生成或重新下载的内容；不会删除你的配置、背景与音乐、皮肤、翻译文件或游戏数据。"
                                TextWrapping="Wrap" LineHeight="22" Opacity="0.65" FontSize="13" Margin="0,0,0,18" />
-                    <!-- 按钮补齐项目标准 Padding="13,0" + Height="35"（与其余设置页一致），
-                         修复原先无内边距导致的"压扁"外观。 -->
-                    <WrapPanel>
-                        <local:MyButton Height="35" MinWidth="150" Text="清理所选缓存" ColorType="Red" Padding="13,0" Margin="0,0,15,0"
+                    <Grid Height="40" Margin="0,0,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="Button" />
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="Button" />
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="Button" />
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="Button" />
+                        </Grid.ColumnDefinitions>
+                        <local:MyButton MinWidth="140" Text="清理所选缓存" ColorType="Red" Margin="0,0,20,0"
                                         Click="BtnClean_Click" />
-                        <local:MyButton Height="35" MinWidth="150" Text="检查无用文件" ColorType="Normal" Padding="13,0" Margin="0,0,15,0"
-                                        Click="BtnScanJunk_Click" />
-                        <local:MyButton Height="35" MinWidth="90" Text="刷新" ColorType="Normal" Padding="13,0" Margin="0,0,15,0"
-                                        Click="BtnRefresh_Click" />
-                        <local:MyButton Height="35" MinWidth="150" Text="打开缓存目录" ColorType="Normal" Padding="13,0"
-                                        Click="BtnOpen_Click" />
-                    </WrapPanel>
+                        <local:MyButton MinWidth="140" Text="检查无用文件" ColorType="Normal" Margin="0,0,20,0"
+                                        Click="BtnScanJunk_Click" Grid.Column="1"/>
+                        <local:MyButton MinWidth="140" Text="刷新" ColorType="Normal" Margin="0,0,20,0"
+                                        Click="BtnRefresh_Click" Grid.Column="2"/>
+                        <local:MyButton MinWidth="140" Text="打开缓存目录" ColorType="Normal"
+                                        Click="BtnOpen_Click" Grid.Column="3"/>
+                    </Grid>
                 </StackPanel>
             </local:MyCard>
         </DockPanel>

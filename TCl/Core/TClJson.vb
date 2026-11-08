@@ -1,13 +1,12 @@
 ' ============================================================================
-'  TCl 自制 JSON 引擎（彻底替代第三方 Newtonsoft.Json 二进制，零外部依赖）
-'  命名空间布局与 Newtonsoft 一致，调用点零改动：
+'  JSON 解析引擎
+'  命名空间布局与 Newtonsoft 一致：
 '    Newtonsoft.Json        → Formatting / JTokenType / JsonConvert
 '    Newtonsoft.Json.Linq   → JToken / JValue / JContainer / JObject / JArray / JProperty
 '  支持：默认字符串/整数索引器、.Value<>/.ToObject<>、Parse/FromObject、序列化、
 '        反射式 POCO 双向映射（枚举/日期/列表/数组/嵌套对象）、
 '        .Children(基类出 JToken / JObject 出 JProperty)/.Properties()/Linq、
 '        JToken 到 String/数值/布尔/日期 的隐式转换。
-'  由 TCl 团队自行实现，不依赖任何外部程序集。
 ' ============================================================================
 Option Explicit On
 

@@ -59,7 +59,10 @@ Public Class MyPageLeft
             '逐个进入动画
             Dim AniList As New List(Of AniData)
             Dim Id As Integer = 0, Delay As Integer = 0
-            For Each Element As FrameworkElement In GetAllAnimControls(True)
+            Dim AllControls = GetAllAnimControls(True)
+            '如果控件太多，减少动画复杂度，避免卡顿
+            Dim UseSimpleAnimation As Boolean = AllControls.Count > 12
+            For Each Element As FrameworkElement In AllControls
                 Element = MyVirtualizingElement.TryInit(Element)
                 If Element.Visibility = Visibility.Collapsed Then
                     '还原之前的隐藏动画可能导致的改变
@@ -68,19 +71,28 @@ Public Class MyPageLeft
                     If TypeOf Element Is MyListItem Then CType(Element, MyListItem).IsMouseOverAnimationEnabled = True
                 Else
                     Element.Opacity = 0
-                    Element.RenderTransform = New TranslateTransform(-25, 0)
+                    Element.RenderTransform = New TranslateTransform(-15, 0)
                     If TypeOf Element Is MyListItem Then CType(Element, MyListItem).IsMouseOverAnimationEnabled = False
-                    AniList.Add(AaOpacity(Element, If(TypeOf Element Is TextBlock, 0.6, 1), 100, Delay, New AniEaseOutFluent(AniEasePower.Weak)))
-                    AniList.Add(AaTranslateX(Element, 5, 200, Delay, New AniEaseOutFluent))
-                    AniList.Add(AaTranslateX(Element, 20, 300, Delay, New AniEaseOutBack(AniEasePower.Weak)))
+                    If UseSimpleAnimation Then
+                        '简单模式：只有 Opacity 和一次平移，动画更短
+                        AniList.Add(AaOpacity(Element, If(TypeOf Element Is TextBlock, 0.6, 1), 80, Delay, New AniEaseOutFluent(AniEasePower.Weak)))
+                        AniList.Add(AaTranslateX(Element, 15, 150, Delay, New AniEaseOutFluent))
+                    Else
+                        '完整模式：原来的动画
+                        AniList.Add(AaOpacity(Element, If(TypeOf Element Is TextBlock, 0.6, 1), 100, Delay, New AniEaseOutFluent(AniEasePower.Weak)))
+                        AniList.Add(AaTranslateX(Element, 5, 200, Delay, New AniEaseOutFluent))
+                        AniList.Add(AaTranslateX(Element, 20, 300, Delay, New AniEaseOutBack(AniEasePower.Weak)))
+                    End If
                     If TypeOf Element Is MyListItem Then
                         AniList.Add(AaCode(
                         Sub()
                             CType(Element, MyListItem).IsMouseOverAnimationEnabled = True
                             CType(Element, MyListItem).RefreshColor(Me, New EventArgs)
-                        End Sub, Delay + 280))
+                        End Sub, Delay + If(UseSimpleAnimation, 150, 280)))
                     End If
-                    Delay += Math.Max(15 - Id, 7) * 2
+                    '延迟上限：最多 150ms，避免控件太多时动画太长
+                    Delay += Math.Min(10, Math.Max(8, 15 - Id))
+                    If Delay > 150 Then Delay = 150
                     Id += 1
                 End If
             Next
@@ -103,9 +115,13 @@ Public Class MyPageLeft
             Dim AniList As New List(Of AniData)
             Dim Id As Integer = 0
             Dim Controls = GetAllAnimControls()
+            '如果控件太多，减少动画时长，避免卡顿
+            Dim ExitDuration As Integer = If(Controls.Count > 12, 30, 50)
+            Dim TotalDelay As Integer = If(Controls.Count > 12, 50, 70)
             For Each Element As FrameworkElement In Controls
-                AniList.Add(AaOpacity(Element, -Element.Opacity, 50, 70 / Controls.Count * Id))
-                AniList.Add(AaTranslateX(Element, -6, 50, 70 / Controls.Count * Id))
+                Dim Delay As Integer = If(Controls.Count > 0, TotalDelay / Controls.Count * Id, 0)
+                AniList.Add(AaOpacity(Element, -Element.Opacity, ExitDuration, Delay))
+                AniList.Add(AaTranslateX(Element, -6, ExitDuration, Delay))
                 Id += 1
             Next
             AniStart(AniList, "PageLeft PageChange " & Uuid)

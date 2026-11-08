@@ -270,7 +270,7 @@
             <local:MyCard Margin="0,24,0,0" Title="社区">
                 <StackPanel Margin="32,44,32,24">
                     <TextBlock TextWrapping="Wrap" LineHeight="24" Opacity="0.7" FontSize="13"
-                               Text="想第一时间了解新版本、反馈问题或了解社区动态，可以加入 TCraft NEXT 社群。" />
+                               Text="有问题反馈？想获取更新？加入我们的启动器交流群吧！" />
                     <WrapPanel Margin="0,18,0,0">
                         <local:MyButton Height="35" MinWidth="150" Text="加入 QQ 群" ColorType="Highlight"
                                         Click="BtnJoinQQ_Click" />

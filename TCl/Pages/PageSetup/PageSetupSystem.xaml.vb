@@ -373,7 +373,7 @@ Public Class PageSetupSystem
 
 #Region "社区 / 卸载（自「更多」页并入）"
 
-    Private Const CommunityUrl As String = "https://qm.qq.com/q/fzoInJrrMW"
+    Private Const CommunityUrl As String = "https://qm.qq.com/q/UONlv4VgwE"
 
     Private Sub BtnJoinQQ_Click(sender As Object, e As MouseButtonEventArgs)
         Try

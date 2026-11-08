@@ -31,10 +31,10 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="1*" />
                 </Grid.ColumnDefinitions>
-                <Border Width="60" Height="60" CornerRadius="6" VerticalAlignment="Top" Background="{DynamicResource ColorObject4}" SnapsToDevicePixels="True">
+                <Border Width="60" Height="60" CornerRadius="6" VerticalAlignment="Top" Background="{DynamicResource ColorBrush4}" SnapsToDevicePixels="True">
                     <Grid>
                         <my:MyImage x:Name="ImgIcon" Stretch="UniformToFill" />
-                        <Border x:Name="PanIconEmpty" Background="{DynamicResource ColorObject4}">
+                        <Border x:Name="PanIconEmpty" Background="{DynamicResource ColorBrush4}">
                             <TextBlock Text="ZIP" FontSize="15" FontWeight="Bold" Foreground="#FFFFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.9" />
                         </Border>
                     </Grid>

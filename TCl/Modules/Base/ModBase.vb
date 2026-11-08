@@ -1400,7 +1400,8 @@ Public Module ModBase
     ''' 当前线程是否为主线程。
     ''' </summary>
     Public Function RunInUi() As Boolean
-        Return Thread.CurrentThread.ManagedThreadId = UiThreadId
+        If Application.Current Is Nothing Then Return True '设计器模式或启动早期
+        Return Application.Current.Dispatcher.CheckAccess()
     End Function
 
     ''' <summary>

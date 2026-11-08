@@ -166,7 +166,7 @@
 
             <local:MyCard Margin="0,0,0,15" Title="获取帮助">
                 <TextBlock Margin="25,42,23,20" TextWrapping="Wrap" LineHeight="22"
-                    Text="上面这些都没解决的话，可以进 TCL 官方 TCraft Launcher 启动器交流群求助：&#10;&#10;  群号：1131373915&#10;  点击加入：https://qm.qq.com/q/WaG64YE9uo&#10;&#10;入群后请说明你的系统（Windows 版本、Java 版本、Minecraft 版本）以及具体遇到了什么问题，越详细越快定位。游戏出问题时记得带上「设置 → 日志」导出的日志，不要只发截图。" />
+                    Text="上面这些都没解决的话，可以进 TCL 官方 TCraft Launcher 启动器交流群求助：&#10;&#10;  群号：1131373915&#10;  点击加入：https://qm.qq.com/q/UONlv4VgwE&#10;&#10;入群后请说明你的系统（Windows 版本、Java 版本、Minecraft 版本）以及具体遇到了什么问题，越详细越快定位。游戏出问题时记得带上「设置 → 日志」导出的日志，不要只发截图。" />
             </local:MyCard>
 
         </StackPanel>

@@ -343,13 +343,18 @@
                             <TextBlock x:Name="LabFontName" Grid.Column="1" VerticalAlignment="Center" Margin="14,0,0,0" FontSize="12" Foreground="Gray" Text="当前：系统默认字体" />
                         </Grid>
                     </Border>
-                    <!-- 第 N 轮：原为 4 列 1* 固定均分，窄窗口下「打开字体文件夹/选择字体文件」被裁成「…」。改 WrapPanel 横排，窄了自动换行。 -->
-                    <WrapPanel>
-                        <local:MyButton x:Name="BtnFontPick" Text="选择字体文件" Padding="12,0" Margin="0,0,14,14" ToolTip="挑选 .ttf / .otf 字体文件，自动存到字体文件夹并立即应用" />
-                        <local:MyButton x:Name="BtnFontRefresh" Text="刷新字体" Padding="12,0" Margin="0,0,14,14" ToolTip="重新扫描字体文件夹，应用其中一个字体" />
-                        <local:MyButton x:Name="BtnFontOpen" Text="打开字体文件夹" Padding="12,0" Margin="0,0,14,14" ToolTip="将 .ttf / .otf 字体文件放到该文件夹，TCL 每次启动自动应用" />
-                        <local:MyButton x:Name="BtnFontReset" Text="恢复默认" Padding="12,0" Margin="0,0,14,14" ColorType="Red" ToolTip="恢复系统默认字体" />
-                    </WrapPanel>
+                    <Grid Height="40" Margin="0,6,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="Button" />
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="Button" />
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="Button" />
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="Button" />
+                        </Grid.ColumnDefinitions>
+                        <local:MyButton x:Name="BtnFontPick" Text="选择字体文件" MinWidth="140" Padding="13,0" Margin="0,0,20,0" ToolTip="挑选 .ttf / .otf 字体文件，自动存到字体文件夹并立即应用" />
+                        <local:MyButton x:Name="BtnFontRefresh" Text="刷新字体" MinWidth="140" Padding="13,0" Margin="0,0,20,0" ToolTip="重新扫描字体文件夹，应用其中一个字体" Grid.Column="1"/>
+                        <local:MyButton x:Name="BtnFontOpen" Text="打开字体文件夹" MinWidth="140" Padding="13,0" Margin="0,0,20,0" ToolTip="将 .ttf / .otf 字体文件放到该文件夹，TCL 每次启动自动应用" Grid.Column="2"/>
+                        <local:MyButton x:Name="BtnFontReset" Text="恢复默认" MinWidth="140" Padding="13,0" Margin="0,0,20,0" ColorType="Red" ToolTip="恢复系统默认字体" Grid.Column="3"/>
+                    </Grid>
                 </StackPanel>
             </local:MyCard>
             <local:MyCard x:Name="CardLogo" Margin="0,24,0,0" Title="标题栏">

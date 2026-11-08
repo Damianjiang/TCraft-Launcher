@@ -88,7 +88,7 @@ Public Class MyToast
         Margin = New Thickness(0, 0, 16, 4)
         Opacity = 0
 
-        '先量出完整高度，再从 0 展开
+        '先量出完整高度，再从 0 展开（对照 PCL-CE MyToast 实现）
         Measure(New Size(Double.PositiveInfinity, Double.PositiveInfinity))
         Arrange(New Rect(0, 0, DesiredSize.Width, DesiredSize.Height))
         _targetHeight = Math.Max(ActualHeight, 45)
@@ -298,7 +298,6 @@ Public Class MyToast
 
         PauseProgress()
 
-        Height = _targetHeight
         _dragStartTranslateX = GetCurrentTranslateX()
 
         CaptureMouse()

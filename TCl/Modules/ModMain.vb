@@ -448,6 +448,10 @@ EndHint:
             ElseIf WaitingMyMsgBox.TryDequeue(TargetMsgBox) Then
                 '没有弹窗，显示一个等待的弹窗
                 FrmMain.PanMsg.Visibility = Visibility.Visible
+                '容错：确保 PanMsg.Background 是 SolidColorBrush，避免颜色字符串解析失败
+                If Not TypeOf FrmMain.PanMsg.Background Is SolidColorBrush Then
+                    FrmMain.PanMsg.Background = New SolidColorBrush(Color.FromArgb(1, 0, 0, 0))
+                End If
                 Select Case TargetMsgBox.Type
                     Case MyMsgBoxType.Input
                         FrmMain.PanMsg.Children.Add(New MyMsgInput(TargetMsgBox))

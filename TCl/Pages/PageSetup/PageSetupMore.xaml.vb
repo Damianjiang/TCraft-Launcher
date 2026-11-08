@@ -4,9 +4,9 @@
 Public Class PageSetupMore
 
     ''' <summary>
-    ''' TCraft NEXT 社区 QQ 群链接。
+    ''' TCraft Launcher 启动器交流群链接。
     ''' </summary>
-    Private Const CommunityUrl As String = "https://qm.qq.com/q/fzoInJrrMW"
+    Private Const CommunityUrl As String = "https://qm.qq.com/q/UONlv4VgwE"
 
     ''' <summary>
     ''' 打开社区 QQ 群链接。

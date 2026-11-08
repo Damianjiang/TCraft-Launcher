@@ -216,7 +216,11 @@
                     移交到这里，这样侧边栏能盖住左边栏、真正从窗口最左边向右展开。
                     空的 Grid 没有背景，不占交互；弹窗层 PanMsg 在它上面。-->
                 <Grid x:Name="HostLaunchSide" Grid.Row="1" />
-                <Grid x:Name="PanMsg" Grid.RowSpan="2" Background="#00000000" Visibility="Collapsed" />
+                <Grid x:Name="PanMsg" Grid.RowSpan="2" Visibility="Collapsed">
+                    <Grid.Background>
+                        <SolidColorBrush Color="#01000000" />
+                    </Grid.Background>
+                </Grid>
             </Grid>
         </Border>
         <!-- （G1）：全局聚合搜索弹卡（Ctrl+K / 标题栏放大镜），首页「更多」卡片同款三段动画 -->
