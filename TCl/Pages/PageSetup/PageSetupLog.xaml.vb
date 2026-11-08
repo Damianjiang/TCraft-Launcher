@@ -31,9 +31,7 @@
         Reloaded = True
     End Sub
 
-    ''' <summary>
-    ''' 调试模式开关：开启后记录 Trace 级详细日志（下载分片、加载器步骤等），关闭只记 Info 以上，节省磁盘空间。
-    ''' </summary>
+    '调试模式开关：开了就记全量日志，平时关着省磁盘
     Private Sub CheckDebugMode_Changed(sender As Object, e As RoutedEventArgs)
         Dim IsDebug As Boolean = CheckDebugMode.Checked
         Settings.Set("SystemDebugMode", IsDebug)
@@ -61,7 +59,7 @@
         LogRawLines.Clear()
         LogViewDirty = True
         If LogWatchTimer Is Nothing Then
-            LogWatchTimer = New System.Windows.Threading.DispatcherTimer With {.Interval = TimeSpan.FromMilliseconds(600)}
+            LogWatchTimer = New System.Windows.Threading.DispatcherTimer With {.Interval = TimeSpan.FromMilliseconds(800)}
             AddHandler LogWatchTimer.Tick, AddressOf LogWatchTick
         End If
         LogWatchTimer.Start()
@@ -113,7 +111,7 @@
                     End If
                     LogRawLines.Add(Line)
                 Next
-                If LogRawLines.Count > 4000 Then LogRawLines.RemoveRange(0, LogRawLines.Count - 4000)
+                If LogRawLines.Count > 1000 Then LogRawLines.RemoveRange(0, LogRawLines.Count - 1000)
                 LogViewDirty = True
             End Using
             RefreshLogView()

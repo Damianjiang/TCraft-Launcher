@@ -69,11 +69,10 @@ Public Class Application
                 End Sub
             AddHandler TaskScheduler.UnobservedTaskException,
                 Sub(snd As Object, evt As UnobservedTaskExceptionEventArgs)
-                    '必须先 SetObserved 再记日志：若记日志过程中抛异常，SetObserved 不执行，
-                    '.NET 照样在终结器线程上把异常抛出来（用户实测仍弹未观察异常窗口）。
-                    evt.SetObserved() '阻止 .NET 在最终化时因未观察任务异常终止进程
+                    '先打标再写日志：写日志要是崩了，SetObserved 没执行，照样弹窗
+                    evt.SetObserved()
                     Try
-                        '从堆栈里提取最顶层业务代码帧（跳过 System. 系统库帧），标注触发模块，方便精准定位
+                        '从堆栈里扒出最上面的业务代码，写日志时带上，方便定位是哪炸了
                         Dim OriginModule As String = "未知模块"
                         Try
                             Dim FullEx As Exception = evt.Exception
@@ -83,7 +82,6 @@ Public Class Application
                             If FullEx?.StackTrace IsNot Nothing Then
                                 For Each Line In FullEx.StackTrace.Split(vbCrLf)
                                     Dim Trimmed = Line.TrimStart()
-                                    '跳过系统库帧（System. / Microsoft. / mscorlib 等），找第一个业务代码帧
                                     If Trimmed.StartsWithF("at ") AndAlso
                                        Not Trimmed.StartsWithF("at System.") AndAlso
                                        Not Trimmed.StartsWithF("at Microsoft.") AndAlso
@@ -96,8 +94,8 @@ Public Class Application
                             End If
                         Catch
                         End Try
-                        'WinHTTP 连接意外重置（12030）这类网络抖动属常见情况，降级为 Warn 避免 Error 级刷屏
-                        'WinHttpException 是 Friend 级别，外面访问不到类型，用消息特征判断
+                        '连接被掐断这种网络抖动太常见，降级 Warn 别刷红
+                        'WinHttpException 是 Friend，外面拿不到类型，只能靠消息关键词认
                         Dim RootEx As Exception = evt.Exception
                         Do While RootEx?.InnerException IsNot Nothing
                             RootEx = RootEx.InnerException
@@ -107,9 +105,9 @@ Public Class Application
                                                 RootMsg.Contains("连接意外终止") OrElse
                                                 RootMsg.Contains("12030")
                         If IsConnectionReset Then
-                            Logger.Warn(evt.Exception, $"后台网络连接意外重置（{OriginModule}）：{RootMsg}")
+                            Logger.Warn(evt.Exception, $"后台网络连接断了（{OriginModule}）：{RootMsg}")
                         Else
-                            Logger.Error(evt.Exception, $"后台任务存在未观察的异常（{OriginModule}）：{RootMsg}")
+                            Logger.Error(evt.Exception, $"后台任务炸了（{OriginModule}）：{RootMsg}")
                         End If
                     Catch
                     End Try
