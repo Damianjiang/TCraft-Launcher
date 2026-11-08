@@ -23,11 +23,24 @@
         PanBack.ScrollToHome()
         LoadList()
         CheckLogAutoScroll.Checked = True
+        CheckDebugMode.Checked = Settings.Get(Of Boolean)("SystemDebugMode")
         StartLogWatcher()
         '非重复加载部分
         Static Reloaded As Boolean = False
         If Reloaded Then Return
         Reloaded = True
+    End Sub
+
+    ''' <summary>
+    ''' 调试模式开关：开启后记录 Trace 级详细日志（下载分片、加载器步骤等），关闭只记 Info 以上，节省磁盘空间。
+    ''' </summary>
+    Private Sub CheckDebugMode_Changed(sender As Object, e As RoutedEventArgs)
+        Dim IsDebug As Boolean = CheckDebugMode.Checked
+        Settings.Set("SystemDebugMode", IsDebug)
+        If Logger.Instance IsNot Nothing Then
+            Logger.Instance.MinLevel = If(IsDebug, LogLevel.Trace, LogLevel.Info)
+        End If
+        Hint(If(IsDebug, "调试模式已开启，将记录详细日志", "调试模式已关闭，仅记录重要日志"), HintType.Blue)
     End Sub
 
     Private Sub PageSetupLog_Unloaded(sender As Object, e As RoutedEventArgs) Handles Me.Unloaded

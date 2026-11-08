@@ -69,9 +69,48 @@ Public Class Application
                 End Sub
             AddHandler TaskScheduler.UnobservedTaskException,
                 Sub(snd As Object, evt As UnobservedTaskExceptionEventArgs)
+                    '必须先 SetObserved 再记日志：若记日志过程中抛异常，SetObserved 不执行，
+                    '.NET 照样在终结器线程上把异常抛出来（用户实测仍弹未观察异常窗口）。
+                    evt.SetObserved() '阻止 .NET 在最终化时因未观察任务异常终止进程
                     Try
-                        Logger.Error(evt.Exception, "后台任务存在未观察的异常（已拦截，不影响运行）")
-                        evt.SetObserved() '阻止 .NET 在最终化时因未观察任务异常终止进程
+                        '从堆栈里提取最顶层业务代码帧（跳过 System. 系统库帧），标注触发模块，方便精准定位
+                        Dim OriginModule As String = "未知模块"
+                        Try
+                            Dim FullEx As Exception = evt.Exception
+                            Do While FullEx?.InnerException IsNot Nothing
+                                FullEx = FullEx.InnerException
+                            Loop
+                            If FullEx?.StackTrace IsNot Nothing Then
+                                For Each Line In FullEx.StackTrace.Split(vbCrLf)
+                                    Dim Trimmed = Line.TrimStart()
+                                    '跳过系统库帧（System. / Microsoft. / mscorlib 等），找第一个业务代码帧
+                                    If Trimmed.StartsWithF("at ") AndAlso
+                                       Not Trimmed.StartsWithF("at System.") AndAlso
+                                       Not Trimmed.StartsWithF("at Microsoft.") AndAlso
+                                       Not Trimmed.StartsWithF("at MS.Win32.") AndAlso
+                                       Not Trimmed.StartsWithF("at MS.Internal.") Then
+                                        OriginModule = Trimmed.Substring(3)
+                                        Exit For
+                                    End If
+                                Next
+                            End If
+                        Catch
+                        End Try
+                        'WinHTTP 连接意外重置（12030）这类网络抖动属常见情况，降级为 Warn 避免 Error 级刷屏
+                        'WinHttpException 是 Friend 级别，外面访问不到类型，用消息特征判断
+                        Dim RootEx As Exception = evt.Exception
+                        Do While RootEx?.InnerException IsNot Nothing
+                            RootEx = RootEx.InnerException
+                        Loop
+                        Dim RootMsg As String = If(RootEx?.Message, If(evt.Exception?.Message, "未知错误"))
+                        Dim IsConnectionReset = RootMsg.Contains("WINHTTP_CALLBACK_STATUS_REQUEST_ERROR") OrElse
+                                                RootMsg.Contains("连接意外终止") OrElse
+                                                RootMsg.Contains("12030")
+                        If IsConnectionReset Then
+                            Logger.Warn(evt.Exception, $"后台网络连接意外重置（{OriginModule}）：{RootMsg}")
+                        Else
+                            Logger.Error(evt.Exception, $"后台任务存在未观察的异常（{OriginModule}）：{RootMsg}")
+                        End If
                     Catch
                     End Try
                 End Sub
