@@ -168,6 +168,12 @@ public final class Theme {
         try {
             Path p = res("images/" + name);
             if (!Files.exists(p)) {
+                // Windows 磁盘不区分大小写，Linux/macOS 和 jar 里都区分：
+                // 文件名和代码里写的大小写不一致时兜底找一次（例如 Logo.png / logo.png）。
+                Path alt = findIgnoreCase(res("images"), name);
+                if (alt != null) p = alt;
+            }
+            if (!Files.exists(p)) {
                 // 也支持绝对路径的用户文件
                 if (name != null && (name.contains("/") || name.contains("\\"))) {
                     Path abs = Paths.get(name);
@@ -176,6 +182,16 @@ public final class Theme {
                 return null;
             }
             return cachedImage(p);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static Path findIgnoreCase(Path dir, String name) {
+        if (dir == null || name == null) return null;
+        try (java.util.stream.Stream<Path> s = Files.list(dir)) {
+            return s.filter(x -> x.getFileName().toString().equalsIgnoreCase(name))
+                    .findFirst().orElse(null);
         } catch (Exception e) {
             return null;
         }
