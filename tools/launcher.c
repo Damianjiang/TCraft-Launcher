@@ -1,8 +1,4 @@
-/*
- * Windows 外壳：构建时把 jar 追加到 exe 末尾。
- * 运行时按 zip 中央目录找到 jar 偏移，解到 exe 同目录的 .tcl 里，
- * 再用系统 Java 启动。和 HMCL 的 exe 一个路子。
- */
+/* Windows 外壳：构建时把 jar 追加到 exe 末尾，运行时解到 .tcl 再用系统 Java 启动。 */
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <stdio.h>
@@ -12,8 +8,7 @@
 
 #define APP_NAME "TCraft Launcher"
 #define JAR_NAME L"TCraftLauncher.jar"
-/* 跟 HMCL 的 ./.hmcl 一个路子：启动器自己的文件（jar、记录）放在 exe 同目录的 .tcl 里。
-   不放 %TEMP% / %LOCALAPPDATA%，免得被磁盘清理工具当临时文件删掉。 */
+/* 启动器文件放 exe 同目录的 .tcl，不放 %TEMP% / %LOCALAPPDATA%，免得被清理工具删。 */
 #define HOME_SUB L".tcl"
 #define CFG_NAME L"launcher.cfg"
 
@@ -101,9 +96,7 @@ static int dir_writable(const wchar_t *dir) {
     return 1;
 }
 
-/* 启动器自己的工作目录：固定用 exe 同目录的 .tcl。
-   刻意不再回退到 %LOCALAPPDATA% / Program Files —— 数据必须跟着程序走，
-   否则用户找不到、清理工具也会删。不可写就返回 0，由调用方明确弹窗告知。 */
+/* 工作目录固定为 exe 同目录的 .tcl，不回退到别处；不可写返回 0，由调用方弹窗。 */
 static int init_home(void) {
     wchar_t exe_dir[MAX_PATH_LEN];
 
@@ -116,10 +109,7 @@ static int init_home(void) {
     return dir_writable(home_dir);
 }
 
-/* 诊断日志：<.tcl>\stub.log。
-   用户反馈"双击没反应"时先看这个文件存不存在：
-   没有 → exe 根本没被执行（多半被杀毒软件 / SmartScreen 拦了）；
-   有   → 能看出卡在哪一步（解包、找 Java、启动、退出码）。 */
+/* 诊断日志 .tcl\stub.log。文件不存在说明 exe 没被执行，多半被杀软拦了。 */
 static void stub_log(const char *line) {
     wchar_t p[MAX_PATH_LEN];
     SYSTEMTIME st;
@@ -182,8 +172,7 @@ static void remove_tree(const wchar_t *path, int depth) {
     RemoveDirectoryW(path);
 }
 
-/* 老版本把 jar 解在 %LOCALAPPDATA%\TCraftLauncher，现在改用 .tcl 了，
-   这里顺手把那份残留清掉（只动这一个固定路径，失败也不报错）。 */
+/* 清理老版本残留的 %LOCALAPPDATA%\TCraftLauncher（固定路径，失败忽略）。 */
 static void cleanup_legacy_home(void) {
     wchar_t alt[MAX_PATH_LEN];
     wchar_t old[MAX_PATH_LEN];
@@ -213,7 +202,7 @@ static int read_file(const wchar_t *path, char *buf, int cap) {
     return (int)got;
 }
 
-/* 记住用户手动选的 java，下次直接用它（路径失效了会自动重新扫描） */
+/* 读上次选定的 java，失效时重新扫描。 */
 static void load_cfg(void) {
     wchar_t p[MAX_PATH_LEN];
     char buf[2048];
@@ -340,17 +329,10 @@ static int copy_range(const wchar_t *src, unsigned long long from, unsigned long
     return ok;
 }
 
-/* ---------- Java 探测 ----------
- * 这里有三个坑，之前踩的就是它们：
- * 1. 这个 exe 是 32 位的（TCC 编译），64 位 Windows 会把 C:\Program Files 重定向到
- *    C:\Program Files (x86)，所以硬编码的根目录永远扫不到 64 位 JDK。
- *    根目录必须从环境变量取真身：ProgramW6432 才是真的 C:\Program Files。
- * 2. 不能"找到第一个就用"。很多机器 PATH / JAVA_HOME 里躺着老 Java 8，
- *    真正装好的 17/21 在别的目录，于是被误报成"没有 Java 17"。
- *    改成：先收集所有候选，再逐个测版本，取最高且 >= 17 的那个。
- * 3. 随包的 JavaFX 运行库是 x64（lib/javafx_font.dll 是 PE32+），
- *    所以同版本下优先 64 位 JVM，否则加载 DLL 会 UnsatisfiedLinkError。
- */
+/* Java 探测。
+   exe 是 32 位，C:\Program Files 会被 WOW64 重定向，根目录须从 ProgramW6432 取；
+   先收集全部候选再逐个测版本（PATH 里常有旧 Java 抢在前面）；
+   同版本优先 64 位，随包的 JavaFX 是 x64。 */
 
 #define MAX_CAND 32
 
@@ -508,7 +490,7 @@ static void cand_add(const wchar_t *path) {
     cand_count++;
 }
 
-/* home 目录下找 bin\javaw.exe，退一步 bin\java.exe；也兼容直接给到 bin 的 JAVA_HOME */
+/* 在 home 下找 bin\java(w).exe，兼容 JAVA_HOME 直接指向 bin。 */
 static void cand_add_home(const wchar_t *home_in) {
     wchar_t home[MAX_PATH_LEN];
     wchar_t p[MAX_PATH_LEN];
@@ -606,9 +588,7 @@ static int pick_best_java(wchar_t *out, int cap) {
 
     found_major = 0;
 
-    /* 1. 上次用户手动选定的路径，优先使用。
-          这是"记住我的选择"的语义：不能被机器上另一个更高版本的 JDK 顶掉，
-          否则用户每次看到的运行时都跟上次不一样。 */
+    /* 上次选定的路径优先，不被更高版本的 JDK 顶掉。 */
     if (cfg_java[0] && file_exists(cfg_java)) {
         int major = java_feature(cfg_java);
         if (major == 0 || major >= 17) {
@@ -643,7 +623,7 @@ static int pick_best_java(wchar_t *out, int cap) {
         return 1;
     }
 
-    /* 版本实在读不出来时宁可放行让它自己报错，也别再误报"没有 Java 17" */
+    /* 版本读不出来时放行，让 java 自己报错。 */
     if (unknown >= 0) {
         copy_str(out, cands[unknown], cap);
         return 1;
@@ -666,16 +646,14 @@ static int run(const wchar_t *java, DWORD *exit_code) {
 
     copy_str(cmd, L"\"", MAX_PATH_LEN * 2);
     cat_str(cmd, java, MAX_PATH_LEN * 2);
-    /* -Dtcraft.dir 告诉 Java 侧"启动器目录在哪"，省得它去猜 user.home */
+    /* 告诉 Java 侧启动器目录，省得它猜 user.home。 */
     cat_str(cmd, L"\" -Dfile.encoding=UTF-8 -Dtcraft.dir=\"", MAX_PATH_LEN * 2);
     cat_str(cmd, home_dir, MAX_PATH_LEN * 2);
     cat_str(cmd, L"\" -jar \"", MAX_PATH_LEN * 2);
     cat_str(cmd, jar_path, MAX_PATH_LEN * 2);
     cat_str(cmd, L"\"", MAX_PATH_LEN * 2);
 
-    /* 把 java 的 stdout/stderr 落到 .tcl\java-error.log。
-       javaw 没有控制台，不重定向的话崩溃信息就彻底丢了，
-       用户只能看到"双击没反应"，我们也没法判断是版本不对还是别的问题。 */
+    /* javaw 没有控制台，把 stdout/stderr 落到 java-error.log，否则崩溃原因丢失。 */
     copy_str(logp, home_dir, MAX_PATH_LEN);
     cat_str(logp, L"\\java-error.log", MAX_PATH_LEN);
     sa.nLength = sizeof(sa);
@@ -699,8 +677,7 @@ static int run(const wchar_t *java, DWORD *exit_code) {
     if (logf != INVALID_HANDLE_VALUE) CloseHandle(logf); /* java 已经继承了句柄 */
     if (!started) return 0;
 
-    /* 观察 2.5 秒：JavaFX 启动要一两秒，这段时间内就退出的必然是失败。
-       不这么盯着，用户看到的就是"双击没反应、进程也没有"。 */
+    /* 观察 2.5 秒，提前退出即视为失败。 */
     if (WaitForSingleObject(pi.hProcess, 2500) == WAIT_OBJECT_0) {
         DWORD code = 0;
         GetExitCodeProcess(pi.hProcess, &code);
@@ -714,12 +691,8 @@ static int run(const wchar_t *java, DWORD *exit_code) {
     return 1;
 }
 
-/* ---------- Java 选择窗口 ----------
- * 缺 Java 时不该只丢一个「去下载」的框：用户可能已经装了、只是没进 PATH，
- * 或者想自己指定一个。这里给一个原生小窗口：
- *   路径可手填/浏览、「下载 JDK」、自动扫描（进度条 + 逐条结果）。
- * 注意：源文件是 UTF-8，TCC 对宽字面量里的中文不可靠，所以中文一律经 w() 转码。
- */
+/* Java 选择窗口：扫描 / 浏览 / 下载。
+   源文件是 UTF-8，TCC 的宽字面量中文不可靠，界面文本一律经 w() 转码。 */
 
 #define IDC_JAVA_PATH    1001
 #define IDC_JAVA_BROWSE  1002
@@ -790,8 +763,7 @@ static void open_jdk_page(void) {
     }
 }
 
-/* UTF-8 → 宽字符。用一个小缓冲池，避免同一句里两次调用互相覆盖
-   （比如 MessageBoxW(w(正文), w(标题)) 这种）。 */
+/* UTF-8 → 宽字符。缓冲池避免同句两次调用互相覆盖。 */
 static const wchar_t *w(const char *utf8) {
     static wchar_t pool[4][1024];
     static int idx;
@@ -1088,8 +1060,7 @@ static LRESULT CALLBACK java_dlg_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     return DefWindowProcW(h, msg, wp, lp);
 }
 
-/* 打开选择窗口：1 = 选到了可用的 java，0 = 用户取消，-1 = 窗口都没能建起来。
-   preset 非空时预填到路径框（自动扫描到的结果），first=1 时换首次运行的文案。 */
+/* 返回 1 = 选中，0 = 取消，-1 = 窗口创建失败。preset 预填，first=1 用首次运行文案。 */
 static int java_dialog(wchar_t *out, int cap, const wchar_t *preset, int first) {
     WNDCLASSW wc;
     MSG msg;
@@ -1183,7 +1154,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR args, int show) {
         return 1;
     }
 
-    /* 工作目录固定为 exe 同目录的 .tcl；不可写就明说，绝不悄悄改写到别处 */
+    /* 工作目录固定为 .tcl，不可写则提示换位置。 */
     if (!init_home()) {
         alert("无法在启动器所在目录创建 .tcl 文件夹。\n\n"
               "启动器的程序文件、配置和运行库都会放在这个 .tcl 里（跟着 exe 走）。\n"
@@ -1227,8 +1198,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR args, int show) {
         stub_log(found ? "自动选中 Java" : "没有自动找到可用 Java");
         if (found) stub_log_w("Java 路径", java);
 
-        /* 首次运行一定要有可见窗口：让用户看到扫描结果并确认一次，
-           顺便把路径记下来；以后就不再打扰。 */
+        /* 首次运行必定弹窗确认，之后不再打扰。 */
         if (first_run || !found) {
             int rc = java_dialog(java, MAX_PATH_LEN, found ? java : NULL, first_run ? 1 : 0);
             if (rc < 0) {
@@ -1245,7 +1215,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR args, int show) {
         }
     }
 
-    /* 兜底：版本读不出来时放行交给 Java 自己报错；读到低版本再让用户重选一次 */
+    /* 读到低版本时让用户重选。 */
     {
         int major = java_feature(java);
         if (major > 0 && major < 17) {
@@ -1272,7 +1242,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR args, int show) {
             return 1;
         }
         if (r == 2) {
-            /* 起来了又秒退：以前这里什么提示都没有，用户只会看到"双击没反应" */
+            /* 秒退：给出退出码和 java 日志路径。 */
             char detail[2000];
             char home8[MAX_PATH_LEN * 3];
             char head[800];
@@ -1285,8 +1255,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR args, int show) {
             cat_str(logp, L"\\java-error.log", MAX_PATH_LEN);
             got = read_file(logp, head, sizeof(head) / 3);
             if (got > 0) {
-                /* java 的 stderr 是系统代码页（简体中文是 GBK），先按 ACP 转成宽字符，
-                   再转 UTF-8，否则弹窗里中文全是乱码。 */
+                /* java 的 stderr 是 ACP（中文为 GBK），转 UTF-8 免得弹窗乱码。 */
                 wchar_t wtmp[400];
                 int n = MultiByteToWideChar(GetACP(), 0, head, got, wtmp, 400);
                 if (n > 0) {

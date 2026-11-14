@@ -83,9 +83,10 @@ TCraft Launcher（简称 **TCL**）是一个用 JavaFX 写的 Minecraft 启动�
 | macOS | `TCraftLauncher-*-mac*.jar` / `.command` | Intel 与 Apple Silicon 分包 |
 | Linux | `TCraftLauncher-*-linux.sh` / `.deb` | x86_64 与 aarch64 |
 
-- 启动器自带 JavaFX，不带 JRE，需要系统里有 **Java 17 或更高版本**；单文件版找不到 Java 时会弹出选择窗口：可自动扫描（带进度和逐条结果）、手动浏览指定 `java.exe`，也能直接跳转下载页。选中的路径记在 `.tcl\launcher.cfg`，之后启动直接复用，不再弹窗；一旦这个 Java 被删除或移动，会自动重新扫描，扫不到才会再次弹窗
-- 单文件版会把内置 jar 解到 **exe 同目录的 `.tcl`**（跟 HMCL 的 `./.hmcl` 一个路子，不会被磁盘清理工具当临时文件清掉）；目录写不出来时直接弹窗让你换个位置放 exe，**不会**偷偷改写到 `%LOCALAPPDATA%` 之类的地方
-- 配置、日志、资源与运行库也都放在 `.tcl` 里（首次会从旧的 `~/.tcraft-launcher-javafx` 迁移配置）；直接用 `java -jar` 运行时没有 `-Dtcraft.dir`，仍沿用旧目录
+- 需要系统里有 **Java 17 或更高版本**（自带 JavaFX，不带 JRE）
+- 找不到 Java 时弹出选择窗口，可自动扫描或手动指定；选中的路径记在 `.tcl\launcher.cfg`，失效后自动重扫
+- 内置 jar 解到 **exe 同目录的 `.tcl`**（同 HMCL 的 `./.hmcl`），不会被清理工具当临时文件删；目录写不出来时弹窗提示换位置，不改写到 `%LOCALAPPDATA%`
+- 配置、日志、资源与运行库同样在 `.tcl` 内，首次启动从旧的 `~/.tcraft-launcher-javafx` 迁移配置
 - 联机功能首次使用会按平台自动下载 EasyTier：Windows 需要管理员权限，macOS 按弹窗授权，Linux 建议 `sudo` 运行
 
 ## 编译与运行
@@ -100,17 +101,11 @@ java --module-path lib --add-modules javafx.controls,javafx.graphics,javafx.base
      -cp out tcraft.Boot
 ```
 
-> `--release 17` **不能省**。少了它，用 JDK 21/25 编译出来的 class 是 21/25 字节码，
-> 用户的 JDK 17 一加载就抛 `UnsupportedClassVersionError`、进程秒退，表现就是「双击没反应」。
-> 产物里的 `class` 必须是 major 61（Java 17）：
->
-> ```bash
-> unzip -p TCraftLauncher.jar tcraft/App.class | head -c 8 | xxd   # 第 7-8 字节 = 00 3d
-> ```
+> `--release 17` 不能省：缺了它，用 JDK 21/25 编出的 class 是 21/25 字节码，
+> JDK 17 加载会抛 `UnsupportedClassVersionError`。产物应为 major 61。
 
-打 Windows 单文件包时，先编译 `tools/launcher.c` 得到 stub，再用
-`python tools/add-icon.py stub.exe stub-icon.exe res/images/icon.ico` 嵌图标
-（TCC 不支持链接 `.rc`，这一步直接往 PE 里写 `.rsrc` 节），最后把 jar 追加到 exe 末尾。
+Windows 单文件包：编译 `tools/launcher.c` → `python tools/add-icon.py` 注入图标
+（TCC 不能链接 `.rc`，直接写 PE 的 `.rsrc` 节）→ 追加 jar。
 
 ## 仓库结构
 
