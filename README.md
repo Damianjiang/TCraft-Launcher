@@ -4,10 +4,8 @@
 
 # TCraft Launcher
 
-**全新重写，轻装上阵。**
-
-一个免费开源的 Minecraft Java 版启动器：毛玻璃界面、主题色跟随壁纸、
-正版登录、联机房间、整合包下载，Windows / macOS / Linux 全平台可用。
+开源的 Minecraft Java 版启动器。支持微软正版登录、EasyTier 联机、
+整合包与 Mod 下载，Windows / macOS / Linux 都可用。
 
 [![Release](https://img.shields.io/github/v/release/Damianjiang/TCraft-Launcher?style=flat-square&color=f2b632)](https://github.com/Damianjiang/TCraft-Launcher/releases)
 [![Downloads](https://img.shields.io/github/downloads/Damianjiang/TCraft-Launcher/total?style=flat-square&color=5eead4)](https://github.com/Damianjiang/TCraft-Launcher/releases)
@@ -31,11 +29,11 @@
 
 ## 这是什么
 
-TCraft Launcher（简称 **TCL**）是一个用 JavaFX 写的 Minecraft 启动器，从界面到核心全部重写：
-单文件发布、无安装向导、无捆绑、无统计上报，拷到哪儿都能跑，删掉就是卸载。
+TCraft Launcher（简称 **TCL**）是用 JavaFX 写的 Minecraft 启动器。绿色单文件，
+没有安装向导、没有捆绑、不上报数据，拷到哪里都能跑，删掉目录就算卸载。
 
-- **单文件发布**：资源与 JavaFX 运行库内嵌进 exe，首次运行自动解压到用户目录，无需额外安装。
-- **好看、可换**：毛玻璃卡片压在背景图上，主题色从壁纸自动提取，另有 30 种预设色板；组件透明度、动画速度都能调。
+- **单文件**：资源与 JavaFX 运行库内嵌进 exe，首次运行解压到 exe 同目录的 `.tcl`，不用另外装。
+- **界面**：半透明卡片压在背景图上，主题色从背景图提取，另有 30 种预设色板；组件透明度、动画速度可调。
 - **多平台**：Windows、macOS（Intel / Apple Silicon）、Linux（x64 / ARM）。
 - **多语言**：简体中文 / English / 繁體中文，切换即时生效。
 
@@ -48,7 +46,7 @@ TCraft Launcher（简称 **TCL**）是一个用 JavaFX 写的 Minecraft 启动�
   </tr>
   <tr>
     <td><sub>实例管理：多文件夹、版本分组、搜索与筛选</sub></td>
-    <td><sub>游戏下载：正式版 / 预览版 / 远古版，Mod 与整合包一站下载</sub></td>
+    <td><sub>游戏下载：正式版 / 预览版 / 远古版，Mod 与整合包都能下载</sub></td>
   </tr>
   <tr>
     <td width="50%"><img src="website/assets/screenshots/03-instancesetup.jpg" alt="版本设置"></td>
@@ -56,7 +54,7 @@ TCraft Launcher（简称 **TCL**）是一个用 JavaFX 写的 Minecraft 启动�
   </tr>
   <tr>
     <td><sub>版本设置：实例信息、内存分配、Java 运行时</sub></td>
-    <td><sub>联机房间：基于 EasyTier 虚拟局域网，邀请码即开即玩</sub></td>
+    <td><sub>联机房间：基于 EasyTier 虚拟局域网，凭邀请码直连</sub></td>
   </tr>
 </table>
 
@@ -67,7 +65,7 @@ TCraft Launcher（简称 **TCL**）是一个用 JavaFX 写的 Minecraft 启动�
 | 模块 | 能力 |
 | --- | --- |
 | 启动 | 多文件夹多实例、收藏夹、内存分配可视化、进程优先级、愚人节彩蛋 |
-| 账户 | 微软正版登录（浏览器登录完自动跳回，无需手动复制链接）/ 离线登录 / 外置 Authlib 登录（LittleSkin 等） |
+| 账户 | 微软正版登录（浏览器登录后把地址栏链接粘回启动器）/ 离线登录 / 外置 Authlib 登录（LittleSkin 等） |
 | 实例 | 版本独立设置、Mod / 存档 / 数据包 / 资源包 / 光影 / 截图 / 服务器管理、实例复制与导出 |
 | 整合包 | CurseForge、Modrinth 整合包导入 |
 | 下载 | 原版与 Forge / NeoForge / Fabric / OptiFine 安装；Mod / 整合包 / 数据包 / 资源包 / 光影 / 世界下载；多镜像测速自动择优 |
@@ -130,4 +128,4 @@ Windows 单文件包：编译 `tools/launcher.c` → `python tools/add-icon.py` 
 
 ## 许可
 
-本项目基于 [MIT License](LICENSE) 开源。欢迎提 Issue 与 Pull Request，也欢迎 Star 支持。
+本项目基于 [MIT License](LICENSE) 开源，欢迎提 Issue 和 Pull Request。
