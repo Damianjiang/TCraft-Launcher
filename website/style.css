@@ -1,0 +1,209 @@
+/* TCraft Launcher 官网：单页，浅色，启动器同款蓝 */
+:root {
+  --accent: #1370f3;
+  --accent-dark: #0b5bcb;
+  --text: #343d4a;
+  --gray: #737373;
+  --bg: #ffffff;
+  --card: #f6f8fb;
+  --border: rgba(52, 61, 74, 0.12);
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  font-family: "Microsoft YaHei UI", "PingFang SC", "Noto Sans SC", system-ui, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  line-height: 1.6;
+}
+
+.wrap { max-width: 960px; margin: 0 auto; padding: 0 20px; }
+
+h2 { font-size: 26px; margin: 0 0 6px; }
+.section-sub { color: var(--gray); margin: 0 0 24px; }
+
+/* 顶栏 */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+}
+.brand-logo { width: 28px; height: 28px; }
+.nav { display: flex; gap: 22px; }
+.nav a { color: var(--text); text-decoration: none; font-size: 14px; }
+.nav a:hover { color: var(--accent); }
+
+/* 主视觉 */
+.hero {
+  position: relative;
+  padding: 72px 0 64px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.92) 82%),
+    url("assets/wallpaper.jpg") center 30% / cover no-repeat;
+  text-align: center;
+}
+.hero-logo { width: 88px; height: 88px; border-radius: 22px; }
+.hero h1 { font-size: 40px; margin: 14px 0 6px; }
+.hero-sub { font-size: 17px; color: var(--gray); margin: 0 0 26px; }
+.hero-actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+
+.btn {
+  display: inline-block;
+  padding: 11px 26px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-size: 15px;
+  font-weight: 600;
+  transition: transform 0.12s ease, background 0.2s ease;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-dark); }
+.btn-ghost {
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--text);
+  border: 1px solid rgba(52, 61, 74, 0.22);
+}
+
+.hero-points {
+  margin-top: 30px;
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.hero-points span {
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 13px;
+  color: var(--gray);
+}
+
+/* 界面展示 */
+.gallery { padding: 56px 0 30px; }
+.shot-card {
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 10px 28px rgba(52, 61, 74, 0.14);
+}
+.shot-card img { display: block; width: 100%; }
+.shot-card figcaption {
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--gray);
+  background: var(--card);
+}
+
+
+/* 功能展示 */
+.features { padding: 40px 0; }
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 22px 20px;
+}
+.card-icon {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  align-items: center;
+  justify-content: center;
+}
+.card-icon svg { width: 20px; height: 20px; }
+.card h3 { font-size: 16px; margin: 14px 0 6px; }
+.card p { margin: 0; font-size: 13.5px; color: var(--gray); }
+
+/* 下载 */
+.download {
+  padding: 48px 0 60px;
+  text-align: center;
+  background: var(--card);
+  border-top: 1px solid var(--border);
+}
+.dl-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-bottom: 16px; }
+.dl-note { font-size: 13px; color: var(--gray); margin: 0; }
+
+/* 页脚 */
+.footer { padding: 26px 0; border-top: 1px solid var(--border); }
+.footer-inner { text-align: center; font-size: 13px; color: var(--gray); }
+.footer a { color: var(--accent); text-decoration: none; }
+.footer p { margin: 6px 0; }
+
+@media (max-width: 640px) {
+  .hero h1 { font-size: 30px; }
+  .nav { gap: 14px; }
+  .nav a { font-size: 13px; }
+}
+
+/* 界面截图网格 */
+.shot-grid {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+}
+.shot-grid figure {
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--card);
+}
+.shot-grid img { display: block; width: 100%; }
+.shot-grid figcaption { padding: 8px 12px; font-size: 12.5px; color: var(--gray); }
+
+/* 首发提醒条 */
+.notice { background: var(--card); border-top: 1px solid var(--border); }
+.notice-inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+.notice-badge {
+  flex-shrink: 0;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 999px;
+  padding: 3px 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.notice-inner p { margin: 0; font-size: 13.5px; color: var(--gray); }
+.notice-inner a { color: var(--accent); text-decoration: none; font-weight: 600; }
+.notice-inner b { color: var(--text); }

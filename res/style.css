@@ -1,0 +1,228 @@
+.root {
+    -fx-font-family: "Microsoft YaHei UI";
+    -fx-font-smoothing-type: gray;
+    /* 去掉 JavaFX 默认的蓝色焦点框（WPF 版没有这个描边） */
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+}
+
+.scroll-pane {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+.scroll-pane .viewport {
+    -fx-background-color: transparent;
+}
+.scroll-pane:focused {
+    -fx-background-color: transparent;
+}
+/* 对照 MyScrollBar.vb：宽 8，静止 ColorBrush4@0.5、悬停 ColorBrush3@0.9、捕获 ColorBrush4@1.0；
+   thumb 圆角 3、内缩 2，无箭头按钮，轨道透明（DelayedUi.xaml MyThumb/ScrollBar 模板） */
+.scroll-bar:vertical, .scroll-bar:horizontal {
+    -fx-background-color: transparent;
+}
+.scroll-bar:vertical {
+    -fx-pref-width: 8;
+}
+.scroll-bar:horizontal {
+    -fx-pref-height: 8;
+}
+.scroll-bar .track {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+.scroll-bar .thumb {
+    -fx-background-color: #4890f5;
+    -fx-background-radius: 3;
+    -fx-background-insets: 2;
+    -fx-opacity: 0.5;
+}
+.scroll-bar .thumb:hover {
+    -fx-background-color: #1370f3;
+    -fx-opacity: 0.9;
+}
+.scroll-bar .increment-button, .scroll-bar .decrement-button {
+    -fx-pref-height: 0;
+    -fx-pref-width: 0;
+    -fx-opacity: 0;
+    -fx-padding: 0;
+}
+.scroll-bar .increment-arrow, .scroll-bar .decrement-arrow {
+    -fx-shape: " ";
+    -fx-padding: 0;
+}
+
+.text-field {
+    -fx-background-color: rgba(255, 255, 255, 0.78);
+    -fx-background-radius: 6;
+    -fx-border-color: rgba(52, 61, 74, 0.22);
+    -fx-border-radius: 6;
+    -fx-border-width: 1;
+    -fx-text-fill: #343d4a;
+    -fx-prompt-text-fill: rgba(52, 61, 74, 0.42);
+    -fx-padding: 5 10 5 10;
+    -fx-font-size: 13;
+}
+.text-field:focused {
+    /* 搜索框等透明输入框不再出现 JavaFX 蓝色焦点条/描边 */
+    -fx-border-color: transparent;
+    -fx-background-color: rgba(255, 255, 255, 0.94);
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+}
+
+.text-area {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    /* 显式指定正文颜色：只清背景不给颜色时，TextArea 会按主题推导出白色，
+       在这套浅色卡片上就是"整页日志看不见字"（owner 反馈的日志页白字）。 */
+    -fx-text-fill: #343d4a;
+}
+
+.text-area .text {
+    -fx-fill: #343d4a;
+}
+.text-area .content {
+    -fx-background-color: transparent;
+}
+.text-area .scroll-pane, .text-area .scroll-pane .viewport {
+    -fx-background-color: transparent;
+}
+
+.combo-box {
+    -fx-background-color: rgba(255, 255, 255, 0.78);
+    -fx-background-radius: 6;
+    -fx-border-color: rgba(52, 61, 74, 0.22);
+    -fx-border-radius: 6;
+    -fx-padding: 2 4 2 6;
+    -fx-font-size: 13;
+}
+.combo-box:hover {
+    -fx-border-color: rgba(52, 61, 74, 0.38);
+}
+.combo-box .list-cell {
+    -fx-text-fill: #343d4a;
+    -fx-font-size: 13;
+    -fx-padding: 3 6 3 6;
+}
+.combo-box .arrow-button {
+    -fx-background-color: transparent;
+}
+.combo-box .arrow {
+    -fx-background-color: #343d4a;
+    -fx-scale-x: 0.7;
+    -fx-scale-y: 0.7;
+}
+.combo-box-popup .list-view {
+    -fx-background-color: #fbfbfb;
+    -fx-background-radius: 8;
+    -fx-border-color: rgba(52, 61, 74, 0.12);
+    -fx-border-radius: 8;
+    -fx-effect: dropshadow(gaussian, rgba(52, 61, 74, 0.28), 18, 0.1, 0, 4);
+    -fx-padding: 4;
+}
+.combo-box-popup .list-view .list-cell {
+    -fx-background-color: transparent;
+    -fx-background-radius: 5;
+    -fx-text-fill: #343d4a;
+    -fx-padding: 5 8 5 8;
+}
+.combo-box-popup .list-view .list-cell:hover,
+.combo-box-popup .list-view .list-cell:filled:selected {
+    -fx-background-color: #eaf2fe;
+    -fx-text-fill: #1370f3;
+}
+
+.check-box {
+    -fx-font-size: 13;
+    -fx-text-fill: #343d4a;
+}
+.check-box .box {
+    -fx-background-color: rgba(255, 255, 255, 0.85);
+    -fx-border-color: rgba(52, 61, 74, 0.35);
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-padding: 2;
+}
+.check-box:selected .box {
+    -fx-background-color: #1370f3;
+    -fx-border-color: #1370f3;
+}
+.check-box:selected .mark {
+    -fx-background-color: white;
+}
+
+.radio-button {
+    -fx-font-size: 13;
+    -fx-text-fill: #343d4a;
+}
+.radio-button .radio {
+    -fx-background-color: rgba(255, 255, 255, 0.85);
+    -fx-border-color: rgba(52, 61, 74, 0.35);
+    -fx-border-radius: 10;
+    -fx-background-radius: 10;
+    -fx-padding: 3;
+}
+.radio-button:selected .radio {
+    -fx-background-color: #1370f3;
+    -fx-border-color: #1370f3;
+}
+.radio-button:selected .dot {
+    -fx-background-color: white;
+}
+
+.slider .track {
+    -fx-background-color: rgba(52, 61, 74, 0.18);
+    -fx-background-radius: 2;
+    -fx-pref-height: 4;
+}
+.slider .thumb {
+    -fx-background-color: #1370f3;
+    -fx-background-radius: 8;
+    -fx-pref-width: 14;
+    -fx-pref-height: 14;
+}
+.slider:focused .thumb {
+    -fx-effect: dropshadow(gaussian, rgba(19, 112, 243, 0.45), 6, 0.2, 0, 0);
+}
+
+.tooltip {
+    -fx-background-color: rgba(40, 46, 56, 0.94);
+    -fx-background-radius: 6;
+    -fx-text-fill: white;
+    -fx-font-size: 12;
+    -fx-padding: 5 9 5 9;
+}
+
+.progress-bar {
+    -fx-background-color: transparent;
+}
+.progress-bar .track {
+    -fx-background-color: rgba(52, 61, 74, 0.12);
+    -fx-background-radius: 4;
+    -fx-pref-height: 6;
+}
+.progress-bar .bar {
+    -fx-background-color: linear-gradient(to right, #4890f5, #1370f3);
+    -fx-background-radius: 4;
+    -fx-background-insets: 0;
+}
+
+.context-menu {
+    -fx-background-color: #fbfbfb;
+    -fx-background-radius: 8;
+    -fx-border-color: rgba(52, 61, 74, 0.12);
+    -fx-border-radius: 8;
+    -fx-effect: dropshadow(gaussian, rgba(52, 61, 74, 0.28), 16, 0.1, 0, 4);
+}
+.menu-item {
+    -fx-background-radius: 5;
+}
+.menu-item:focused {
+    -fx-background-color: #eaf2fe;
+}
+.menu-item .label {
+    -fx-text-fill: #343d4a;
+    -fx-font-size: 13;
+}

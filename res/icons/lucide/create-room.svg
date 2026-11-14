@@ -1,0 +1,4 @@
+<!-- TCL 联机「创建房间」图标：路径取自 TCl 1.3.7 PageLinkMain.xaml，EvenOdd 挖空 -->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 1024 1024">
+  <path fill="currentColor" d="M384 128v192h256a64 64 0 0 1 64 64v256h192V128H384zM320 320V128a64 64 0 0 1 64-64h512a64 64 0 0 1 64 64v512a64 64 0 0 1-64 64h-192v192a64 64 0 0 1-64 64H128a64 64 0 0 1-64-64V384a64 64 0 0 1 64-64h192z m320 384H384a64 64 0 0 1-64-64V384H128v512h512v-192z m0-64V384H384v256h256z"/>
+</svg>

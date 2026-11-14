@@ -1,0 +1,18 @@
+# 构建产物
+build/
+dist/
+out/
+javac.*.args
+
+# 运行与日志
+*.log
+hs_err_pid*
+
+# 系统杂项
+.DS_Store
+Thumbs.db
+
+# 构建脚本与工具缓存：开发者自行准备，不入库
+build.ps1
+tools/set-icon.ps1
+tools/tcc/
