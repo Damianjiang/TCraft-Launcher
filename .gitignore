@@ -4,6 +4,22 @@ dist/
 out/
 javac.*.args
 
+# 编译中间产物：编译时会自动重新生成，不入库
+*.class
+*.o
+*.obj
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.pyc
+__pycache__/
+bin/
+obj/
+*.tmp
+*.cache
+*.bak
+
 # 运行与日志
 *.log
 hs_err_pid*
