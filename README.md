@@ -100,6 +100,10 @@ java --module-path lib --add-modules javafx.controls,javafx.graphics,javafx.base
      -cp out tcraft.Boot
 ```
 
+打 Windows 单文件包时，先编译 `tools/launcher.c` 得到 stub，再用
+`python tools/add-icon.py stub.exe stub-icon.exe res/images/icon.ico` 嵌图标
+（TCC 不支持链接 `.rc`，这一步直接往 PE 里写 `.rsrc` 节），最后把 jar 追加到 exe 末尾。
+
 ## 仓库结构
 
 ```
