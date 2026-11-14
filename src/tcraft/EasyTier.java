@@ -103,9 +103,9 @@ public final class EasyTier {
         return isWindows() ? "easytier-cli.exe" : "easytier-cli";
     }
 
-    /** 联机模块目录：~/.tcraft-launcher-javafx/EasyTier/ */
+    /** 联机模块目录：<启动器目录>/EasyTier/ */
     public static Path folder() {
-        return Paths.get(System.getProperty("user.home"), ".tcraft-launcher-javafx", "EasyTier");
+        return Resources.home().resolve("EasyTier");
     }
 
     public static Path corePath() {

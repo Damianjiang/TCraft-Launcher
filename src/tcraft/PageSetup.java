@@ -869,7 +869,7 @@ public class PageSetup implements Page {
         });
         language.add(Ui.settingRow("语言", lang));
         FlowPane i18n = new FlowPane(10, 10);
-        java.nio.file.Path i18nFile = Paths.get(System.getProperty("user.home"), ".tcraft-launcher-javafx", "i18n.txt");
+        java.nio.file.Path i18nFile = Resources.home().resolve("i18n.txt");
         i18n.getChildren().addAll(
                 Ui.button("导出翻译文件", Ui.BTN_NORMAL, () -> {
                     try {
@@ -964,7 +964,7 @@ public class PageSetup implements Page {
     /** 卸载启动器数据，先停 EasyTier 再删。 */
     private void uninstallCard(VBox page) {
         Ui.Card danger = addCard(page, "卸载");
-        Path appData = Paths.get(System.getProperty("user.home"), ".tcraft-launcher-javafx");
+        Path appData = Resources.home();
         Label desc = Ui.label("仅清理启动器自建的内容（配置、日志、缓存、联机内核），不会删除游戏目录、存档与已安装的 Minecraft。"
                 + "确认后停止联机内核并退出；便携版程序文件需手动删除。", 12, Theme.gray2);
         desc.setWrapText(true);
@@ -1043,7 +1043,7 @@ public class PageSetup implements Page {
                 }),
                 Ui.button("打开数据文件夹", Ui.BTN_NORMAL, () -> {
                     try {
-                        Path dir = Paths.get(System.getProperty("user.home"), ".tcraft-launcher-javafx");
+                        Path dir = Resources.home();
                         Files.createDirectories(dir);
                         Shell.openFolder(dir.toString());
                     } catch (Exception e) {
@@ -1133,7 +1133,7 @@ public class PageSetup implements Page {
 
     private void buildLog(VBox page) {
         header(page, "日志", "查看、导出与清理运行日志。");
-        Path logDir = Paths.get(System.getProperty("user.home"), ".tcraft-launcher-javafx");
+        Path logDir = Resources.home();
         Path logFile = logDir.resolve("launcher.log");
 
         Ui.Card ops = addCard(page, "日志操作");
@@ -1286,7 +1286,7 @@ public class PageSetup implements Page {
 
     private void buildCache(VBox page) {
         header(page, "存储与清理", "看清启动器与游戏各自的磁盘占用，安全释放空间。");
-        Path base = Paths.get(System.getProperty("user.home"), ".tcraft-launcher-javafx");
+        Path base = Resources.home();
         Path cacheDir = base.resolve("cache");
 
         Ui.Card overview = addCard(page, "存储总览");
@@ -1493,9 +1493,13 @@ public class PageSetup implements Page {
     /** 递归删目录，失败项收进 failedSink。 */
     private static java.util.List<String> deleteDirCollect(Path dir, java.util.List<String> failedSink) {
         if (!Files.isDirectory(dir)) return failedSink;
+        Path running = Resources.jar(); // 正在用的 jar 被 JVM 锁着，删不掉，跳过它别当失败
         try (var stream = Files.walk(dir)) {
             for (Path p : stream.sorted(Comparator.reverseOrder()).toList()) {
                 try {
+                    Path name = p.getFileName();
+                    if (name != null && "TCraftLauncher.jar".equals(name.toString())) continue;
+                    if (running != null && p.toAbsolutePath().normalize().equals(running)) continue;
                     Files.deleteIfExists(p);
                 } catch (Exception e) {
                     failedSink.add(p.toString());

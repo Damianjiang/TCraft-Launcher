@@ -41,8 +41,7 @@ public class App extends Application {
 
     /** crash.txt 路径。 */
     private static java.nio.file.Path configCrashPath() {
-        return java.nio.file.Paths.get(System.getProperty("user.home"),
-                ".tcraft-launcher-javafx", "crash.txt");
+        return Resources.home().resolve("crash.txt");
     }
 
     @Override

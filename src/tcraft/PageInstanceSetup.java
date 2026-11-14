@@ -312,7 +312,7 @@ public class PageInstanceSetup implements Page {
             } catch (Exception ignored) {
             }
         }
-        Path launcherLog = Paths.get(System.getProperty("user.home"), ".tcraft-launcher-javafx", "launcher.log");
+        Path launcherLog = Resources.home().resolve("launcher.log");
         if (Files.isRegularFile(launcherLog)) diagAddSource("启动器日志（当前）", launcherLog);
 
         HBox controls = new HBox(10);
@@ -794,7 +794,7 @@ public class PageInstanceSetup implements Page {
 
     /** 选项预设目录，JSON 格式。 */
     private Path optionPresetDir() {
-        Path dir = Paths.get(System.getProperty("user.home"), ".tcraft-launcher-javafx", "option-presets");
+        Path dir = Resources.home().resolve("option-presets");
         try {
             Files.createDirectories(dir);
         } catch (Exception ignored) {

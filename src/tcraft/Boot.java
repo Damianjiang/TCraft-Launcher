@@ -57,7 +57,7 @@ public final class Boot {
     /** 把堆栈写进 crash.txt，返回路径；失败返回 null。 */
     static Path writeCrash(Throwable t) {
         try {
-            Path dir = Paths.get(System.getProperty("user.home"), ".tcraft-launcher-javafx");
+            Path dir = Resources.home();
             Files.createDirectories(dir);
             Path crash = dir.resolve("crash.txt");
             java.io.PrintWriter pw = new java.io.PrintWriter(Files.newBufferedWriter(

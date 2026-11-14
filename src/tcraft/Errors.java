@@ -468,7 +468,7 @@ public final class Errors {
         } catch (Throwable ignored) {
         }
         try {
-            Path dir = Paths.get(System.getProperty("user.home"), ".tcraft-launcher-javafx");
+            Path dir = Resources.home();
             Files.createDirectories(dir);
             String entry = "[" + LocalDateTime.now() + "] " + title + " — " + headline
                     + "\n" + detail + "\n\n";

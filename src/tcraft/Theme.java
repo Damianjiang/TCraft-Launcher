@@ -510,19 +510,22 @@ public final class Theme {
             group.getChildren().add(c);
         }
         // viewBox 支持 24 以外的底（TCl 参考图标是 1024 底的填充路径）
+        // 注意：图标文件缺失时 svg 为 null，这里必须跳过解析，否则整条 UI 线程会抛 NPE
         double vbx = 24;
-        int rootStart = svg.indexOf("<svg");
-        if (rootStart >= 0) {
-            int rootEnd = svg.indexOf(">", rootStart);
-            if (rootEnd > rootStart) {
-                String vb = attr(svg.substring(rootStart, rootEnd), "viewBox");
-                if (vb != null) {
-                    String[] parts = vb.trim().split("[\\s,]+");
-                    if (parts.length >= 4) {
-                        try {
-                            double w = Double.parseDouble(parts[2]);
-                            if (w > 0) vbx = w;
-                        } catch (NumberFormatException ignored) {
+        if (svg != null) {
+            int rootStart = svg.indexOf("<svg");
+            if (rootStart >= 0) {
+                int rootEnd = svg.indexOf(">", rootStart);
+                if (rootEnd > rootStart) {
+                    String vb = attr(svg.substring(rootStart, rootEnd), "viewBox");
+                    if (vb != null) {
+                        String[] parts = vb.trim().split("[\\s,]+");
+                        if (parts.length >= 4) {
+                            try {
+                                double w = Double.parseDouble(parts[2]);
+                                if (w > 0) vbx = w;
+                            } catch (NumberFormatException ignored) {
+                            }
                         }
                     }
                 }

@@ -247,8 +247,8 @@ public final class Data {
     private final Path configPath;
 
     private Data() {
-        Path home = Paths.get(System.getProperty("user.home"));
-        configPath = home.resolve(".tcraft-launcher-javafx").resolve("config.properties");
+        Path home = Resources.home();
+        configPath = home.resolve("config.properties");
         gameDir = detectGameDir();
         // 启动不灌内置版本，等官方清单。
         load();
@@ -256,7 +256,7 @@ public final class Data {
         if (instances.isEmpty()) seedInstances();
         if (folders.isEmpty()) folders.add(new FolderItem("当前文件夹", gameDir));
         if (javaPath == null || javaPath.isEmpty()) javaPath = detectJava();
-        log.add("[TCL] TCraft Launcher 1.3.7 (JavaFX Edition)");
+        log.add("[TCL] TCraft Launcher " + Build.VERSION + " (JavaFX Edition)");
         log.add("[TCL] 当前游戏目录：" + gameDir);
         log.add("[TCL] Java：" + (javaPath.isEmpty() ? "未找到" : javaPath));
         applyProxy();

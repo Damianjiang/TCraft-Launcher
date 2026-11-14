@@ -23,9 +23,71 @@ public final class Resources {
     private Resources() {
     }
 
-    /** 配置、资源、运行库都在这。 */
-    public static Path home() {
-        return Paths.get(System.getProperty("user.home"), ".tcraft-launcher-javafx");
+    private static Path homeDir;
+
+    /** 配置、资源、运行库都在这。
+     *  单文件 exe 会用 -Dtcraft.dir 告诉我们位置（exe 同目录的 .tcl，跟 HMCL 的 ./.hmcl 一样）；
+     *  直接 java -jar 运行时没有这个属性，沿用旧的 ~/.tcraft-launcher-javafx 保持兼容。 */
+    public static synchronized Path home() {
+        if (homeDir != null) return homeDir;
+        Path dir = resolveHome();
+        try {
+            Files.createDirectories(dir);
+        } catch (Exception ignored) {
+        }
+        homeDir = dir;
+        return dir;
+    }
+
+    private static Path resolveHome() {
+        Path legacy = Paths.get(System.getProperty("user.home"), ".tcraft-launcher-javafx");
+        String explicit = System.getProperty("tcraft.dir");
+        if (explicit == null || explicit.trim().isEmpty()) explicit = System.getenv("TCRAFT_HOME");
+        if (explicit == null || explicit.trim().isEmpty()) return legacy;
+
+        Path dir = Paths.get(explicit.trim()).toAbsolutePath().normalize();
+        migrateLegacy(legacy, dir);
+        return dir;
+    }
+
+    /** 老版本把配置放在用户目录，升级到 .tcl 后把"值钱的小文件"搬过去，只搬一次。 */
+    private static void migrateLegacy(Path legacy, Path target) {
+        Path marker = target.resolve(".migrated");
+        if (Files.exists(marker)) return;
+        if (legacy.equals(target) || !Files.isDirectory(legacy)) return;
+        try {
+            Files.createDirectories(target);
+            for (String name : new String[]{"config.properties", "i18n.txt"}) {
+                Path src = legacy.resolve(name);
+                Path dst = target.resolve(name);
+                if (Files.isRegularFile(src) && !Files.exists(dst)) {
+                    Files.copy(src, dst, StandardCopyOption.COPY_ATTRIBUTES);
+                }
+            }
+            copyDir(legacy.resolve("option-presets"), target.resolve("option-presets"));
+            Files.writeString(marker, "migrated from " + legacy);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static void copyDir(Path src, Path dst) {
+        if (!Files.isDirectory(src)) return;
+        try (java.util.stream.Stream<Path> walk = Files.walk(src)) {
+            walk.forEach(p -> {
+                try {
+                    Path out = dst.resolve(src.relativize(p).toString());
+                    if (Files.isDirectory(p)) {
+                        Files.createDirectories(out);
+                    } else if (!Files.exists(out)) {
+                        Path parent = out.getParent();
+                        if (parent != null) Files.createDirectories(parent);
+                        Files.copy(p, out, StandardCopyOption.COPY_ATTRIBUTES);
+                    }
+                } catch (Exception ignored) {
+                }
+            });
+        } catch (Exception ignored) {
+        }
     }
 
     public static String platform() {
