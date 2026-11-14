@@ -168,8 +168,7 @@ public final class Theme {
         try {
             Path p = res("images/" + name);
             if (!Files.exists(p)) {
-                // Windows 磁盘不区分大小写，Linux/macOS 和 jar 里都区分：
-                // 文件名和代码里写的大小写不一致时兜底找一次（例如 Logo.png / logo.png）。
+                // 文件名与代码大小写不一致时兜底找一次（磁盘和 jar 内区分大小写）。
                 Path alt = findIgnoreCase(res("images"), name);
                 if (alt != null) p = alt;
             }
@@ -526,7 +525,7 @@ public final class Theme {
             group.getChildren().add(c);
         }
         // viewBox 支持 24 以外的底（TCl 参考图标是 1024 底的填充路径）
-        // 注意：图标文件缺失时 svg 为 null，这里必须跳过解析，否则整条 UI 线程会抛 NPE
+        // 图标缺失时 svg 为 null，跳过解析，否则 UI 线程 NPE
         double vbx = 24;
         if (svg != null) {
             int rootStart = svg.indexOf("<svg");

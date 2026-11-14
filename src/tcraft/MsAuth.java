@@ -42,7 +42,7 @@ public final class MsAuth {
         return REDIRECT;
     }
 
-    /** 授权页地址。这个 client id 只注册了 oauth20_desktop.srf 一个回调，不能用 localhost。 */
+    /** 授权页地址。client id 只注册了 oauth20_desktop.srf。 */
     public static String authorizeUrl() {
         if (CLIENT_ID.isEmpty()) return "";
         return "https://login.live.com/oauth20_authorize.srf"

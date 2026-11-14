@@ -344,7 +344,7 @@ public final class Dialogs {
         win.showModal(card);
     }
 
-    /** 微软登录后半段：换令牌、写账户、刷新界面。回环自动回跳和手动粘贴共用。 */
+    /** 微软登录后半段：换令牌、写账户、刷新界面。 */
     private static void completeMsLogin(MainWindow win, Data d, String code,
                                         Label status, StackPane[] btnRef) {
         Thread worker = new Thread(() -> {

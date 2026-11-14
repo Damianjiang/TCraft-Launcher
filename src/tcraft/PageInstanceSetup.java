@@ -3136,7 +3136,7 @@ public class PageInstanceSetup implements Page {
         String readme = "TCraft Launcher JavaFX 版整合包附带的启动器文件说明" + System.lineSeparator()
                 + System.lineSeparator()
                 + "本压缩包内含启动脚本与资源文件。运行启动器还需要：" + System.lineSeparator()
-                + "1. 已安装 Java 25 或更高版本（含 JavaFX，可直接使用启动器发行包）；" + System.lineSeparator()
+                + "1. 已安装 Java 17 或更高版本（含 JavaFX，可直接使用启动器发行包）；" + System.lineSeparator()
                 + "2. 启动器程序目录（out/ 与 lib/），请从发行包补齐，或直接使用完整安装的启动器。" + System.lineSeparator()
                 + System.lineSeparator()
                 + "整合包游戏文件位于 overrides 目录（Modrinth 格式请先导入 .mrpack）。" + System.lineSeparator();

@@ -25,9 +25,7 @@ public final class Resources {
 
     private static Path homeDir;
 
-    /** 配置、资源、运行库都在这。
-     *  单文件 exe 会用 -Dtcraft.dir 告诉我们位置（exe 同目录的 .tcl，跟 HMCL 的 ./.hmcl 一样）；
-     *  直接 java -jar 运行时没有这个属性，沿用旧的 ~/.tcraft-launcher-javafx 保持兼容。 */
+    /** 配置、资源、运行库的根目录。 */
     public static synchronized Path home() {
         if (homeDir != null) return homeDir;
         Path dir = resolveHome();
@@ -50,7 +48,7 @@ public final class Resources {
         return dir;
     }
 
-    /** 老版本把配置放在用户目录，升级到 .tcl 后把"值钱的小文件"搬过去，只搬一次。 */
+    /** 把旧目录的配置搬到 .tcl，只搬一次。 */
     private static void migrateLegacy(Path legacy, Path target) {
         Path marker = target.resolve(".migrated");
         if (Files.exists(marker)) return;
@@ -162,7 +160,7 @@ public final class Resources {
                 relaunch(jar, rt, used, args);
             }
         } catch (Exception e) {
-            // 解包失败不拦，交给启动流程报错；先落个痕，不然只能瞎猜
+            // 解包失败交给启动流程报错，这里只留日志
             try {
                 Files.createDirectories(home());
                 try (PrintWriter pw = new PrintWriter(Files.newBufferedWriter(
