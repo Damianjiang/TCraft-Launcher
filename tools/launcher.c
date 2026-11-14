@@ -25,6 +25,7 @@
 #endif
 int __stdcall MultiByteToWideChar(unsigned int, unsigned long, const char *, int, wchar_t *, int);
 int __stdcall WideCharToMultiByte(unsigned int, unsigned long, const wchar_t *, int, char *, int, const char *, int *);
+unsigned int __stdcall GetACP(void);
 
 static wchar_t self_path[MAX_PATH_LEN];
 static wchar_t home_dir[MAX_PATH_LEN];
@@ -654,8 +655,11 @@ static int pick_best_java(wchar_t *out, int cap) {
    0 = CreateProcess 失败，1 = 正常运行中，2 = 起来了但很快退出（带退出码） */
 static int run(const wchar_t *java, DWORD *exit_code) {
     wchar_t cmd[MAX_PATH_LEN * 2];
+    wchar_t logp[MAX_PATH_LEN];
     STARTUPINFOW si;
     PROCESS_INFORMATION pi;
+    SECURITY_ATTRIBUTES sa;
+    HANDLE logf;
     BOOL started;
 
     if (exit_code) *exit_code = 0;
@@ -669,12 +673,30 @@ static int run(const wchar_t *java, DWORD *exit_code) {
     cat_str(cmd, jar_path, MAX_PATH_LEN * 2);
     cat_str(cmd, L"\"", MAX_PATH_LEN * 2);
 
+    /* 把 java 的 stdout/stderr 落到 .tcl\java-error.log。
+       javaw 没有控制台，不重定向的话崩溃信息就彻底丢了，
+       用户只能看到"双击没反应"，我们也没法判断是版本不对还是别的问题。 */
+    copy_str(logp, home_dir, MAX_PATH_LEN);
+    cat_str(logp, L"\\java-error.log", MAX_PATH_LEN);
+    sa.nLength = sizeof(sa);
+    sa.lpSecurityDescriptor = NULL;
+    sa.bInheritHandle = TRUE;
+    logf = CreateFileW(logp, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, &sa,
+                       CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+
     ZeroMemory(&si, sizeof(si));
     si.cb = sizeof(si);
+    if (logf != INVALID_HANDLE_VALUE) {
+        si.dwFlags = STARTF_USESTDHANDLES;
+        si.hStdOutput = logf;
+        si.hStdError = logf;
+        si.hStdInput = NULL;
+    }
     ZeroMemory(&pi, sizeof(pi));
 
-    started = CreateProcessW(java, cmd, NULL, NULL, FALSE, CREATE_NO_WINDOW,
-                             NULL, home_dir, &si, &pi);
+    started = CreateProcessW(java, cmd, NULL, NULL, logf != INVALID_HANDLE_VALUE,
+                             CREATE_NO_WINDOW, NULL, home_dir, &si, &pi);
+    if (logf != INVALID_HANDLE_VALUE) CloseHandle(logf); /* java 已经继承了句柄 */
     if (!started) return 0;
 
     /* 观察 2.5 秒：JavaFX 启动要一两秒，这段时间内就退出的必然是失败。
@@ -1251,19 +1273,45 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR args, int show) {
         }
         if (r == 2) {
             /* 起来了又秒退：以前这里什么提示都没有，用户只会看到"双击没反应" */
-            char detail[1024];
+            char detail[2000];
             char home8[MAX_PATH_LEN * 3];
+            char head[800];
+            char line[128];
+            wchar_t logp[MAX_PATH_LEN];
+            int got;
+
             WideCharToMultiByte(CP_UTF8, 0, home_dir, -1, home8, sizeof(home8), NULL, NULL);
+            copy_str(logp, home_dir, MAX_PATH_LEN);
+            cat_str(logp, L"\\java-error.log", MAX_PATH_LEN);
+            got = read_file(logp, head, sizeof(head) / 3);
+            if (got > 0) {
+                /* java 的 stderr 是系统代码页（简体中文是 GBK），先按 ACP 转成宽字符，
+                   再转 UTF-8，否则弹窗里中文全是乱码。 */
+                wchar_t wtmp[400];
+                int n = MultiByteToWideChar(GetACP(), 0, head, got, wtmp, 400);
+                if (n > 0) {
+                    wtmp[n] = 0;
+                    head[0] = 0;
+                    WideCharToMultiByte(CP_UTF8, 0, wtmp, -1, head, sizeof(head), NULL, NULL);
+                }
+            } else {
+                head[0] = 0;
+            }
+
+            sprintf(line, "java 启动后立即退出（退出码 %lu）", (unsigned long)code);
+            stub_log(line);
+            stub_log(got > 0 ? "java-error.log 有内容" : "java-error.log 为空");
+
             sprintf(detail,
                     "启动器启动后立即退出了（退出码 %lu）。\n\n"
-                    "常见原因：\n"
-                    "· 这个 Java 跟启动器不匹配（需要 64 位 JDK 17 或更高）\n"
-                    "· .tcl 里的运行库被安全软件删了，或 jar 解包不完整\n"
-                    "· 显卡 / JavaFX 初始化失败\n\n"
-                    "排查日志（发给开发者即可定位）：\n%s\\stub.log\n%s\\launcher.log\n\n"
+                    "Java 自己的报错：\n%s\n\n"
+                    "如果上面写着 UnsupportedClassVersionError，说明这个 Java 版本低于 17，"
+                    "请装 JDK 17 或更高版本（推荐 64 位）。\n\n"
+                    "完整日志：\n%s\\stub.log\n%s\\java-error.log\n\n"
                     "也可以删掉 .tcl\\launcher.cfg 后重新运行，换一个 Java 试试。",
-                    (unsigned long)code, home8, home8);
-            stub_log("java 启动后立即退出");
+                    (unsigned long)code,
+                    got > 0 ? head : "（java 没有输出任何内容）",
+                    home8, home8);
             alert(detail);
             return 1;
         }
