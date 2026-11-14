@@ -30,6 +30,7 @@ static wchar_t self_path[MAX_PATH_LEN];
 static wchar_t home_dir[MAX_PATH_LEN];
 static wchar_t jar_path[MAX_PATH_LEN];
 static wchar_t cfg_java[MAX_PATH_LEN]; /* .tcl\launcher.cfg 里记住的 java 路径 */
+static int first_run;                   /* 还没有 launcher.cfg */
 
 /* 中文按 UTF-8 转宽字符，再交给 MessageBoxW */
 static void alert(const char *utf8) {
@@ -99,12 +100,11 @@ static int dir_writable(const wchar_t *dir) {
     return 1;
 }
 
-/* 启动器自己的工作目录：
-   首选 exe 同目录的 .tcl（跟着程序走，重装/移动都在一起）；
-   只有装在 Program Files、只读 U 盘这类不可写位置时，才退回 %LOCALAPPDATA%。 */
-static void init_home(void) {
+/* 启动器自己的工作目录：固定用 exe 同目录的 .tcl。
+   刻意不再回退到 %LOCALAPPDATA% / Program Files —— 数据必须跟着程序走，
+   否则用户找不到、清理工具也会删。不可写就返回 0，由调用方明确弹窗告知。 */
+static int init_home(void) {
     wchar_t exe_dir[MAX_PATH_LEN];
-    wchar_t alt[MAX_PATH_LEN];
 
     copy_str(exe_dir, self_path, MAX_PATH_LEN);
     strip_file(exe_dir);
@@ -112,13 +112,42 @@ static void init_home(void) {
     copy_str(home_dir, exe_dir, MAX_PATH_LEN);
     cat_str(home_dir, L"\\" HOME_SUB, MAX_PATH_LEN);
     create_dirs(home_dir);
-    if (dir_writable(home_dir)) return;
+    return dir_writable(home_dir);
+}
 
-    if (GetEnvironmentVariableW(L"LOCALAPPDATA", alt, MAX_PATH_LEN) && alt[0]) {
-        copy_str(home_dir, alt, MAX_PATH_LEN);
-        cat_str(home_dir, L"\\" HOME_SUB, MAX_PATH_LEN);
-        create_dirs(home_dir);
-    }
+/* 诊断日志：<.tcl>\stub.log。
+   用户反馈"双击没反应"时先看这个文件存不存在：
+   没有 → exe 根本没被执行（多半被杀毒软件 / SmartScreen 拦了）；
+   有   → 能看出卡在哪一步（解包、找 Java、启动、退出码）。 */
+static void stub_log(const char *line) {
+    wchar_t p[MAX_PATH_LEN];
+    SYSTEMTIME st;
+    HANDLE h;
+    DWORD wrote = 0;
+    char buf[1200];
+    int n;
+
+    if (!home_dir[0]) return;
+    copy_str(p, home_dir, MAX_PATH_LEN);
+    cat_str(p, L"\\stub.log", MAX_PATH_LEN);
+    h = CreateFileW(p, FILE_APPEND_DATA, FILE_SHARE_READ, NULL, OPEN_ALWAYS,
+                    FILE_ATTRIBUTE_NORMAL, NULL);
+    if (h == INVALID_HANDLE_VALUE) return;
+    GetLocalTime(&st);
+    n = sprintf(buf, "[%02d:%02d:%02d] %s\r\n", st.wHour, st.wMinute, st.wSecond, line);
+    if (n > 0) WriteFile(h, buf, (DWORD)n, &wrote, NULL);
+    CloseHandle(h);
+}
+
+/* 带一条路径的日志行（宽字符转 UTF-8 再写） */
+static void stub_log_w(const char *tag, const wchar_t *value) {
+    char buf[1200];
+    char v8[MAX_PATH_LEN * 3];
+
+    v8[0] = 0;
+    if (value) WideCharToMultiByte(CP_UTF8, 0, value, -1, v8, sizeof(v8), NULL, NULL);
+    sprintf(buf, "%s = %s", tag, v8);
+    stub_log(buf);
 }
 
 /* 递归删目录（失败就跳过，不弹任何东西） */
@@ -192,6 +221,7 @@ static void load_cfg(void) {
     cfg_java[0] = 0;
     cfg_path(p, MAX_PATH_LEN);
     got = read_file(p, buf, sizeof(buf));
+    first_run = (got <= 0); /* 没有 launcher.cfg：首次运行，必须给用户一个可见窗口 */
     if (got <= 0) return;
     buf[got] = 0;
     if (MultiByteToWideChar(CP_UTF8, 0, buf, -1, cfg_java, MAX_PATH_LEN) <= 0) {
@@ -620,11 +650,15 @@ static int pick_best_java(wchar_t *out, int cap) {
     return 0;
 }
 
-static int run(const wchar_t *java) {
+/* 启动 java 并观察 2.5 秒：
+   0 = CreateProcess 失败，1 = 正常运行中，2 = 起来了但很快退出（带退出码） */
+static int run(const wchar_t *java, DWORD *exit_code) {
     wchar_t cmd[MAX_PATH_LEN * 2];
     STARTUPINFOW si;
     PROCESS_INFORMATION pi;
     BOOL started;
+
+    if (exit_code) *exit_code = 0;
 
     copy_str(cmd, L"\"", MAX_PATH_LEN * 2);
     cat_str(cmd, java, MAX_PATH_LEN * 2);
@@ -642,6 +676,17 @@ static int run(const wchar_t *java) {
     started = CreateProcessW(java, cmd, NULL, NULL, FALSE, CREATE_NO_WINDOW,
                              NULL, home_dir, &si, &pi);
     if (!started) return 0;
+
+    /* 观察 2.5 秒：JavaFX 启动要一两秒，这段时间内就退出的必然是失败。
+       不这么盯着，用户看到的就是"双击没反应、进程也没有"。 */
+    if (WaitForSingleObject(pi.hProcess, 2500) == WAIT_OBJECT_0) {
+        DWORD code = 0;
+        GetExitCodeProcess(pi.hProcess, &code);
+        if (exit_code) *exit_code = code;
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+        return 2;
+    }
     CloseHandle(pi.hProcess);
     CloseHandle(pi.hThread);
     return 1;
@@ -702,6 +747,8 @@ static HWND ctl_path;
 static HWND ctl_prog;
 static HWND ctl_log;
 static int java_dlg_result;
+static int java_dlg_first;              /* 首次运行：文案换个说法 */
+static wchar_t java_dlg_seed[MAX_PATH_LEN]; /* 打开时预填的路径 */
 static wchar_t java_dlg_pick[MAX_PATH_LEN];
 static int scan_idx, scan_total;
 static wchar_t scan_best[MAX_PATH_LEN];
@@ -926,8 +973,11 @@ static void java_dlg_create(HWND h) {
     HWND c;
 
     c = CreateWindowExW(0, L"STATIC",
-            w("没有找到 Java 17 或更高版本。启动器自带 JavaFX，但不带 JRE。\r\n"
-              "可以点「自动扫描」让启动器找一遍，也可以点「浏览…」自己指定 java.exe。"),
+            java_dlg_first
+                ? w("首次运行：启动器会在 exe 旁边建一个 .tcl 目录存放程序和配置。\r\n"
+                    "请确认下面要用的 Java（已自动填好扫描结果），点「使用并启动」即可。")
+                : w("没有找到 Java 17 或更高版本。启动器自带 JavaFX，但不带 JRE。\r\n"
+                    "可以点「自动扫描」让启动器找一遍，也可以点「浏览…」自己指定 java.exe。"),
             WS_CHILD | WS_VISIBLE, 16, 12, 616, 44, h, NULL, NULL, NULL);
     SendMessageW(c, WM_SETFONT, (WPARAM)font, TRUE);
 
@@ -935,7 +985,8 @@ static void java_dlg_create(HWND h) {
                         16, 70, 60, 20, h, NULL, NULL, NULL);
     SendMessageW(c, WM_SETFONT, (WPARAM)font, TRUE);
 
-    ctl_path = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", cfg_java,
+    ctl_path = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT",
+                               java_dlg_seed[0] ? java_dlg_seed : cfg_java,
                                WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL,
                                80, 66, 376, 24, h, (HMENU)IDC_JAVA_PATH, NULL, NULL);
     SendMessageW(ctl_path, WM_SETFONT, (WPARAM)font, TRUE);
@@ -1015,8 +1066,9 @@ static LRESULT CALLBACK java_dlg_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     return DefWindowProcW(h, msg, wp, lp);
 }
 
-/* 打开选择窗口：1 = 选到了可用的 java，0 = 用户取消，-1 = 窗口都没能建起来 */
-static int java_dialog(wchar_t *out, int cap) {
+/* 打开选择窗口：1 = 选到了可用的 java，0 = 用户取消，-1 = 窗口都没能建起来。
+   preset 非空时预填到路径框（自动扫描到的结果），first=1 时换首次运行的文案。 */
+static int java_dialog(wchar_t *out, int cap, const wchar_t *preset, int first) {
     WNDCLASSW wc;
     MSG msg;
     HINSTANCE inst = GetModuleHandleW(NULL);
@@ -1034,6 +1086,9 @@ static int java_dialog(wchar_t *out, int cap) {
     RegisterClassW(&wc);
 
     java_dlg_result = 0;
+    java_dlg_first = first;
+    java_dlg_seed[0] = 0;
+    if (preset && preset[0] && file_exists(preset)) copy_str(java_dlg_seed, preset, MAX_PATH_LEN);
     java_dlg_pick[0] = 0;
 
     x = (GetSystemMetrics(0) - dw) / 2;
@@ -1106,8 +1161,19 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR args, int show) {
         return 1;
     }
 
-    /* 工作目录跟着 exe 走：<exe 目录>\.tcl */
-    init_home();
+    /* 工作目录固定为 exe 同目录的 .tcl；不可写就明说，绝不悄悄改写到别处 */
+    if (!init_home()) {
+        alert("无法在启动器所在目录创建 .tcl 文件夹。\n\n"
+              "启动器的程序文件、配置和运行库都会放在这个 .tcl 里（跟着 exe 走）。\n"
+              "请把 TCraftLauncher.exe 挪到有写入权限的地方再运行，比如：\n"
+              "  · D 盘下任意文件夹\n"
+              "  · 桌面\n"
+              "  · U 盘（可写）\n\n"
+              "不要放在 Program Files、系统盘根目录，也不要放在只读介质里。");
+        return 1;
+    }
+    stub_log_w("==== 启动", self_path);
+    stub_log_w("工作目录", home_dir);
     cleanup_legacy_home();
     copy_str(jar_path, home_dir, MAX_PATH_LEN);
     cat_str(jar_path, L"\\" JAR_NAME, MAX_PATH_LEN);
@@ -1122,22 +1188,39 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR args, int show) {
     if ((unsigned long long)jar_size_low
         + ((unsigned long long)jar_size_high << 32) != (size - offset)) {
         if (!copy_range(self_path, offset, size - offset, jar_path)) {
-            alert("释放内置 jar 失败：exe 所在目录不可写。请把启动器放到有写权限的位置再运行。");
+            stub_log("解包内置 jar 失败");
+            alert("释放内置 jar 失败：.tcl 目录写不进去。\n\n"
+                  "常见原因：安全软件拦截、磁盘已满、或 exe 放在只读位置。\n"
+                  "请换个位置放 exe 后重试。");
             return 1;
         }
+        stub_log("已解包内置 jar");
     }
 
     load_cfg();
+    stub_log(first_run ? "首次运行（没有 launcher.cfg）" : "读取 launcher.cfg 成功");
 
-    if (!pick_best_java(java, MAX_PATH_LEN)) {
-        /* 自动找不到：交给用户选（可浏览、可扫描），选完记到 .tcl\launcher.cfg */
-        int rc = java_dialog(java, MAX_PATH_LEN);
-        if (rc < 0) {
-            offer_download();
-            return 1;
+    {
+        int found = pick_best_java(java, MAX_PATH_LEN);
+        stub_log(found ? "自动选中 Java" : "没有自动找到可用 Java");
+        if (found) stub_log_w("Java 路径", java);
+
+        /* 首次运行一定要有可见窗口：让用户看到扫描结果并确认一次，
+           顺便把路径记下来；以后就不再打扰。 */
+        if (first_run || !found) {
+            int rc = java_dialog(java, MAX_PATH_LEN, found ? java : NULL, first_run ? 1 : 0);
+            if (rc < 0) {
+                stub_log("Java 选择窗口创建失败");
+                offer_download();
+                return 1;
+            }
+            if (rc == 0) {
+                stub_log("用户取消了 Java 选择窗口");
+                return 1;
+            }
+            save_cfg(java);
+            stub_log_w("用户选定 Java", java);
         }
-        if (rc == 0) return 1;
-        save_cfg(java);
     }
 
     /* 兜底：版本读不出来时放行交给 Java 自己报错；读到低版本再让用户重选一次 */
@@ -1146,7 +1229,8 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR args, int show) {
         if (major > 0 && major < 17) {
             int rc;
             found_major = major;
-            rc = java_dialog(java, MAX_PATH_LEN);
+            stub_log("配置里的 Java 版本过低，重新让用户选择");
+            rc = java_dialog(java, MAX_PATH_LEN, NULL, 0);
             if (rc <= 0) {
                 if (rc < 0) offer_download();
                 return 1;
@@ -1155,9 +1239,35 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR args, int show) {
         }
     }
 
-    if (!run(java)) {
-        alert("启动 Java 失败，可能是 Java 路径失效或权限问题。");
-        return 1;
+    {
+        DWORD code = 0;
+        int r = run(java, &code);
+
+        if (r == 0) {
+            stub_log("CreateProcess 失败");
+            alert("启动 Java 失败：这个 Java 路径可能已经失效，或者没有执行权限。\n\n"
+                  "删掉启动器目录下的 .tcl\\launcher.cfg 再运行一次，就能重新选择 Java。");
+            return 1;
+        }
+        if (r == 2) {
+            /* 起来了又秒退：以前这里什么提示都没有，用户只会看到"双击没反应" */
+            char detail[1024];
+            char home8[MAX_PATH_LEN * 3];
+            WideCharToMultiByte(CP_UTF8, 0, home_dir, -1, home8, sizeof(home8), NULL, NULL);
+            sprintf(detail,
+                    "启动器启动后立即退出了（退出码 %lu）。\n\n"
+                    "常见原因：\n"
+                    "· 这个 Java 跟启动器不匹配（需要 64 位 JDK 17 或更高）\n"
+                    "· .tcl 里的运行库被安全软件删了，或 jar 解包不完整\n"
+                    "· 显卡 / JavaFX 初始化失败\n\n"
+                    "排查日志（发给开发者即可定位）：\n%s\\stub.log\n%s\\launcher.log\n\n"
+                    "也可以删掉 .tcl\\launcher.cfg 后重新运行，换一个 Java 试试。",
+                    (unsigned long)code, home8, home8);
+            stub_log("java 启动后立即退出");
+            alert(detail);
+            return 1;
+        }
+        stub_log("启动成功，stub 退出");
     }
     return 0;
 }
