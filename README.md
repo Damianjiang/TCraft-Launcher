@@ -24,8 +24,10 @@
 ---
 
 > [!NOTE]
-> **v1.0.0 是 JavaFX 独立重构后的第一个正式版。** 相比旧版（VB.NET / WPF）这是一次彻底重写，架构和界面都是全新的，但也意味着很多地方还不够成熟：部分功能仍在打磨、个别设置项可能不生效、macOS 与 Linux 也没有经过充分测试。
-> 遇到问题、有想法，或者只是想围观开发进度，都欢迎到 [Issues](https://github.com/Damianjiang/TCraft-Launcher/issues) 提交反馈，或者[加入 QQ 交流群](https://qm.qq.com/q/UONlv4VgwE)（群链接也写在启动器「更多 → 关于」里）。
+> 本仓库是 JavaFX 重写版，相比旧版（VB.NET / WPF）架构和界面全部重做，部分功能仍在打磨，
+> 个别设置项可能不生效，macOS / Linux 也未充分测试。
+> 遇到问题或有建议，欢迎到 [Issues](https://github.com/Damianjiang/TCraft-Launcher/issues) 反馈，
+> 或[加入 QQ 交流群](https://qm.qq.com/q/UONlv4VgwE)（群号也写在启动器「更多 → 关于」里）。
 
 ## 这是什么
 

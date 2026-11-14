@@ -310,71 +310,18 @@ public final class Dialogs {
         final Data d = Data.get();
         VBox form = new VBox(10);
         form.setPadding(new Insets(15, 7, 0, 7));
-        form.getChildren().add(Ui.hint("点「打开登录页」在浏览器里登录，登录完成后会自动回到启动器。"
-                + "如果浏览器停在别的页面没自动跳，把地址栏整条链接复制粘到下面，点「完成登录」。", 0));
+        form.getChildren().add(Ui.hint("点「打开登录页」在浏览器里登录。登录完浏览器会停在 login.live.com 的一个空白页，"
+                + "把地址栏整条链接复制到下面，点「完成登录」。", 0));
 
         TextField pasted = Ui.field("粘贴登录后浏览器地址栏的整条链接");
         pasted.setPrefHeight(32);
         Label status = Ui.wrap(Ui.label("尚未开始", 12, Theme.gray2), 380);
 
         final StackPane[] btnRef = new StackPane[1];
-        // 本机回环会话：自动接 code 用；重开或取消时都要关掉
-        final MsAuth.Callback[] callbackRef = new MsAuth.Callback[1];
-        // 会话对应的 PKCE verifier 和 redirect；手动兜底流程为空 + 固定回调
-        final String[] verifierRef = new String[1];
-        final String[] redirectRef = new String[1];
-        redirectRef[0] = MsAuth.redirectUri();
-
-        Runnable closeCallback = () -> {
-            if (callbackRef[0] != null) {
-                callbackRef[0].close();
-                callbackRef[0] = null;
-            }
-        };
 
         StackPane open = Ui.button("打开登录页", Ui.BTN_THEME, () -> {
-            closeCallback.run();
-            try {
-                // HMCL 同款：起本机监听，浏览器登录完跳回 localhost，自动拿 code
-                MsAuth.Callback cb = MsAuth.Callback.start();
-                callbackRef[0] = cb;
-                verifierRef[0] = cb.verifier();
-                redirectRef[0] = cb.redirectUri();
-                MsAuth.openBrowser(cb.authorizeUrl());
-                status.setText("浏览器已打开，登录完成后会自动跳回启动器。");
-                Thread waiter = new Thread(() -> {
-                    try {
-                        String code = cb.awaitCode(5 * 60 * 1000);
-                        String verifier = verifierRef[0];
-                        String redirect = redirectRef[0];
-                        javafx.application.Platform.runLater(() -> {
-                            if (callbackRef[0] != cb) return; // 会话被重开顶掉
-                            btnRef[0].setDisable(true);
-                            status.setText("已收到登录回调，正在换取令牌…");
-                            completeMsLogin(win, d, code, redirect, verifier, status, btnRef);
-                        });
-                    } catch (Exception e) {
-                        javafx.application.Platform.runLater(() -> {
-                            if (callbackRef[0] != cb) return;
-                            status.setText("自动登录没有完成：" + e.getMessage()
-                                    + " 也可以按老办法手动粘贴链接。");
-                        });
-                    } finally {
-                        cb.close();
-                        if (callbackRef[0] == cb) callbackRef[0] = null;
-                    }
-                }, "TCL-MSA-Wait");
-                waiter.setDaemon(true);
-                waiter.start();
-            } catch (Exception e) {
-                // 监听起不来（防火墙、端口策略），退回手动粘贴流程
-                verifierRef[0] = null;
-                redirectRef[0] = MsAuth.redirectUri();
-                MsAuth.openBrowser(MsAuth.authorizeUrl());
-                status.setText("本机回调监听不可用（可能被防火墙拦截）。请按老办法："
-                        + "登录后把地址栏整条链接粘到下面。");
-                Errors.error("微软登录本机回调监听失败", e);
-            }
+            MsAuth.openBrowser(MsAuth.authorizeUrl());
+            status.setText("登录完成后复制地址栏的整条链接，粘到下面。");
         });
         StackPane done = Ui.button("完成登录", Ui.BTN_HIGHLIGHT, () -> {
             String code = MsAuth.parseCode(pasted.getText());
@@ -384,28 +331,25 @@ public final class Dialogs {
             }
             btnRef[0].setDisable(true);
             status.setText("正在换取令牌…");
-            completeMsLogin(win, d, code, redirectRef[0], verifierRef[0], status, btnRef);
+            completeMsLogin(win, d, code, status, btnRef);
         });
         btnRef[0] = done;
 
         HBox actions = new HBox(12);
         actions.setAlignment(Pos.CENTER_RIGHT);
         actions.getChildren().addAll(
-                Ui.button("取消", Ui.BTN_NORMAL, () -> {
-                    closeCallback.run();
-                    win.closeModal();
-                }), open, done);
+                Ui.button("取消", Ui.BTN_NORMAL, win::closeModal), open, done);
         form.getChildren().addAll(pasted, status, actions);
         card.getChildren().add(form);
         win.showModal(card);
     }
 
     /** 微软登录后半段：换令牌、写账户、刷新界面。回环自动回跳和手动粘贴共用。 */
-    private static void completeMsLogin(MainWindow win, Data d, String code, String redirect,
-                                        String verifier, Label status, StackPane[] btnRef) {
+    private static void completeMsLogin(MainWindow win, Data d, String code,
+                                        Label status, StackPane[] btnRef) {
         Thread worker = new Thread(() -> {
             try {
-                MsAuth.Result r = MsAuth.loginWithCode(code, redirect, verifier);
+                MsAuth.Result r = MsAuth.loginWithCode(code);
                 String skin = MsAuth.saveSkin(r, d.gameDir);
                 javafx.application.Platform.runLater(() -> {
                     String name = r.name.isEmpty() ? "Player" : r.name;
