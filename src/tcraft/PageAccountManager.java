@@ -125,7 +125,9 @@ public class PageAccountManager implements Page {
     /** 正版账户才显示皮肤卡。 */
     private void syncSkinCard() {
         if (content == null) return;
-        Data.Account current = signedIn() ? data.account() : null;
+        // 只有微软账户才动得了正版皮肤，第三方和离线不显示这张卡
+        Data.Account current = signedIn() && "msa".equals(data.account().userType)
+                ? data.account() : null;
         if (current == skinCardFor) return;   // 账户没变就不用重建
         if (skinBox != null) {
             content.getChildren().remove(skinBox);
@@ -188,7 +190,10 @@ public class PageAccountManager implements Page {
         List<Node> actions = new ArrayList<>();
         if (a.online) {
             actions.add(Ui.iconButton("scan-face", 28, 15, "3D 查看该账户的皮肤", () -> Dialogs.skinPicker(win, a)));
-            actions.add(Ui.iconButton("shirt", 28, 15, "在官网管理该账户的皮肤", () -> openWebsite("https://www.minecraft.net/profile")));
+            if ("msa".equals(a.userType)) {
+                actions.add(Ui.iconButton("shirt", 28, 15, "在官网管理该账户的皮肤",
+                        () -> openWebsite("https://www.minecraft.net/profile")));
+            }
             actions.add(Ui.iconButton("refresh-cw", 28, 15, "刷新该账户的登录状态", () -> {
                 refreshSilently(); // 静默刷新，不闪整页
                 win.toast("已刷新。", a.name, 1);
@@ -259,7 +264,16 @@ public class PageAccountManager implements Page {
     /** 行里那句登录状态。 */
     private String rowInfo(int index, boolean current) {
         Data.Account a = data.accounts.get(index);
-        return (a.online ? "正版登录" : "离线登录") + (current ? " · 当前账户" : "");
+        return loginType(a) + (current ? " · 当前账户" : "");
+    }
+
+    /** 和标题栏徽章一致的登录类型。 */
+    private static String loginType(Data.Account a) {
+        if (a == null) return "离线登录";
+        if ("msa".equals(a.userType)) return "正版登录";
+        if ("nide".equals(a.userType)) return "统一通行证";
+        if ("legacy".equals(a.userType) && a.online) return "第三方登录";
+        return "离线登录";
     }
 
     private void addAccount() {

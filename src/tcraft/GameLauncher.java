@@ -312,6 +312,40 @@ public final class GameLauncher {
         }
 
         Data.Account account = data.account();
+        // 微软令牌大约 24 小时过期：过期或状态不明时验证一次，失效就续期
+        if (account != null && "msa".equals(account.userType)) {
+            boolean overdue = account.expiresAt == 0 || System.currentTimeMillis() > account.expiresAt;
+            boolean valid = true;
+            if (overdue) {
+                try {
+                    valid = MsAuth.validate(account.accessToken);
+                } catch (Exception ignored) {
+                    // 网络异常先不拦，让游戏自己试
+                }
+            }
+            if (!valid) {
+                try {
+                    MsAuth.Result r = MsAuth.refresh(account.refreshToken);
+                    account.accessToken = r.accessToken;
+                    if (!r.refreshToken.isEmpty()) account.refreshToken = r.refreshToken;
+                    account.expiresAt = r.expiresAt;
+                    data.save();
+                } catch (Exception e) {
+                    throw new Exception("微软登录已失效：" + e.getMessage(), e);
+                }
+            }
+        }
+        // 外置登录的 token 会过期，启动前先续一次，失效就让用户重登
+        if (account != null && "legacy".equals(account.userType)
+                && account.server != null && !account.server.isEmpty()) {
+            try {
+                Yggdrasil.ensureFresh(account);
+            } catch (Yggdrasil.AuthException e) {
+                throw new Exception("外置登录已失效：" + e.getMessage() + "。请在「账户」里重新登录。", e);
+            } catch (java.io.IOException e) {
+                throw new Exception("连接认证服务器失败：" + e.getMessage() + "，请检查网络或代理设置。", e);
+            }
+        }
         String username = account == null ? "Player" : account.name;
         String uuid = account == null ? Data.offlineUuid(username) : account.uuid;
         uuid = uuid.replace("-", "");
@@ -319,6 +353,15 @@ public final class GameLauncher {
                 && !account.accessToken.isEmpty() ? account.accessToken : "0";
         String userType = account != null && account.userType != null && !account.userType.isEmpty()
                 ? account.userType : (account != null && account.online ? "msa" : "legacy");
+        // 外置登录在游戏里按微软账户处理，authlib-injector 才知道去该服务器验证
+        boolean externalAuth = account != null && "legacy".equals(userType)
+                && account.server != null && !account.server.isEmpty();
+        String gameUserType = externalAuth ? "msa" : userType;
+        // 统一通行证基于旧版 authlib-injector，只认 mojang
+        if (account != null && "nide".equals(userType)
+                && account.server != null && !account.server.isEmpty()) {
+            gameUserType = "mojang";
+        }
         int ram = Math.max(512, data.getInt("InstanceRam", 0) > 0
                 ? data.getInt("InstanceRam", 4096) : data.getInt("LaunchRam", 4096));
         // 自动按物理内存的 1/4 分配。
@@ -363,7 +406,7 @@ public final class GameLauncher {
         vars.put("auth_uuid", uuid);
         vars.put("auth_access_token", accessToken);
         vars.put("auth_session", "token:" + accessToken + ":" + uuid);
-        vars.put("user_type", userType);
+        vars.put("user_type", gameUserType);
         vars.put("version_type", "release");
         vars.put("user_properties", "{}");
         // 这些变量不补会以字面量进游戏参数。

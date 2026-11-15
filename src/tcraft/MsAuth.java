@@ -27,6 +27,8 @@ public final class MsAuth {
         public String name = "";
         public String skinUrl = "";
         public String capeUrl = "";
+        /** Minecraft 令牌过期时间（毫秒），0 表示没拿到。 */
+        public long expiresAt = 0;
     }
 
     /** 桌面应用的固定回调地址，手动粘贴流程用。 */
@@ -117,6 +119,7 @@ public final class MsAuth {
             Map<String, Object> m = e.body.isEmpty() ? Map.of() : Json.obj(Json.parse(e.body));
             String xerr = Json.str(m, "XErr", "");
             switch (xerr) {
+                case "2148916227" -> throw new Exception("该账户已被 Xbox Live 封禁");
                 case "2148916233" -> throw new Exception("该微软账户还没有 Xbox 档案，请先在 xbox.com 创建");
                 case "2148916235" -> throw new Exception("该账户所在地区不支持 Xbox Live");
                 case "2148916238" -> throw new Exception("未成年人账户需要先加入家庭组");
@@ -134,10 +137,14 @@ public final class MsAuth {
                 mcBody, "application/json")));
         String token = Json.str(mc, "access_token", "");
         if (token.isEmpty()) throw new Exception("Minecraft 登录失败：该账户可能未拥有游戏");
+        checkEntitlement(token);
 
         Result r = new Result();
         r.accessToken = token;
         r.refreshToken = refreshToken;
+        // 提前一分钟算过期，避免卡在边界上
+        long expiresIn = (long) Json.num(mc, "expires_in", 86400);
+        r.expiresAt = System.currentTimeMillis() + Math.max(60, expiresIn - 60) * 1000L;
 
         // 档案，含皮肤
         try {
@@ -161,6 +168,61 @@ public final class MsAuth {
             // 档案接口可能 404，token 仍然可用
         }
         return r;
+    }
+
+    /** 没有游戏所有权的账户也能换到令牌，但进游戏会被踢，先拦一次。 */
+    private static void checkEntitlement(String token) throws Exception {
+        String text;
+        try {
+            text = get("https://api.minecraftservices.com/entitlements/mcstore", token);
+        } catch (Exception e) {
+            return; // 接口不可用时不挡登录
+        }
+        Map<String, Object> owned;
+        try {
+            owned = Json.obj(Json.parse(text));
+        } catch (Exception e) {
+            return;
+        }
+        if (Json.arr(owned.get("items")).isEmpty()) {
+            throw new Exception("该账户还没有购买 Minecraft: Java Edition");
+        }
+    }
+
+    /** 用 refreshToken 换新的 Minecraft 令牌，令牌过期后启动前调用。 */
+    public static Result refresh(String refreshToken) throws Exception {
+        if (refreshToken == null || refreshToken.isEmpty()) {
+            throw new Exception("没有可用的续期令牌，请重新登录微软账号");
+        }
+        String body = "client_id=" + CLIENT_ID
+                + "&refresh_token=" + enc(refreshToken)
+                + "&grant_type=refresh_token"
+                + "&redirect_uri=" + enc(REDIRECT)
+                + "&scope=" + enc(SCOPE);
+        Map<String, Object> m;
+        try {
+            m = Json.obj(Json.parse(post("https://login.live.com/oauth20_token.srf", body, null)));
+        } catch (HttpError e) {
+            Map<String, Object> err = e.body.isEmpty() ? Map.of() : Json.obj(Json.parse(e.body));
+            String why = Json.str(err, "error_description", "");
+            throw new Exception("微软登录已过期：" + (why.isEmpty() ? "请重新登录" : why));
+        }
+        String token = Json.str(m, "access_token", "");
+        if (token.isEmpty()) throw new Exception("微软没有返回访问令牌");
+        String next = Json.str(m, "refresh_token", refreshToken);
+        return loginMinecraft(token, next.isEmpty() ? refreshToken : next);
+    }
+
+    /** Minecraft 令牌还有效吗。401 算失效，其他错误照常抛出。 */
+    public static boolean validate(String accessToken) throws Exception {
+        if (accessToken == null || accessToken.isEmpty()) return false;
+        try {
+            get("https://api.minecraftservices.com/minecraft/profile", accessToken);
+            return true;
+        } catch (HttpError e) {
+            if (e.code == 401) return false;
+            throw e;
+        }
     }
 
     /** 下载皮肤，返回头像能用的相对路径。 */

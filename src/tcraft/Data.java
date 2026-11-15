@@ -28,6 +28,10 @@ public final class Data {
         public String userType = ""; // msa / legacy / nide / ""
         /** 第三方登录源：nide 是服务器码，legacy 是地址。 */
         public String server = "";
+        /** 微软长期令牌，用来在 Minecraft 令牌过期后自动续期。 */
+        public String refreshToken = "";
+        /** Minecraft 令牌过期时间（毫秒），0 表示还不知道。 */
+        public long expiresAt = 0;
 
         public Account(String name, String uuid, String skin, boolean online) {
             this.name = name;
@@ -542,7 +546,8 @@ public final class Data {
     }
 
     public static String offlineUuid(String name) {
-        return UUID.nameUUIDFromBytes(("OfflinePlayer:" + name).getBytes()).toString();
+        // 必须用 UTF-8，和 HMCL、原版离线模式算出来的一致；用平台默认编码中文名会对不上
+        return UUID.nameUUIDFromBytes(("OfflinePlayer:" + name).getBytes(StandardCharsets.UTF_8)).toString();
     }
 
     /** 读 Java 主版本号，先看 release 文件。 */
@@ -853,6 +858,13 @@ public final class Data {
                     }
                     if (p.length >= 7) a.clientToken = p[6];
                     if (p.length >= 8) a.server = p[7];
+                    if (p.length >= 9) a.refreshToken = p[8];
+                    if (p.length >= 10) {
+                        try {
+                            a.expiresAt = Long.parseLong(p[9]);
+                        } catch (Exception ignored) {
+                        }
+                    }
                     accounts.add(a);
                 }
             }
@@ -922,7 +934,9 @@ public final class Data {
                 Account a = accounts.get(i);
                 props.setProperty("account." + i, a.name + "|" + a.uuid + "|" + a.skin + "|" + a.online
                         + "|" + a.accessToken + "|" + a.userType + "|" + a.clientToken
-                        + "|" + a.server.replace("|", " "));
+                        + "|" + a.server.replace("|", " ")
+                        + "|" + (a.refreshToken == null ? "" : a.refreshToken.replace("|", " "))
+                        + "|" + a.expiresAt);
             }
             props.setProperty("account.selected", String.valueOf(selectedAccount));
             // 隐藏实例追加到末尾写回，索引不变

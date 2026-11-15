@@ -1,6 +1,5 @@
 package tcraft;
 
-import java.net.URI;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -367,6 +366,8 @@ public final class Dialogs {
                     }
                     target.uuid = r.uuid.isEmpty() ? target.uuid : r.uuid;
                     target.accessToken = r.accessToken;
+                    target.refreshToken = r.refreshToken;
+                    target.expiresAt = r.expiresAt;
                     target.userType = "msa";
                     target.online = true;
                     if (!skin.isEmpty()) target.skin = skin;
@@ -396,7 +397,7 @@ public final class Dialogs {
         final Data d = Data.get();
         VBox form = new VBox(8);
         form.setPadding(new Insets(15, 7, 0, 7));
-        form.getChildren().add(Ui.hint("第三方：通过 Yggdrasil 接口登录（如 LittleSkin / 网易）。", 0));
+        form.getChildren().add(Ui.hint("皮肤站 API 地址，一般以 /api/yggdrasil 结尾（如 LittleSkin）。", 0));
         TextField server = Ui.field("认证服务器，例如 https://littleskin.cn/api/yggdrasil");
         server.setText("https://littleskin.cn/api/yggdrasil");
         server.setPrefHeight(32);
@@ -418,41 +419,51 @@ public final class Dialogs {
             lRef[0].setDisable(true);
             Thread worker = new Thread(() -> {
                 try {
-                    String url = srv.endsWith("/") ? srv + "login" : srv + "/login";
-                    java.net.HttpURLConnection c = (java.net.HttpURLConnection) URI.create(url).toURL().openConnection();
-                    c.setConnectTimeout(12000);
-                    c.setReadTimeout(20000);
-                    c.setRequestMethod("POST");
-                    c.setDoOutput(true);
-                    c.setRequestProperty("Content-Type", "application/json");
-                    c.getOutputStream().write(("{\"username\":\"" + usr + "\",\"password\":\"" + pwd + "\",\"clientToken\":\"\"}").getBytes(java.nio.charset.StandardCharsets.UTF_8));
-                    int code = c.getResponseCode();
-                    if (code != 200) {
-                        javafx.application.Platform.runLater(() -> {
-                            win.toast("登录失败", "认证服务器返回 HTTP " + code + "。", 2);
-                            lRef[0].setDisable(false);
-                        });
-                        return;
+                    Yggdrasil.Server auth = Yggdrasil.locate(srv);
+                    Yggdrasil.Session session = Yggdrasil.authenticate(auth, usr, pwd,
+                            java.util.UUID.randomUUID().toString());
+                    Yggdrasil.Profile profile = session.selected;
+                    if (profile == null) {
+                        if (session.available.isEmpty()) {
+                            throw new Yggdrasil.AuthException(0, "这个账号还没有游戏角色，请先在皮肤站创建角色");
+                        }
+                        // 有多个角色时让用户选，选完再用 refresh 指定 selectedProfile
+                        profile = session.available.size() == 1
+                                ? session.available.get(0) : chooseProfile(win, session.available);
+                        if (profile == null) {
+                            javafx.application.Platform.runLater(() -> lRef[0].setDisable(false));
+                            return;
+                        }
+                        Yggdrasil.Session picked = Yggdrasil.refresh(auth, session.accessToken,
+                                session.clientToken, profile);
+                        session = picked;
+                        if (picked.selected != null) profile = picked.selected;
                     }
-                    String body = new String(c.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
-                    java.util.Map<String, Object> m = Json.obj(Json.parse(body));
-                    String token = Json.str(m, "accessToken", "");
-                    java.util.Map<String, Object> prof = Json.obj(m.get("selectedProfile"));
-                    String uuid = formatUuid(Json.str(prof, "id", Json.str(m, "uuid", "")));
-                    String uname = Json.str(prof, "name", Json.str(m, "username", usr));
-                    final String fuuid = uuid.isEmpty() ? Data.offlineUuid(uname) : uuid;
-                    final String fname = uname;
+                    String uuid = formatUuid(profile.id);
+                    final String fname = profile.name;
+                    final String fuuid = uuid.isEmpty() ? Data.offlineUuid(profile.name) : uuid;
+                    final String ftoken = session.accessToken;
+                    final String fclient = session.clientToken;
+                    final String fserver = auth.apiRoot;
+                    final String fsite = auth.display();
                     javafx.application.Platform.runLater(() -> {
                         Data.Account a = new Data.Account(fname, fuuid, selectedSkin, true);
-                        a.accessToken = token;
+                        a.accessToken = ftoken;
+                        a.clientToken = fclient;
                         a.userType = "legacy";
+                        a.server = fserver;
                         d.accounts.add(a);
                         d.selectedAccount = d.accounts.size() - 1;
                         d.save();
                         win.refreshAccountBadge();
                         win.closeModal();
                         win.openPage(win.currentKey, false);
-                        win.toast("已添加第三方账户", fname, 1);
+                        win.toast("已添加 " + fsite, fname, 1);
+                    });
+                } catch (Yggdrasil.AuthException e) {
+                    javafx.application.Platform.runLater(() -> {
+                        win.toast("登录失败", e.getMessage(), 3);
+                        lRef[0].setDisable(false);
                     });
                 } catch (Exception e) {
                     javafx.application.Platform.runLater(() -> lRef[0].setDisable(false));
@@ -469,6 +480,40 @@ public final class Dialogs {
         form.getChildren().addAll(server, email, password, actions);
         card.getChildren().add(form);
         win.showModal(card);
+    }
+
+    /** 账号下有多个角色时选一个，后台线程等结果；取消返回 null。 */
+    private static Yggdrasil.Profile chooseProfile(MainWindow win, java.util.List<Yggdrasil.Profile> list)
+            throws InterruptedException {
+        java.util.concurrent.atomic.AtomicReference<Yggdrasil.Profile> picked =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+        javafx.application.Platform.runLater(() -> {
+            VBox card = msgCard("选择角色");
+            VBox box = new VBox(8);
+            box.setPadding(new Insets(15, 7, 0, 7));
+            box.getChildren().add(Ui.hint("这个账号有多个角色，选一个用来启动游戏。", 0));
+            for (Yggdrasil.Profile p : list) {
+                box.getChildren().add(Ui.button(p.name, Ui.BTN_NORMAL, () -> {
+                    picked.set(p);
+                    win.closeModal();
+                    latch.countDown();
+                }));
+            }
+            StackPane cancel = Ui.button("取消", Ui.BTN_NORMAL, () -> {
+                win.closeModal();
+                latch.countDown();
+            });
+            HBox actions = new HBox(cancel);
+            actions.setAlignment(Pos.CENTER_RIGHT);
+            box.getChildren().add(actions);
+            card.getChildren().add(box);
+            win.showModal(card);
+            // 点遮罩、按 ESC 关掉时也要放行后台线程
+            win.setModalCloseHook(latch::countDown);
+        });
+        latch.await(120, java.util.concurrent.TimeUnit.SECONDS);
+        return picked.get();
     }
 
     /** 统一通行证登录，走 auth.mc-user.com 的 Yggdrasil。 */
@@ -518,43 +563,25 @@ public final class Dialogs {
             lRef[0].setDisable(true);
             Thread worker = new Thread(() -> {
                 try {
-                    String url = "https://auth.mc-user.com:233/" + c + "/authserver/authenticate";
-                    String body = "{\"agent\":{\"name\":\"Minecraft\",\"version\":1},\"username\":\""
-                            + usr.replace("\"", "") + "\",\"password\":\"" + pwd.replace("\"", "").replace("\\", "\\\\") + "\",\"requestUser\":true}";
-                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection) URI.create(url).toURL().openConnection();
-                    conn.setConnectTimeout(12000);
-                    conn.setReadTimeout(20000);
-                    conn.setRequestMethod("POST");
-                    conn.setDoOutput(true);
-                    conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-                    conn.setRequestProperty("Accept-Language", "zh-CN");
-                    conn.getOutputStream().write(body.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-                    int httpCode = conn.getResponseCode();
-                    java.io.InputStream in = httpCode == 200 ? conn.getInputStream() : conn.getErrorStream();
-                    String resp = in == null ? "" : new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
-                    if (httpCode != 200) {
-                        // 错误响应里有 errorMessage
-                        java.util.Map<String, Object> err = Json.obj(Json.parse(resp));
-                        String msg = Json.str(err, "errorMessage", "认证服务器返回 HTTP " + httpCode);
-                        final String fmsg = msg;
-                        javafx.application.Platform.runLater(() -> {
-                            win.toast("登录失败", fmsg, 2);
-                            lRef[0].setDisable(false);
-                        });
-                        return;
+                    // 统一通行证也是 Yggdrasil，只是 API 根按服务器码分
+                    Yggdrasil.Server auth = new Yggdrasil.Server(
+                            "https://auth.mc-user.com:233/" + c + "/", "统一通行证");
+                    Yggdrasil.Session session = Yggdrasil.authenticate(auth, usr, pwd,
+                            java.util.UUID.randomUUID().toString());
+                    Yggdrasil.Profile profile = session.selected;
+                    if (profile == null && !session.available.isEmpty()) {
+                        profile = session.available.get(0);
+                        session = Yggdrasil.refresh(auth, session.accessToken, session.clientToken, profile);
+                        if (session.selected != null) profile = session.selected;
                     }
-                    java.util.Map<String, Object> m = Json.obj(Json.parse(resp));
-                    String token = Json.str(m, "accessToken", "");
-                    String client = Json.str(m, "clientToken", "");
-                    java.util.Map<String, Object> prof = Json.obj(m.get("selectedProfile"));
-                    String uuid = formatUuid(Json.str(prof, "id", ""));
-                    String uname = Json.str(prof, "name", usr);
-                    final String fuuid = uuid.isEmpty() ? Data.offlineUuid(uname) : uuid;
-                    final String fname = uname;
-                    final String fclient = client;
+                    final String fname = profile == null ? usr : profile.name;
+                    String uuid = profile == null ? "" : formatUuid(profile.id);
+                    final String fuuid = uuid.isEmpty() ? Data.offlineUuid(fname) : uuid;
+                    final String ftoken = session.accessToken;
+                    final String fclient = session.clientToken;
                     javafx.application.Platform.runLater(() -> {
                         Data.Account a = new Data.Account(fname, fuuid, selectedSkin, true);
-                        a.accessToken = token;
+                        a.accessToken = ftoken;
                         a.clientToken = fclient;
                         a.userType = "nide";
                         a.server = c;
@@ -567,6 +594,11 @@ public final class Dialogs {
                         win.closeModal();
                         win.openPage(win.currentKey, false);
                         win.toast("已添加统一通行证账户", fname, 1);
+                    });
+                } catch (Yggdrasil.AuthException e) {
+                    javafx.application.Platform.runLater(() -> {
+                        win.toast("登录失败", e.getMessage(), 3);
+                        lRef[0].setDisable(false);
                     });
                 } catch (Exception e) {
                     javafx.application.Platform.runLater(() -> lRef[0].setDisable(false));
