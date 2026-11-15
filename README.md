@@ -94,18 +94,18 @@ TCraft Launcher（简称 **TCL**）是用 JavaFX 写的 Minecraft 启动器。�
 
 ## 编译与运行
 
-需要 **JDK 17 或更高版本**编译，克隆后用仓库自带的 JavaFX 运行库直接编译：
+需要 **JDK 17 或更高版本**，`lib/` 里是编译用的 JavaFX jar：
 
 ```bash
-javac --release 17 --module-path lib --add-modules javafx.controls,javafx.graphics,javafx.base,javafx.media \
+javac --release 17 --module-path lib --add-modules javafx.controls,javafx.media \
       -encoding UTF-8 -d out src/tcraft/*.java
-
-java --module-path lib --add-modules javafx.controls,javafx.graphics,javafx.base,javafx.media \
-     -cp out tcraft.Boot
 ```
 
 > `--release 17` 不能省：缺了它，用 JDK 21/25 编出的 class 是 21/25 字节码，
 > JDK 17 加载会抛 `UnsupportedClassVersionError`。产物应为 major 61。
+
+打包：class 与 `res/` 打成一个 jar（`Main-Class: tcraft.Boot`），首次启动会按平台把 JavaFX
+下载到 `.tcl/dependencies`，所以仓库里不放 JavaFX 的本机库。
 
 Windows 单文件包：编译 `tools/launcher.c` → `python tools/add-icon.py` 注入图标
 （TCC 不能链接 `.rc`，直接写 PE 的 `.rsrc` 节）→ 追加 jar。
@@ -115,10 +115,9 @@ Windows 单文件包：编译 `tools/launcher.c` → `python tools/add-icon.py` 
 ```
 ├── src/tcraft/     启动器源码（JavaFX）
 ├── res/            资源：图标、语言表、样式、内置壁纸
-├── lib/            各平台 JavaFX 运行库
-├── tools/          原生启动器源码（launcher.c）
-├── website/        官网（GitHub Pages 自动部署）
-└── dist/           构建产物（不入库）
+├── lib/            JavaFX 编译依赖（jar）
+├── tools/          原生启动器源码（launcher.c）与图标注入脚本
+└── website/        官网（GitHub Pages 自动部署）
 ```
 
 官网在推送后由 GitHub Actions 自动发布到 [GitHub Pages](https://damianjiang.github.io/TCraft-Launcher/)。
