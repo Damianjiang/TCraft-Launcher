@@ -729,9 +729,9 @@ public class PageResourceDetail implements Page {
         return false;
     }
 
-    /** 实例文件夹，folder 为空时回退全局游戏目录。 */
+    /** 实例的游戏目录，隔离时是 versions/&lt;版本&gt;。 */
     private String folderOf(Data.Instance ins) {
-        return ins.folder != null && !ins.folder.isEmpty() ? ins.folder : data.gameDir;
+        return Isolation.run(ins).toString();
     }
 
     private static long lastModified(String dir, String sub) {

@@ -111,22 +111,46 @@ public class PageOther implements Page {
         page.getChildren().add(legal);
 
         Ui.Card about = Ui.card("关于");
-        about.add(paragraph("TCraft Launcher 1.0.0 由 TCraft 团队开发与维护，持续更新，并已在 GitHub 开源。\n提供游戏与模组、整合包、资源包、光影的下载与管理，支持原版、Forge / NeoForge / Fabric / OptiFine / LiteLoader。\n同时提供登录、启动、联机、实例与整合包导出等完整能力。\n点击链接加入群聊【TCraft Launcher启动器交流群】：https://qm.qq.com/q/UONlv4VgwE，获取更新、反馈问题。"));
+        about.add(paragraph("TCraft Launcher 是用 JavaFX 写的开源 Minecraft 启动器，支持微软正版登录、EasyTier 联机，以及游戏、Mod、整合包与资源包的下载管理。"));
+        about.add(actionRow("加入 QQ 群", Ui.BTN_HIGHLIGHT, "群号 1131373915 · 获取更新、反馈问题", COMMUNITY_URL));
         Label buildType = Ui.label("当前构建：完整版（已内置微软正版登录）", 12.5, Theme.gray2);
         buildType.setWrapText(true);
         buildType.setStyle("-fx-font-weight: bold;");
-        about.add(buildType);
+        Label version = Ui.label("v" + Build.VERSION, 12, Theme.gray3);
+        HBox buildRow = new HBox(8, buildType, version);
+        buildRow.setAlignment(Pos.CENTER_LEFT);
+        about.add(buildRow);
         VBox.setMargin(about, new Insets(0, 0, 15, 0));
         page.getChildren().add(about);
 
         Ui.Card thanks = Ui.card("参考与致谢");
-        thanks.add(paragraph("TCL 的功能规划与交互设计参考了 HMCL（Hello Minecraft! Launcher）的成熟方案；版本安装、资源下载、启动参数构建等核心流程，参考了 PCL（Plain Craft Launcher，作者龙腾猫跃）的主体代码。\n上述参考仅用于学习与兼容性实现：TCL 的界面与代码由 TCraft 团队使用 VB.NET / C# 重新编写，与 HMCL、PCL 均无隶属、赞助或背书关系，也不会与其混淆。在此向 HMCL 开发者与龙腾猫跃致谢。\n同时感谢 Lucide 图标库（ISC）等开源组件，相关权利归各自作者所有。"));
+        thanks.add(paragraph("TCL 的功能规划与交互设计参考了 HMCL（Hello Minecraft! Launcher）的成熟方案，界面与代码为独立编写，与 HMCL、PCL（Plain Craft Launcher）均无隶属、赞助或背书关系。\n"
+                + "图标来自 Lucide（ISC），联机能力来自 EasyTier，在此一并致谢。"));
         VBox.setMargin(thanks, new Insets(0, 0, 15, 0));
         page.getChildren().add(thanks);
 
         Ui.Card repo = Ui.card("开源地址");
-        repo.add(paragraph("https://github.com/Damianjiang/TCraft-Launcher\n欢迎提交 Issue 与 Pull Request，也欢迎 Star 支持。"));
+        repo.add(paragraph("欢迎提交 Issue 与 Pull Request，也欢迎 Star 支持。"));
+        repo.add(actionRow("打开 GitHub 仓库", Ui.BTN_NORMAL, "github.com/Damianjiang/TCraft-Launcher", GITHUB_URL));
         page.getChildren().add(repo);
+    }
+
+    /** 官方 QQ 群邀请链接。 */
+    private static final String COMMUNITY_URL = "https://qm.qq.com/q/UONlv4VgwE";
+    private static final String GITHUB_URL = "https://github.com/Damianjiang/TCraft-Launcher";
+
+    /** 按钮 + 一行说明，按钮不撑满整行。 */
+    private HBox actionRow(String text, int type, String note, String url) {
+        StackPane btn = Ui.button(text, type, () -> openUrl(url));
+        btn.setMinWidth(126);
+        btn.setMaxWidth(Region.USE_PREF_SIZE);
+        Label hint = Ui.label(note, 12, Theme.gray2);
+        hint.setWrapText(true);
+        HBox.setHgrow(hint, Priority.ALWAYS);
+        HBox row = new HBox(12, btn, hint);
+        row.setAlignment(Pos.CENTER_LEFT);
+        VBox.setMargin(row, new Insets(12, 0, 0, 0));
+        return row;
     }
 
     /** 关于页正文，自动换行。 */
@@ -343,13 +367,20 @@ public class PageOther implements Page {
         int[] removed = {0};
         try {
             String[] subdirs = {"crash-reports", "logs"};
-            for (String s : subdirs) {
-                File dir = new File(data.gameDir, s);
-                if (!dir.isDirectory()) continue;
-                File[] files = dir.listFiles();
-                if (files == null) continue;
-                for (File f : files) {
-                    if (f.isFile() && f.delete()) removed[0]++;
+            java.nio.file.Path global = java.nio.file.Paths.get(data.gameDir);
+            Data.Instance ins = data.instance();
+            java.nio.file.Path run = ins == null ? global : Isolation.run(ins);
+            java.nio.file.Path[] roots = run.equals(global)
+                    ? new java.nio.file.Path[]{global} : new java.nio.file.Path[]{global, run};
+            for (java.nio.file.Path root : roots) {
+                for (String s : subdirs) {
+                    File dir = new File(root.toFile(), s);
+                    if (!dir.isDirectory()) continue;
+                    File[] files = dir.listFiles();
+                    if (files == null) continue;
+                    for (File f : files) {
+                        if (f.isFile() && f.delete()) removed[0]++;
+                    }
                 }
             }
             win.toast("已清理垃圾", "删除了 " + removed[0] + " 个缓存文件。", 1);

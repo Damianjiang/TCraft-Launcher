@@ -47,6 +47,22 @@ public final class Lang {
         return mode == 1 ? v[0] : v[1];
     }
 
+    /** 带参数的文案：用 %s / %d 占位，先翻译模板再填参数。 */
+    public static String tf(String zh, Object... args) {
+        String pattern = t(zh);
+        if (args == null || args.length == 0) return pattern;
+        try {
+            return String.format(pattern, args);
+        } catch (Exception e) {
+            // 翻译里混进了 % 之类，退回中文原文
+            try {
+                return String.format(zh, args);
+            } catch (Exception ignored) {
+                return zh;
+            }
+        }
+    }
+
     /** 把界面文字换成当前语言，查不到原样保留。 */
     public static void localize(javafx.scene.Node node) {
         if (node == null || mode == 0) return;

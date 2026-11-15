@@ -15,6 +15,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /** Minecraft 原版 / Fabric 下载器，带任务进度。 */
 public final class Downloader {
@@ -24,7 +26,7 @@ public final class Downloader {
     private static final String BMCL_DEFAULT = "https://bmclapi2.bangbang93.com";
 
     /** 当前镜像根，留空用内置 BMCLAPI。 */
-    private static String bmcl() {
+    static String bmcl() {
         String custom = Data.get().get("SystemBmclRoot", "").trim();
         if (custom.isEmpty()) return BMCL_DEFAULT;
         if (!custom.startsWith("http://") && !custom.startsWith("https://")) custom = "https://" + custom;
@@ -36,23 +38,30 @@ public final class Downloader {
     }
 
     public static void startInstall(MainWindow win, Data.McVersion version, String loader) {
-        startInstall(win, version, loader, (java.nio.file.Path) null, null, null);
+        startInstall(win, version, loader, (java.nio.file.Path) null, null, null, null);
     }
 
     /** loaderVersion 为 null 时用官方推荐版本。 */
     public static void startInstall(MainWindow win, Data.McVersion version, String loader, String loaderVersion) {
-        startInstall(win, version, loader, (java.nio.file.Path) null, loaderVersion, null);
+        startInstall(win, version, loader, (java.nio.file.Path) null, loaderVersion, null, null);
     }
 
     /** 安装到指定目录，整合包导入用。 */
     public static void startInstall(MainWindow win, Data.McVersion version, String loader,
                                     java.nio.file.Path gameDirOverride) {
-        startInstall(win, version, loader, gameDirOverride, (String) null, (Inst) null);
+        startInstall(win, version, loader, gameDirOverride, (String) null, (Inst) null, null);
     }
 
     /** 完整安装入口，inst 为 null 表示不用组件选择。 */
     public static void startInstall(MainWindow win, Data.McVersion version, String loader,
                                     java.nio.file.Path gameDirOverride, String loaderVersion, Inst inst) {
+        startInstall(win, version, loader, gameDirOverride, loaderVersion, inst, null);
+    }
+
+    /** onInstalled 在装完后回调真实版本号，整合包导入靠它登记实例。 */
+    public static void startInstall(MainWindow win, Data.McVersion version, String loader,
+                                    java.nio.file.Path gameDirOverride, String loaderVersion, Inst inst,
+                                    java.util.function.Consumer<String> onInstalled) {
         Tasks.Task task = new Tasks.Task("安装 " + version.id + ("原版".equals(loader) ? "" : " · " + loader)
                 + (inst != null && !inst.name.isEmpty() && !inst.name.equals(version.id) ? "（" + inst.name + "）" : ""));
         task.versionId = version.id;
@@ -70,7 +79,7 @@ public final class Downloader {
 
         Thread thread = new Thread(() -> {
             try {
-                install(task, version, loader, data, win, gameDirOverride, loaderVersion, inst);
+                String actual = install(task, version, loader, data, win, gameDirOverride, loaderVersion, inst);
                 task.progress = 1;
                 task.state = Tasks.State.DONE;
                 task.stage = "安装完成";
@@ -78,6 +87,10 @@ public final class Downloader {
                 javafx.application.Platform.runLater(() ->
                         win.toast("安装完成", version.id + ("原版".equals(loader) ? "" : " · " + loader), 1));
                 data.log("安装完成：" + version.id + "（" + loader + "）");
+                if (onInstalled != null) {
+                    final String realVersion = actual;
+                    javafx.application.Platform.runLater(() -> onInstalled.accept(realVersion));
+                }
                 // 回 FX 线程刷新当前页。
                 javafx.application.Platform.runLater(() -> {
                     String key = win.currentKey;
@@ -118,42 +131,23 @@ public final class Downloader {
                 : !inst.neoforge.isEmpty() ? inst.neoforge
                 : !inst.liteLoader.isEmpty() ? inst.liteLoader
                 : !inst.legacyFabric.isEmpty() ? inst.legacyFabric : "";
-        // 按设置决定是否装进独立目录。
-        startInstall(win, version, loader, resolveIsolation(data, version, loader, inst), loaderVersion, inst);
-    }
-
-    /** 0 关闭 / 1 隔离可装 Mod 的版本 / 2 隔离非正式版 / 3 两者 / 4 隔离所有版本。 */
-    private static Path resolveIsolation(Data data, Data.McVersion version, String loader, Inst inst) {
-        int mode = data.getInt("LaunchIsolation", 4);
-        if (mode == 0) return null;
-        boolean modCapable = loader != null && !loader.isEmpty() && !"原版".equals(loader);
-        boolean nonRelease = !"正式版".equals(version.group());
-        boolean isolate = switch (mode) {
-            case 1 -> modCapable;
-            case 2 -> nonRelease;
-            case 3 -> modCapable || nonRelease;
-            default -> true;
-        };
-        if (!isolate) return null;
-        String name = (inst != null && inst.name != null && !inst.name.isBlank())
-                ? inst.name.trim() : version.id;
-        name = name.replaceAll("[\\\\/:*?\"<>|]", "_");
-        return Paths.get(data.gameDir, "TCL", "instances", name);
+        // 装进当前游戏目录，隔离在启动时按设置决定（共用 libraries / assets）。
+        startInstall(win, version, loader, (java.nio.file.Path) null, loaderVersion, inst);
     }
 
     /** 整合包导入用的简化入口。 */
-    public static void install(Tasks.Task task, Data.McVersion version, String loader, Data data, MainWindow win,
+    public static String install(Tasks.Task task, Data.McVersion version, String loader, Data data, MainWindow win,
                                 java.nio.file.Path gameDirOverride) throws Exception {
-        install(task, version, loader, data, win, gameDirOverride, null, null);
+        return install(task, version, loader, data, win, gameDirOverride, null, null);
     }
 
-    public static void install(Tasks.Task task, Data.McVersion version, String loader, Data data, MainWindow win,
+    public static String install(Tasks.Task task, Data.McVersion version, String loader, Data data, MainWindow win,
                                 java.nio.file.Path gameDirOverride, String loaderVersion) throws Exception {
-        install(task, version, loader, data, win, gameDirOverride, loaderVersion, null);
+        return install(task, version, loader, data, win, gameDirOverride, loaderVersion, null);
     }
 
-    /** 完整安装，含附加载器、OptiFine、LiteLoader 这些组件。 */
-    public static void install(Tasks.Task task, Data.McVersion version, String loader, Data data, MainWindow win,
+    /** 完整安装，含附加载器、OptiFine、LiteLoader 这些组件；返回实际版本号。 */
+    public static String install(Tasks.Task task, Data.McVersion version, String loader, Data data, MainWindow win,
                                 java.nio.file.Path gameDirOverride, String loaderVersion, Inst inst) throws Exception {
         Path game = gameDirOverride != null ? gameDirOverride : Paths.get(data.gameDir);
         Files.createDirectories(game.resolve("versions"));
@@ -376,18 +370,27 @@ public final class Downloader {
             sub(task, 5, Tasks.State.DONE);
         }
 
-        // 附加载器下到 mods 或缓存目录。
-        if (inst != null) installExtraComponents(task, version.id, game, inst, "OptiFine".equals(loader), win);
+        // 附加载器下到 mods 或缓存目录；隔离实例放进 versions/<版本>，跟游戏实际目录一致
+        if (inst != null) {
+            Data.Instance probe = new Data.Instance("", actualVersion, loader, "", "", "", 0, false,
+                    game.toString(), Isolation.FOLLOW);
+            Path contentDir = Isolation.on(probe) ? game.resolve("versions").resolve(actualVersion) : game;
+            try {
+                Files.createDirectories(contentDir.resolve("mods"));
+            } catch (Exception ignored) {
+            }
+            installExtraComponents(task, version.id, contentDir, inst, "OptiFine".equals(loader), win);
+        }
 
         // 整合包导入交给调用方登记实例。
-        if (gameDirOverride != null && inst == null) return;
+        if (gameDirOverride != null && inst == null) return actualVersion;
         String instanceName = (inst != null && inst.name != null && !inst.name.isBlank())
                 ? inst.name.trim() : actualVersion;
         Data.Instance instance = new Data.Instance(
                 instanceName, actualVersion, loader, loaderVersion == null ? "" : loaderVersion,
                 version.group() + " " + version.id + ("原版".equals(loader) ? "" : "，已安装 " + loader),
                 instanceIcon(loader, version),
-                System.currentTimeMillis(), false, game.toString());
+                System.currentTimeMillis(), false, game.toString(), Isolation.FOLLOW);
         int selected = -1;
         for (int i = 0; i < data.instances.size(); i++) {
             if (data.instances.get(i).name.equals(instance.name)) { selected = i; break; }
@@ -398,6 +401,7 @@ public final class Downloader {
         }
         data.selectedInstance = selected;
         data.save();
+        return actualVersion;
     }
 
     /** 实例图标跟着主加载器。 */
@@ -507,8 +511,8 @@ public final class Downloader {
         if ("Forge".equals(loader)) {
             String fv = wantedVersion == null ? "" : wantedVersion.trim();
             if (fv.isEmpty()) {
-                String promos = getText("https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json",
-                        bmcl() + "/forge/minecraftforge/promotions_slim.json");
+                String promos = getText(bmcl() + "/maven/net/minecraftforge/forge/promotions_slim.json",
+                        "https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json");
                 Map<String, Object> p = Json.obj(Json.obj(Json.parse(promos)), "promos");
                 fv = Json.str(p, mc + "-recommended", Json.str(p, mc + "-latest", ""));
             }
@@ -519,10 +523,18 @@ public final class Downloader {
         } else {
             String best = wantedVersion == null ? "" : wantedVersion.trim();
             if (best.isEmpty()) {
-                String listText = getText("https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge");
+                String listText = getText(bmcl() + "/maven/net/neoforged/neoforge/maven-metadata.xml",
+                        "https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge");
                 String want = neoforgePrefix(mc);
-                for (Object o : Json.arr(Json.obj(Json.parse(listText)), "versions")) {
-                    String v = String.valueOf(o);
+                List<String> all = new ArrayList<>();
+                Matcher xml = Pattern.compile("<version>([^<]+)</version>").matcher(listText);
+                while (xml.find()) all.add(xml.group(1));
+                if (all.isEmpty()) {
+                    for (Object o : Json.arr(Json.obj(Json.parse(listText)), "versions")) {
+                        all.add(String.valueOf(o));
+                    }
+                }
+                for (String v : all) {
                     if (want == null || !v.startsWith(want)) continue;
                     if (best.isEmpty() || compareVersion(v, best) > 0) best = v;
                 }
@@ -535,6 +547,7 @@ public final class Downloader {
 
         Path installer = game.resolve("TCL").resolve("installers")
                 .resolve(loader.toLowerCase() + "-" + mc + "-installer.jar");
+        task.stage = "下载 " + loader + " 安装器";
         downloadFile(task, installerUrl, installer, 0.95, 0.97, loader + " 安装器");
         String javaExe = data.javaPath;
         if (javaExe == null || javaExe.isEmpty() || !Files.isRegularFile(Paths.get(javaExe))) {
@@ -551,16 +564,38 @@ public final class Downloader {
         // 输出写文件，避免安装器大量日志把管道塞满导致卡死
         Path logFile = installer.getParent().resolve(loader.toLowerCase() + "-" + mc + ".log");
         Files.createDirectories(logFile.getParent());
-        ProcessBuilder pb = new ProcessBuilder(javaExe, "-jar", installer.toString(),
-                "--installClient", game.toString());
+        List<String> cmd = new ArrayList<>();
+        cmd.add(javaExe);
+        cmd.add("-Dfile.encoding=UTF-8");
+        // 安装器自己也要联网下依赖，代理一起带过去
+        String proxyHost = data.get("SystemProxyHost", "");
+        String proxyPort = data.get("SystemProxyPort", "7890");
+        int proxyMode = data.getInt("SystemHttpProxyType", 1);
+        if (!proxyHost.isEmpty() && (proxyMode == 2 || proxyMode == 3)) {
+            if (proxyMode == 3) {
+                cmd.add("-DsocksProxyHost=" + proxyHost);
+                cmd.add("-DsocksProxyPort=" + proxyPort);
+            } else {
+                cmd.add("-Dhttp.proxyHost=" + proxyHost);
+                cmd.add("-Dhttp.proxyPort=" + proxyPort);
+                cmd.add("-Dhttps.proxyHost=" + proxyHost);
+                cmd.add("-Dhttps.proxyPort=" + proxyPort);
+            }
+        }
+        cmd.add("-jar");
+        cmd.add(installer.toString());
+        cmd.add("--installClient");
+        cmd.add(game.toString());
+        // 安装器自己从官方 maven 拉依赖很慢，先用镜像把能预下的都放好
+        prefetchInstallerLibraries(task, installer, game, loader);
+        if (task.canceled) throw new IOException("已取消");
+        task.stage = "正在运行 " + loader + " 安装器";
+        ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.directory(game.toFile());
         pb.redirectErrorStream(true);
         pb.redirectOutput(logFile.toFile());
         Process process = pb.start();
-        if (!process.waitFor(15, java.util.concurrent.TimeUnit.MINUTES)) {
-            process.destroyForcibly();
-            throw new IOException(loader + " 安装器超时，请检查网络后重试。日志：" + logFile);
-        }
+        runInstaller(task, process, logFile, loader);
         int code = process.exitValue();
         if (code != 0) {
             String output = Files.isRegularFile(logFile)
@@ -569,6 +604,125 @@ public final class Downloader {
             throw new IOException(loader + " 安装器退出码 " + code + "：" + tail.trim());
         }
         return findInstalledVersion(game, prefix, mc);
+    }
+
+    /** 从安装器 jar 的 install_profile.json 里读出依赖，先用镜像下好，安装器校验通过就直接跳过。 */
+    private static void prefetchInstallerLibraries(Tasks.Task task, Path installer, Path game, String loader) {
+        try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(installer.toFile())) {
+            java.util.zip.ZipEntry entry = zip.getEntry("install_profile.json");
+            if (entry == null) return;
+            String text = new String(zip.getInputStream(entry).readAllBytes(), StandardCharsets.UTF_8);
+            Map<String, Object> profile = Json.obj(Json.parse(text));
+            List<Map<String, Object>> libs = new ArrayList<>();
+            for (Object o : Json.arr(profile.get("libraries"))) libs.add(Json.obj(o));
+            for (Object o : Json.arr(Json.obj(profile.get("versionInfo")).get("libraries"))) libs.add(Json.obj(o));
+            // spec 1 的客户端库在 jar 内的 version.json 里
+            String jsonPath = Json.str(profile, "json", "");
+            if (!jsonPath.isEmpty()) {
+                java.util.zip.ZipEntry versionEntry = zip.getEntry(jsonPath.replaceFirst("^/", ""));
+                if (versionEntry != null) {
+                    String versionText = new String(zip.getInputStream(versionEntry).readAllBytes(), StandardCharsets.UTF_8);
+                    for (Object o : Json.arr(Json.obj(Json.parse(versionText)).get("libraries"))) {
+                        libs.add(Json.obj(o));
+                    }
+                }
+            }
+            if (libs.isEmpty()) return;
+            task.stage = "预下载 " + loader + " 依赖";
+            int done = 0;
+            for (Map<String, Object> lib : libs) {
+                if (task.canceled) return;
+                Map<String, Object> artifact = Json.obj(Json.obj(lib.get("downloads")).get("artifact"));
+                String path = Json.str(artifact, "path", "");
+                String url = Json.str(artifact, "url", "");
+                if (path.isEmpty()) {
+                    // 老版本 Forge 只有 name + url
+                    String name = Json.str(lib, "name", "");
+                    String base = Json.str(lib, "url", "");
+                    if (name.isEmpty() || base.isEmpty()) continue;
+                    path = nameToPath(name);
+                    if (!base.endsWith("/")) base += "/";
+                    url = base + path;
+                }
+                if (url.isEmpty()) continue;
+                Path target = game.resolve("libraries").resolve(path);
+                if (!Files.isRegularFile(target) || Files.size(target) <= 0) {
+                    // 有 sha1 就让下载器校验，坏文件不会留给安装器
+                    String sha1 = Json.str(artifact, "sha1", "");
+                    String label = sha1.matches("[0-9a-fA-F]{40}") ? sha1 : loader + " 依赖 " + target.getFileName();
+                    try {
+                        downloadFile(task, url, target, 0.97, 0.99, label);
+                    } catch (Exception e) {
+                        // 预下载失败不影响安装器，它自己会再试
+                        Data.get().log("预下载失败：" + path + " " + e.getMessage());
+                    }
+                }
+                done++;
+                task.stage = "预下载 " + loader + " 依赖 " + done + " / " + libs.size();
+            }
+        } catch (Exception e) {
+            Data.get().log("读取 " + loader + " 安装器清单失败：" + e.getMessage());
+        }
+    }
+
+    /** 等安装器退出：实时把日志最后一行显示在任务里，取消能真正杀掉进程。 */    private static void runInstaller(Tasks.Task task, Process process, Path logFile, String loader) throws Exception {
+        long start = System.currentTimeMillis();
+        long lastChange = start;
+        String lastLine = "";
+        while (true) {
+            if (task.canceled) {
+                killTree(process);
+                throw new IOException("已取消");
+            }
+            if (process.waitFor(700, java.util.concurrent.TimeUnit.MILLISECONDS)) return;
+            String line = lastLogLine(logFile);
+            long now = System.currentTimeMillis();
+            if (!line.isEmpty() && !line.equals(lastLine)) {
+                lastLine = line;
+                lastChange = now;
+                task.stage = "运行 " + loader + " 安装器：" + (line.length() > 70 ? line.substring(0, 70) + "…" : line);
+            } else if (now - lastChange > 3000) {
+                // 日志没动静也报个时长，让人知道没死
+                task.stage = "运行 " + loader + " 安装器（" + ((now - start) / 1000) + " 秒，下载依赖较慢请稍候）";
+                lastChange = now;
+            }
+            if (now - start > 20 * 60 * 1000L) {
+                killTree(process);
+                throw new IOException(loader + " 安装器超过 20 分钟没有结束，请检查网络或改用镜像。日志：" + logFile);
+            }
+        }
+    }
+
+    /** 先杀子进程再杀自己，安装器会 fork 出子 JVM。 */
+    private static void killTree(Process process) {
+        try {
+            process.descendants().forEach(ProcessHandle::destroyForcibly);
+        } catch (Exception ignored) {
+        }
+        process.destroyForcibly();
+    }
+
+    /** 日志最后一行，读文件尾巴避免整份加载。 */
+    private static String lastLogLine(Path logFile) {
+        try {
+            if (!Files.isRegularFile(logFile)) return "";
+            long size = Files.size(logFile);
+            long from = Math.max(0, size - 4096);
+            String text;
+            try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(logFile.toFile(), "r")) {
+                raf.seek(from);
+                byte[] buf = new byte[(int) (size - from)];
+                raf.readFully(buf);
+                text = new String(buf, StandardCharsets.UTF_8);
+            }
+            String[] lines = text.split("\\R");
+            for (int i = lines.length - 1; i >= 0; i--) {
+                String s = lines[i].trim();
+                if (!s.isEmpty()) return s;
+            }
+        } catch (Exception ignored) {
+        }
+        return "";
     }
 
     private static String findInstalledVersion(Path game, String prefix, String mc) {
@@ -618,7 +772,9 @@ public final class Downloader {
     private static String installFabric(Tasks.Task task, String gameVersion, Path game, String wantedVersion, boolean legacy) throws Exception {
         String base = (legacy ? "https://meta.legacyfabric.net/v2/versions/loader/"
                 : "https://meta.fabricmc.net/v2/versions/loader/") + gameVersion;
-        Object list = Json.parse(getText(base));
+        // 官方 meta 在国内很慢，镜像优先
+        String mirror = legacy ? base : bmcl() + "/fabric-meta/v2/versions/loader/" + gameVersion;
+        Object list = Json.parse(getText(mirror, base));
         List<Object> loaders = Json.arr(list);
         if (loaders.isEmpty()) throw new IOException("没有可用的 Fabric 加载器");
         String loaderVersion = null;
@@ -642,7 +798,7 @@ public final class Downloader {
         }
         if (loaderVersion == null || loaderVersion.isEmpty()) throw new IOException("没有可用的 " + (legacy ? "Legacy" : "") + "Fabric 加载器版本");
         String profileUrl = base + "/" + loaderVersion + "/profile/json";
-        String profileText = getText(profileUrl);
+        String profileText = getText(mirror + "/" + loaderVersion + "/profile/json", profileUrl);
         Map<String, Object> profile = Json.obj(Json.parse(profileText));
         String id = legacy ? "legacy-fabric-loader-" + loaderVersion + "-" + gameVersion
                 : "fabric-loader-" + loaderVersion + "-" + gameVersion;
@@ -862,6 +1018,24 @@ public final class Downloader {
         }
         if (url.contains("resources.download.minecraft.net")) {
             mirrorUrls.add(url.replace("https://resources.download.minecraft.net", root + "/assets"));
+        }
+        // 加载器 maven 也走镜像：官方源在国内经常只有几十 KB/s，安装器能拖十几分钟
+        if (url.contains("maven.minecraftforge.net")) {
+            mirrorUrls.add(url.replace("https://maven.minecraftforge.net", root + "/maven")
+                    .replace("http://maven.minecraftforge.net", root + "/maven"));
+        }
+        if (url.contains("files.minecraftforge.net/maven")) {
+            mirrorUrls.add(url.replace("https://files.minecraftforge.net/maven", root + "/maven")
+                    .replace("http://files.minecraftforge.net/maven", root + "/maven"));
+        }
+        if (url.contains("maven.neoforged.net/releases")) {
+            mirrorUrls.add(url.replace("https://maven.neoforged.net/releases", root + "/maven"));
+        }
+        if (url.contains("maven.fabricmc.net")) {
+            mirrorUrls.add(url.replace("https://maven.fabricmc.net", root + "/maven"));
+        }
+        if (url.contains("meta.fabricmc.net")) {
+            mirrorUrls.add(url.replace("https://meta.fabricmc.net", root + "/fabric-meta"));
         }
         if (source == 2 && !mirrorUrls.isEmpty()) {
             out.addAll(mirrorUrls);

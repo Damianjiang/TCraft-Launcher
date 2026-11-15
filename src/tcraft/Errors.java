@@ -265,7 +265,7 @@ public final class Errors {
             card.getChildren().add(ask);
         }
 
-        Label copyWarn = Ui.label("请不要发送截图，请复制下面的完整报错，粘贴到交流群或 GitHub Issues 提交。",
+        Label copyWarn = Ui.label("请不要发送截图。点「导出日志」保存错误报告，再把文件发到 TCL 交流群（1131373915）。",
                 12, Theme.red);
         copyWarn.setWrapText(true);
         copyWarn.setMaxWidth(470);
@@ -283,7 +283,7 @@ public final class Errors {
                     () -> finish(null)));
         } else if (r.behavior == Behavior.ALERT_FEEDBACK || r.behavior == Behavior.ALERT_CRASH) {
             actions.getChildren().addAll(
-                    Ui.button("复制全部", Ui.BTN_NORMAL, () -> copyAll(r)),
+                    Ui.button("导出日志", Ui.BTN_NORMAL, () -> exportAndToast(r)),
                     Ui.button("反馈", Ui.BTN_RED, () -> finish(() -> doFeedback(r))),
                     Ui.button(r.behavior == Behavior.ALERT_CRASH ? "退出启动器" : "取消",
                             Ui.BTN_NORMAL, () -> finish(() -> {
@@ -291,35 +291,81 @@ public final class Errors {
                             })));
         } else {
             actions.getChildren().addAll(
-                    Ui.button("复制全部", Ui.BTN_NORMAL, () -> copyAll(r)),
+                    Ui.button("导出日志", Ui.BTN_NORMAL, () -> exportAndToast(r)),
                     Ui.button("确定", Ui.BTN_RED, () -> finish(null)));
         }
         card.getChildren().add(actions);
         return card;
     }
 
-    /** 标题、简要原因、完整堆栈和系统信息一起复制。 */
-    private static void copyAll(Report r) {
-        copy(fullReport(r));
+    /** 按钮用：导出并提示，弹窗不关，用户还能继续点「反馈」。 */
+    private static void exportAndToast(Report r) {
+        Path file = exportReport(r);
         MainWindow w = window;
-        if (w != null) onFx(() -> w.toast("完整报错已复制", "可直接粘贴给开发者。", 1));
+        if (w == null) return;
+        if (file == null) {
+            onFx(() -> w.toast("导出失败", "无法写入错误报告，请改用「设置 → 日志」导出。", 3));
+        } else {
+            onFx(() -> w.toast("错误报告已导出",
+                    file.getFileName() + " · 请把文件发到 TCL 交流群（1131373915）", 2));
+        }
     }
 
-    private static String fullReport(Report r) {
-        return r.title + "\n" + r.headline + "\n\n" + r.detail + "\n\n" + systemInfo();
+    /** 把报错、诊断信息和最近的启动器日志写成一个文件，再打开所在文件夹。 */
+    private static Path exportReport(Report r) {
+        Path file = null;
+        try {
+            Path dir = Resources.home().resolve("feedback");
+            Files.createDirectories(dir);
+            String stamp = LocalDateTime.now()
+                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
+            file = dir.resolve("TCraft-错误报告-" + stamp + ".log");
+            // 带 BOM，记事本和 QQ 里直接看不会乱码
+            Files.writeString(file, "\uFEFF" + exportText(r), StandardCharsets.UTF_8);
+        } catch (Throwable t) {
+            logOnly("导出错误报告失败", t);
+            return null;
+        }
+        try {
+            Shell.openFolder(file.getParent().toString());
+        } catch (Throwable ignored) {
+        }
+        return file;
+    }
+
+    /** 导出文件的正文：报错 + 诊断 + 最近 200 行日志。 */
+    private static String exportText(Report r) {
+        return exportText(r.title, r.headline, r.detail);
+    }
+
+    /** 同上，方便单独验证。 */
+    static String exportText(String title, String headline, String detail) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("TCraft Launcher ").append(Build.VERSION)
+                .append("（").append(Build.EDITION).append("）错误报告\n");
+        sb.append("时间：").append(LocalDateTime.now().withNano(0)).append('\n');
+        sb.append("\n===== 报错 =====\n").append(title).append('\n').append(headline).append('\n');
+        if (detail != null && !detail.isEmpty()) {
+            sb.append("\n===== 详细信息 =====\n").append(detail).append('\n');
+        }
+        sb.append("\n===== 诊断信息 =====\n").append(systemInfo()).append('\n');
+        try {
+            List<String> logs = Data.get().log;
+            int from = Math.max(0, logs.size() - 200);
+            sb.append("\n===== 最近日志（最后 ").append(logs.size() - from).append(" 行）=====\n");
+            for (int i = from; i < logs.size(); i++) sb.append(logs.get(i)).append('\n');
+        } catch (Throwable ignored) {
+        }
+        return sanitize(sb.toString());
     }
 
     /** 复制完整报错、写诊断日志，再弹「反馈」窗。 */
     private static void doFeedback(Report r) {
         feedbackInfo();
-        copy(fullReport(r));
-        MainWindow w = window;
-        if (w != null) {
-            onFx(() -> w.toast("完整报错已复制", "可直接粘贴到反馈群或发给开发者。", 1));
-        }
-        String text = "请加入 TCraft Launcher 启动器交流群（群号 1131373915）提交问题。\n"
-                + "完整报错已复制到剪贴板，可直接粘贴到群内。\n"
-                + "也可以在 设置 → 日志 中查看并复制。";
+        Path file = exportReport(r);
+        String text = file == null
+                ? "错误报告导出失败，可在 设置 → 日志 中手动导出，再把文件发到 TCL 交流群（1131373915）。"
+                : "错误报告已导出，所在文件夹已自动打开。请把 .log 文件发到 TCraft Launcher 启动器交流群（群号 1131373915），不要只发截图。";
         enqueue(new Report("反馈", text, "", Behavior.ALERT, true, true));
     }
 
@@ -364,25 +410,27 @@ public final class Errors {
         }
     }
 
-    /** 主窗口还没加载时降级成系统原生对话框。 */
-    private static void fallback(Report r) {
+    /** 主窗口还没加载时降级成系统原生对话框。 */    private static void fallback(Report r) {
         try {
             javax.swing.SwingUtilities.invokeLater(() -> {
                 try {
                     String text = r.headline + "\n\n"
                             + (r.detail.length() > 1600 ? r.detail.substring(0, 1600) + "…" : r.detail)
-                            + "\n\n请不要发送截图，请复制完整报错，粘贴到交流群或 GitHub Issues 提交。";
-                    Object[] options = {"复制并关闭", "关闭"};
+                            + "\n\n请不要发送截图。点「导出日志」保存错误报告，再把文件发到 TCL 交流群（1131373915）。";
+                    Object[] options = {"导出日志", "关闭"};
                     int res = javax.swing.JOptionPane.showOptionDialog(null, text, r.title,
                             javax.swing.JOptionPane.DEFAULT_OPTION, javax.swing.JOptionPane.ERROR_MESSAGE,
                             null, options, options[0]);
                     if (res == 0) {
-                        try {
-                            java.awt.datatransfer.StringSelection sel =
-                                    new java.awt.datatransfer.StringSelection(sanitize(fullReport(r)));
-                            java.awt.Toolkit.getDefaultToolkit().getSystemClipboard()
-                                    .setContents(sel, sel);
-                        } catch (Throwable ignored) {
+                        Path file = exportReport(r);
+                        if (file == null) {
+                            try {
+                                java.awt.datatransfer.StringSelection sel =
+                                        new java.awt.datatransfer.StringSelection(sanitize(exportText(r)));
+                                java.awt.Toolkit.getDefaultToolkit().getSystemClipboard()
+                                        .setContents(sel, sel);
+                            } catch (Throwable ignored) {
+                            }
                         }
                     }
                 } catch (Throwable ignored) {

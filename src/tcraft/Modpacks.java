@@ -294,7 +294,9 @@ public final class Modpacks {
             Path dir = Paths.get(data.gameDir, "versions", instanceName);
             Data.Instance created = null;
             for (Data.Instance ins : data.instances) {
-                if (instanceName.equals(ins.name) && dir.toString().equals(ins.folder)) {
+                if (instanceName.equals(ins.name) && ins.folder != null
+                        && Paths.get(ins.folder).toAbsolutePath().normalize()
+                        .equals(Paths.get(data.gameDir).toAbsolutePath().normalize())) {
                     created = ins;
                     break;
                 }
@@ -435,11 +437,12 @@ public final class Modpacks {
                 }
             }
 
-            // 登记实例
-            String desc = info.typeName + " 整合包" + (info.loader.isEmpty() ? "" : "，" + info.loader + " " + info.loaderVersion);
-            Data.Instance instance = new Data.Instance(instanceName, info.mcVersion,
+            // 登记实例：内容在 versions/<实例名>，用自己的版本 json 继承加载器版本
+            String desc = info.typeName + " 整合包 · MC " + info.mcVersion
+                    + (info.loader.isEmpty() ? "" : "，" + info.loader + " " + info.loaderVersion);
+            Data.Instance instance = new Data.Instance(instanceName, instanceName,
                     info.loader.isEmpty() ? "原版" : info.loader, info.loaderVersion, desc,
-                    iconPath, System.currentTimeMillis(), false, versionFolder.toString());
+                    iconPath, System.currentTimeMillis(), false, data.gameDir, Isolation.ON);
             for (Data.Instance ins : data.instances) {
                 if (instanceName.equals(ins.name)) {
                     data.instances.remove(ins);
@@ -454,9 +457,25 @@ public final class Modpacks {
             task.stage = "安装游戏版本 " + info.mcVersion
                     + (info.loader.isEmpty() ? "" : " · " + info.loader);
 
-            // 把 MC 和加载器装进实例目录
+            // 把 MC 和加载器装进游戏目录，装完写一份继承加载器版本的实例 json
             String loader = info.loader.isEmpty() ? "原版" : info.loader;
-            Downloader.startInstall(win, new Data.McVersion(info.mcVersion, "release", ""), loader, versionFolder);
+            Downloader.startInstall(win, new Data.McVersion(info.mcVersion, "release", ""), loader,
+                    Paths.get(data.gameDir), info.loaderVersion, null, actual -> {
+                        if (actual == null || actual.isEmpty()) return;
+                        try {
+                            Path dir = Paths.get(data.gameDir, "versions", instanceName);
+                            Files.createDirectories(dir);
+                            String json = "{\"id\":" + Json.quote(instanceName)
+                                    + ",\"inheritsFrom\":" + Json.quote(actual)
+                                    + ",\"type\":\"release\"}";
+                            Files.writeString(dir.resolve(instanceName + ".json"), json, StandardCharsets.UTF_8);
+                            data.save();
+                            win.refreshRight();
+                            data.log("整合包版本已就绪：" + instanceName + " → " + actual);
+                        } catch (Exception e) {
+                            data.log("写整合包版本 json 失败：" + e.getMessage());
+                        }
+                    });
             task.progress = 1;
             task.state = Tasks.State.DONE;
             task.stage = "整合包内容就绪";

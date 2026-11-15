@@ -34,11 +34,17 @@ public class PageInstanceSetup implements Page {
     private final Data data = Data.get();
     private VBox leftList;
 
-    /** 实例根目录，folder 为空时回退全局游戏目录。 */
+    /** 实例根目录：隔离时是 versions/&lt;版本&gt;，否则是所在游戏目录。 */
     private java.nio.file.Path instanceRoot() {
         Data.Instance ins = data.instance();
-        String folder = ins != null && ins.folder != null && !ins.folder.isEmpty() ? ins.folder : data.gameDir;
-        return java.nio.file.Paths.get(folder);
+        if (ins == null) return java.nio.file.Paths.get(data.gameDir);
+        return Isolation.run(ins);
+    }
+
+    /** 基础游戏目录：libraries、assets 与 versions 所在位置。 */
+    private java.nio.file.Path baseRoot() {
+        Data.Instance ins = data.instance();
+        return ins == null ? java.nio.file.Paths.get(data.gameDir) : Isolation.base(ins);
     }
 
     public PageInstanceSetup(MainWindow win) {
@@ -132,7 +138,11 @@ public class PageInstanceSetup implements Page {
     }
 
     private void resetSettings() {
-        data.set("InstanceIsolation", 0);
+        Data.Instance ins = data.instance();
+        if (ins != null) {
+            ins.isolation = Isolation.FOLLOW;
+            data.save();
+        }
         data.set("InstanceRam", 4096);
         data.set("InstanceJvmArgs", "");
         data.set("InstanceWindowTitle", "");
@@ -219,7 +229,7 @@ public class PageInstanceSetup implements Page {
                     data.save();
                     win.launchGame();
                 }),
-                Ui.button("打开文件夹", Ui.BTN_NORMAL, () -> openFolder(ins.folder)),
+                Ui.button("打开文件夹", Ui.BTN_NORMAL, () -> openFolder(instanceRoot().toString())),
                 Ui.button("复制实例", Ui.BTN_NORMAL, this::copyInstance),
                 Ui.button("删除实例", Ui.BTN_RED, () -> Dialogs.confirm(win, "删除实例", "确定要删除实例「" + ins.name + "」吗？",
                         () -> {
@@ -238,7 +248,7 @@ public class PageInstanceSetup implements Page {
         stats.add(row("游戏版本", ins.version),
                 row("加载器", ins.loader == null || ins.loader.isEmpty() ? "原版" : ins.loader + (ins.loaderVersion == null || ins.loaderVersion.isEmpty() ? "" : " " + ins.loaderVersion)),
                 row("上次游玩", ins.lastPlayed <= 0 ? "从未启动" : Instant.ofEpochMilli(ins.lastPlayed).atZone(ZoneId.systemDefault()).format(fmt)),
-                row("游戏目录", ins.folder),
+                row("游戏目录", instanceRoot().toString() + (Isolation.on(ins) ? "（版本隔离）" : "")),
                 row("Java 路径", data.javaPath.isEmpty() ? "未找到" : data.javaPath));
 
         Ui.Card actions = addCard(page, "快捷操作");
@@ -487,7 +497,7 @@ public class PageInstanceSetup implements Page {
         javafx.scene.input.ClipboardContent c = new javafx.scene.input.ClipboardContent();
         c.putString(sb.toString());
         javafx.scene.input.Clipboard.getSystemClipboard().setContent(c);
-        win.toast("已复制 " + diagDisplay.size() + " 行日志。", "", 1);
+        win.toast(Lang.tf("已复制 %d 行日志。", diagDisplay.size()), "", 1);
     }
 
     private void diagExport() {
@@ -921,9 +931,22 @@ public class PageInstanceSetup implements Page {
     private void buildSettings(VBox page) {
         header(page, "版本设置", "仅作用于当前实例的启动选项。");
         Ui.Card basic = addCard(page, "基础设置");
-        ComboBox<String> isolation = Ui.combo(new String[]{"使用全局设置", "隔离所有版本", "不隔离"}, data.getInt("InstanceIsolation", 0));
-        isolation.setOnAction(e -> data.set("InstanceIsolation", isolation.getSelectionModel().getSelectedIndex()));
+        Data.Instance current = data.instance();
+        Label isolationHint = Ui.label(current == null ? "" : Isolation.describe(current), 11.5, Theme.gray3);
+        isolationHint.setWrapText(true);
+        isolationHint.setMaxWidth(430);
+        ComboBox<String> isolation = Ui.combo(new String[]{"使用全局设置", "隔离（独立 mods、saves）", "不隔离"},
+                current == null ? 0 : Math.max(0, Math.min(2, current.isolation)));
+        isolation.setPrefWidth(280);
+        isolation.setOnAction(e -> {
+            if (current == null) return;
+            current.isolation = isolation.getSelectionModel().getSelectedIndex();
+            data.save();
+            isolationHint.setText(Isolation.describe(current));
+            win.toast("版本隔离", Isolation.describe(current), 1);
+        });
         basic.add(Ui.settingRow("版本隔离", isolation));
+        basic.add(isolationHint);
         TextField title = Ui.field("默认");
         title.setText(data.get("InstanceWindowTitle", ""));
         title.textProperty().addListener((o, a, b) -> data.set("InstanceWindowTitle", b));
@@ -956,7 +979,7 @@ public class PageInstanceSetup implements Page {
         HBox actions = new HBox(10);
         actions.getChildren().addAll(
                 Ui.button("重置本页设置", Ui.BTN_NORMAL, this::resetSettings),
-                Ui.button("打开版本文件", Ui.BTN_NORMAL, () -> openFolder(instanceRoot().resolve("versions").toString())));
+                Ui.button("打开版本文件", Ui.BTN_NORMAL, () -> openFolder(baseRoot().resolve("versions").toString())));
         page.getChildren().add(actions);
     }
 
@@ -1070,7 +1093,7 @@ public class PageInstanceSetup implements Page {
                 Path target = modsDir.resolve(enabledName);
                 Files.copy(f.toPath(), target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             }
-            win.toast("已安装 " + files.size() + " 个 Mod", "", 1);
+            win.toast(Lang.tf("已安装 %d 个 Mod", files.size()), "", 1);
             win.refreshRight();
         } catch (Exception e) {
             win.toast("安装失败", e.getMessage(), 3);
@@ -1084,9 +1107,9 @@ public class PageInstanceSetup implements Page {
             Path target = disabled ? mod.resolveSibling(name.substring(0, name.length() - ".disabled".length()))
                     : mod.resolveSibling(name + ".disabled");
             if (Files.exists(target)) {
-                Dialogs.confirm(win, "存在文件冲突", "目前同时存在启用和禁用的两个 Mod 文件：\n - "
-                        + target.getFileName() + "\n - " + name
-                        + "\n\n注意，这两个文件的内容并不相同。请手动删除或重命名其中一个后再试。", () -> {
+                Dialogs.confirm(win, "存在文件冲突", Lang.tf("目前同时存在启用和禁用的两个 Mod 文件：\n - %s\n - %s"
+                        + "\n\n注意，这两个文件的内容并不相同。请手动删除或重命名其中一个后再试。",
+                        target.getFileName(), name), () -> {
                 });
                 return;
             }
@@ -1139,7 +1162,7 @@ public class PageInstanceSetup implements Page {
             rows.getChildren().add(desc);
         }
         rows.getChildren().add(Ui.label("文件：" + mod.getFileName(), 12, Theme.gray2));
-        rows.getChildren().add(Ui.label("大小：" + sizeOf(mod) + " · 修改于 " + time, 12, Theme.gray2));
+        rows.getChildren().add(Ui.label(Lang.tf("大小：%s · 修改于 %s", sizeOf(mod), time), 12, Theme.gray2));
         rows.getChildren().add(Ui.label("状态：" + (disabled ? "已禁用" : "已启用"), 12, Theme.gray2));
         card.getChildren().addAll(rows, Ui.button("关闭", Ui.BTN_NORMAL, win::closeModal));
         win.showModal(card);
@@ -1147,7 +1170,7 @@ public class PageInstanceSetup implements Page {
 
     /** 确认后移入回收站。 */
     private void deleteFile(Path file, String kind) {
-        Dialogs.confirm(win, "删除" + kind, "确定要删除 " + file.getFileName() + " 吗？文件将移入回收站。", () -> {
+        Dialogs.confirm(win, "删除" + kind, Lang.tf("确定要删除 %s 吗？文件将移入回收站。", file.getFileName()), () -> {
             // 回收站要等 PowerShell 进程，不能放 FX 线程
             Thread worker = new Thread(() -> {
                 boolean ok = Shell.deleteToRecycleBin(file.toString());
@@ -1527,7 +1550,7 @@ public class PageInstanceSetup implements Page {
 
     /** 确认后删除存档。 */
     private void deleteSave(Path save) {
-        Dialogs.confirm(win, "删除存档", "确定要删除存档 " + save.getFileName() + " 吗？\n该世界将永久丢失，无法恢复。", () -> {
+        Dialogs.confirm(win, "删除存档", Lang.tf("确定要删除存档 %s 吗？\n该世界将永久丢失，无法恢复。", save.getFileName()), () -> {
             try (var stream = Files.walk(save)) {
                 for (Path p : stream.sorted(java.util.Comparator.reverseOrder()).toList()) {
                     Files.deleteIfExists(p);
@@ -1598,7 +1621,7 @@ public class PageInstanceSetup implements Page {
             }
         } catch (Exception ignored) {
         }
-        header(page, "存档", "共 " + saves.size() + " 个世界。");
+        header(page, "存档", Lang.tf("共 %d 个世界。", saves.size()));
         HBox actions = new HBox(10);
         actions.getChildren().addAll(
                 Ui.button("打开存档文件夹", Ui.BTN_NORMAL, () -> {
@@ -1648,7 +1671,7 @@ public class PageInstanceSetup implements Page {
     private void buildScreenshots(VBox page) {
         Path dir = instanceRoot().resolve("screenshots");
         List<Path> shots = listFiles(dir, ".png", ".jpg", ".jpeg");
-        header(page, "截图", "共 " + shots.size() + " 张截图。");
+        header(page, "截图", Lang.tf("共 %d 张截图。", shots.size()));
         HBox actions = new HBox(10);
         actions.getChildren().addAll(
                 Ui.button("打开截图文件夹", Ui.BTN_NORMAL, () -> {
@@ -1973,7 +1996,7 @@ public class PageInstanceSetup implements Page {
             } catch (Exception ignored) {
             }
         }
-        header(page, "存档数据包", "共 " + packs.size() + " 个数据包。");
+        header(page, "存档数据包", Lang.tf("共 %d 个数据包。", packs.size()));
         HBox actions = new HBox(10);
         actions.getChildren().addAll(
                 Ui.button("打开存档文件夹", Ui.BTN_NORMAL, () -> openFolder(instanceRoot().resolve("saves").toString())),
@@ -2056,7 +2079,7 @@ public class PageInstanceSetup implements Page {
         Ui.Card head = addCard(page, name);
         head.add(Ui.label("Modrinth 整合包 · 版本 " + versionId + " · Minecraft " + mc + loader, 13, Theme.gray2));
         List<Object> files = Json.arr(json.get("files"));
-        Ui.Card list = addCard(page, "共 " + files.size() + " 个文件，颜色深表示已存在：");
+        Ui.Card list = addCard(page, Lang.tf("共 %d 个文件，颜色深表示已存在：", files.size()));
         for (Object o : files) {
             java.util.Map<String, Object> item = Json.obj(o);
             String relativePath = Json.str(item, "path", "");
@@ -2083,7 +2106,7 @@ public class PageInstanceSetup implements Page {
                 + " · 作者 " + Json.str(json, "author", "")
                 + " · Minecraft " + Json.str(mc, "version", ""), 13, Theme.gray2));
         List<Object> files = Json.arr(json.get("files"));
-        Ui.Card list = addCard(page, "共 " + files.size() + " 个文件（CurseForge 仅记录项目与文件 ID）：");
+        Ui.Card list = addCard(page, Lang.tf("共 %d 个文件（CurseForge 仅记录项目与文件 ID）：", files.size()));
         for (Object o : files) {
             java.util.Map<String, Object> item = Json.obj(o);
             String row = "project " + Json.str(item, "projectID", "") + " / file " + Json.str(item, "fileID", "");
@@ -2341,40 +2364,41 @@ public class PageInstanceSetup implements Page {
             name = ins.name + "-副本" + (n++);
         }
         final String copyName = name;
-        Path srcRoot = instanceRoot();
-        Path newFolder = instanceRoot().getParent() != null
-                ? instanceRoot().getParent().resolve("versions").resolve(copyName) : srcRoot.resolve(copyName);
-        // 隔离目录放 versions/{name}
-        final String folderStr = ins.folder != null && !ins.folder.isEmpty()
-                ? newFolder.toString() : data.gameDir;
+        Path base = baseRoot();
+        Path srcRoot = base.resolve("versions").resolve(ins.version);
+        Path newFolder = base.resolve("versions").resolve(copyName);
+        boolean isolated = Isolation.on(ins);
+        if (!Files.isDirectory(srcRoot)) {
+            win.toast("复制失败", "版本目录不存在：" + srcRoot, 3);
+            return;
+        }
         Tasks.Task task = new Tasks.Task("复制实例 · " + ins.name);
         task.subs.add(new Tasks.SubTask("复制文件"));
         Tasks.INSTANCE.add(task);
         win.toast("正在复制实例", name, 0);
         new Thread(() -> {
             try {
-                if (ins.folder != null && !ins.folder.isEmpty()) {
-                    Files.createDirectories(newFolder);
-                    try (var stream = Files.walk(srcRoot)) {
-                        List<Path> files = stream.filter(Files::isRegularFile).toList();
-                        task.remainingFiles = files.size();
-                        int done = 0;
-                        for (Path f : files) {
-                            if (task.canceled) throw new Exception("已取消");
-                            Path dest = newFolder.resolve(srcRoot.relativize(f).toString());
-                            Files.createDirectories(dest.getParent());
-                            Files.copy(f, dest, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                            done++;
-                            task.progress = done / (double) files.size();
-                            task.stage = "正在复制 " + done + " / " + files.size();
-                        }
+                Files.createDirectories(newFolder);
+                try (var stream = Files.walk(srcRoot)) {
+                    List<Path> files = stream.filter(Files::isRegularFile).toList();
+                    task.remainingFiles = files.size();
+                    int done = 0;
+                    for (Path f : files) {
+                        if (task.canceled) throw new Exception("已取消");
+                        Path dest = newFolder.resolve(srcRoot.relativize(f).toString());
+                        Files.createDirectories(dest.getParent());
+                        Files.copy(f, dest, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                        done++;
+                        task.progress = done / (double) files.size();
+                        task.stage = "正在复制 " + done + " / " + files.size();
                     }
-                } else {
-                    // 非隔离实例只复制登记
                 }
+                // 版本 json 改名并把 id 改成新实例名
+                PageInstance.rewriteVersionJson(newFolder, ins.version, copyName);
                 javafx.application.Platform.runLater(() -> {
-                    Data.Instance copy = new Data.Instance(copyName, ins.version, ins.loader, ins.loaderVersion,
-                            ins.description, ins.icon, System.currentTimeMillis(), false, folderStr);
+                    Data.Instance copy = new Data.Instance(copyName, copyName, ins.loader, ins.loaderVersion,
+                            ins.description, ins.icon, System.currentTimeMillis(), false, base.toString(),
+                            isolated ? Isolation.ON : Isolation.OFF);
                     data.instances.add(copy);
                     data.selectedInstance = data.instances.size() - 1;
                     data.save();
@@ -2495,7 +2519,7 @@ public class PageInstanceSetup implements Page {
         options.add(modrinth);
         if (exportRulesOverride != null) {
             // 配置覆盖时固定导出内容
-            options.add(Ui.label("导出内容列表：从配置文件中读取（" + exportRulesOverride.size() + " 行）。", 12.5, Theme.gray2));
+            options.add(Ui.label(Lang.tf("导出内容列表：从配置文件中读取（%d 行）。", exportRulesOverride.size()), 12.5, Theme.gray2));
         }
 
         Ui.Card adv = addCard(page, "高级选项");
@@ -2890,7 +2914,7 @@ public class PageInstanceSetup implements Page {
     private void backupInstance() {
         Data.Instance ins = data.instance();
         if (ins == null) return;
-        Path backups = instanceRoot().resolve("TCL").resolve("Backups");
+        Path backups = baseRoot().resolve("TCL").resolve("Backups");
         try {
             Files.createDirectories(backups);
         } catch (Exception ignored) {

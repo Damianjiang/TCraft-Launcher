@@ -216,9 +216,9 @@ public class App extends Application {
         }
 
         Stage fail = new Stage(StageStyle.DECORATED);
-        fail.setTitle("TCraft Launcher 启动失败");
+        fail.setTitle(Lang.t("TCraft Launcher 启动失败"));
 
-        Label title = new Label("启动器没能进入主界面");
+        Label title = new Label(Lang.t("启动器没能进入主界面"));
         title.setStyle("-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: #1f2430;");
 
         Label msg = new Label(root);
@@ -233,20 +233,31 @@ public class App extends Application {
         where.setWrapText(true);
         where.setStyle("-fx-font-size: 11px; -fx-text-fill: #5b6472;");
 
-        Label warn = new Label("请不要发送截图，请复制下面的完整报错，粘贴到交流群或 GitHub Issues 提交。");
+        Label warn = new Label(Lang.t("请不要发送截图。点「导出错误报告」保存日志，再把文件发到 TCL 交流群（1131373915）。"));
         warn.setWrapText(true);
         warn.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #ce2111;");
 
         String report = "TCraft Launcher 启动失败\n" + root + "\n\n" + detail
                 + (crash == null ? "" : "\n日志：" + crash);
-        Button copy = new Button("复制全部");
-        Button openDir = new Button("打开日志文件夹");
+        Button copy = new Button(Lang.t("导出错误报告"));
+        Button openDir = new Button(Lang.t("打开日志文件夹"));
         Button close = new Button("关闭");
         copy.setOnAction(e -> {
-            javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
-            content.putString(report);
-            javafx.scene.input.Clipboard.getSystemClipboard().setContent(content);
-            copy.setText("已复制");
+            try {
+                String stamp = java.time.LocalDateTime.now()
+                        .format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
+                java.nio.file.Path dir = crash != null && crash.getParent() != null
+                        ? crash.getParent()
+                        : java.nio.file.Paths.get(System.getProperty("java.io.tmpdir"));
+                java.nio.file.Files.createDirectories(dir);
+                java.nio.file.Path file = dir.resolve("TCraft-启动失败-" + stamp + ".log");
+                java.nio.file.Files.writeString(file, "\uFEFF" + report,
+                        java.nio.charset.StandardCharsets.UTF_8);
+                Shell.openFolder(dir.toString());
+                copy.setText("已导出：" + file.getFileName());
+            } catch (Exception ex) {
+                copy.setText("导出失败");
+            }
         });
         String crashPath = crash == null ? null : crash.getParent().toString();
         openDir.setOnAction(e -> {

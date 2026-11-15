@@ -231,7 +231,8 @@ public final class Http {
         InputStream in = raw;
         String encoding = resp.headers().firstValue("content-encoding").orElse("");
         if (encoding.toLowerCase().contains("gzip")) in = new java.util.zip.GZIPInputStream(raw);
-        byte[] bytes = in.readAllBytes();
+        // 20 秒没有新数据就当连接假死，交给外层重试，避免整个任务挂住
+        byte[] bytes = Fetch.readAll(in, 20_000);
         String type = resp.headers().firstValue("content-type").orElse("");
         java.nio.charset.Charset cs = StandardCharsets.UTF_8;
         int idx = type.toLowerCase().indexOf("charset=");

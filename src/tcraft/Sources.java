@@ -2,7 +2,6 @@ package tcraft;
 
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,7 +22,7 @@ public final class Sources {
     private static final long TTL_MS = 10 * 60 * 1000L;
     private static final int PROBE_BYTES = 128 * 1024;
 
-    /** 按速度排序，没测过的保持原顺序。 */
+    /** 按速度排序；首次最多等 2.5 秒测速，测不完的先按调用方顺序走。 */
     public static List<String> rank(List<String> urls) {
         if (urls == null || urls.size() < 2) return urls;
         // 每个域名取一个样本 URL
@@ -34,26 +33,35 @@ public final class Sources {
         }
         if (sample.size() < 2) return urls;
 
-        // 并发测速，同一域名只测一次
-        Map<String, Future<Double>> jobs = new HashMap<>();
+        // 并发测速，同一域名只发一次；结果写缓存，供这次和下次排序
+        Map<String, Future<Double>> jobs = new LinkedHashMap<>();
         for (Map.Entry<String, String> e : sample.entrySet()) {
             if (cached(e.getKey()) != null) continue;
+            final String h = e.getKey();
             final String url = e.getValue();
             try {
-                jobs.put(e.getKey(), INFLIGHT.computeIfAbsent(e.getKey(),
-                        h -> Http.pool().submit(() -> probe(url))));
+                jobs.put(h, INFLIGHT.computeIfAbsent(h, k -> Http.pool().submit(() -> {
+                    try {
+                        double kbps = probe(url);
+                        // 失败也记下来，避免每个文件都重新探测一遍
+                        SPEED.put(h, new double[]{kbps, System.currentTimeMillis()});
+                        return kbps;
+                    } finally {
+                        INFLIGHT.remove(h);
+                    }
+                })));
             } catch (Exception ignored) {
             }
         }
+        // 别让测速拖住下载：最多等 2.5 秒，没测完的当作未知
+        long deadline = System.currentTimeMillis() + 2500;
         for (Map.Entry<String, Future<Double>> e : jobs.entrySet()) {
-            Future<Double> f = e.getValue();
+            long left = deadline - System.currentTimeMillis();
+            if (left <= 0) break;
             try {
-                double kbps = f.get(8, TimeUnit.SECONDS);
-                if (kbps > 0) SPEED.put(e.getKey(), new double[]{kbps, System.currentTimeMillis()});
+                e.getValue().get(left, TimeUnit.MILLISECONDS);
             } catch (Exception ignored) {
-                // 测速失败排后面
-            } finally {
-                INFLIGHT.remove(e.getKey(), f);
+                // 慢源/超时，交给排序时的 -1 处理
             }
         }
 
@@ -88,15 +96,11 @@ public final class Sources {
     private static double probe(String url) {
         long t = System.nanoTime();
         try (Http.Body body = Http.open(url, Duration.ofSeconds(4), 0, PROBE_BYTES - 1)) {
-            byte[] buffer = new byte[8192];
-            long total = 0;
-            int n;
-            while (total < PROBE_BYTES && (n = body.in.read(buffer)) > 0) {
-                total += n;
-            }
+            // 卡住不动就别一直占着线程，3 秒没数据直接算失败
+            byte[] data = Fetch.readAll(body.in, 3000);
             long ms = Math.max(1, (System.nanoTime() - t) / 1_000_000);
-            if (total <= 0) return -1;
-            return total / 1024.0 / (ms / 1000.0);
+            if (data.length <= 0) return -1;
+            return data.length / 1024.0 / (ms / 1000.0);
         } catch (Exception e) {
             return -1;
         }

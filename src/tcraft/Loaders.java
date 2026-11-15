@@ -254,29 +254,62 @@ public final class Loaders {
     }
 
     private static List<String> forge(String mc) throws Exception {
-        String xml = get("https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml");
         List<String> out = new ArrayList<>();
-        Matcher m = Pattern.compile("<version>([^<]+)</version>").matcher(xml);
-        while (m.find()) {
-            String v = m.group(1);
-            // 版本形如 1.21.1-52.0.2，只留当前 MC 版本的
-            if (v.startsWith(mc + "-")) out.add(v.substring(mc.length() + 1));
+        // 镜像的 Forge 版本表只有几十 KB，官方 maven-metadata.xml 又大又慢
+        try {
+            String json = get(Downloader.bmcl() + "/forge/minecraft/" + mc);
+            for (Object o : Json.arr(Json.parse(json))) {
+                Map<String, Object> m = Json.obj(o);
+                if (!mc.equals(Json.str(m, "mcversion", mc))) continue;
+                String v = Json.str(m, "version", "");
+                if (!v.isEmpty() && !out.contains(v)) out.add(v);
+            }
+        } catch (Exception ignored) {
+        }
+        if (out.isEmpty()) {
+            String xml = get("https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml",
+                    Downloader.bmcl() + "/maven/net/minecraftforge/forge/maven-metadata.xml");
+            Matcher m = Pattern.compile("<version>([^<]+)</version>").matcher(xml);
+            while (m.find()) {
+                String v = m.group(1);
+                // 版本形如 1.21.1-52.0.2，只留当前 MC 版本的
+                if (v.startsWith(mc + "-")) out.add(v.substring(mc.length() + 1));
+            }
         }
         if (out.isEmpty()) throw new Exception("Forge 没有适用于 Minecraft " + mc + " 的版本");
-        Collections.reverse(out); // 保持旧到新
+        out.sort(Loaders::compareVersions); // 旧到新
         return out;
     }
 
     private static List<String> neoforge(String mc) throws Exception {
-        String json = get("https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge");
         String prefix = neoforgePrefix(mc);
         if (prefix == null) throw new Exception("NeoForge 只支持 1.20.2 及之后的版本");
         List<String> out = new ArrayList<>();
-        for (Object o : Json.arr(Json.obj(Json.parse(json)), "versions")) {
-            String v = String.valueOf(o);
-            if (v.startsWith(prefix)) out.add(v);
+        // 官方 API 在国内经常连不上，先读镜像的 maven-metadata.xml
+        try {
+            String xml = get(Downloader.bmcl() + "/maven/net/neoforged/neoforge/maven-metadata.xml",
+                    "https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge");
+            Matcher m = Pattern.compile("<version>([^<]+)</version>").matcher(xml);
+            while (m.find()) {
+                String v = m.group(1);
+                if (v.startsWith(prefix)) out.add(v);
+            }
+            if (out.isEmpty()) {
+                // 官方 API 是 JSON
+                for (Object o : Json.arr(Json.obj(Json.parse(xml)), "versions")) {
+                    String v = String.valueOf(o);
+                    if (v.startsWith(prefix)) out.add(v);
+                }
+            }
+        } catch (Exception e) {
+            for (Object o : Json.arr(Json.obj(Json.parse(get(
+                    "https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge"))), "versions")) {
+                String v = String.valueOf(o);
+                if (v.startsWith(prefix)) out.add(v);
+            }
         }
         if (out.isEmpty()) throw new Exception("NeoForge 没有适用于 Minecraft " + mc + " 的版本");
+        out.sort(Loaders::compareVersions);
         return out;
     }
 
@@ -297,7 +330,8 @@ public final class Loaders {
     }
 
     private static List<String> fabric(String mc) throws Exception {
-        String json = get("https://meta.fabricmc.net/v2/versions/loader/" + mc);
+        String json = get(Downloader.bmcl() + "/fabric-meta/v2/versions/loader/" + mc,
+                "https://meta.fabricmc.net/v2/versions/loader/" + mc);
         List<Object> items = Json.arr(Json.parse(json));
         List<String> out = new ArrayList<>();
         for (Object item : items) {
@@ -310,8 +344,29 @@ public final class Loaders {
         return out;
     }
 
-    private static String get(String url) throws Exception {
-        // 版本清单都不小，走 gzip
-        return Http.get(url);
+    private static String get(String... urls) throws Exception {
+        // 版本清单都不小，走 gzip；多个源按速度择优
+        return Downloader.getText(urls);
+    }
+
+    /** 版本号按数字段比较，47.0.10 排在 47.0.9 后面。 */
+    private static int compareVersions(String a, String b) {
+        String[] x = a.split("[^0-9]+");
+        String[] y = b.split("[^0-9]+");
+        int n = Math.max(x.length, y.length);
+        for (int i = 0; i < n; i++) {
+            int av = i < x.length && !x[i].isEmpty() ? parseInt(x[i]) : 0;
+            int bv = i < y.length && !y[i].isEmpty() ? parseInt(y[i]) : 0;
+            if (av != bv) return Integer.compare(av, bv);
+        }
+        return 0;
+    }
+
+    private static int parseInt(String s) {
+        try {
+            return Integer.parseInt(s);
+        } catch (Exception e) {
+            return 0;
+        }
     }
 }

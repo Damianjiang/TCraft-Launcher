@@ -56,22 +56,63 @@ public final class Boot {
         if (startupWindow != null) startupWindow.close();
         Path crash = t == null ? null : writeCrash(t);
         String full = text + (crash == null ? "" : "\n\n详细堆栈已写入：\n" + crash)
-                + "\n\n请不要发送截图，请复制完整报错，粘贴到交流群或 GitHub Issues 提交。";
+                + "\n\n请不要发送截图，点「导出错误报告」保存日志，再把文件发到 TCL 交流群（1131373915）。";
         System.err.println(full);
         try {
-            Object[] options = {"复制并退出", "退出"};
+            Object[] options = {"导出错误报告", "退出"};
             int res = javax.swing.JOptionPane.showOptionDialog(null, full, "TCraft Launcher 启动失败",
                     javax.swing.JOptionPane.DEFAULT_OPTION, javax.swing.JOptionPane.ERROR_MESSAGE,
                     null, options, options[0]);
-            if (res == 0) {
-                java.awt.datatransfer.StringSelection sel =
-                        new java.awt.datatransfer.StringSelection(full);
-                java.awt.Toolkit.getDefaultToolkit().getSystemClipboard().setContents(sel, sel);
-            }
+            if (res == 0) exportReport(full, t);
         } catch (Throwable ignored) {
             // 无图形环境时只能靠日志
         }
         System.exit(1);
+    }
+
+    /** 只用 JDK 写错误报告，JavaFX 起不来时也能导出。 */
+    private static void exportReport(String text, Throwable t) {
+        try {
+            Path dir = Resources.home().resolve("feedback");
+            Files.createDirectories(dir);
+            String stamp = java.time.LocalDateTime.now()
+                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
+            Path file = dir.resolve("TCraft-错误报告-" + stamp + ".log");
+            StringBuilder sb = new StringBuilder();
+            sb.append("TCraft Launcher ").append(Build.VERSION).append(" 错误报告\n");
+            sb.append("时间：").append(java.time.LocalDateTime.now().withNano(0)).append('\n');
+            sb.append("\n===== 报错 =====\n").append(text).append('\n');
+            if (t != null) {
+                java.io.StringWriter sw = new java.io.StringWriter();
+                t.printStackTrace(new java.io.PrintWriter(sw));
+                sb.append("\n===== 完整堆栈 =====\n").append(sw).append('\n');
+            }
+            sb.append("\n===== 诊断信息 =====\n")
+                    .append("系统：").append(System.getProperty("os.name")).append(' ')
+                    .append(System.getProperty("os.version")).append(' ')
+                    .append(System.getProperty("os.arch")).append('\n')
+                    .append("Java：").append(System.getProperty("java.version")).append(" (")
+                    .append(System.getProperty("java.vendor")).append(")\n")
+                    .append("工作目录：").append(System.getProperty("user.dir")).append('\n')
+                    .append("配置目录：").append(Resources.home()).append('\n');
+            sb.append("\n===== 最近日志 =====\n");
+            Path log = Resources.home().resolve("launcher.log");
+            if (Files.isRegularFile(log)) {
+                String[] lines = new String(Files.readAllBytes(log),
+                        java.nio.charset.StandardCharsets.UTF_8).split("\\R");
+                int from = Math.max(0, lines.length - 200);
+                for (int i = from; i < lines.length; i++) sb.append(lines[i]).append('\n');
+            } else {
+                sb.append("（暂无日志）\n");
+            }
+            // 带 BOM，记事本和 QQ 里直接打开不乱码
+            Files.writeString(file, "\uFEFF" + sb, java.nio.charset.StandardCharsets.UTF_8);
+            try {
+                java.awt.Desktop.getDesktop().open(dir.toFile());
+            } catch (Throwable ignored) {
+            }
+        } catch (Throwable ignored) {
+        }
     }
 
     /** 把堆栈写进 crash.txt，返回路径；失败返回 null。 */

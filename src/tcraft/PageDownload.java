@@ -805,9 +805,9 @@ public class PageDownload implements Page {
             Downloader.startInstall(win, inst);
             exitSelectPage(); // 装完回版本列表
         };
-        // 有加载器且未开版本隔离时确认一次
-        int indie = data.getInt("LaunchArgumentIndieV2", 0);
-        if (inst.hasLoader() && (indie == 0 || indie == 2)) {
+        // 有加载器且关掉了版本隔离时确认一次
+        int isolation = data.getInt("LaunchIsolation", 4);
+        if (inst.hasLoader() && isolation == 0) {
             Dialogs.confirm(win, "版本隔离提示",
                     "你尚未开启版本隔离，多个 MC 版本会共用同一个 Mod 文件夹。\n"
                             + "因此，游戏可能会因为读取到与当前版本不符的 Mod 而崩溃。\n"
@@ -1020,7 +1020,7 @@ public class PageDownload implements Page {
         resourceLoadingHost = Ui.loadingCard("正在加载 " + category + " 列表…");
         page.getChildren().addAll(hintError, resourceLoadingHost, status);
 
-        Ui.Card card = Ui.card(category + " 资源");
+        Ui.Card card = Ui.card(Lang.tf("%s 资源", category));
         card.setSpacing(0);
         card.setContentPadding(new Insets(4, 12, 10, 12));
         final VBox rows = new VBox(0);
@@ -1281,7 +1281,7 @@ public class PageDownload implements Page {
 
     private Node resourceRow(Resource r) {
         Node icon = iconNode(r, 30);
-        Ui.ListItem row = new Ui.ListItem(icon, r.name, r.desc.isEmpty() ? "下载量 " + r.downloads : r.desc, 46);
+        Ui.ListItem row = new Ui.ListItem(icon, r.name, r.desc.isEmpty() ? Lang.tf("下载量 %s", r.downloads) : r.desc, 46);
         row.setOnMouseClicked(e -> openDetail(r, "world".equals(r.projectType) ? "curseforge" : "modrinth"));
         return row;
     }

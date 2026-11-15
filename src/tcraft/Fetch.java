@@ -20,6 +20,8 @@ public final class Fetch {
     /** 单源 5 次重试。 */
     private static final int DEFAULT_RETRY = 5;
     private static final long[] BACKOFF_MS = {200, 500, 1000, 2000, 3000};
+    /** 连接建立后多久收不到字节就判定为卡死，关流重试。 */
+    private static final long IDLE_TIMEOUT_MS = 20_000;
 
     /** 下载到 target，带断点续传和校验。 */
     public static void file(Tasks.Task task, String url, Path target, String sha1,
@@ -82,6 +84,8 @@ public final class Fetch {
                                  MessageDigest digest, double from, double to) throws IOException {
         Http.Body body = done > 0 ? Http.open(url, Duration.ofSeconds(60), done)
                 : Http.open(url, Duration.ofSeconds(60));
+        IdleGuard guard = new IdleGuard(body.in, IDLE_TIMEOUT_MS);
+        guard.start();
         try (InputStream in = body.in) {
             boolean append = done > 0 && body.status == 206;
             if (done > 0 && !append) {
@@ -103,6 +107,7 @@ public final class Fetch {
             try {
                 int n;
                 while ((n = in.read(buffer)) >= 0) {
+                    guard.touch();
                     if (task != null && task.canceled) throw new IOException("已取消");
                     out.write(buffer, 0, n);
                     if (digest != null) digest.update(buffer, 0, n);
@@ -124,6 +129,67 @@ public final class Fetch {
             // 长度对不上说明连接被掐断，交给外层重试
             if (body.length >= 0 && written != body.length) {
                 throw new IOException("下载不完整：" + written + " / " + body.length);
+            }
+        } finally {
+            guard.close();
+        }
+    }
+
+    /** 读满一个流；idleMs 内没有新数据就关流，避免连接假死一直挂着。 */
+    public static byte[] readAll(InputStream in, long idleMs) throws IOException {
+        IdleGuard guard = new IdleGuard(in, idleMs);
+        guard.start();
+        try {
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            byte[] buffer = new byte[65536];
+            int n;
+            while ((n = in.read(buffer)) >= 0) {
+                guard.touch();
+                out.write(buffer, 0, n);
+            }
+            return out.toByteArray();
+        } finally {
+            guard.close();
+        }
+    }
+
+    /** 盯着读流的心跳，超时就 close，让阻塞的 read 抛异常。 */
+    private static final class IdleGuard extends Thread {
+        private final InputStream in;
+        private final long timeoutMs;
+        private volatile long last = System.currentTimeMillis();
+        private volatile boolean stopped;
+
+        IdleGuard(InputStream in, long timeoutMs) {
+            super("TCL-Fetch-Idle");
+            setDaemon(true);
+            this.in = in;
+            this.timeoutMs = timeoutMs;
+        }
+
+        void touch() {
+            last = System.currentTimeMillis();
+        }
+
+        void close() {
+            stopped = true;
+            interrupt();
+        }
+
+        @Override
+        public void run() {
+            while (!stopped) {
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {
+                    return;
+                }
+                if (System.currentTimeMillis() - last <= timeoutMs) continue;
+                try {
+                    in.close();
+                } catch (IOException ignored) {
+                }
+                return;
             }
         }
     }

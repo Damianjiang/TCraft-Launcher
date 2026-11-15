@@ -47,9 +47,17 @@ public final class Data {
         public long lastPlayed;
         public boolean favorite;
         public String folder;
+        /** 版本隔离：0 跟随全局设置，1 强制隔离，2 不隔离。 */
+        public int isolation;
 
         public Instance(String name, String version, String loader, String loaderVersion,
                         String description, String icon, long lastPlayed, boolean favorite, String folder) {
+            this(name, version, loader, loaderVersion, description, icon, lastPlayed, favorite, folder, 0);
+        }
+
+        public Instance(String name, String version, String loader, String loaderVersion,
+                        String description, String icon, long lastPlayed, boolean favorite, String folder,
+                        int isolation) {
             this.name = name;
             this.version = version;
             this.loader = loader;
@@ -59,6 +67,7 @@ public final class Data {
             this.lastPlayed = lastPlayed;
             this.favorite = favorite;
             this.folder = folder;
+            this.isolation = isolation;
         }
 
         public String subtitle() {
@@ -622,7 +631,11 @@ public final class Data {
                 String name = dir.getFileName().toString();
                 if (!Files.isRegularFile(dir.resolve(name + ".json"))) return;
                 boolean exists = false;
-                for (Instance i : instances) if (i.name.equals(name) && i.folder.equals(gameDir)) exists = true;
+                for (Instance i : instances) {
+                    // 已登记实例用的就是这个版本目录，不再重复生成「已导入的版本」
+                    if (i.folder != null && i.folder.equals(gameDir)
+                            && (i.name.equals(name) || name.equals(i.version))) exists = true;
+                }
                 if (exists) return;
                 String lower = name.toLowerCase();
                 String loader = lower.contains("fabric") ? "Fabric" : lower.contains("neoforge") ? "NeoForge"
@@ -853,9 +866,11 @@ public final class Data {
                 if (p.length >= 9) {
                     Instance ins = new Instance(p[0], p[1], p[2], p[3], p[4], p[5],
                             parseLong(p[6]), Boolean.parseBoolean(p[7]), p[8]);
+                    if (p.length >= 10) ins.isolation = (int) parseLong(p[9]);
                     instances.add(ins);
                 }
             }
+            migrateLegacyIsolation();
             selectedInstance = getInt("instance.selected", 0);
             folders.clear();
             int foldCount = getInt("folder.count", 0);
@@ -889,6 +904,15 @@ public final class Data {
         }
     }
 
+    /** 1.3.14 及更早的「隔离」是整棵目录装进 TCL/instances，本身已经独立，不再套一层。 */
+    private void migrateLegacyIsolation() {
+        for (Instance ins : instances) {
+            if (ins.isolation != 0 || ins.folder == null || ins.folder.isEmpty()) continue;
+            String path = ins.folder.replace('\\', '/').toLowerCase(java.util.Locale.ROOT);
+            if (path.contains("/tcl/instances/")) ins.isolation = 2;
+        }
+    }
+
     /** 下载线程和界面线程都会调，串行化避免写坏配置文件。 */
     public synchronized void save() {
         try {
@@ -909,7 +933,7 @@ public final class Data {
                 Instance ins = persisted.get(i);
                 props.setProperty("instance." + i, ins.name + "|" + ins.version + "|" + ins.loader + "|"
                         + ins.loaderVersion + "|" + ins.description + "|" + ins.icon + "|" + ins.lastPlayed + "|"
-                        + ins.favorite + "|" + ins.folder);
+                        + ins.favorite + "|" + ins.folder + "|" + ins.isolation);
             }
             props.setProperty("instance.selected", String.valueOf(selectedInstance));
             props.setProperty("folder.current", gameDir);

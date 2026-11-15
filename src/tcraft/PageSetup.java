@@ -74,10 +74,10 @@ public class PageSetup implements Page {
         };
         navPanel = items;
         for (String[] s : sections) items.getChildren().add(navItem(s[1], s[2], s[3], s[0]));
-        items.getChildren().add(new Region() {{ setMinHeight(8); }});
+        // 返回固定在下栏，不跟着功能列表滚走，跟实例设置、任务页保持一致
         Ui.ListItem back = new Ui.ListItem(Theme.icon("arrow-left", 16, Theme.text), "返回", null, 34);
         back.setOnMouseClicked(e -> win.openPage("launch", true));
-        items.getChildren().add(back);
+        VBox.setMargin(back, new Insets(6, 0, 0, 0));
 
         search.textProperty().addListener((o, a, b) -> {
             String q = b == null ? "" : b.toLowerCase();
@@ -89,7 +89,7 @@ public class PageSetup implements Page {
                 }
             }
         });
-        panel.getChildren().addAll(title, search, scroll);
+        panel.getChildren().addAll(title, search, scroll, back);
         return panel;
     }
 
@@ -261,6 +261,8 @@ public class PageSetup implements Page {
         Ui.Card arg = addCard(page, "启动选项");
         comboRow(arg, "默认版本隔离", ISOLATION_ITEMS, data.getInt("LaunchIsolation", 4),
                 i -> data.set("LaunchIsolation", i));
+        arg.add(Ui.hint("开启后每个版本用 versions/版本号 当游戏目录，mods、saves、config 各自独立；"
+                + "libraries 与 assets 仍然共用，不会重复占空间。", 0));
         textRow(arg, "游戏窗口标题", "默认", data.get("LaunchWindowTitle", ""), s -> data.set("LaunchWindowTitle", s));
         textRow(arg, "自定义信息", "TCL", data.get("LaunchCustomInfo", "TCL"), s -> data.set("LaunchCustomInfo", s));
         int visValue = data.getInt("LaunchVisibility", 5);

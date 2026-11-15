@@ -423,7 +423,7 @@ public class PageInstance implements Page {
                 Ui.MenuRow.of("更换图标", "image", () -> changeIcon(ins)),
                 Ui.MenuRow.of("颜色标签", "palette", () -> openSubMenu(() -> showColorMenu(anchor, ins))),
                 Ui.MenuRow.of("加入合集", "layers", () -> openSubMenu(() -> showCollectionMenu(anchor, ins))),
-                Ui.MenuRow.of("打开实例文件夹", "folder-open", () -> openFolder(ins.folder)),
+                Ui.MenuRow.of("打开实例文件夹", "folder-open", () -> openFolder(Isolation.run(ins).toString())),
                 Ui.MenuRow.of("创建桌面快捷方式", "external-link", () -> createInstanceShortcut(ins)),
                 Ui.MenuRow.of(ins.favorite ? "取消收藏" : "加入收藏夹", "heart", () -> {
                     ins.favorite = !ins.favorite;
@@ -607,11 +607,12 @@ public class PageInstance implements Page {
                 win.toast("无法复制实例", error, 2);
                 return;
             }
-            java.nio.file.Path root = java.nio.file.Paths.get(
-                    ins.folder != null && !ins.folder.isEmpty() ? ins.folder : data.gameDir, "versions");
-            java.nio.file.Path src = root.resolve(ins.version);
-            java.nio.file.Path dest = root.resolve(name);
-            final String targetFolder = ins.folder != null && !ins.folder.isEmpty() ? ins.folder : data.gameDir;
+            java.nio.file.Path base = java.nio.file.Paths.get(
+                    ins.folder != null && !ins.folder.isEmpty() ? ins.folder : data.gameDir);
+            java.nio.file.Path src = base.resolve("versions").resolve(ins.version);
+            java.nio.file.Path dest = base.resolve("versions").resolve(name);
+            final String targetFolder = base.toString();
+            final boolean isolated = Isolation.on(ins);
             win.toast("正在复制实例", ins.name + " → " + name, 0);
             Thread worker = new Thread(() -> {
                 try {
@@ -619,7 +620,8 @@ public class PageInstance implements Page {
                     rewriteVersionJson(dest, ins.version, name);
                     javafx.application.Platform.runLater(() -> {
                         Data.Instance copy = new Data.Instance(name, name, ins.loader, ins.loaderVersion,
-                                ins.description, ins.icon, System.currentTimeMillis(), false, targetFolder);
+                                ins.description, ins.icon, System.currentTimeMillis(), false, targetFolder,
+                                isolated ? Isolation.ON : Isolation.OFF);
                         data.instances.add(copy);
                         data.selectedInstance = data.instances.size() - 1;
                         data.save();
@@ -662,7 +664,7 @@ public class PageInstance implements Page {
     }
 
     /** 版本 json 改名并把 id 改成新实例名。 */
-    private static void rewriteVersionJson(java.nio.file.Path dir, String oldId, String newId) throws Exception {
+    static void rewriteVersionJson(java.nio.file.Path dir, String oldId, String newId) throws Exception {
         java.nio.file.Path oldJson = dir.resolve(oldId + ".json");
         if (!java.nio.file.Files.isRegularFile(oldJson)) {
             try (var list = java.nio.file.Files.list(dir)) {
@@ -921,7 +923,8 @@ public class PageInstance implements Page {
                 if (!java.nio.file.Files.isRegularFile(dir.resolve(name + ".json"))) return;
                 boolean exists = false;
                 for (Data.Instance i : data.instances) {
-                    if (i.name.equals(name) && i.folder.equals(gameDir.toString())) exists = true;
+                    if (i.folder != null && i.folder.equals(gameDir.toString())
+                            && (i.name.equals(name) || name.equals(i.version))) exists = true;
                 }
                 if (exists) return;
                 String lower = name.toLowerCase();

@@ -1924,11 +1924,14 @@ public class MainWindow {
     private static final double TOAST_MIN_REMAINING_MS = 300;
     private static final int TOAST_RETURN_MS = 150;
 
-    public void toast(String title, String message, int type) {
+    public void toast(String rawTitle, String rawMessage, int type) {
+        // 静态文案走翻译表，带变量拼出来的查不到就原样显示
+        final String title = Lang.t(rawTitle);
+        final String message = Lang.t(rawMessage == null ? "" : rawMessage);
         // toast 可能被后台线程调用，统一切回 FX 线程。
         try {
             if (!javafx.application.Platform.isFxApplicationThread()) {
-                javafx.application.Platform.runLater(() -> toast(title, message, type));
+                javafx.application.Platform.runLater(() -> toast(rawTitle, rawMessage, type));
                 return;
             }
         } catch (Throwable t) {
@@ -2310,11 +2313,12 @@ public class MainWindow {
         field.setPrefHeight(34);
         VBox results = new VBox(2);
         ScrollPane scroll = Ui.scroll(results);
-        // 视口高度跟结果条数走（行高 38 + 间距 2），结果不满一屏时卡片不留空挡
+        // 视口高度按整行算（行高 38 + 间距 2），不满一屏时卡片不留空挡、也不切半行
         scroll.setMaxHeight(330);
         Label empty = Ui.label("没有匹配的结果", 12, Theme.gray3);
         empty.setOpacity(0.7);
         empty.setVisible(false);
+        empty.setManaged(false);   // 隐藏时不能占位，否则卡片底部会多出一条空挡
         card.getChildren().addAll(field, scroll, empty);
         StackPane.setAlignment(card, Pos.TOP_CENTER);
         StackPane.setMargin(card, new Insets(70, 0, 0, 0));
@@ -2384,7 +2388,12 @@ public class MainWindow {
                 if (count >= 30) break;
             }
             empty.setVisible(count == 0);
-            scroll.setPrefViewportHeight(Math.max(38, Math.min(300, count * 40.0 - 2)));
+            empty.setManaged(count == 0);
+            scroll.setVisible(count > 0);
+            scroll.setManaged(count > 0);
+            // 最多 7 行整，行高 40（38 行 + 2 间距），避免最后一行被切一半
+            int rows = Math.min(7, Math.max(1, count));
+            scroll.setPrefViewportHeight(rows * 40.0 - 2);
         };
         filter.accept("");
         field.textProperty().addListener((o, a, b) -> filter.accept(b));
@@ -2766,18 +2775,25 @@ public class MainWindow {
     private void runLaunchProgress(Data.Instance ins) {
         launchTimeline = null;
         launchCancelled = false;
+        if (ins == null) {
+            Errors.alert("Minecraft 启动失败", new Exception("还没有选择版本，请先在「实例」页选一个版本再启动。"));
+            launching = false;
+            closeLaunchPanel();
+            return;
+        }
         Thread thread = new Thread(() -> {
             try {
                 data.launchLog.clear(); // 新启动先清空旧日志
                 launchStepText("检查版本文件", 0.08);
                 if (launchCancelled) return;
-                // 版本 JSON 按实例目录找，隔离实例优先
-                String folder = ins.folder != null && !ins.folder.isEmpty() ? ins.folder : data.gameDir;
-                java.nio.file.Path json = Paths.get(folder, "versions",
-                        ins.version, ins.version + ".json");
+                // 版本 JSON 在基础目录，游戏目录可能是隔离后的 versions/<版本>
+                java.nio.file.Path json = Isolation.base(ins).resolve("versions")
+                        .resolve(ins.version).resolve(ins.version + ".json");
                 if (!java.nio.file.Files.isRegularFile(json)) {
                     throw new Exception("未找到版本文件 " + json + "，请先在「下载」页安装 " + ins.version);
                 }
+                data.launchLog("游戏目录：" + Isolation.run(ins) + (Isolation.on(ins) ? "（已隔离）" : "（共用）"));
+                hintIsolation(ins);
                 launchStepText("校验资源完整性", 0.3);
                 if (launchCancelled) return;
                 // 启动前扫描缺失文件并补齐
@@ -2839,8 +2855,22 @@ public class MainWindow {
         thread.start();
     }
 
-    private void launchStepText(String step, double progress) {
-        Platform.runLater(() -> {
+    /** 首次以隔离方式启动时提示一次：共享目录的 mods 不会自动带过来。 */
+    private final java.util.Set<String> isolationHinted = new java.util.HashSet<>();
+
+    private void hintIsolation(Data.Instance ins) {
+        if (!Isolation.on(ins)) return;
+        java.nio.file.Path run = Isolation.run(ins);
+        java.nio.file.Path sharedMods = Isolation.base(ins).resolve("mods");
+        if (java.nio.file.Files.isDirectory(run.resolve("mods"))) return;
+        if (!java.nio.file.Files.isDirectory(sharedMods)) return;
+        if (!isolationHinted.add(ins.name + "|" + run)) return;
+        data.launchLog("提示：已开启版本隔离，共享目录的 mods 不会自动复制到 " + run);
+        Platform.runLater(() -> toast("版本隔离已开启",
+                "本版本的 mods 在 " + run.getFileName() + " 下，共享 mods 未复制", 2));
+    }
+
+    private void launchStepText(String step, double progress) {        Platform.runLater(() -> {
             launchStep.setText(step);
             setLaunchProgress(progress);
             data.launchLog(step); // 步骤写进首页调试日志卡

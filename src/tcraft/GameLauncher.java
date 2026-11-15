@@ -61,10 +61,14 @@ public final class GameLauncher {
         return chain;
     }
 
+    /** 基础游戏目录：libraries、assets 和版本文件都在这儿。 */
     private static Path gameDirOf(Data.Instance instance) {
-        Data data = Data.get();
-        return Paths.get(instance.folder == null || instance.folder.isEmpty()
-                ? data.gameDir : instance.folder);
+        return Isolation.base(instance);
+    }
+
+    /** 游戏运行目录：开了隔离就是 versions/&lt;版本&gt;。 */
+    private static Path runDirOf(Data.Instance instance) {
+        return Isolation.run(instance);
     }
 
     /** 启动前校验依赖库、natives、客户端 jar 和资源索引。 */
@@ -195,8 +199,13 @@ public final class GameLauncher {
             Path console = Paths.get(javaExe.substring(0, javaExe.length() - 9) + "java.exe");
             if (Files.isRegularFile(console)) javaExe = console.toString();
         }
-        Path game = Paths.get(instance.folder == null || instance.folder.isEmpty()
-                ? data.gameDir : instance.folder);
+        Path game = gameDirOf(instance);
+        Path run = runDirOf(instance);
+        try {
+            Files.createDirectories(run);
+        } catch (Exception e) {
+            throw new Exception("无法创建游戏目录：" + run, e);
+        }
         Path versionDir = game.resolve("versions").resolve(instance.version);
         Path jsonPath = versionDir.resolve(instance.version + ".json");
         if (!Files.isRegularFile(jsonPath)) {
@@ -347,7 +356,7 @@ public final class GameLauncher {
         Map<String, String> vars = new LinkedHashMap<>();
         vars.put("auth_player_name", username);
         vars.put("version_name", instance.version);
-        vars.put("game_directory", game.toAbsolutePath().toString());
+        vars.put("game_directory", run.toAbsolutePath().toString());
         vars.put("assets_root", assetsDir);
         vars.put("game_assets", assetsDir);
         vars.put("assets_index_name", assetIndex);
@@ -368,7 +377,7 @@ public final class GameLauncher {
         vars.put("library_directory", game.resolve("libraries").toAbsolutePath().toString());
         vars.put("resolution_width", String.valueOf(Math.max(1, winW)));
         vars.put("resolution_height", String.valueOf(Math.max(1, winH)));
-        vars.put("quickPlayPath", game.resolve("TCL").resolve("quickplay.log").toAbsolutePath().toString());
+        vars.put("quickPlayPath", run.resolve("TCL").resolve("quickplay.log").toAbsolutePath().toString());
         vars.put("quickPlaySingleplayer", "");
         vars.put("quickPlayMultiplayer", "");
         vars.put("quickPlayRealms", "");
@@ -448,12 +457,12 @@ public final class GameLauncher {
 
         // 第三方登录注入。
         if (account != null && "nide".equals(account.userType) && account.server != null && !account.server.isEmpty()) {
-            Path nideJar = Paths.get(data.gameDir, "TCL", "nide8auth.jar");
+            Path nideJar = game.resolve("TCL").resolve("nide8auth.jar");
             ensureNideAgentJar(nideJar, account.server);
             cmd.add("-javaagent:" + nideJar.toAbsolutePath() + "=" + account.server);
         } else if (account != null && "legacy".equals(account.userType)
                 && account.server != null && !account.server.isEmpty()) {
-            Path authJar = Paths.get(data.gameDir, "TCL", "authlib-injector.jar");
+            Path authJar = game.resolve("TCL").resolve("authlib-injector.jar");
             ensureAuthlibInjectorJar(authJar);
             cmd.add("-Dauthlibinjector.side=client"); // 参数顺序跟 nide8auth 一致
             cmd.add("-javaagent:" + authJar.toAbsolutePath() + "=" + account.server);
@@ -542,7 +551,7 @@ public final class GameLauncher {
                 boolean win = System.getProperty("os.name", "").toLowerCase().contains("win");
                 String shell = win ? "cmd.exe" : "/bin/sh";
                 String arg = win ? "/c" : "-c";
-                Process preProcess = new ProcessBuilder(shell, arg, pre).directory(game.toFile())
+                Process preProcess = new ProcessBuilder(shell, arg, pre).directory(run.toFile())
                         .redirectErrorStream(true).start();
                 if (data.getBool("LaunchPreCommandWait", true)) {
                     preProcess.waitFor();
@@ -562,9 +571,10 @@ public final class GameLauncher {
             }
         }
         ProcessBuilder builder = new ProcessBuilder(cmd);
-        builder.directory(game.toFile());
+        builder.directory(run.toFile());
         builder.redirectErrorStream(true);
         Process process = builder.start();
+        data.launchLog("游戏目录：" + run);
         data.launchLog("已启动游戏进程：" + String.join(" ", cmd));
         Thread reader = new Thread(() -> {
             try (BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
