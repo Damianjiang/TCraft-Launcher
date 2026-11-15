@@ -35,7 +35,7 @@ TCraft Launcher（简称 **TCL**）是用 JavaFX 写的 Minecraft 启动器。�
 没有安装向导、没有捆绑、不上报数据，拷到哪里都能跑，删掉目录就算卸载。
 
 - **单文件**：资源打进 jar；JavaFX 首次启动按当前系统下载到 `.tcl\dependencies`，Windows / macOS / Linux 共用同一个 jar。
-- **界面**：半透明卡片压在背景图上，主题色从背景图提取，另有 30 种预设色板；组件透明度、动画速度可调。
+- **界面**：半透明卡片压在背景图上，壁纸可以用图片或视频，主题色从背景里取，另有多套预设色板；组件透明度、动画速度可调，支持背景音乐。
 - **多平台**：Windows、macOS（Intel / Apple Silicon）、Linux（x64 / ARM）。
 - **多语言**：简体中文 / English / 繁體中文，切换即时生效。
 
@@ -66,24 +66,24 @@ TCraft Launcher（简称 **TCL**）是用 JavaFX 写的 Minecraft 启动器。�
 
 | 模块 | 能力 |
 | --- | --- |
-| 启动 | 多文件夹多实例、收藏夹、内存分配可视化、进程优先级、愚人节彩蛋 |
+| 启动 | 多文件夹多实例、收藏夹、内存分配可视化、进程优先级、启动加载窗、愚人节彩蛋 |
 | 账户 | 微软正版登录（浏览器登录后把地址栏链接粘回启动器）/ 离线登录 / 外置 Authlib 登录（LittleSkin 等） |
 | 实例 | 版本隔离（默认开启，实例各自一套游戏目录）、版本独立设置、Mod / 存档 / 数据包 / 资源包 / 光影 / 截图 / 服务器管理、实例复制与导出 |
 | 整合包 | CurseForge、Modrinth 整合包导入 |
 | 下载 | 原版与 Forge / NeoForge / Fabric / OptiFine 安装；Mod / 整合包 / 数据包 / 资源包 / 光影 / 世界下载；多镜像测速自动择优 |
 | 联机 | 基于 EasyTier 的虚拟局域网：创建 / 加入房间，房主「对局域网开放」后朋友凭邀请码直连 |
 | 皮肤 | 2D 正视图 + 3D 模型预览 |
-| 其他 | 全局搜索（Ctrl+K）、任务管理与限速、多语言切换、背景音乐、日志落盘 |
+| 其他 | 全局搜索（Ctrl+K）、任务管理与限速、多语言切换、背景音乐、日志落盘、报错一键复制（含堆栈与系统信息） |
 
 ## 下载
 
-到 [Releases](https://github.com/Damianjiang/TCraft-Launcher/releases/latest) 下载对应平台的单文件版，均附带 SHA256 校验：
+到 [Releases](https://github.com/Damianjiang/TCraft-Launcher/releases/latest) 下载，每个文件都附 `.sha256`：
 
 | 平台 | 文件 | 说明 |
 | --- | --- | --- |
-| Windows | `TCraftLauncher-*.exe` | 双击运行，jar 已追加在 exe 末尾 |
-| macOS | `TCraftLauncher-*.jar` / `.command` | 与 Windows / Linux 共用同一个 jar |
-| Linux | `TCraftLauncher-*.sh` / `.deb` | 与 Windows / macOS 共用同一个 jar |
+| Windows | `TCraftLauncher-<版本>-win.exe` | 双击运行，jar 已追加在 exe 末尾 |
+| macOS | `TCraftLauncher-<版本>.jar` | 用 `java -jar` 运行，和 Windows / Linux 是同一个 jar |
+| Linux | `TCraftLauncher-<版本>-linux.sh` | `chmod +x` 后直接执行，内含同一个 jar |
 
 - 需要系统里有 **Java 17 或更高版本**（不捆绑 JRE）
 - 首次启动弹出 Java 选择窗口，可自动扫描或手动指定；确认后记在 `.tcl\launcher.cfg`，路径失效或版本读不出时再次提示
@@ -120,7 +120,7 @@ Windows 单文件包：编译 `tools/launcher.c` → `python tools/add-icon.py` 
 └── website/        官网（GitHub Pages 自动部署）
 ```
 
-官网在推送后由 GitHub Actions 自动发布到 [GitHub Pages](https://damianjiang.github.io/TCraft-Launcher/)。
+`website/` 有改动并推送到 main 后，由 GitHub Actions 自动发布到 [GitHub Pages](https://damianjiang.github.io/TCraft-Launcher/)。
 
 ## 致谢与声明
 
