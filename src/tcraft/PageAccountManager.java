@@ -335,19 +335,19 @@ public class PageAccountManager implements Page {
     }
 
     private void saveSkinFile(Data.Account a) {
-        Path source = Theme.res("images/" + (a.skin == null ? "Steve.png" : a.skin));
-        if (!Files.exists(source)) {
-            win.toast("保存失败", "找不到皮肤文件。", 2);
-            return;
-        }
+        String skinName = a.skin == null ? "Steve.png" : a.skin;
         FileChooser chooser = new FileChooser();
         chooser.setTitle("保存皮肤文件");
         chooser.setInitialFileName(a.name + ".png");
         chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PNG 图片", "*.png"));
         java.io.File target = chooser.showSaveDialog(win.stage);
         if (target == null) return;
-        try {
-            Files.copy(source, target.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        try (java.io.InputStream in = Theme.imageStream(skinName)) {
+            if (in == null) {
+                win.toast("保存失败", "找不到皮肤文件。", 2);
+                return;
+            }
+            Files.copy(in, target.toPath(), StandardCopyOption.REPLACE_EXISTING);
             win.toast("已保存皮肤文件", target.getAbsolutePath(), 1);
         } catch (Exception e) {
             win.toast("保存失败", e.getMessage() == null ? "未知错误" : e.getMessage(), 2);

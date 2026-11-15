@@ -105,30 +105,124 @@ public final class Theme {
     public static final int UNLOCK_EVERY_LAUNCHES = 99;
 
     public static Image wallpaper;
-    private static final Path ROOT;
     public static Font baseFont;
-
-    static {
-        // 目录版用程序旁的 res，单文件版用用户目录解压的那份
-        Path dir = Resources.appDir();
-        ROOT = Files.isDirectory(dir.resolve("res")) ? dir : Resources.home();
-    }
 
     private Theme() {
     }
 
+    /** 用户数据目录（皮肤、图标、日志）。 */
     public static Path root() {
-        return ROOT;
+        return Resources.home();
     }
 
-    public static Path res(String relative) {
-        return ROOT.resolve("res").resolve(relative);
+    public static Path skinDir() {
+        return Resources.home().resolve("skins");
+    }
+
+    public static Path iconDir() {
+        return Resources.home().resolve("icons");
+    }
+
+    public static Path skinFile(String fileName) {
+        return skinDir().resolve(fileName);
+    }
+
+    public static Path iconFile(String fileName) {
+        return iconDir().resolve(fileName);
+    }
+
+    /** jar 内资源索引：小写相对路径 -> 实际路径。 */
+    private static java.util.Map<String, String> resourceIndex;
+
+    private static synchronized java.util.Map<String, String> resourceIndex() {
+        if (resourceIndex != null) return resourceIndex;
+        java.util.Map<String, String> map = new java.util.HashMap<>();
+        Path jar = Resources.jar();
+        if (jar != null) {
+            try (java.util.jar.JarFile jf = new java.util.jar.JarFile(jar.toFile())) {
+                var entries = jf.entries();
+                while (entries.hasMoreElements()) {
+                    String name = entries.nextElement().getName();
+                    if (name.startsWith("res/") && !name.endsWith("/")) {
+                        map.put(name.toLowerCase(java.util.Locale.ROOT), name);
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+        } else {
+            Path dir = Resources.appDir().resolve("res");
+            try (var walk = Files.walk(dir)) {
+                walk.filter(Files::isRegularFile).forEach(p -> {
+                    String rel = "res/" + dir.relativize(p).toString().replace('\\', '/');
+                    map.put(rel.toLowerCase(java.util.Locale.ROOT), rel);
+                });
+            } catch (Exception ignored) {
+            }
+        }
+        resourceIndex = map;
+        return map;
+    }
+
+    private static String resourcePath(String relative) {
+        if (relative == null) return null;
+        return resourceIndex().get(("res/" + relative).toLowerCase(java.util.Locale.ROOT));
+    }
+
+    public static boolean resExists(String relative) {
+        return resourcePath(relative) != null;
+    }
+
+    public static URL resUrl(String relative) {
+        String path = resourcePath(relative);
+        return path == null ? null : Theme.class.getResource("/" + path);
+    }
+
+    public static java.io.InputStream resStream(String relative) {
+        URL url = resUrl(relative);
+        try {
+            return url == null ? null : url.openStream();
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    public static String resText(String relative) {
+        try (java.io.InputStream in = resStream(relative)) {
+            if (in == null) return "";
+            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            return "";
+        }
+    }
+
+    /** 用户皮肤/图标优先，其次才是 jar 内置图片。 */
+    private static Path userImage(String name) {
+        if (name == null || name.isEmpty()) return null;
+        if (name.startsWith("Skins/")) {
+            Path p = skinDir().resolve(name.substring(6));
+            return Files.isRegularFile(p) ? p : null;
+        }
+        if (name.startsWith("Icons/")) {
+            Path p = iconDir().resolve(name.substring(6));
+            return Files.isRegularFile(p) ? p : null;
+        }
+        Path skin = skinDir().resolve(name);
+        return Files.isRegularFile(skin) ? skin : null;
+    }
+
+    /** 打开图片流，先查用户目录再查 jar。 */
+    public static java.io.InputStream imageStream(String name) throws IOException {
+        Path user = userImage(name);
+        if (user != null) return Files.newInputStream(user);
+        return resStream("images/" + name);
     }
 
     public static void init() {
-        try {
-            Font f = Font.loadFont(res("Font.ttf").toUri().toString(), 13);
-            if (f != null) baseFont = f;
+        try (java.io.InputStream in = resStream("Font.ttf")) {
+            if (in != null) {
+                Font f = Font.loadFont(in, 13);
+                if (f != null) baseFont = f;
+            }
         } catch (Exception ignored) {
         }
         resetWallpaper();
@@ -161,36 +255,30 @@ public final class Theme {
         }
     }
 
-    /** 图片缓存以路径、修改时间和大小做键。 */
+    /** 图片缓存以资源名或文件路径做键。 */
     private static final java.util.Map<String, Image> IMAGE_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
 
     public static Image loadImage(String name) {
+        if (name == null || name.isEmpty()) return null;
         try {
-            Path p = res("images/" + name);
-            if (!Files.exists(p)) {
-                // 文件名与代码大小写不一致时兜底找一次（磁盘和 jar 内区分大小写）。
-                Path alt = findIgnoreCase(res("images"), name);
-                if (alt != null) p = alt;
+            // 绝对路径的用户文件
+            if (name.contains("/") || name.contains("\\")) {
+                Path abs = Paths.get(name);
+                if (Files.isRegularFile(abs)) return cachedImage(abs);
             }
-            if (!Files.exists(p)) {
-                // 也支持绝对路径的用户文件
-                if (name != null && (name.contains("/") || name.contains("\\"))) {
-                    Path abs = Paths.get(name);
-                    if (Files.isRegularFile(abs)) return cachedImage(abs);
-                }
-                return null;
+            Path user = userImage(name);
+            if (user != null) return cachedImage(user);
+            String key = "res:" + name.toLowerCase(java.util.Locale.ROOT);
+            Image cached = IMAGE_CACHE.get(key);
+            if (cached != null) return cached;
+            try (java.io.InputStream in = resStream("images/" + name)) {
+                if (in == null) return null;
+                Image img = new Image(in, 0, 0, true, false);
+                if (img.isError()) return null;
+                if (IMAGE_CACHE.size() > 512) IMAGE_CACHE.clear();
+                IMAGE_CACHE.put(key, img);
+                return img;
             }
-            return cachedImage(p);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private static Path findIgnoreCase(Path dir, String name) {
-        if (dir == null || name == null) return null;
-        try (java.util.stream.Stream<Path> s = Files.list(dir)) {
-            return s.filter(x -> x.getFileName().toString().equalsIgnoreCase(name))
-                    .findFirst().orElse(null);
         } catch (Exception e) {
             return null;
         }
@@ -395,7 +483,8 @@ public final class Theme {
     private static synchronized URL regenerateCss() {
         try {
             // style.css 里这几个蓝色标记换成当前色板，走 CSS 的控件（弹层、菜单、勾选框等）就跟主题走
-            String css = Files.readString(res("style.css"), StandardCharsets.UTF_8);
+            String css = resText("style.css");
+            if (css.isEmpty()) return cssUrl;
             css = css.replace("#4890f5", hex(accentLight))
                     .replace("#1370f3", hex(accent))
                     .replace("#eaf2fe", hex(accentPale3));
@@ -403,10 +492,7 @@ public final class Theme {
             Files.writeString(out, css, StandardCharsets.UTF_8);
             cssUrl = out.toUri().toURL();
         } catch (Exception e) {
-            try {
-                cssUrl = res("style.css").toUri().toURL();
-            } catch (Exception ignored) {
-            }
+            cssUrl = resUrl("style.css");
         }
         return cssUrl;
     }
@@ -456,14 +542,10 @@ public final class Theme {
             String cached = SVG_CACHE.get(name);
             return cached.isEmpty() ? null : cached;
         }
-        try {
-            Path p = res("icons/lucide/" + name + ".svg");
-            if (Files.exists(p)) {
-                String text = Files.readString(p, StandardCharsets.UTF_8);
-                SVG_CACHE.put(name, text);
-                return text;
-            }
-        } catch (IOException ignored) {
+        String text = resText("icons/lucide/" + name + ".svg");
+        if (!text.isEmpty()) {
+            SVG_CACHE.put(name, text);
+            return text;
         }
         SVG_CACHE.put(name, "");
         return null;

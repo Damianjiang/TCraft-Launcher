@@ -46,8 +46,10 @@ public class App extends Application {
 
     @Override
     public void start(Stage stage) {
-        // 先把启动画面放出来
-        java.awt.Window splash = createSplash();
+        StartupWindow splash = Boot.startupWindow;
+        if (splash == null) splash = StartupWindow.open();
+        final StartupWindow ui = splash;
+        ui.setStatus("正在检查资源是否齐全…", 25);
 
         try {
             // 全局异常兜底：FX 线程弹窗，后台线程只记日志。
@@ -57,22 +59,38 @@ public class App extends Application {
                     Errors.uncaught(thread, throwable, true));
             Theme.init();
             Lang.reload();
-            Theme.applyComponentOpacity(); // 按 UiComponentOpacity 重算半透明色
-            EasyTier.killLeftovers(); // 清掉上次残留的 easytier-core
+            Theme.applyComponentOpacity();
+            ui.setStatus("正在检查资源是否齐全…", 45);
+            // 清残留 easytier-core 放后台，不挡启动
+            Thread cleanup = new Thread(EasyTier::killLeftovers, "TCL-Cleanup");
+            cleanup.setDaemon(true);
+            cleanup.start();
         } catch (Throwable t) {
             showFatal(splash, t);
             return;
         }
 
         try {
+            ui.setStatus("正在准备主界面…", 62);
             window = new MainWindow(stage);
+            ui.setStatus("正在准备主界面…", 82);
             stage.show();
+            stage.setAlwaysOnTop(false);
             window.playIntro();
+            ui.setStatus("准备完成", 100);
         } catch (Throwable t) {
             showFatal(splash, t);
             return;
         }
-        if (splash != null) splash.toFront();
+        ui.close();
+        stage.setAlwaysOnTop(false);
+        javafx.application.Platform.runLater(() -> {
+            stage.setAlwaysOnTop(false);
+            stage.toFront();
+        });
+        PauseTransition top = new PauseTransition(Duration.millis(1500));
+        top.setOnFinished(e -> stage.setAlwaysOnTop(false));
+        top.play();
 
         // 提前握手，第一次进资源页能省 1~2 秒。
         Http.warmup(
@@ -86,26 +104,6 @@ public class App extends Application {
         Data.get().refreshVersions(false, () -> {
             if (window != null) window.refreshRight();
         });
-
-        // 停 300ms 再淡出
-        Thread fader = new Thread(() -> {
-            try {
-                Thread.sleep(300);
-            } catch (InterruptedException ignored) {
-            }
-            if (splash == null) return;
-            for (float o = 1f; o >= 0f; o -= 0.1f) {
-                try {
-                    splash.setOpacity(o);
-                    Thread.sleep(30);
-                } catch (Exception ignored) {
-                }
-            }
-            splash.dispose();
-            javafx.application.Platform.runLater(() -> stage.setAlwaysOnTop(true));
-        }, "TCL-Splash-Fade");
-        fader.setDaemon(true);
-        fader.start();
 
         handleSnapshotArgs();
         handlePerfArgs();
@@ -140,6 +138,10 @@ public class App extends Application {
             }
             if (target == null) {
                 window.toast("快捷方式启动失败", "未找到实例「" + wanted + "」", 2);
+                return;
+            }
+            if (!Data.usableJava(Data.get().javaPath)) {
+                window.toast("需要先设置 Java", "请在 设置 → Java 中选择运行时后再启动。", 2);
                 return;
             }
             Data data = Data.get();
@@ -197,42 +199,10 @@ public class App extends Application {
         warm.play();
     }
 
-    /** 启动画面的 AWT 窗口。 */
-    private java.awt.Window splash;
-
-    /** 200×200 纯 Logo，屏幕居中，AWT 裁圆角。 */
-    private java.awt.Window createSplash() {
-        try {
-            java.awt.Window w = new java.awt.Window((java.awt.Frame) null);
-            w.setBackground(new java.awt.Color(0, 0, 0, 0));
-            java.awt.Image img = java.awt.Toolkit.getDefaultToolkit()
-                    .getImage(Theme.res("images/Splash.png").toUri().toURL());
-            java.awt.Canvas canvas = new java.awt.Canvas() {
-                @Override
-                public void paint(java.awt.Graphics g) {
-                    g.drawImage(img, 0, 0, 200, 200, null);
-                }
-            };
-            w.add(canvas, java.awt.BorderLayout.CENTER);
-            w.setSize(200, 200);
-            w.setShape(new java.awt.geom.RoundRectangle2D.Float(0, 0, 200, 200, 40, 40)); // 圆角半径 20
-            w.setLocationRelativeTo(null);
-            w.setAlwaysOnTop(true);
-            w.setVisible(true);
-            return w;
-        } catch (Exception e) {
-            return null; // 失败也不拦启动
-        }
-    }
-
-    /** 启动失败：写 crash.txt、关启动画面、弹窗。 */
-    private void showFatal(java.awt.Window splash, Throwable t) {
+    /** 启动失败：写 crash.txt、关加载窗、弹窗。 */
+    private void showFatal(StartupWindow splash, Throwable t) {
         Path crash = Boot.writeCrash(t);
-
-        try {
-            if (splash != null) splash.dispose();
-        } catch (Exception ignored) {
-        }
+        if (splash != null) splash.close();
 
         String root = String.valueOf(t);
         StringBuilder detail = new StringBuilder();
@@ -263,8 +233,21 @@ public class App extends Application {
         where.setWrapText(true);
         where.setStyle("-fx-font-size: 11px; -fx-text-fill: #5b6472;");
 
+        Label warn = new Label("请不要发送截图，请复制下面的完整报错，粘贴到交流群或 GitHub Issues 提交。");
+        warn.setWrapText(true);
+        warn.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #ce2111;");
+
+        String report = "TCraft Launcher 启动失败\n" + root + "\n\n" + detail
+                + (crash == null ? "" : "\n日志：" + crash);
+        Button copy = new Button("复制全部");
         Button openDir = new Button("打开日志文件夹");
         Button close = new Button("关闭");
+        copy.setOnAction(e -> {
+            javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
+            content.putString(report);
+            javafx.scene.input.Clipboard.getSystemClipboard().setContent(content);
+            copy.setText("已复制");
+        });
         String crashPath = crash == null ? null : crash.getParent().toString();
         openDir.setOnAction(e -> {
             if (crashPath != null) {
@@ -278,13 +261,13 @@ public class App extends Application {
             fail.close();
             Platform.exit();
         });
-        HBox buttons = new HBox(10, openDir, close);
+        HBox buttons = new HBox(10, copy, openDir, close);
         buttons.setAlignment(Pos.CENTER_RIGHT);
 
-        VBox box = new VBox(10, title, msg, stack, where, buttons);
+        VBox box = new VBox(10, title, msg, stack, where, warn, buttons);
         box.setPadding(new javafx.geometry.Insets(18, 20, 16, 20));
         box.setStyle("-fx-background-color: #ffffff;");
-        Scene scene = new Scene(box, 520, 340);
+        Scene scene = new Scene(box, 560, 420);
         fail.setScene(scene);
         fail.setOnCloseRequest(e -> Platform.exit());
         fail.centerOnScreen();

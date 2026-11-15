@@ -649,9 +649,29 @@ static int run(const wchar_t *java, DWORD *exit_code) {
     /* 告诉 Java 侧启动器目录，省得它猜 user.home。 */
     cat_str(cmd, L"\" -Dfile.encoding=UTF-8 -Dtcraft.dir=\"", MAX_PATH_LEN * 2);
     cat_str(cmd, home_dir, MAX_PATH_LEN * 2);
-    cat_str(cmd, L"\" -jar \"", MAX_PATH_LEN * 2);
-    cat_str(cmd, jar_path, MAX_PATH_LEN * 2);
-    cat_str(cmd, L"\"", MAX_PATH_LEN * 2);
+    {
+        /* JavaFX 已下载时直接带 module-path 启动，少起一个 JVM。 */
+        wchar_t deps[MAX_PATH_LEN];
+        wchar_t check[MAX_PATH_LEN];
+        copy_str(deps, home_dir, MAX_PATH_LEN);
+        cat_str(deps, L"\\dependencies\\win\\openjfx", MAX_PATH_LEN);
+        copy_str(check, deps, MAX_PATH_LEN);
+        cat_str(check, L"\\.ready", MAX_PATH_LEN);
+        if (file_exists(check)) {
+            cat_str(cmd, L"\" -Djava.library.path=\"", MAX_PATH_LEN * 2);
+            cat_str(cmd, deps, MAX_PATH_LEN * 2);
+            cat_str(cmd, L"\" --module-path=\"", MAX_PATH_LEN * 2);
+            cat_str(cmd, deps, MAX_PATH_LEN * 2);
+            cat_str(cmd, L"\" --add-modules=javafx.controls,javafx.graphics,javafx.base,javafx.media -cp \"",
+                    MAX_PATH_LEN * 2);
+            cat_str(cmd, jar_path, MAX_PATH_LEN * 2);
+            cat_str(cmd, L"\" tcraft.Boot", MAX_PATH_LEN * 2);
+        } else {
+            cat_str(cmd, L"\" -jar \"", MAX_PATH_LEN * 2);
+            cat_str(cmd, jar_path, MAX_PATH_LEN * 2);
+            cat_str(cmd, L"\"", MAX_PATH_LEN * 2);
+        }
+    }
 
     /* javaw 没有控制台，把 stdout/stderr 落到 java-error.log，否则崩溃原因丢失。 */
     copy_str(logp, home_dir, MAX_PATH_LEN);
@@ -677,14 +697,14 @@ static int run(const wchar_t *java, DWORD *exit_code) {
     if (logf != INVALID_HANDLE_VALUE) CloseHandle(logf); /* java 已经继承了句柄 */
     if (!started) return 0;
 
-    /* 观察 2.5 秒，提前退出即视为失败。 */
+    /* 观察 2.5 秒；退出码 0 是正常交接给带 JavaFX 的新进程，不算失败。 */
     if (WaitForSingleObject(pi.hProcess, 2500) == WAIT_OBJECT_0) {
         DWORD code = 0;
         GetExitCodeProcess(pi.hProcess, &code);
         if (exit_code) *exit_code = code;
         CloseHandle(pi.hProcess);
         CloseHandle(pi.hThread);
-        return 2;
+        return code == 0 ? 1 : 2;
     }
     CloseHandle(pi.hProcess);
     CloseHandle(pi.hThread);

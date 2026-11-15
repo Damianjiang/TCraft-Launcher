@@ -584,7 +584,7 @@ public class PageInstance implements Page {
         try {
             String safe = ins.name == null || ins.name.isEmpty() ? "instance" : ins.name;
             for (char c : "\\/:*?\"<>|".toCharArray()) safe = safe.replace(String.valueOf(c), "_");
-            java.nio.file.Path dir = Theme.res("images/Icons");
+            java.nio.file.Path dir = Theme.iconDir();
             java.nio.file.Files.createDirectories(dir);
             java.nio.file.Path target = dir.resolve(safe + ".png");
             java.nio.file.Files.copy(file.toPath(), target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);

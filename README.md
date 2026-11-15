@@ -34,7 +34,7 @@
 TCraft Launcher（简称 **TCL**）是用 JavaFX 写的 Minecraft 启动器。绿色单文件，
 没有安装向导、没有捆绑、不上报数据，拷到哪里都能跑，删掉目录就算卸载。
 
-- **单文件**：资源与 JavaFX 运行库内嵌进 exe，首次运行解压到 exe 同目录的 `.tcl`，不用另外装。
+- **单文件**：资源打进 jar；JavaFX 首次启动按当前系统下载到 `.tcl\dependencies`，Windows / macOS / Linux 共用同一个 jar。
 - **界面**：半透明卡片压在背景图上，主题色从背景图提取，另有 30 种预设色板；组件透明度、动画速度可调。
 - **多平台**：Windows、macOS（Intel / Apple Silicon）、Linux（x64 / ARM）。
 - **多语言**：简体中文 / English / 繁體中文，切换即时生效。
@@ -81,14 +81,15 @@ TCraft Launcher（简称 **TCL**）是用 JavaFX 写的 Minecraft 启动器。�
 
 | 平台 | 文件 | 说明 |
 | --- | --- | --- |
-| Windows | `TCraftLauncher-*-win.exe` | 双击运行 |
-| macOS | `TCraftLauncher-*-mac*.jar` / `.command` | Intel 与 Apple Silicon 分包 |
-| Linux | `TCraftLauncher-*-linux.sh` / `.deb` | x86_64 与 aarch64 |
+| Windows | `TCraftLauncher-*.exe` | 双击运行，jar 已追加在 exe 末尾 |
+| macOS | `TCraftLauncher-*.jar` / `.command` | 与 Windows / Linux 共用同一个 jar |
+| Linux | `TCraftLauncher-*.sh` / `.deb` | 与 Windows / macOS 共用同一个 jar |
 
-- 需要系统里有 **Java 17 或更高版本**（自带 JavaFX，不带 JRE）
-- 找不到 Java 时弹出选择窗口，可自动扫描或手动指定；选中的路径记在 `.tcl\launcher.cfg`，失效后自动重扫
+- 需要系统里有 **Java 17 或更高版本**（不捆绑 JRE）
+- 首次启动弹出 Java 选择窗口，可自动扫描或手动指定；确认后记在 `.tcl\launcher.cfg`，路径失效或版本读不出时再次提示
+- 首次启动还会按当前系统下载 JavaFX 到 **`.tcl\dependencies\<平台>\openjfx`**（约 10 MB，之后复用）
 - 内置 jar 解到 **exe 同目录的 `.tcl`**（同 HMCL 的 `./.hmcl`），不会被清理工具当临时文件删；目录写不出来时弹窗提示换位置，不改写到 `%LOCALAPPDATA%`
-- 配置、日志、资源与运行库同样在 `.tcl` 内，首次启动从旧的 `~/.tcraft-launcher-javafx` 迁移配置
+- 配置、日志、皮肤与实例图标在 `.tcl` 内，首次启动从旧的 `~/.tcraft-launcher-javafx` 迁移配置
 - 联机功能首次使用会按平台自动下载 EasyTier：Windows 需要管理员权限，macOS 按弹窗授权，Linux 建议 `sudo` 运行
 
 ## 编译与运行

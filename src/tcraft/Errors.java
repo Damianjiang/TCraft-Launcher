@@ -261,9 +261,16 @@ public final class Errors {
                     13, Theme.gray2);
             ask.setWrapText(true);
             ask.setMaxWidth(470);
-            VBox.setMargin(ask, new Insets(0, 7, 12, 7));
+            VBox.setMargin(ask, new Insets(0, 7, 8, 7));
             card.getChildren().add(ask);
         }
+
+        Label copyWarn = Ui.label("请不要发送截图，请复制下面的完整报错，粘贴到交流群或 GitHub Issues 提交。",
+                12, Theme.red);
+        copyWarn.setWrapText(true);
+        copyWarn.setMaxWidth(470);
+        VBox.setMargin(copyWarn, new Insets(0, 7, 12, 7));
+        card.getChildren().add(copyWarn);
 
         HBox actions = new HBox(12);
         actions.setAlignment(Pos.CENTER_RIGHT);
@@ -275,39 +282,51 @@ public final class Errors {
             actions.getChildren().add(Ui.button("确定", r.warn ? Ui.BTN_RED : Ui.BTN_HIGHLIGHT,
                     () -> finish(null)));
         } else if (r.behavior == Behavior.ALERT_FEEDBACK || r.behavior == Behavior.ALERT_CRASH) {
-            // 主按钮在左，次按钮在右
-            String detail = r.detail;
             actions.getChildren().addAll(
-                    Ui.button("反馈", Ui.BTN_RED, () -> finish(() -> doFeedback(detail))),
+                    Ui.button("复制全部", Ui.BTN_NORMAL, () -> copyAll(r)),
+                    Ui.button("反馈", Ui.BTN_RED, () -> finish(() -> doFeedback(r))),
                     Ui.button(r.behavior == Behavior.ALERT_CRASH ? "退出启动器" : "取消",
                             Ui.BTN_NORMAL, () -> finish(() -> {
                                 if (r.behavior == Behavior.ALERT_CRASH) Platform.exit();
                             })));
         } else {
-            actions.getChildren().add(Ui.button("确定", Ui.BTN_RED, () -> finish(null)));
+            actions.getChildren().addAll(
+                    Ui.button("复制全部", Ui.BTN_NORMAL, () -> copyAll(r)),
+                    Ui.button("确定", Ui.BTN_RED, () -> finish(null)));
         }
         card.getChildren().add(actions);
         return card;
     }
 
-    /** 写诊断信息、复制详情、弹「反馈」窗。 */
-    private static void doFeedback(String detail) {
+    /** 标题、简要原因、完整堆栈和系统信息一起复制。 */
+    private static void copyAll(Report r) {
+        copy(fullReport(r));
+        MainWindow w = window;
+        if (w != null) onFx(() -> w.toast("完整报错已复制", "可直接粘贴给开发者。", 1));
+    }
+
+    private static String fullReport(Report r) {
+        return r.title + "\n" + r.headline + "\n\n" + r.detail + "\n\n" + systemInfo();
+    }
+
+    /** 复制完整报错、写诊断日志，再弹「反馈」窗。 */
+    private static void doFeedback(Report r) {
         feedbackInfo();
-        copy(detail);
+        copy(fullReport(r));
         MainWindow w = window;
         if (w != null) {
-            onFx(() -> w.toast("错误详情已复制", "可直接粘贴到反馈群或发给开发者。", 1));
+            onFx(() -> w.toast("完整报错已复制", "可直接粘贴到反馈群或发给开发者。", 1));
         }
         String text = "请加入 TCraft Launcher 启动器交流群（群号 1131373915）提交问题。\n"
-                + "错误信息已复制到剪贴板，可直接粘贴到群内。\n"
-                + "你也可以在 设置 → 日志 中查看并复制错误信息。";
+                + "完整报错已复制到剪贴板，可直接粘贴到群内。\n"
+                + "也可以在 设置 → 日志 中查看并复制。";
         enqueue(new Report("反馈", text, "", Behavior.ALERT, true, true));
     }
 
-    /** 把系统诊断信息写进日志，不弹窗。 */
-    private static void feedbackInfo() {
+    /** 系统诊断信息，复制和日志共用。 */
+    private static String systemInfo() {
+        StringBuilder sb = new StringBuilder("诊断信息：\n");
         try {
-            StringBuilder sb = new StringBuilder("诊断信息：\n");
             sb.append("操作系统：").append(System.getProperty("os.name")).append(' ')
                     .append(System.getProperty("os.version")).append(" (")
                     .append(System.getProperty("os.arch")).append(")\n");
@@ -318,7 +337,15 @@ public final class Errors {
             sb.append("剩余内存：").append(free).append(" M / ").append(max).append(" M\n");
             sb.append("MC 文件夹：").append(sanitize(String.valueOf(Data.get().gameDir))).append('\n');
             sb.append("文件位置：").append(sanitize(String.valueOf(Theme.root())));
-            Data.get().log(sb.toString());
+        } catch (Throwable ignored) {
+        }
+        return sb.toString();
+    }
+
+    /** 把系统诊断信息写进日志，不弹窗。 */
+    private static void feedbackInfo() {
+        try {
+            Data.get().log(systemInfo());
         } catch (Throwable ignored) {
         }
     }
@@ -343,16 +370,16 @@ public final class Errors {
             javax.swing.SwingUtilities.invokeLater(() -> {
                 try {
                     String text = r.headline + "\n\n"
-                            + (r.detail.length() > 1200 ? r.detail.substring(0, 1200) + "…" : r.detail);
-                    int option = (r.behavior == Behavior.ALERT_FEEDBACK || r.behavior == Behavior.ALERT_CRASH)
-                            ? javax.swing.JOptionPane.YES_NO_OPTION
-                            : javax.swing.JOptionPane.OK_OPTION;
-                    int res = javax.swing.JOptionPane.showConfirmDialog(null, text, r.title,
-                            option, javax.swing.JOptionPane.ERROR_MESSAGE);
-                    if (res == javax.swing.JOptionPane.YES_OPTION) {
+                            + (r.detail.length() > 1600 ? r.detail.substring(0, 1600) + "…" : r.detail)
+                            + "\n\n请不要发送截图，请复制完整报错，粘贴到交流群或 GitHub Issues 提交。";
+                    Object[] options = {"复制并关闭", "关闭"};
+                    int res = javax.swing.JOptionPane.showOptionDialog(null, text, r.title,
+                            javax.swing.JOptionPane.DEFAULT_OPTION, javax.swing.JOptionPane.ERROR_MESSAGE,
+                            null, options, options[0]);
+                    if (res == 0) {
                         try {
                             java.awt.datatransfer.StringSelection sel =
-                                    new java.awt.datatransfer.StringSelection(sanitize(r.detail));
+                                    new java.awt.datatransfer.StringSelection(sanitize(fullReport(r)));
                             java.awt.Toolkit.getDefaultToolkit().getSystemClipboard()
                                     .setContents(sel, sel);
                         } catch (Throwable ignored) {
@@ -396,7 +423,7 @@ public final class Errors {
         boolean inner = false;
         int depth = 0;
         for (Throwable cur = ex; cur != null && depth < 8; cur = cur.getCause(), depth++) {
-            sb.append(inner ? "→ " : "").append(cur.getClass().getName()).append("：")
+            sb.append(inner ? "由 " : "").append(cur.getClass().getName()).append("：")
                     .append(cur.getMessage() == null ? "(无消息)" : cur.getMessage()).append('\n');
             StackTraceElement[] st = cur.getStackTrace();
             for (int i = 0; i < Math.min(st.length, 24); i++) sb.append("    ").append(st[i]).append('\n');
@@ -407,7 +434,7 @@ public final class Errors {
         String reason = commonReason(ex);
         String detail = sanitize(sb.toString());
         if (reason == null) return detail;
-        return reason + "\n\n——————— 详细错误信息 ———————\n" + detail;
+        return reason + "\n\n详细错误信息：\n" + detail;
     }
 
     /** 常见错误原因分析，按 Java 异常类型映射。 */

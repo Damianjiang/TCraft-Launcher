@@ -167,7 +167,7 @@ public final class MsAuth {
     public static String saveSkin(Result r, String gameDir) {
         if (r.skinUrl == null || r.skinUrl.isEmpty()) return "";
         try {
-            java.nio.file.Path dir = Theme.res("images/Skins");
+            java.nio.file.Path dir = Theme.skinDir();
             java.nio.file.Files.createDirectories(dir);
             String file = (r.name.isEmpty() ? "skin" : r.name) + ".png";
             java.nio.file.Files.write(dir.resolve(file), download(r.skinUrl));

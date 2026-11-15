@@ -256,6 +256,21 @@ public final class Data {
         if (instances.isEmpty()) seedInstances();
         if (folders.isEmpty()) folders.add(new FolderItem("当前文件夹", gameDir));
         if (javaPath == null || javaPath.isEmpty()) javaPath = detectJava();
+        // exe 外壳选定的 Java 优先级最高
+        String forcedJava = System.getProperty("tcraft.java", "");
+        if (!forcedJava.isEmpty() && usableJava(forcedJava)) {
+            javaPath = forcedJava;
+        } else {
+            // Windows 外壳把选择结果写在 launcher.cfg
+            try {
+                Path cfg = configPath.getParent().resolve("launcher.cfg");
+                if (Files.isRegularFile(cfg)) {
+                    String picked = Files.readString(cfg, StandardCharsets.UTF_8).trim();
+                    if (usableJava(picked)) javaPath = picked;
+                }
+            } catch (Exception ignored) {
+            }
+        }
         log.add("[TCL] TCraft Launcher " + Build.VERSION + " (JavaFX Edition)");
         log.add("[TCL] 当前游戏目录：" + gameDir);
         log.add("[TCL] Java：" + (javaPath.isEmpty() ? "未找到" : javaPath));
@@ -322,66 +337,199 @@ public final class Data {
         return Paths.get(System.getProperty("user.home"), ".minecraft").toString();
     }
 
+    /** 一个可用的 Java 运行时。 */
+    public record JavaRuntime(String path, int major, String folder) {
+    }
+
+    private volatile List<JavaRuntime> javaScanCache;
+    private volatile long javaScanAt;
+
+    /** 清掉扫描缓存，下次重新读磁盘。 */
+    public void invalidateJavaScan() {
+        javaScanCache = null;
+        javaScanAt = 0;
+    }
+
+    /** 选中版本最高的 17+ Java，没有 17+ 就用最高版本。 */
     public String detectJava() {
-        String os = System.getProperty("os.name", "").toLowerCase();
+        List<JavaRuntime> list = scanJavaRuntimes();
+        for (JavaRuntime r : list) {
+            if (r.major >= 17) return r.path;
+        }
+        return list.isEmpty() ? "" : list.get(0).path;
+    }
+
+    /** 路径存在且能读到版本号才算可用。 */
+    public static boolean usableJava(String path) {
+        if (path == null || path.isBlank()) return false;
+        try {
+            return Files.isRegularFile(Paths.get(path)) && javaMajor(path) > 0;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** 设置游戏用 Java，并同步给 exe 外壳。 */
+    public void setJavaRuntime(String path, int major) {
+        javaPath = path;
+        set("java.path", path);
+        save();
+        if (major >= 17) writeLauncherCfg(path);
+    }
+
+    /** 写 .tcl\launcher.cfg，下次由外壳直接启动。 */
+    private void writeLauncherCfg(String path) {
+        try {
+            Files.createDirectories(configPath.getParent());
+            Files.writeString(configPath.getParent().resolve("launcher.cfg"), path, StandardCharsets.UTF_8);
+        } catch (Exception ignored) {
+        }
+    }
+
+    /** 扫描本机 Java，按版本降序；60 秒内复用结果。 */
+    public List<JavaRuntime> scanJavaRuntimes() {
+        long now = System.currentTimeMillis();
+        List<JavaRuntime> cached = javaScanCache;
+        if (cached != null && now - javaScanAt < 60_000) return cached;
+        java.util.LinkedHashMap<String, JavaRuntime> found = new java.util.LinkedHashMap<>();
+        for (String raw : javaCandidates()) {
+            if (raw == null || raw.isBlank()) continue;
+            try {
+                Path exe = Paths.get(raw).toAbsolutePath().normalize();
+                if (!Files.isRegularFile(exe)) continue;
+                Path home = exe.getParent() == null ? null : exe.getParent().getParent();
+                // 同一个 Java 的 javaw / java 只保留一个
+                String key = (home == null ? exe.toString() : home.toString()).toLowerCase(java.util.Locale.ROOT);
+                if (found.containsKey(key)) continue;
+                int major = javaMajor(exe.toString());
+                if (major <= 0) continue;
+                String folder = home == null || home.getFileName() == null ? "" : home.getFileName().toString();
+                found.put(key, new JavaRuntime(exe.toString(), major, folder));
+            } catch (Exception ignored) {
+            }
+        }
+        List<JavaRuntime> list = new ArrayList<>(found.values());
+        list.sort((a, b) -> Integer.compare(b.major, a.major));
+        javaScanCache = list;
+        javaScanAt = now;
+        return list;
+    }
+
+    /** 收集可能的 java 可执行文件，Windows 额外查注册表。 */
+    private List<String> javaCandidates() {
+        String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
         boolean win = os.contains("win");
-        String exe = win ? "javaw.exe" : "java";
-        // 当前运行环境自带的 Java，最稳
-        String runtime = System.getProperty("java.home");
-        if (runtime != null) {
-            Path p = Paths.get(runtime, "bin", exe);
-            if (Files.isRegularFile(p)) return p.toString();
-        }
-        // JAVA_HOME
-        String jhome = System.getenv("JAVA_HOME");
-        if (jhome != null && !jhome.isEmpty()) {
-            if (Files.isRegularFile(Paths.get(jhome, "bin", exe))) return Paths.get(jhome, "bin", exe).toString();
-            if (Files.isRegularFile(Paths.get(jhome, exe))) return Paths.get(jhome, exe).toString();
-        }
-        // 各平台固定路径
+        boolean mac = os.contains("mac") || os.contains("darwin");
+        List<String> out = new ArrayList<>();
+
+        addJavaExes(out, System.getProperty("java.home"), win, mac);
+        addJavaExes(out, System.getenv("JAVA_HOME"), win, mac);
+
         if (win) {
-            for (String c : new String[]{
-                    "C:\\Program Files\\Microsoft\\jdk-25.0.4.7-hotspot\\bin\\javaw.exe",
-                    "C:\\Program Files\\Java\\jdk-21\\bin\\javaw.exe"}) {
-                if (Files.isRegularFile(Paths.get(c))) return c;
-            }
-        } else if (os.contains("mac")) {
-            // 真实 JDK 优先，/usr/bin/java 在 Apple Silicon 只是 stub
-            List<Path> candidates = new ArrayList<>();
-            String[] roots = {"/Library/Java/JavaVirtualMachines", "/opt/homebrew/opt", "/usr/local/opt"};
-            for (String root : roots) {
-                java.io.File dir = new java.io.File(root);
-                java.io.File[] list = dir.listFiles();
-                if (list == null) continue;
-                for (java.io.File f : list) {
-                    Path candidate = root.startsWith("/Library")
-                            ? f.toPath().resolve("Contents/Home/bin/java")
-                            : f.toPath().resolve("bin/java");
-                    if (Files.isRegularFile(candidate)) candidates.add(candidate);
+            for (String env : new String[]{"ProgramFiles", "ProgramFiles(x86)", "ProgramW6432"}) {
+                String base = System.getenv(env);
+                if (base == null || base.isBlank()) continue;
+                for (String vendor : new String[]{"Java", "Microsoft", "Eclipse Adoptium", "Eclipse Foundation",
+                        "BellSoft", "Zulu", "Amazon Corretto", "Semeru", "GraalVM", "JetBrains"}) {
+                    addJavaRoot(out, Paths.get(base, vendor), win, mac);
                 }
             }
-            Path best = null;
-            int bestMajor = -1;
-            for (Path c : candidates) {
-                int major = javaMajor(c.toString());
-                if (major > bestMajor) {
-                    bestMajor = major;
-                    best = c;
-                }
+            String local = System.getenv("LOCALAPPDATA");
+            String programData = System.getenv("ProgramData");
+            if (local != null && !local.isBlank()) {
+                addJavaRoot(out, Paths.get(local, "Programs", "Eclipse Adoptium"), win, mac);
+                addJavaRoot(out, Paths.get(local, "Programs", "Microsoft"), win, mac);
+                addJavaRoot(out, Paths.get(local, "Programs", "Common", "Oracle", "Java"), win, mac);
+                addJavaRoot(out, Paths.get(local, "JetBrains", "Toolbox", "apps"), win, mac);
             }
-            if (best != null) return best.toString();
-            if (new java.io.File("/usr/bin/java").canExecute()) return "/usr/bin/java";
+            if (programData != null && !programData.isBlank()) {
+                addJavaRoot(out, Paths.get(programData, "Oracle", "Java"), win, mac);
+                addJavaRoot(out, Paths.get(programData, "chocolatey", "lib"), win, mac);
+            }
+            String user = System.getProperty("user.home");
+            if (user != null) {
+                addJavaRoot(out, Paths.get(user, ".jdks"), win, mac);
+                addJavaRoot(out, Paths.get(user, "scoop", "apps"), win, mac);
+            }
+        } else if (mac) {
+            for (String root : new String[]{"/Library/Java/JavaVirtualMachines", "/opt/homebrew/opt", "/usr/local/opt"}) {
+                addJavaRoot(out, Paths.get(root), win, mac);
+            }
+        } else {
+            for (String root : new String[]{"/usr/lib/jvm", "/usr/local/openjdk", "/usr/java"}) {
+                addJavaRoot(out, Paths.get(root), win, mac);
+            }
         }
-        // PATH
+
         String pathEnv = System.getenv("PATH");
         if (pathEnv != null) {
-            String sep = win ? ";" : java.io.File.pathSeparator;
-            for (String part : pathEnv.split(sep)) {
-                Path p = Paths.get(part, exe);
-                if (Files.isRegularFile(p)) return p.toString();
+            for (String part : pathEnv.split(java.io.File.pathSeparator)) {
+                if (!part.isBlank()) addJavaBinDir(out, part, win);
             }
         }
-        return "";
+        if (mac) {
+            out.add("/usr/bin/java");
+            out.add("/usr/local/bin/java");
+        }
+        return out;
+    }
+
+    private static void addJavaExes(List<String> out, String home, boolean win, boolean mac) {
+        if (home == null || home.isBlank()) return;
+        try {
+            addJavaExes(out, Paths.get(home), win, mac);
+        } catch (Exception ignored) {
+        }
+    }
+
+    /** PATH 里的项本身就是 bin 目录。 */
+    private static void addJavaBinDir(List<String> out, String dir, boolean win) {
+        String lower = dir.toLowerCase(java.util.Locale.ROOT);
+        if (win && (lower.contains("\\windowsapps") || lower.contains("/windowsapps"))) return;
+        try {
+            Path base = Paths.get(dir);
+            for (String exe : win ? new String[]{"javaw.exe", "java.exe"} : new String[]{"java"}) {
+                Path p = base.resolve(exe);
+                if (Files.isRegularFile(p)) out.add(p.toString());
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static void addJavaExes(List<String> out, Path home, boolean win, boolean mac) {
+        if (home == null) return;
+        // WindowsApps 里是应用商店的占位别名，运行会弹商店
+        String lower = home.toString().toLowerCase(java.util.Locale.ROOT);
+        if (win && (lower.contains("\\windowsapps") || lower.contains("/windowsapps"))) return;
+        String exe = win ? "javaw.exe" : "java";
+        Path bin = home.resolve("bin").resolve(exe);
+        if (Files.isRegularFile(bin)) out.add(bin.toString());
+        if (win) {
+            Path console = home.resolve("bin").resolve("java.exe");
+            if (Files.isRegularFile(console)) out.add(console.toString());
+        }
+        if (mac) {
+            Path bundle = home.resolve("Contents/Home/bin/java");
+            if (Files.isRegularFile(bundle)) out.add(bundle.toString());
+        }
+    }
+
+    /** 安装根目录最多向下找两层，覆盖 jdk-17 与 scoop 这类布局。 */
+    private static void addJavaRoot(List<String> out, Path root, boolean win, boolean mac) {
+        if (root == null || !Files.isDirectory(root)) return;
+        addJavaExes(out, root, win, mac);
+        try (var dirs = Files.list(root)) {
+            dirs.filter(Files::isDirectory)
+                    .sorted(java.util.Comparator.comparing(Path::toString))
+                    .forEach(dir -> {
+                        addJavaExes(out, dir, win, mac);
+                        try (var inner = Files.list(dir)) {
+                            inner.filter(Files::isDirectory).forEach(sub -> addJavaExes(out, sub, win, mac));
+                        } catch (Exception ignored) {
+                        }
+                    });
+        } catch (Exception ignored) {
+        }
     }
 
     public static String offlineUuid(String name) {
@@ -405,9 +553,13 @@ public final class Data {
                 }
             }
             Process p = new ProcessBuilder(javaExe, "-version").redirectErrorStream(true).start();
+            // 卡死的 Java 不能拖住启动，最多等 5 秒
+            if (!p.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                p.destroyForcibly();
+                return 0;
+            }
             String text = new String(p.getInputStream().readAllBytes(),
                     java.nio.charset.StandardCharsets.UTF_8);
-            p.waitFor();
             java.util.regex.Matcher m = java.util.regex.Pattern
                     .compile("version \"([^\"]+)\"").matcher(text);
             if (m.find()) return parseJavaMajor(m.group(1));
@@ -737,7 +889,8 @@ public final class Data {
         }
     }
 
-    public void save() {
+    /** 下载线程和界面线程都会调，串行化避免写坏配置文件。 */
+    public synchronized void save() {
         try {
             Files.createDirectories(configPath.getParent());
             props.setProperty("account.count", String.valueOf(accounts.size()));
@@ -870,20 +1023,52 @@ public final class Data {
         }
     }
 
+    /** 日志先入队，由后台线程批量落盘，游戏输出多时不会卡 UI。 */
+    private final java.util.concurrent.BlockingQueue<String> logQueue =
+            new java.util.concurrent.LinkedBlockingQueue<>(5000);
+    private volatile Thread logWriter;
+
     public void log(String line) {
         String stamped = "[" + LocalDateTime.now().toLocalTime().withNano(0) + "] " + line;
         log.add(stamped);
         if (log.size() > 500) log.remove(0);
-        // 调试模式同时输出到控制台
         if (getBool("SystemDebugMode", false)) System.out.println("[TCL] " + stamped);
-        // 同时写 launcher.log
-        try {
-            Files.createDirectories(configPath.getParent());
-            Files.writeString(configPath.getParent().resolve("launcher.log"),
-                    stamped + System.lineSeparator(), StandardCharsets.UTF_8,
-                    java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
-        } catch (Exception ignored) {
+        startLogWriter();
+        if (!logQueue.offer(stamped)) {
+            logQueue.poll();
+            logQueue.offer(stamped);
         }
     }
 
+    private synchronized void startLogWriter() {
+        if (logWriter != null) return;
+        logWriter = new Thread(this::drainLogQueue, "TCL-LogWriter");
+        logWriter.setDaemon(true);
+        logWriter.start();
     }
+
+    private void drainLogQueue() {
+        Path file = configPath.getParent().resolve("launcher.log");
+        while (true) {
+            try {
+                String first = logQueue.take();
+                StringBuilder batch = new StringBuilder(first);
+                long until = System.currentTimeMillis() + 400;
+                while (true) {
+                    long left = until - System.currentTimeMillis();
+                    if (left <= 0) break;
+                    String next = logQueue.poll(Math.min(left, 100),
+                            java.util.concurrent.TimeUnit.MILLISECONDS);
+                    if (next == null) break;
+                    batch.append(System.lineSeparator()).append(next);
+                }
+                Files.createDirectories(file.getParent());
+                Files.writeString(file, batch + System.lineSeparator(), StandardCharsets.UTF_8,
+                        java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
+            } catch (InterruptedException e) {
+                return;
+            } catch (Exception ignored) {
+            }
+        }
+    }
+}

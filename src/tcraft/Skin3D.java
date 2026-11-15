@@ -13,8 +13,6 @@ import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
 import javafx.util.Duration;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -135,13 +133,8 @@ public final class Skin3D extends Region {
     /** 按资源名加载皮肤并预览。 */
     public void setSkinFile(String resName) {
         try {
-            Path p = Theme.res("images/" + resName);
-            if (!Files.exists(p)) {
-                clearSkin();
-                return;
-            }
-            Image img = new Image(p.toUri().toString());
-            if (img.isError()) {
+            Image img = Theme.loadImage(resName);
+            if (img == null || img.isError()) {
                 clearSkin();
                 return;
             }

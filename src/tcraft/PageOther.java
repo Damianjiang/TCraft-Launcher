@@ -146,8 +146,8 @@ public class PageOther implements Page {
         page.getChildren().add(search);
 
         String[][] faq = {
-                {"如何安装 Java？", "启动游戏需要 Java 运行环境。可以在「设置 → Java」中点击「自动检测」，或手动选择 javaw.exe。\n"
-                        + "TCL 会为不同版本的 Minecraft 自动匹配合适的 Java 版本。"},
+                {"如何安装 Java？", "启动游戏需要 Java 17 或更高版本。可以在「设置 → Java」中点击「检测 Java 环境…」，或手动选择 javaw.exe。\n"
+                        + "启动前会检查 Java 版本，不满足要求时会提示切换。"},
                 {"如何导入整合包？", "在「实例」页左侧点击「导入整合包」，选择 .zip 或 .mrpack 文件即可。\n"
                         + "导入完成后会在实例列表中生成一个新的实例。"},
                 {"如何更换皮肤？", "点击标题栏的账户徽章进入账户管理，选择账户后可以更换皮肤。\n"
@@ -522,7 +522,7 @@ public class PageOther implements Page {
         Thread worker = new Thread(() -> {
             try {
                 String skin = "https://crafatar.com/skins/" + java.net.URLEncoder.encode(player, "UTF-8") + ".png";
-                java.nio.file.Path target = java.nio.file.Paths.get(data.gameDir, "TCL", "Skins", player + ".png");
+                java.nio.file.Path target = Theme.skinFile(player + ".png");
                 java.nio.file.Files.createDirectories(target.getParent());
                 downloadRaw(skin, target, () -> {
                     Data.Account a = data.account();

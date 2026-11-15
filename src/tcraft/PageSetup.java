@@ -184,6 +184,7 @@ public class PageSetup implements Page {
                 data.applyProxy();
             }
             case "java" -> {
+                data.invalidateJavaScan();
                 data.javaPath = data.detectJava();
                 data.save();
             }
@@ -416,8 +417,7 @@ public class PageSetup implements Page {
             String path = javaCombo.getSelectionModel().getSelectedItem();
             if (path == null || path.equals("未找到 Java")) return;
             if (data.javaPath.equals(path)) return;
-            data.javaPath = path;
-            data.save();
+            data.setJavaRuntime(path, Data.javaMajor(path));
             win.toast("Java 已切换", path, 1);
         });
         adv.add(Ui.settingRow("Java 列表", javaCombo));
@@ -873,8 +873,7 @@ public class PageSetup implements Page {
         i18n.getChildren().addAll(
                 Ui.button("导出翻译文件", Ui.BTN_NORMAL, () -> {
                     try {
-                        Files.createDirectories(i18nFile.getParent());
-                        Files.copy(Theme.res("LangTables.txt"), i18nFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                        copyLangFile(i18nFile);
                         win.toast("翻译文件", "已导出到 " + i18nFile, 1);
                     } catch (Exception e) {
                         win.toast("导出失败", e.getMessage(), 3);
@@ -887,10 +886,7 @@ public class PageSetup implements Page {
                 }),
                 Ui.button("打开文件", Ui.BTN_NORMAL, () -> {
                     try {
-                        if (!Files.exists(i18nFile)) {
-                            Files.createDirectories(i18nFile.getParent());
-                            Files.copy(Theme.res("LangTables.txt"), i18nFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                        }
+                        if (!Files.exists(i18nFile)) copyLangFile(i18nFile);
                         Shell.openFile(i18nFile.toString());
                     } catch (Exception e) {
                         win.toast("无法打开", e.getMessage(), 3);
@@ -1016,28 +1012,14 @@ public class PageSetup implements Page {
         manage.add(status);
         FlowPane actions = new FlowPane(10, 10);
         actions.getChildren().addAll(
-                Ui.button("导入 Java…", Ui.BTN_HIGHLIGHT, () -> {
-                    FileChooser chooser = new FileChooser();
-                    chooser.setTitle("选择 javaw.exe");
-                    chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Java 可执行文件", "javaw.exe", "java.exe"));
-                    File file = chooser.showOpenDialog(win.stage);
-                    if (file != null) {
-                        data.javaPath = file.getAbsolutePath();
-                        data.save();
-                        win.refreshRight();
-                        win.toast("Java 已导入", data.javaPath, 1);
-                    }
-                }),
+                Ui.button("导入 Java…", Ui.BTN_HIGHLIGHT, this::importJava),
                 Ui.button("下载 Java…", Ui.BTN_NORMAL, () -> {
                     String url = "https://learn.microsoft.com/java/openjdk/download#openjdk-17";
-                    if (!Shell.openUrl(url)) {
-                        win.toast("打开链接失败", url, 3);
-                    }
+                    if (!Shell.openUrl(url)) win.toast("打开链接失败", url, 3);
                 }),
                 Ui.button("重新搜索", Ui.BTN_NORMAL, () -> {
-                    data.javaPath = data.detectJava();
-                    data.save();
-                    win.refreshRight();
+                    data.invalidateJavaScan();
+                    applyDetectedJava();
                     win.toast("搜索完成", data.javaPath.isEmpty() ? "未找到 Java" : data.javaPath,
                             data.javaPath.isEmpty() ? 2 : 1);
                 }),
@@ -1051,76 +1033,81 @@ public class PageSetup implements Page {
                     }
                 }),
                 Ui.button("初始化此项", Ui.BTN_RED, () -> {
-                    data.javaPath = data.detectJava();
-                    data.save();
-                    win.refreshRight();
+                    data.invalidateJavaScan();
+                    applyDetectedJava();
                     win.toast("已初始化", "Java 列表已恢复为自动搜索结果", 1);
                 }));
         manage.add(actions);
 
         Ui.Card found = addCard(page, "已发现的 Java");
-        List<String> javas = findJavas();
+        List<Data.JavaRuntime> javas = data.scanJavaRuntimes();
         VBox list = new VBox(2);
-        for (String path : javas) {
-            boolean selected = path.equals(data.javaPath);
+        for (Data.JavaRuntime rt : javas) {
+            boolean selected = rt.path().equals(data.javaPath);
+            String name = "Java " + rt.major() + (rt.folder().isEmpty() ? "" : " · " + rt.folder());
             Ui.ListItem item = new Ui.ListItem(Theme.icon("coffee", 17, selected ? Theme.accent : Theme.text),
-                    shortJavaName(path), path, 40);
+                    name, rt.path(), 44);
             item.setSelected(selected);
             item.setOnMouseClicked(e -> {
-                if (data.javaPath.equals(path)) return;
-                data.javaPath = path;
-                data.save();
+                if (data.javaPath.equals(rt.path())) return;
+                data.setJavaRuntime(rt.path(), rt.major());
                 win.refreshRight();
-                win.toast("Java 已选择", path, 1);
+                win.toast("Java 已选择", rt.path(), 1);
             });
             list.getChildren().add(item);
         }
-        if (javas.isEmpty()) list.getChildren().add(Ui.label("没有检测到 Java，请手动选择 javaw.exe。", 12, Theme.gray3));
+        if (javas.isEmpty()) {
+            list.getChildren().add(Ui.label("没有检测到 Java，请手动选择或先安装 Java 17。", 12, Theme.gray3));
+        }
         found.add(list);
     }
 
-    private List<String> findJavas() {
-        List<String> out = new ArrayList<>();
-        String detected = data.detectJava();
-        if (!detected.isEmpty()) out.add(detected);
-        if (!data.javaPath.isEmpty() && !out.contains(data.javaPath)) out.add(0, data.javaPath);
-        String os = System.getProperty("os.name", "").toLowerCase();
-        boolean win = os.contains("win");
-        String exe = win ? "javaw.exe" : "java";
-        String[] roots = win
-                ? new String[]{"C:\\Program Files\\Java", "C:\\Program Files\\Microsoft",
-                "C:\\Program Files\\Eclipse Adoptium", "C:\\Program Files\\BellSoft",
-                "C:\\Program Files\\Zulu", "C:\\Program Files (x86)\\Java"}
-                : new String[]{"/usr/lib/jvm", "/usr/local/openjdk", "/opt/homebrew/opt",
-                "/usr/local/opt", "/Library/Java/JavaVirtualMachines"};
-        for (String r : roots) {
-            Path base = Paths.get(r);
-            if (!Files.isDirectory(base)) continue;
-            try (var stream = Files.list(base)) {
-                stream.filter(Files::isDirectory).sorted(Comparator.comparing(Path::toString)).forEach(p -> {
-                    Path homeDir = win ? p : (Files.isDirectory(p.resolve("Contents/Home")) ? p.resolve("Contents/Home") : p);
-                    Path exePath = homeDir.resolve("bin").resolve(exe);
-                    if (Files.isRegularFile(exePath) && !out.contains(exePath.toString())) out.add(exePath.toString());
-                });
-            } catch (Exception ignored) {
-            }
+    private static void copyLangFile(Path target) throws Exception {
+        Files.createDirectories(target.getParent());
+        try (java.io.InputStream in = Theme.resStream("LangTables.txt")) {
+            if (in == null) throw new Exception("找不到语言表");
+            Files.copy(in, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         }
-        if (!win) {
-            for (String c : new String[]{"/usr/bin/java", "/usr/local/bin/java"}) {
-                if (new java.io.File(c).canExecute() && !out.contains(c)) out.add(c);
-            }
-        }
-        return out;
     }
 
-    private String shortJavaName(String path) {
-        try {
-            String version = path.contains("jdk-") ? path.substring(path.indexOf("jdk-")) : "Java";
-            if (version.contains("\\")) version = version.substring(0, version.indexOf('\\'));
-            return version + "  ·  " + Paths.get(path).getParent().getParent().getFileName();
-        } catch (Exception e) {
-            return "Java";
+    /** 自动选一个可用 Java，并记为已确认。 */
+    private void applyDetectedJava() {
+        String path = data.detectJava();
+        if (path.isEmpty()) {
+            data.javaPath = "";
+            data.save();
+        } else {
+            data.setJavaRuntime(path, Data.javaMajor(path));
         }
+        win.refreshRight();
+    }
+
+    /** 手动导入并校验 Java。 */
+    private void importJava() {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("选择 Java 可执行文件");
+        boolean winOs = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win");
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Java 可执行文件",
+                winOs ? new String[]{"javaw.exe", "java.exe"} : new String[]{"java"}));
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("所有文件", "*.*"));
+        File file = chooser.showOpenDialog(win.stage);
+        if (file == null) return;
+        int major = Data.javaMajor(file.getAbsolutePath());
+        if (major <= 0) {
+            win.toast("无法识别该 Java", "请选择 bin 目录下的 " + (winOs ? "javaw.exe" : "java"), 2);
+            return;
+        }
+        data.setJavaRuntime(file.getAbsolutePath(), major);
+        win.refreshRight();
+        win.toast("Java 已导入", "Java " + major + " · " + file.getAbsolutePath(), 1);
+    }
+
+    /** 启动设置里的 Java 下拉列表。 */
+    private List<String> findJavas() {
+        List<String> out = new ArrayList<>();
+        for (Data.JavaRuntime rt : data.scanJavaRuntimes()) out.add(rt.path());
+        if (!data.javaPath.isEmpty() && !out.contains(data.javaPath)) out.add(0, data.javaPath);
+        return out;
     }
 
     /** Color 转 #rrggbb，给内联 CSS 用。 */

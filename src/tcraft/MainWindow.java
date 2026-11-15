@@ -224,7 +224,7 @@ public class MainWindow {
                 e.consume();
             } else if (e.getCode() == KeyCode.ESCAPE) {
                 if (searchLayer != null && searchLayer.isVisible()) closeSearch();
-                else if (modalLayer != null && modalLayer.isVisible()) closeModal();
+                else if (modalLayer != null && modalLayer.isVisible() && modalDismissable) closeModal();
             }
         });
         stage.setOnCloseRequest(e -> {
@@ -306,6 +306,15 @@ public class MainWindow {
         shellTimer = new Timeline(new KeyFrame(Duration.millis(250), e -> updateExtras()));
         shellTimer.setCycleCount(Timeline.INDEFINITE);
         shellTimer.play();
+        // 最小化或隐藏时停表，后台不再定时刷新
+        stage.iconifiedProperty().addListener((o, a, b) -> syncShellTimer());
+        stage.showingProperty().addListener((o, a, b) -> syncShellTimer());
+    }
+
+    private void syncShellTimer() {
+        if (shellTimer == null) return;
+        if (stage.isIconified() || !stage.isShowing()) shellTimer.pause();
+        else shellTimer.play();
     }
 
     /** 刷新右下角按钮的可见性。 */
@@ -2169,6 +2178,8 @@ public class MainWindow {
         if (maskFade != null) maskFade.stop();
         if (modalExit != null) modalExit.stop();
         modalLayer.setBackground(Ui.fill(mask == null ? Theme.modalMask : mask, 0));
+        // 新弹窗不继承上一个弹窗的关闭回调
+        modalCloseHook = null;
         modalContent = card;
         modalDismissable = dismissable;
         solidifyModal(card); // 兜底：弹窗一律不透明

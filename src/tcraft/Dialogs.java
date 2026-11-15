@@ -614,7 +614,7 @@ public final class Dialogs {
         }
         String safe = playerName == null || playerName.isEmpty() ? "skin" : playerName;
         for (char c : "\\/:*?\"<>|".toCharArray()) safe = safe.replace(String.valueOf(c), "_");
-        java.nio.file.Path dir = Theme.res("images/Skins");
+        java.nio.file.Path dir = Theme.skinDir();
         java.nio.file.Files.createDirectories(dir);
         java.nio.file.Path target = dir.resolve(safe + ".png");
         java.nio.file.Files.copy(source, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
@@ -638,9 +638,7 @@ public final class Dialogs {
         final int[] ticket = {0};
 
         Skin3D viewer = new Skin3D(196, 240);
-        if (!skinRes[0].isEmpty() && Theme.res("images/" + skinRes[0]).toFile().exists()) {
-            viewer.setSkinFile(skinRes[0]);
-        }
+        if (!skinRes[0].isEmpty()) viewer.setSkinFile(skinRes[0]);
         StackPane previewBack = new StackPane(viewer);
         previewBack.setAlignment(Pos.CENTER);
         previewBack.setPrefSize(216, 240);
@@ -960,7 +958,7 @@ public final class Dialogs {
         }
         String safe = accountName == null || accountName.isEmpty() ? "skin" : accountName;
         for (char c : "\\/:*?\"<>|".toCharArray()) safe = safe.replace(String.valueOf(c), "_");
-        java.nio.file.Path dir = Theme.res("images/Skins");
+        java.nio.file.Path dir = Theme.skinDir();
         java.nio.file.Files.createDirectories(dir);
         java.nio.file.Path target = dir.resolve(safe + ".png");
         java.nio.file.Files.write(target, data);

@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
-"""给 TCC 生成的 PE 注入 .rsrc 节（主要是程序图标）。
-
-TCC 不支持链接 .rc/.res，而 Windows 资源管理器读的是 PE 里的 RT_GROUP_ICON /
-RT_ICON，所以这里直接按 PE 规范手工构造资源节：
+"""把 ico 写进 PE 的 .rsrc 节（TCC 不能链接 .rc）。
 
     python tools/add-icon.py <in.exe> <out.exe> <icon.ico>
 
-注意：必须在「jar 追加到 exe 末尾」之前做，否则要搬动几十 MB 数据。
+在追加 jar 之前运行。
 """
 
 import struct
@@ -58,9 +55,9 @@ def build_rsrc_section(images):
         RT_GROUP_ICON: {1: {LANG_ZH: ("group", grp)}},
     }
 
-    # pass 1：计算目录结构大小，分配偏移
-    dirs = []      # (offset, [(name, is_dir, target_offset_or_data_index)])
-    datas = []     # data bytes，按顺序
+    # 先排目录，再排数据项，最后放数据本身
+    dirs = []      # (offset, [(name, is_dir, target)])
+    datas = []
 
     def walk(node, base):
         ids = sorted(node.keys())
@@ -81,12 +78,11 @@ def build_rsrc_section(images):
 
     tree_end = walk(tree, 0)
 
-    # 数据项表紧跟在目录之后
+    # 目录 -> 数据项 -> 数据
     de_base = align(tree_end, 4)
     de_end = de_base + 16 * len(datas)
     blob_base = align(de_end, 4)
 
-    # 分配每个数据的偏移
     blob_offsets = []
     cur = blob_base
     for b in datas:
@@ -97,7 +93,7 @@ def build_rsrc_section(images):
 
     buf = bytearray(total)
 
-    # 写目录
+    # 写目录：子目录写树内偏移，叶子先留空
     for base, entries, count in dirs:
         struct.pack_into("<IIHHHH", buf, base, 0, 0, 0, 0, 0, count)
         off = base + 16
@@ -105,11 +101,10 @@ def build_rsrc_section(images):
             if is_dir:
                 struct.pack_into("<II", buf, off, name, 0x80000000 | target)
             else:
-                struct.pack_into("<II", buf, off, name, 0)  # 先占位，下面 fix 成数据项偏移
+                struct.pack_into("<II", buf, off, name, 0)
             off += 8
 
-    # 修正：叶子目录的 entry 指向数据项（需要 RVA，稍后填）；这里先写 0x80000000|de_offset
-    # 重新按同样顺序遍历一次，替换为数据项偏移
+    # 叶子改成指向数据项，不带 0x80000000
     de_cursor = 0
 
     def fix(node, base):
@@ -122,7 +117,6 @@ def build_rsrc_section(images):
                 target = struct.unpack_from("<I", buf, off + 4)[0] & 0x7FFFFFFF
                 fix(child, target)
             else:
-                # 叶子节点指向 IMAGE_RESOURCE_DATA_ENTRY，这里不能带 0x80000000
                 struct.pack_into("<I", buf, off + 4, de_base + de_cursor * 16)
                 de_cursor += 1
             off += 8

@@ -1,8 +1,5 @@
 package tcraft;
 
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -21,10 +18,10 @@ public final class Lang {
 
     public static void reload() {
         TABLE.clear();
-        Path p = Theme.res("LangTables.txt");
         try {
-            if (!Files.exists(p)) return;
-            for (String line : Files.readAllLines(p, StandardCharsets.UTF_8)) {
+            String text = Theme.resText("LangTables.txt");
+            if (text.isEmpty()) return;
+            for (String line : text.split("\\R")) {
                 if (line.isEmpty()) continue;
                 String[] cols = line.split("\t", -1);
                 if (cols.length < 2) continue;

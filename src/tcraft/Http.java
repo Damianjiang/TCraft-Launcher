@@ -28,20 +28,24 @@ public final class Http {
     private static final int MAX_ATTEMPTS = 3;
     private static final long[] BACKOFF_MS = {300, 900};
 
+    /** 固定线程池，空闲 30 秒自动回收，避免后台一直挂着线程。 */
+    private static ExecutorService idlePool(int size, String name) {
+        java.util.concurrent.ThreadPoolExecutor pool = new java.util.concurrent.ThreadPoolExecutor(
+                size, size, 30, TimeUnit.SECONDS, new java.util.concurrent.LinkedBlockingQueue<>(), r -> {
+                    Thread t = new Thread(r, name);
+                    t.setDaemon(true);
+                    return t;
+                });
+        pool.allowCoreThreadTimeOut(true);
+        return pool;
+    }
+
     /** 网络任务线程池，守护线程。 */
-    private static final ExecutorService POOL = Executors.newFixedThreadPool(
-            Math.max(4, Math.min(8, Runtime.getRuntime().availableProcessors())), r -> {
-                Thread t = new Thread(r, "TCL-Net");
-                t.setDaemon(true);
-                return t;
-            });
+    private static final ExecutorService POOL = idlePool(
+            Math.max(4, Math.min(8, Runtime.getRuntime().availableProcessors())), "TCL-Net");
 
     /** 图标下载池。 */
-    private static final ExecutorService ICON_POOL = Executors.newFixedThreadPool(10, r -> {
-        Thread t = new Thread(r, "TCL-Icon");
-        t.setDaemon(true);
-        return t;
-    });
+    private static final ExecutorService ICON_POOL = idlePool(10, "TCL-Icon");
 
     /** 重试延时调度线程。 */
     private static final ExecutorService ASYNC = Executors.newCachedThreadPool(r -> {

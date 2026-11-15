@@ -2,7 +2,6 @@ package tcraft;
 
 import java.net.URI;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -549,17 +548,23 @@ public final class Downloader {
                     "{\"profiles\":{},\"settings\":{\"enableSnapshots\":false,\"enableAdvanced\":false},"
                             + "\"version\":3}", StandardCharsets.UTF_8);
         }
+        // 输出写文件，避免安装器大量日志把管道塞满导致卡死
+        Path logFile = installer.getParent().resolve(loader.toLowerCase() + "-" + mc + ".log");
+        Files.createDirectories(logFile.getParent());
         ProcessBuilder pb = new ProcessBuilder(javaExe, "-jar", installer.toString(),
                 "--installClient", game.toString());
         pb.directory(game.toFile());
         pb.redirectErrorStream(true);
+        pb.redirectOutput(logFile.toFile());
         Process process = pb.start();
-        String output;
-        try (InputStream in = process.getInputStream()) {
-            output = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        if (!process.waitFor(15, java.util.concurrent.TimeUnit.MINUTES)) {
+            process.destroyForcibly();
+            throw new IOException(loader + " 安装器超时，请检查网络后重试。日志：" + logFile);
         }
-        int code = process.waitFor();
+        int code = process.exitValue();
         if (code != 0) {
+            String output = Files.isRegularFile(logFile)
+                    ? Files.readString(logFile, StandardCharsets.UTF_8) : "";
             String tail = output.length() > 400 ? output.substring(output.length() - 400) : output;
             throw new IOException(loader + " 安装器退出码 " + code + "：" + tail.trim());
         }
