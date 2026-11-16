@@ -55,15 +55,32 @@ public final class Updates {
     private static final java.util.concurrent.atomic.AtomicBoolean SETTLED =
             new java.util.concurrent.atomic.AtomicBoolean(true);
 
+    /** 本次检查的开始时间，用来判断是不是已经卡住。 */
+    private static volatile long startedAt;
+
+    /** 只用来做超时兜底，单线程，不占资源。 */
+    private static final java.util.concurrent.ScheduledExecutorService TIMEOUT =
+            java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "TCL-Update-Timeout");
+                t.setDaemon(true);
+                return t;
+            });
+
     /** manual=true 时无论结果都会给反馈；自动检查只在有新版本时弹窗。 */
     public static void check(MainWindow win, boolean manual) {
         if (!manual && !windowAlive(win)) return;
         if (checking) {
-            if (manual) win.toast("正在检查更新", "请稍候…", 0);
-            return;
+            // 上一次超过 20 秒还没收尾，就当它卡死了，允许重新发起
+            if (System.currentTimeMillis() - startedAt < 20000) {
+                if (manual) win.toast("正在检查更新", "请稍候…", 0);
+                return;
+            }
+            checking = false;
         }
         checking = true;
+        startedAt = System.currentTimeMillis();
         SETTLED.set(false);
+        Data.get().log("检查更新：" + (manual ? "手动" : "自动"));
         if (manual) win.toast("正在检查更新", "正在读取 GitHub Releases…", 0);
 
         Thread thread = new Thread(() -> {
@@ -79,16 +96,16 @@ public final class Updates {
         thread.setDaemon(true);
         thread.start();
 
-        // DNS 解析卡住时 request timeout 不会生效，兜一个总超时，避免一直卡在「正在检查」
-        PauseTransition timeout = new PauseTransition(Duration.seconds(15));
-        timeout.setOnFinished(e -> settle(win, null, new IOException("连接超时"), manual));
-        timeout.play();
+        // DNS 解析卡住时 request timeout 不会生效，用后台调度器兜一个总超时
+        TIMEOUT.schedule(() -> settle(win, null, new IOException("连接超时"), manual),
+                15, java.util.concurrent.TimeUnit.SECONDS);
     }
 
     /** 收尾只执行一次：复位状态，再按结果给反馈。 */
     private static void settle(MainWindow win, Release release, Exception error, boolean manual) {
         if (!SETTLED.compareAndSet(false, true)) return;
         checking = false;   // 先复位，界面反馈再排队
+        startedAt = 0;
         Platform.runLater(() -> {
             if (App.SNAPSHOT_MODE || App.PERF_MODE) return;
             if (!windowAlive(win)) return;
@@ -98,6 +115,7 @@ public final class Updates {
                 if (manual) showFailure(win, reason(error));
                 return;
             }
+            Data.get().log("检查更新完成：" + release.tag);
             try {
                 handle(win, release, manual);
             } catch (Throwable t) {
