@@ -123,12 +123,13 @@ public class PageOther implements Page {
 
         HBox updateRow = new HBox(12);
         updateRow.setAlignment(Pos.CENTER_LEFT);
-        StackPane updateBtn = Ui.button("检查更新", Ui.BTN_HIGHLIGHT, () -> Updates.check(win, true));
-        updateBtn.setMinWidth(126);
-        updateBtn.setMaxWidth(Region.USE_PREF_SIZE);
         Label updateHint = Ui.label("从 GitHub Releases 读取最新版本与更新日志", 12, Theme.gray2);
         updateHint.setWrapText(true);
         HBox.setHgrow(updateHint, Priority.ALWAYS);
+        StackPane updateBtn = Ui.button("检查更新", Ui.BTN_HIGHLIGHT,
+                () -> Updates.check(win, true, updateHint));
+        updateBtn.setMinWidth(126);
+        updateBtn.setMaxWidth(Region.USE_PREF_SIZE);
         updateRow.getChildren().addAll(updateBtn, updateHint);
         VBox.setMargin(updateRow, new Insets(12, 0, 0, 0));
         about.add(updateRow);

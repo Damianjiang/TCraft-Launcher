@@ -68,6 +68,11 @@ public final class Updates {
 
     /** manual=true 时无论结果都会给反馈；自动检查只在有新版本时弹窗。 */
     public static void check(MainWindow win, boolean manual) {
+        check(win, manual, null);
+    }
+
+    /** hint 不为空时，把结果同时写到这行说明文字上，免得用户错过弹窗。 */
+    public static void check(MainWindow win, boolean manual, Label hint) {
         if (!manual && !windowAlive(win)) return;
         if (checking) {
             // 上一次超过 20 秒还没收尾，就当它卡死了，允许重新发起
@@ -91,18 +96,18 @@ public final class Updates {
             } catch (Exception e) {
                 error = e;
             }
-            settle(win, release, error, manual);
+            settle(win, release, error, manual, hint);
         }, "TCL-Update");
         thread.setDaemon(true);
         thread.start();
 
         // DNS 解析卡住时 request timeout 不会生效，用后台调度器兜一个总超时
-        TIMEOUT.schedule(() -> settle(win, null, new IOException("连接超时"), manual),
-                15, java.util.concurrent.TimeUnit.SECONDS);
+        TIMEOUT.schedule(() -> settle(win, null, new IOException("连接超时"), manual, hint),
+                12, java.util.concurrent.TimeUnit.SECONDS);
     }
 
     /** 收尾只执行一次：复位状态，再按结果给反馈。 */
-    private static void settle(MainWindow win, Release release, Exception error, boolean manual) {
+    private static void settle(MainWindow win, Release release, Exception error, boolean manual, Label hint) {
         if (!SETTLED.compareAndSet(false, true)) return;
         checking = false;   // 先复位，界面反馈再排队
         startedAt = 0;
@@ -110,12 +115,15 @@ public final class Updates {
             if (App.SNAPSHOT_MODE || App.PERF_MODE) return;
             if (!windowAlive(win)) return;
             if (release == null) {
+                String why = reason(error);
                 Data.get().log("检查更新失败：" + (error == null ? "未知错误" : error));
                 // 自动检查失败不打扰，手动检查才弹窗
-                if (manual) showFailure(win, reason(error));
+                if (hint != null) hint.setText("检查失败：" + why);
+                if (manual) showFailure(win, why);
                 return;
             }
             Data.get().log("检查更新完成：" + release.tag);
+            if (hint != null) hint.setText("GitHub 最新版本 v" + clean(release.tag));
             try {
                 handle(win, release, manual);
             } catch (Throwable t) {
@@ -314,15 +322,32 @@ public final class Updates {
         return new Release(tag, "");
     }
 
-    private static String fetch(String url, String accept) throws IOException, InterruptedException {
+    private static String fetch(String url, String accept) throws IOException {
         HttpRequest request = HttpRequest.newBuilder(URI.create(url))
-                .timeout(java.time.Duration.ofSeconds(8))
+                .timeout(java.time.Duration.ofSeconds(6))
                 .header("User-Agent", "TCraftLauncher-JavaFX/" + Build.VERSION)
                 .header("Accept", accept)
                 .GET()
                 .build();
-        HttpResponse<String> response = Http.client().send(request,
-                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        HttpResponse<String> response;
+        try {
+            // orTimeout 自带定时器，DNS 卡住时也能按时断开，不依赖底层 socket
+            response = Http.client().sendAsync(request,
+                            HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
+                    .orTimeout(6, java.util.concurrent.TimeUnit.SECONDS)
+                    .get();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("请求被中断", e);
+        } catch (java.util.concurrent.ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof java.util.concurrent.TimeoutException) {
+                throw new IOException("连接超时", cause);
+            }
+            if (cause instanceof IOException io) throw io;
+            throw new IOException(cause == null || cause.getMessage() == null
+                    ? "请求失败" : cause.getMessage(), cause);
+        }
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
             throw new IOException("HTTP " + response.statusCode());
         }
