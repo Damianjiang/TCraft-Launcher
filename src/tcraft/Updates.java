@@ -55,6 +55,10 @@ public final class Updates {
     private static final java.util.concurrent.atomic.AtomicBoolean SETTLED =
             new java.util.concurrent.atomic.AtomicBoolean(true);
 
+    /** 每次检查的代号，晚到的旧结果直接丢掉，避免抢走新检查的收尾。 */
+    private static final java.util.concurrent.atomic.AtomicLong GENERATION =
+            new java.util.concurrent.atomic.AtomicLong();
+
     /** 本次检查的开始时间，用来判断是不是已经卡住。 */
     private static volatile long startedAt;
 
@@ -74,14 +78,9 @@ public final class Updates {
     /** hint 不为空时，把结果同时写到这行说明文字上，免得用户错过弹窗。 */
     public static void check(MainWindow win, boolean manual, Label hint) {
         if (!manual && !windowAlive(win)) return;
-        if (checking) {
-            // 上一次超过 20 秒还没收尾，就当它卡死了，允许重新发起
-            if (System.currentTimeMillis() - startedAt < 20000) {
-                if (manual) win.toast("正在检查更新", "请稍候…", 0);
-                return;
-            }
-            checking = false;
-        }
+        // 自动检查不打断进行中的检查；手动点击永远优先，直接作废上一次
+        if (checking && !manual) return;
+        long generation = GENERATION.incrementAndGet();
         checking = true;
         startedAt = System.currentTimeMillis();
         SETTLED.set(false);
@@ -97,23 +96,27 @@ public final class Updates {
             } catch (Exception e) {
                 error = e;
             }
-            settle(win, release, error, manual, hint);
+            settle(generation, win, release, error, manual, hint);
         }, "TCL-Update");
         thread.setDaemon(true);
         thread.start();
 
         // DNS 解析卡住时 request timeout 不会生效，用后台调度器兜一个总超时
-        TIMEOUT.schedule(() -> settle(win, null, new IOException("连接超时"), manual, hint),
+        TIMEOUT.schedule(() -> settle(generation, win, null, new IOException("连接超时"), manual, hint),
                 12, java.util.concurrent.TimeUnit.SECONDS);
     }
 
     /** 收尾只执行一次：复位状态，再按结果给反馈。 */
-    private static void settle(MainWindow win, Release release, Exception error, boolean manual, Label hint) {
+    private static void settle(long generation, MainWindow win, Release release, Exception error,
+                               boolean manual, Label hint) {
+        // 旧检查晚到的结果直接丢掉，否则会抢走新检查的收尾
+        if (generation != GENERATION.get()) return;
         if (!SETTLED.compareAndSet(false, true)) return;
         checking = false;   // 先复位，界面反馈再排队
         startedAt = 0;
         Platform.runLater(() -> {
             try {
+                if (generation != GENERATION.get()) return;
                 if (App.SNAPSHOT_MODE || App.PERF_MODE) return;
                 if (!windowAlive(win)) return;
                 if (release == null) {
