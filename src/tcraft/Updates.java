@@ -1,6 +1,8 @@
 package tcraft;
 
+import javafx.animation.KeyFrame;
 import javafx.animation.PauseTransition;
+import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -51,16 +53,19 @@ public final class Updates {
         delay.play();
     }
 
-    /** 本次检查是否已经有结果，线程和超时定时器只能有一个收尾。 */
-    private static final java.util.concurrent.atomic.AtomicBoolean SETTLED =
-            new java.util.concurrent.atomic.AtomicBoolean(true);
-
     /** 每次检查的代号，晚到的旧结果直接丢掉，避免抢走新检查的收尾。 */
     private static final java.util.concurrent.atomic.AtomicLong GENERATION =
             new java.util.concurrent.atomic.AtomicLong();
 
-    /** 本次检查的开始时间，用来判断是不是已经卡住。 */
+    /** 本次检查的开始时间。 */
     private static volatile long startedAt;
+
+    /** 后台线程写结果，FX 线程轮询读取。 */
+    private static volatile Release pendingRelease;
+    private static volatile Exception pendingError;
+    private static volatile long pendingGen;
+    /** 轮询器要存字段，局部变量会被回收。 */
+    private static Timeline poller;
 
     /** 只用来做超时兜底，单线程，不占资源。 */
     private static final java.util.concurrent.ScheduledExecutorService TIMEOUT =
@@ -83,7 +88,9 @@ public final class Updates {
         long generation = GENERATION.incrementAndGet();
         checking = true;
         startedAt = System.currentTimeMillis();
-        SETTLED.set(false);
+        pendingRelease = null;
+        pendingError = null;
+        pendingGen = 0;
         Data.get().log("检查更新：" + (manual ? "手动" : "自动"));
         if (manual) win.toast("正在检查更新", "正在读取 GitHub Releases…", 0);
         if (hint != null) hint.setText("正在检查…");
@@ -96,53 +103,77 @@ public final class Updates {
             } catch (Exception e) {
                 error = e;
             }
-            settle(generation, win, release, error, manual, hint);
+            if (generation != GENERATION.get()) return;
+            pendingRelease = release;
+            pendingError = error;
+            pendingGen = generation;
+            Data.get().log("检查结果就绪：" + (release == null
+                    ? (error == null ? "无结果" : String.valueOf(error)) : release.tag));
         }, "TCL-Update");
         thread.setDaemon(true);
         thread.start();
 
-        // DNS 解析卡住时 request timeout 不会生效，用后台调度器兜一个总超时
-        TIMEOUT.schedule(() -> settle(generation, win, null, new IOException("连接超时"), manual, hint),
-                12, java.util.concurrent.TimeUnit.SECONDS);
+        // 超时只在后台打标记，不碰界面
+        TIMEOUT.schedule(() -> {
+            if (generation != GENERATION.get()) return;
+            pendingError = new IOException("连接超时");
+            pendingGen = generation;
+            Data.get().log("检查更新超时：12 秒没有返回");
+        }, 12, java.util.concurrent.TimeUnit.SECONDS);
+
+        // 在 FX 线程轮询取结果，不依赖 Platform.runLater 和后台线程回调
+        stopPoller();
+        poller = new Timeline(new KeyFrame(Duration.millis(120), e -> poll(generation, win, manual, hint)));
+        poller.setCycleCount(Timeline.INDEFINITE);
+        poller.play();
     }
 
-    /** 收尾只执行一次：复位状态，再按结果给反馈。 */
-    private static void settle(long generation, MainWindow win, Release release, Exception error,
-                               boolean manual, Label hint) {
-        // 旧检查晚到的结果直接丢掉，否则会抢走新检查的收尾
-        if (generation != GENERATION.get()) return;
-        if (!SETTLED.compareAndSet(false, true)) return;
-        checking = false;   // 先复位，界面反馈再排队
+    /** FX 线程轮询：结果到了就收尾。 */
+    private static void poll(long generation, MainWindow win, boolean manual, Label hint) {
+        if (generation != GENERATION.get()) {
+            stopPoller();
+            return;
+        }
+        if (pendingGen != generation) return;
+        stopPoller();
+        Release release = pendingRelease;
+        Exception error = pendingError;
+        pendingRelease = null;
+        pendingError = null;
+        pendingGen = 0;
+        checking = false;
         startedAt = 0;
-        Platform.runLater(() -> {
-            try {
-                if (generation != GENERATION.get()) return;
-                if (App.SNAPSHOT_MODE || App.PERF_MODE) return;
-                if (!windowAlive(win)) return;
-                if (release == null) {
-                    String why = reason(error);
-                    Data.get().log("检查更新失败：" + (error == null ? "未知错误" : error));
-                    // 自动检查失败不打扰，手动检查才提示
-                    if (hint != null) hint.setText("检查失败：" + why);
-                    if (manual) {
-                        win.toast("检查更新失败", why, 3);
-                        showFailure(win, why);
-                    }
-                    return;
+        try {
+            if (App.SNAPSHOT_MODE || App.PERF_MODE) return;
+            if (!windowAlive(win)) return;
+            if (release == null) {
+                String why = reason(error);
+                Data.get().log("检查更新失败：" + (error == null ? "未知错误" : error));
+                if (hint != null) hint.setText("检查失败：" + why);
+                if (manual) {
+                    win.toast("检查更新失败", why, 3);
+                    showFailure(win, why);
                 }
-                Data.get().log("检查更新完成：" + release.tag);
-                if (hint != null) hint.setText("GitHub 最新版本 v" + clean(release.tag));
-                // toast 兜底：即使弹窗没显示出来，也能看到结果
-                if (manual) win.toast("检查更新", "GitHub 最新版本 v" + clean(release.tag), 1);
-                handle(win, release, manual);
-            } catch (Throwable t) {
-                Data.get().log("更新提示失败：" + t);
-                try {
-                    win.toast("检查更新", "读取成功但提示失败，请到 Releases 页面查看", 2);
-                } catch (Throwable ignored) {
-                }
+                return;
             }
-        });
+            Data.get().log("检查更新完成：" + release.tag);
+            if (hint != null) hint.setText("GitHub 最新版本 v" + clean(release.tag));
+            if (manual) win.toast("检查更新", "GitHub 最新版本 v" + clean(release.tag), 1);
+            handle(win, release, manual);
+        } catch (Throwable t) {
+            Data.get().log("更新提示失败：" + t);
+            try {
+                win.toast("检查更新", "读取成功但提示失败，请到 Releases 页面查看", 2);
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    private static void stopPoller() {
+        if (poller != null) {
+            poller.stop();
+            poller = null;
+        }
     }
 
     /** 检查失败：说明原因，并留一个手动打开下载页的入口。 */
