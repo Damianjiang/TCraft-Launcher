@@ -87,6 +87,7 @@ public final class Updates {
         SETTLED.set(false);
         Data.get().log("检查更新：" + (manual ? "手动" : "自动"));
         if (manual) win.toast("正在检查更新", "正在读取 GitHub Releases…", 0);
+        if (hint != null) hint.setText("正在检查…");
 
         Thread thread = new Thread(() -> {
             Release release = null;
@@ -112,23 +113,31 @@ public final class Updates {
         checking = false;   // 先复位，界面反馈再排队
         startedAt = 0;
         Platform.runLater(() -> {
-            if (App.SNAPSHOT_MODE || App.PERF_MODE) return;
-            if (!windowAlive(win)) return;
-            if (release == null) {
-                String why = reason(error);
-                Data.get().log("检查更新失败：" + (error == null ? "未知错误" : error));
-                // 自动检查失败不打扰，手动检查才弹窗
-                if (hint != null) hint.setText("检查失败：" + why);
-                if (manual) showFailure(win, why);
-                return;
-            }
-            Data.get().log("检查更新完成：" + release.tag);
-            if (hint != null) hint.setText("GitHub 最新版本 v" + clean(release.tag));
             try {
+                if (App.SNAPSHOT_MODE || App.PERF_MODE) return;
+                if (!windowAlive(win)) return;
+                if (release == null) {
+                    String why = reason(error);
+                    Data.get().log("检查更新失败：" + (error == null ? "未知错误" : error));
+                    // 自动检查失败不打扰，手动检查才提示
+                    if (hint != null) hint.setText("检查失败：" + why);
+                    if (manual) {
+                        win.toast("检查更新失败", why, 3);
+                        showFailure(win, why);
+                    }
+                    return;
+                }
+                Data.get().log("检查更新完成：" + release.tag);
+                if (hint != null) hint.setText("GitHub 最新版本 v" + clean(release.tag));
+                // toast 兜底：即使弹窗没显示出来，也能看到结果
+                if (manual) win.toast("检查更新", "GitHub 最新版本 v" + clean(release.tag), 1);
                 handle(win, release, manual);
             } catch (Throwable t) {
-                Data.get().log("处理更新信息失败：" + t);
-                if (manual) showFailure(win, reason(t instanceof Exception e ? e : null));
+                Data.get().log("更新提示失败：" + t);
+                try {
+                    win.toast("检查更新", "读取成功但提示失败，请到 Releases 页面查看", 2);
+                } catch (Throwable ignored) {
+                }
             }
         });
     }

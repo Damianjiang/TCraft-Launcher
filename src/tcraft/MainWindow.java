@@ -88,6 +88,8 @@ public class MainWindow {
     private Node modalContent;
     private FadeTransition maskFade;
     private Timeline modalExit;
+    /** 入场动画要有引用，否则可能被回收，卡片会停在透明状态。 */
+    private Timeline modalEnter;
     /** 弹窗关闭回调，只触发一次。 */
     private Runnable modalCloseHook;
     private TextFieldBridge searchField;
@@ -2217,7 +2219,7 @@ public class MainWindow {
         card.setScaleX(0.92);
         card.setScaleY(0.92);
         card.setTranslateY(18);
-        Timeline tl = new Timeline(
+        modalEnter = new Timeline(
                 new KeyFrame(Duration.ZERO, new KeyValue(card.opacityProperty(), 0),
                         new KeyValue(card.scaleXProperty(), 0.92), new KeyValue(card.scaleYProperty(), 0.92),
                         new KeyValue(card.translateYProperty(), 18)),
@@ -2227,7 +2229,7 @@ public class MainWindow {
                 new KeyFrame(Duration.millis(340 + 50),
                         new KeyValue(card.scaleXProperty(), 1, Ui.EASE_OUT_BACK_MIDDLE),
                         new KeyValue(card.scaleYProperty(), 1, Ui.EASE_OUT_BACK_MIDDLE)));
-        tl.play();
+        modalEnter.play();
     }
 
     /** 弹窗底色补成不透明，圆角和内边距保留。 */
