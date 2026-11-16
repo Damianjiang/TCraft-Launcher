@@ -597,7 +597,7 @@ public class PageDownload implements Page {
         if (renameHint == null || selectVersion == null) return;
         String cur = selectNameField.getText() == null ? "" : selectNameField.getText();
         boolean show = nameEdited && !cur.isEmpty();
-        renameHint.setText(show ? "原名称：" + getSelectName() : "");
+        renameHint.setText(show ? Lang.t("原名称：") + getSelectName() : "");
         renameHint.setVisible(show);
         restoreBtn.setVisible(show);
     }

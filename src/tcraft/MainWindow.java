@@ -678,7 +678,12 @@ public class MainWindow {
         // 主体铺满根节点。
         frame.setMaxWidth(Double.MAX_VALUE);
         frame.setMaxHeight(Double.MAX_VALUE);
-        frame.setEffect(Theme.shadow(22, 6, 0.35, Color.web("#2a3240")));
+        // 投影放独立底板，避免整窗逐帧重绘
+        Region shadowPlate = new Region();
+        shadowPlate.setBackground(Ui.fill(Color.WHITE, windowRadius()));
+        shadowPlate.setEffect(Theme.shadow(22, 6, 0.35, Color.web("#2a3240")));
+        shadowPlate.setMouseTransparent(true);
+        frame.getChildren().add(shadowPlate);
         VBox frameBox = new VBox();
         // 标题栏和正文各自上色，整块刷纯色会把正文染成标题栏颜色。
         frameBox.setBackground(null);
@@ -1742,12 +1747,12 @@ public class MainWindow {
     private String subPageTitle(String key) {
         switch (key) {
             case "account":
-                return "账户管理";
+                return Lang.t("账户管理");
             case "tasks":
-                return "任务管理";
+                return Lang.t("任务管理");
             case "instanceSetup": {
                 Data.Instance ins = data.instance();
-                return "版本设置 - " + (ins == null ? "未知版本" : ins.name);
+                return Lang.tf("版本设置 - %s", ins == null ? Lang.t("未知版本") : ins.name);
             }
             case "resourceDetail": {
                 // 标题显示资源名，不写笼统的「资源详情」。

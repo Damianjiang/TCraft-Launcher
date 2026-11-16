@@ -32,6 +32,8 @@ public class App extends Application {
 
     /** 截图/自检模式，会改窗口尺寸，不写用户配置。 */
     public static boolean SNAPSHOT_MODE;
+    /** --perf 采样模式，跳过更新检查等后台任务。 */
+    public static boolean PERF_MODE;
 
     private MainWindow window;
 
@@ -107,6 +109,8 @@ public class App extends Application {
 
         handleSnapshotArgs();
         handlePerfArgs();
+        // 启动更新检查放在截图/性能采样之后，避免干扰自检
+        Updates.checkOnStartup(window);
         startStartupInstance();
     }
 
@@ -174,6 +178,7 @@ public class App extends Application {
             }
         }
         if (secs <= 0) return;
+        PERF_MODE = true;
         final int window = secs;
         // 空转 5 秒再采样
         PauseTransition warm = new PauseTransition(Duration.seconds(5));

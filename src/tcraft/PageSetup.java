@@ -182,6 +182,7 @@ public class PageSetup implements Page {
                 data.set("SystemProxyPass", "");
                 data.set("SystemHttpProxyForGame", false);
                 data.applyProxy();
+                data.set("CheckUpdateOnStartup", true);
             }
             case "java" -> {
                 data.invalidateJavaScan();
@@ -386,7 +387,7 @@ public class PageSetup implements Page {
         adv.setCollapsed(true);
         // 支持 ${library_directory} 这类替换标记
         TextArea jvm = new TextArea(data.get("LaunchJvmArgs", ""));
-        jvm.setPromptText("留空则使用默认值");
+        jvm.setPromptText(Lang.t("留空则使用默认值"));
         jvm.setWrapText(true);
         jvm.setPrefHeight(100);
         jvm.setPrefWidth(360);
@@ -550,8 +551,9 @@ public class PageSetup implements Page {
         int launches = data.getInt("SystemCount", 0);
         String next = Theme.nextHiddenThemeName();
         if (next.isEmpty()) return "隐藏主题已全部解锁。";
-        return "隐藏主题每累计启动 " + Theme.UNLOCK_EVERY_LAUNCHES + " 次解锁一个（当前已启动 " + launches
-                + " 次，再启动 " + Theme.launchesToNextUnlock(launches) + " 次可解锁「" + next + "」）。";
+        return Lang.tf("隐藏主题每累计启动 %d 次解锁一个（当前已启动 %d 次，再启动 %d 次可解锁「%s」）。",
+                Theme.UNLOCK_EVERY_LAUNCHES, launches, Theme.launchesToNextUnlock(launches),
+                Lang.t(next));
     }
 
     private void buildUi(VBox page) {
@@ -561,9 +563,9 @@ public class PageSetup implements Page {
         // 未全解锁时显示进度
         if (!Theme.nextHiddenThemeName().isEmpty()) {
             int left = Theme.launchesToNextUnlock(data.getInt("SystemCount", 0));
-            Label prog = Ui.label("隐藏主题 " + Theme.unlockedHiddenIds().size() + "/" + Theme.HIDDEN_THEMES.length
-                            + " · 每累计启动 " + Theme.UNLOCK_EVERY_LAUNCHES + " 次解锁一个，再启动 "
-                            + left + " 次可解锁「" + Theme.nextHiddenThemeName() + "」",
+            Label prog = Ui.label(Lang.tf("隐藏主题 %d/%d · 每累计启动 %d 次解锁一个，再启动 %d 次可解锁「%s」",
+                            Theme.unlockedHiddenIds().size(), Theme.HIDDEN_THEMES.length,
+                            Theme.UNLOCK_EVERY_LAUNCHES, left, Lang.t(Theme.nextHiddenThemeName())),
                     12, Theme.gray3);
             prog.setWrapText(true);
             theme.add(prog);
@@ -932,6 +934,15 @@ public class PageSetup implements Page {
                     win.toast("已复制识别码", Data.offlineUuid(System.getProperty("user.name")), 1);
                 }));
         other.add(dataBtns);
+        other.add(directCheck("每次启动时检查更新", "CheckUpdateOnStartup", true));
+        other.add(Ui.hint("启动后从 GitHub Releases 读取最新版本与更新日志；发现新版本会弹窗提示，无法连接时会提示网络问题。", 0));
+        HBox updateRow = new HBox(12);
+        updateRow.setAlignment(Pos.CENTER_LEFT);
+        updateRow.getChildren().addAll(
+                standaloneButton("检查更新", Ui.BTN_HIGHLIGHT, 120, () -> Updates.check(win, true)),
+                Ui.label(Lang.tf("当前版本：v%s", Build.VERSION), 12, Theme.gray2));
+        VBox.setMargin(updateRow, new Insets(6, 0, 0, 0));
+        other.add(updateRow);
 
         communityCard(page);
         uninstallCard(page);
@@ -1008,8 +1019,8 @@ public class PageSetup implements Page {
                 + "点击列表项可切换当前使用的 Java。", 12.5, Theme.gray2);
         intro.setWrapText(true);
         manage.add(intro);
-        Label status = Ui.label(data.javaPath.isEmpty() ? "当前：未找到 Java" : "当前：" + data.javaPath,
-                12, Theme.gray3);
+        Label status = Ui.label(Lang.t("当前：") + (data.javaPath.isEmpty()
+                ? Lang.t("未找到 Java") : data.javaPath), 12, Theme.gray3);
         status.setWrapText(true);
         manage.add(status);
         FlowPane actions = new FlowPane(10, 10);
@@ -1087,11 +1098,11 @@ public class PageSetup implements Page {
     /** 手动导入并校验 Java。 */
     private void importJava() {
         FileChooser chooser = new FileChooser();
-        chooser.setTitle("选择 Java 可执行文件");
+        chooser.setTitle(Lang.t("选择 Java 可执行文件"));
         boolean winOs = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win");
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Java 可执行文件",
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(Lang.t("Java 可执行文件"),
                 winOs ? new String[]{"javaw.exe", "java.exe"} : new String[]{"java"}));
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("所有文件", "*.*"));
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(Lang.t("所有文件"), "*.*"));
         File file = chooser.showOpenDialog(win.stage);
         if (file == null) return;
         int major = Data.javaMajor(file.getAbsolutePath());
@@ -1186,7 +1197,7 @@ public class PageSetup implements Page {
                 view.setText(text);
                 if (autoScroll.isSelected()) view.setScrollTop(Double.MAX_VALUE);
             }
-            status.setText("实时监听 " + logFile.getFileName() + " · " + lines.length + " 行");
+            status.setText(Lang.tf("实时监听 %s · %d 行", logFile.getFileName(), lines.length));
         }));
         tick[0].setCycleCount(javafx.animation.Animation.INDEFINITE);
         tick[0].play();
@@ -1205,7 +1216,7 @@ public class PageSetup implements Page {
         } else {
             for (Path f : files) {
                 Ui.ListItem row = new Ui.ListItem(Theme.icon("scroll-text", 16, Theme.text),
-                        f.getFileName().toString(), bytes(fileSize(f)) + " · 点击打开", 36);
+                        f.getFileName().toString(), bytes(fileSize(f)) + " · " + Lang.t("点击打开"), 36);
                 row.setOnMouseClicked(ev -> openLogFile(f));
                 all.add(row);
             }
@@ -1370,7 +1381,7 @@ public class PageSetup implements Page {
     }
 
     private HBox sizeBar(String title, long value, long total) {
-        Label lab = Ui.label(title + "    " + bytes(value), 12, Theme.gray2);
+        Label lab = Ui.label(Lang.t(title) + "    " + bytes(value), 12, Theme.gray2);
         ProgressBar bar = new ProgressBar(Math.max(0.01, Math.min(1, value / (double) Math.max(1, total))));
         bar.setPrefHeight(7);
         bar.setMaxWidth(Double.MAX_VALUE);
@@ -1599,7 +1610,7 @@ public class PageSetup implements Page {
         Runnable syncCustomRow = () -> {
             String c = customRoot.getText() == null ? "" : customRoot.getText().trim();
             rows[2].setVisible(!c.isEmpty());
-            names[2].setText("自定义源 (" + (c.isEmpty() ? "未设置" : c) + ")");
+            names[2].setText(Lang.t("自定义源") + " (" + (c.isEmpty() ? Lang.t("未设置") : c) + ")");
         };
         customRoot.textProperty().addListener((o, a, b) -> syncCustomRow.run());
         syncCustomRow.run();

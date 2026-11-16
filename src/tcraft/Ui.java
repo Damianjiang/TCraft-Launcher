@@ -199,19 +199,29 @@ public final class Ui {
 
             // 悬停点亮阴影，DropShadow 没有 opacity，用 color alpha 插值。
             addEventHandler(javafx.scene.input.MouseEvent.MOUSE_ENTERED, e -> {
-                Timeline anim = new Timeline(new KeyFrame(Duration.millis(160),
-                        new KeyValue(glow.radiusProperty(), 11, EASE_OUT_FLUENT),
-                        new KeyValue(glow.colorProperty(), Color.web(Theme.accent.toString(), 0.16), EASE_OUT_FLUENT)));
-                anim.play();
+                animateGlow(true);
                 titleLabel.setTextFill(Theme.accentDark);
             });
             addEventHandler(javafx.scene.input.MouseEvent.MOUSE_EXITED, e -> {
-                Timeline anim = new Timeline(new KeyFrame(Duration.millis(220),
-                        new KeyValue(glow.radiusProperty(), 5, EASE_OUT_FLUENT),
-                        new KeyValue(glow.colorProperty(), Color.web("#343d4a", 0.07), EASE_OUT_FLUENT)));
-                anim.play();
+                animateGlow(false);
                 titleLabel.setTextFill(Theme.text);
             });
+        }
+
+        /** 大卡片直接落终态，避免逐帧重糊。 */
+        private void animateGlow(boolean hover) {
+            double radius = hover ? 11 : 5;
+            Color color = hover ? Color.web(Theme.accent.toString(), 0.16)
+                    : Color.web("#343d4a", 0.07);
+            if (getHeight() > 260) {
+                glow.setRadius(radius);
+                glow.setColor(color);
+                return;
+            }
+            Timeline anim = new Timeline(new KeyFrame(Duration.millis(hover ? 160 : 220),
+                    new KeyValue(glow.radiusProperty(), radius, EASE_OUT_FLUENT),
+                    new KeyValue(glow.colorProperty(), color, EASE_OUT_FLUENT)));
+            anim.play();
         }
 
         public void add(Node... nodes) {
@@ -1736,6 +1746,8 @@ public final class Ui {
                         e -> thumb.setStyle(null));
             }
         });
+        // 滚轮缓动，列表不再一格一格地跳
+        SmoothScroll.install(sp);
         return sp;
     }
 

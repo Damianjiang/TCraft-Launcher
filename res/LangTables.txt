@@ -3459,11 +3459,6 @@ Mixin 注入失败	Mixin injection failed	Mixin 注入失敗
 当前：跟随系统代理	Current: system proxy	目前：跟隨系統代理
 当前：HTTP 代理 	Current: HTTP proxy 	目前：HTTP 代理 
 当前：SOCKS5 代理 	Current: SOCKS5 proxy 	目前：SOCKS5 代理 
-TCraft Launcher 无法启动：
-
-	TCraft Launcher could not start:
-
-	TCraft Launcher 無法啟動：
 
 填充	Fill	填充	
 墨绿	Dark green	墨綠	
@@ -3682,3 +3677,40 @@ TCraft Launcher 是用 JavaFX 写的开源 Minecraft 启动器，支持微软正
 目前同时存在启用和禁用的两个 Mod 文件：\n - %s\n - %s\n\n注意，这两个文件的内容并不相同。请手动删除或重命名其中一个后再试。	Both an enabled and a disabled copy of this mod exist:\n - %s\n - %s\n\nTheir contents differ. Delete or rename one of them, then try again.	目前同時存在啟用和停用的兩個 Mod 檔案：\n - %s\n - %s\n\n注意，這兩個檔案的內容並不相同。請手動刪除或重新命名其中一個後再試。	
 启动器没能进入主界面	The launcher could not reach the main window	啟動器沒能進入主介面	
 请不要发送截图。点「导出错误报告」保存日志，再把文件发到 TCL 交流群（1131373915）。	Please do not send screenshots. Click "Export error report", save the log, then post the file in the TCL group (1131373915).	請不要傳送截圖。點「匯出錯誤報告」儲存日誌，再把檔案發到 TCL 交流群（1131373915）。	
+每次启动时检查更新	Check for updates on every launch	每次啟動時檢查更新	
+启动后从 GitHub Releases 读取最新版本与更新日志；发现新版本会弹窗提示，无法连接时会提示网络问题。	Reads the latest version and release notes from GitHub Releases after launch; shows a prompt for new versions and a network hint when it cannot connect.	啟動後從 GitHub Releases 讀取最新版本與更新日誌；發現新版本會彈窗提示，無法連線時會提示網路問題。	
+从 GitHub Releases 读取最新版本与更新日志	Read the latest version and release notes from GitHub Releases	從 GitHub Releases 讀取最新版本與更新日誌	
+正在读取 GitHub Releases…	Reading GitHub Releases…	正在讀取 GitHub Releases…	
+请稍候…	Please wait…	請稍候…	
+最新版本：v%s	Latest version: v%s	最新版本：v%s	
+当前版本：v%s	Current version: v%s	目前版本：v%s	
+该版本未填写更新日志。	No release notes were provided for this version.	該版本未填寫更新日誌。	
+前往下载	Download Now	前往下載	
+稍后	Later	稍後	
+无法检查更新	Unable to check for updates	無法檢查更新	
+GitHub 可能连接不稳定，你可以使用瓦特工具箱等工具开个加速或来个 VPN。	GitHub may be unstable. Try an accelerator such as Watt Toolkit, or use a VPN.	GitHub 可能連線不穩定，你可以使用瓦特工具箱等工具開個加速或來個 VPN。	
+当前版本 v%s，GitHub 最新版本 v%s。	Current version v%s; GitHub's latest version is v%s.	目前版本 v%s，GitHub 最新版本 v%s。	
+当前版本 v%s 比 GitHub 上的 v%s 更新。	Current version v%s is newer than GitHub's v%s.	目前版本 v%s 比 GitHub 上的 v%s 更新。	
+皮肤站 API 地址，一般以 /api/yggdrasil 结尾（如 LittleSkin）。	Skin site API address, usually ending with /api/yggdrasil (e.g. LittleSkin).	皮膚站 API 位址，一般以 /api/yggdrasil 結尾（如 LittleSkin）。	
+这个账号有多个角色，选一个用来启动游戏。	This account has multiple characters. Choose one to launch the game.	這個帳號有多個角色，選一個用來啟動遊戲。	
+仅使用官方源	Official sources only	僅使用官方來源	
+启动器缓存	Launcher cache	啟動器快取	
+GitHub Releases（安装器）	GitHub Releases (installer)	GitHub Releases（安裝器）	
+原名称：	Original name: 	原名稱：	
+选择 Java 可执行文件	Select Java executable	選擇 Java 執行檔	
+所有文件	All files	所有檔案	
+GitHub 没有返回可用的版本号。	GitHub did not return a usable version number.	GitHub 沒有傳回可用的版本號。	
+已添加 %s	Added %s	已新增 %s	
+版本设置 - %s	Version settings - %s	版本設定 - %s	
+实时监听 %s · %d 行	Watching %s · %d lines	即時監聽 %s · %d 行	
+点击打开	Click to open	點擊開啟	
+隐藏主题 %d/%d · 每累计启动 %d 次解锁一个，再启动 %d 次可解锁「%s」	Hidden themes %d/%d · unlock one every %d launches; %d more launches unlock "%s"	隱藏主題 %d/%d · 每累計啟動 %d 次解鎖一個，再啟動 %d 次可解鎖「%s」	
+隐藏主题每累计启动 %d 次解锁一个（当前已启动 %d 次，再启动 %d 次可解锁「%s」）。	A hidden theme unlocks every %d launches (%d so far; %d more unlocks "%s").	隱藏主題每累計啟動 %d 次解鎖一個（目前已啟動 %d 次，再啟動 %d 次可解鎖「%s」）。	
+启动失败怎么办？	What if the game fails to launch?	啟動失敗怎麼辦？	
+什么是版本隔离？	What is version isolation?	什麼是版本隔離？	
+首次下载时会各抓 128KB 测一次速（每个域名只测一次，结果缓存 10 分钟），实际按最快的源下载；某个源变慢或连不上会自动换另一个。	The first download speed-tests each source with 128 KB (once per domain, cached for 10 minutes) and uses the fastest source; slow or unreachable sources are switched automatically.	首次下載時會各抓 128KB 測一次速（每個網域只測一次，結果快取 10 分鐘），實際按最快的來源下載；某個來源變慢或連不上會自動換另一個。	
+请在 实例页左侧「文件夹列表」中更改下载目标文件夹。在某个文件夹或游戏版本上右键，即可选择打开对应文件夹。	Change the download target folder in the Folder list on the left of the Instances page. Right-click a folder or game version to open it in the file manager.	請在 實例頁左側「資料夾清單」中更改下載目標資料夾。在某個資料夾或遊戲版本上按右鍵，即可選擇開啟對應資料夾。	
+仅清理启动器自建的内容（配置、日志、缓存、联机内核），不会删除游戏目录、存档与已安装的 Minecraft。确认后停止联机内核并退出；便携版程序文件需手动删除。	Only launcher-created data (config, logs, cache, multiplayer core) is removed; game directories, saves and installed Minecraft are untouched. Confirming stops the multiplayer core and exits; portable program files must be deleted manually.	僅清理啟動器自建的內容（設定、日誌、快取、多人連線核心），不會刪除遊戲目錄、存檔與已安裝的 Minecraft。確認後停止多人連線核心並退出；免安裝版程式檔案需手動刪除。	
+TCL 需要 Java 才能启动游戏。列表中的第一个可用 Java 将被默认使用，点击列表项可切换当前使用的 Java。	TCL needs Java to launch the game. The first available Java in the list is used by default; click an entry to switch the active Java.	TCL 需要 Java 才能啟動遊戲。清單中的第一個可用 Java 將被預設使用，點擊清單項目可切換目前使用的 Java。	
+提示：SOCKS5 只对游戏进程生效，启动器自身的下载 / 搜索走的是 HTTP 代理通道（Clash、v2rayN 的混合端口都同时支持 HTTP，填那个端口即可）。	Note: SOCKS5 only applies to the game process. The launcher's own downloads and searches use the HTTP proxy channel (Clash and v2rayN mixed ports also accept HTTP, so use that port).	提示：SOCKS5 只對遊戲行程生效，啟動器自身的下載 / 搜尋走的是 HTTP 代理通道（Clash、v2rayN 的混合連接埠都同時支援 HTTP，填那個連接埠即可）。	
+填自建或内网的 BMCLAPI 兼容镜像根（如 http://192.168.1.10:8080），填了会一起测速；下载时「镜像优先」会自动走它。留空则只测官方源与内置 BMCLAPI。	Enter a self-hosted or intranet BMCLAPI-compatible mirror root (e.g. http://192.168.1.10:8080); it is included in the speed test and used by Mirror first. Leave empty to test only the official source and built-in BMCLAPI.	填自建或內網的 BMCLAPI 相容鏡像根（如 http://192.168.1.10:8080），填了會一起測速；下載時「鏡像優先」會自動走它。留空則只測官方來源與內建 BMCLAPI。	

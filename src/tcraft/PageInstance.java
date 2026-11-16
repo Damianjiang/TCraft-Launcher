@@ -276,7 +276,7 @@ public class PageInstance implements Page {
 
     private void addGroup(VBox parent, String name, List<Data.Instance> list) {
         if (list.isEmpty()) return;
-        Label header = Ui.bold(name + " · " + list.size(), 12, Theme.gray2);
+        Label header = Ui.bold(Lang.t(name) + " · " + list.size(), 12, Theme.gray2);
         VBox.setMargin(header, new Insets(7, 8, 3, 8));
         parent.getChildren().add(header);
         for (Data.Instance ins : list) parent.getChildren().add(instanceRow(ins));
@@ -903,7 +903,7 @@ public class PageInstance implements Page {
         importPack.setOnMouseClicked(e -> importModpack(win));
         panel.getChildren().addAll(addFolder, importPack);
 
-        Label note = Ui.label("游戏目录\n" + data.gameDir, 10.5, Theme.gray3);
+        Label note = Ui.label(Lang.t("游戏目录") + "\n" + data.gameDir, 10.5, Theme.gray3);
         note.setWrapText(true);
         note.setMaxWidth(240);
         VBox.setMargin(note, new Insets(14, 4, 8, 4));

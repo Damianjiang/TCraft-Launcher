@@ -1032,11 +1032,13 @@ public final class Data {
     /** 网络页显示的代理状态。 */
     public String describeProxy() {
         int mode = Math.max(0, Math.min(3, getInt("SystemHttpProxyType", 1)));
+        String prefix = Lang.t("当前：");
+        String address = get("SystemProxyHost", "") + ":" + get("SystemProxyPort", "7890");
         return switch (mode) {
-            case 0 -> "当前：不使用代理";
-            case 1 -> "当前：跟随系统代理";
-            case 2 -> "当前：HTTP 代理 " + get("SystemProxyHost", "") + ":" + get("SystemProxyPort", "7890");
-            default -> "当前：SOCKS5 代理 " + get("SystemProxyHost", "") + ":" + get("SystemProxyPort", "7890");
+            case 0 -> prefix + Lang.t("不使用代理");
+            case 1 -> prefix + Lang.t("跟随系统代理");
+            case 2 -> prefix + Lang.t("HTTP 代理") + " " + address;
+            default -> prefix + Lang.t("SOCKS5 代理") + " " + address;
         };
     }
 

@@ -21,6 +21,8 @@ public final class Lang {
         try {
             String text = Theme.resText("LangTables.txt");
             if (text.isEmpty()) return;
+            // 记事本保存的 UTF-8 可能带 BOM，不去掉第一条词条会失配
+            if (text.charAt(0) == '\uFEFF') text = text.substring(1);
             for (String line : text.split("\\R")) {
                 if (line.isEmpty()) continue;
                 String[] cols = line.split("\t", -1);

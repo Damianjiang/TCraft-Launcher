@@ -458,7 +458,7 @@ public final class Dialogs {
                         win.refreshAccountBadge();
                         win.closeModal();
                         win.openPage(win.currentKey, false);
-                        win.toast("已添加 " + fsite, fname, 1);
+                        win.toast(Lang.tf("已添加 %s", fsite), fname, 1);
                     });
                 } catch (Yggdrasil.AuthException e) {
                     javafx.application.Platform.runLater(() -> {
