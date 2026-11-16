@@ -95,19 +95,41 @@ public final class Updates {
             if (release == null) {
                 Data.get().log("检查更新失败：" + (error == null ? "未知错误" : error));
                 // 自动检查失败不打扰，手动检查才弹窗
-                if (manual) Dialogs.message(win, "无法检查更新", reason(error), true, "确定");
+                if (manual) showFailure(win, reason(error));
                 return;
             }
             try {
                 handle(win, release, manual);
             } catch (Throwable t) {
                 Data.get().log("处理更新信息失败：" + t);
-                if (manual) {
-                    Dialogs.message(win, "无法检查更新",
-                            reason(t instanceof Exception e ? e : null), true, "确定");
-                }
+                if (manual) showFailure(win, reason(t instanceof Exception e ? e : null));
             }
         });
+    }
+
+    /** 检查失败：说明原因，并留一个手动打开下载页的入口。 */
+    private static void showFailure(MainWindow win, String message) {
+        VBox card = Dialogs.msgCard("无法检查更新");
+        card.setPrefWidth(440);
+        card.setMinWidth(400);
+        VBox body = new VBox(8);
+        body.setPadding(new Insets(14, 7, 0, 7));
+        Label text = Ui.label(message, 13, Theme.text);
+        text.setWrapText(true);
+        text.setMaxWidth(390);
+        body.getChildren().add(text);
+
+        HBox actions = new HBox(12);
+        actions.setAlignment(Pos.CENTER_RIGHT);
+        actions.setPadding(new Insets(15, 7, 0, 7));
+        actions.getChildren().addAll(
+                Ui.button("打开下载页", Ui.BTN_NORMAL, () -> {
+                    win.closeModal();
+                    if (!Shell.openUrl(RELEASES_URL)) win.toast("打开链接失败", RELEASES_URL, 3);
+                }),
+                Ui.button("确定", Ui.BTN_HIGHLIGHT, win::closeModal));
+        card.getChildren().addAll(body, actions);
+        win.showModal(card, true);
     }
 
     /** 把常见网络错误翻成一句能看懂的话。 */
@@ -131,7 +153,7 @@ public final class Updates {
         String current = Build.VERSION == null ? "" : Build.VERSION.trim();
         String latest = release.tag == null ? "" : release.tag.trim();
         if (latest.isEmpty()) {
-            if (manual) Dialogs.message(win, "检查更新失败", "GitHub 没有返回可用的版本号。", true, "确定");
+            if (manual) showFailure(win, "GitHub 没有返回可用的版本号。");
             return;
         }
         // 开发版/无法解析的版本号：直接展示最新版信息，方便本地构建也能验证
