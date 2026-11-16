@@ -37,7 +37,7 @@ public final class Updates {
             "https://api.github.com/repos/Damianjiang/TCraft-Launcher/releases/latest";
 
     /** 正在检查时禁止重复发起。 */
-    private static boolean checking;
+    private static volatile boolean checking;
 
     private Updates() {
     }
@@ -51,6 +51,10 @@ public final class Updates {
         delay.play();
     }
 
+    /** 本次检查是否已经有结果，线程和超时定时器只能有一个收尾。 */
+    private static final java.util.concurrent.atomic.AtomicBoolean SETTLED =
+            new java.util.concurrent.atomic.AtomicBoolean(true);
+
     /** manual=true 时无论结果都会给反馈；自动检查只在有新版本时弹窗。 */
     public static void check(MainWindow win, boolean manual) {
         if (!manual && !windowAlive(win)) return;
@@ -59,7 +63,9 @@ public final class Updates {
             return;
         }
         checking = true;
+        SETTLED.set(false);
         if (manual) win.toast("正在检查更新", "正在读取 GitHub Releases…", 0);
+
         Thread thread = new Thread(() -> {
             Release release = null;
             Exception error = null;
@@ -68,24 +74,53 @@ public final class Updates {
             } catch (Exception e) {
                 error = e;
             }
-            Release result = release;
-            Exception failure = error;
-            Platform.runLater(() -> {
-                checking = false;
-                if (App.SNAPSHOT_MODE || App.PERF_MODE) return;
-                if (!windowAlive(win)) return;
-                if (result == null) {
-                    Data.get().log("检查更新失败：" + (failure == null ? "未知错误" : failure));
-                    Dialogs.message(win, "无法检查更新",
-                            "GitHub 可能连接不稳定，你可以使用瓦特工具箱等工具开个加速或来个 VPN。",
-                            true, "确定");
-                    return;
-                }
-                handle(win, result, manual);
-            });
+            settle(win, release, error, manual);
         }, "TCL-Update");
         thread.setDaemon(true);
         thread.start();
+
+        // DNS 解析卡住时 request timeout 不会生效，兜一个总超时，避免一直卡在「正在检查」
+        PauseTransition timeout = new PauseTransition(Duration.seconds(15));
+        timeout.setOnFinished(e -> settle(win, null, new IOException("连接超时"), manual));
+        timeout.play();
+    }
+
+    /** 收尾只执行一次：复位状态，再按结果给反馈。 */
+    private static void settle(MainWindow win, Release release, Exception error, boolean manual) {
+        if (!SETTLED.compareAndSet(false, true)) return;
+        checking = false;   // 先复位，界面反馈再排队
+        Platform.runLater(() -> {
+            if (App.SNAPSHOT_MODE || App.PERF_MODE) return;
+            if (!windowAlive(win)) return;
+            if (release == null) {
+                Data.get().log("检查更新失败：" + (error == null ? "未知错误" : error));
+                // 自动检查失败不打扰，手动检查才弹窗
+                if (manual) Dialogs.message(win, "无法检查更新", reason(error), true, "确定");
+                return;
+            }
+            try {
+                handle(win, release, manual);
+            } catch (Throwable t) {
+                Data.get().log("处理更新信息失败：" + t);
+                if (manual) {
+                    Dialogs.message(win, "无法检查更新",
+                            reason(t instanceof Exception e ? e : null), true, "确定");
+                }
+            }
+        });
+    }
+
+    /** 把常见网络错误翻成一句能看懂的话。 */
+    private static String reason(Exception e) {
+        String msg = e == null || e.getMessage() == null ? "" : e.getMessage();
+        String low = msg.toLowerCase();
+        if (msg.contains("PKIX") || low.contains("certificate")) {
+            return "证书校验失败，可能是代理或网络工具拦截了 GitHub，关掉代理再试。";
+        }
+        if (msg.contains("超时") || low.contains("timed out") || low.contains("timeout")) {
+            return "连接 GitHub 超时，请检查网络后再试。";
+        }
+        return "GitHub 可能连接不稳定，你可以使用瓦特工具箱等工具开个加速或来个 VPN。";
     }
 
     private static boolean windowAlive(MainWindow win) {
@@ -241,7 +276,7 @@ public final class Updates {
 
     private static String fetch(String url, String accept) throws IOException, InterruptedException {
         HttpRequest request = HttpRequest.newBuilder(URI.create(url))
-                .timeout(java.time.Duration.ofSeconds(12))
+                .timeout(java.time.Duration.ofSeconds(8))
                 .header("User-Agent", "TCraftLauncher-JavaFX/" + Build.VERSION)
                 .header("Accept", accept)
                 .GET()
