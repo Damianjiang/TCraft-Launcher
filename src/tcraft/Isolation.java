@@ -3,10 +3,7 @@ package tcraft;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-/**
- * 版本隔离：每个版本用 versions/&lt;版本&gt; 当游戏目录，mods、saves、config 各自一份；
- * libraries 与 assets 仍然共用，不会把整份游戏复制一遍。
- */
+/** 版本隔离：每个版本独立 mods、saves、config，libraries 与 assets 共用。 */
 public final class Isolation {
 
     /** 跟随全局设置。 */
@@ -88,7 +85,7 @@ public final class Isolation {
 
     /** 设置页里显示用的一句话。 */
     public static String describe(Data.Instance ins) {
-        if (!on(ins)) return "不隔离（多个版本共用 mods、saves）";
+        if (!on(ins)) return Lang.t("不隔离（多个版本共用 mods、saves）");
         Path run = run(ins);
         Path base = base(ins);
         String rel;
@@ -97,6 +94,6 @@ public final class Isolation {
         } catch (Exception e) {
             rel = run.toString();
         }
-        return "已隔离（" + rel + "）";
+        return Lang.tf("已隔离（%s）", rel);
     }
 }

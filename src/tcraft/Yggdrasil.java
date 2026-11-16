@@ -11,10 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * 外置登录：Yggdrasil 协议，配合 authlib-injector 使用。
- * 端点、请求体和返回字段按 authlib-injector 的标准来，和皮肤站（LittleSkin 等）通用。
- */
+/** 外置登录：Yggdrasil 协议，配合 authlib-injector 使用。 */
 public final class Yggdrasil {
 
     /** 认证服务器。apiRoot 末尾一定带斜杠。 */
@@ -53,6 +50,7 @@ public final class Yggdrasil {
 
     /** 服务器拒绝，message 可以直接显示给用户。 */
     public static final class AuthException extends Exception {
+        private static final long serialVersionUID = 1L;
         public final int status;
 
         AuthException(int status, String message) {
@@ -64,10 +62,7 @@ public final class Yggdrasil {
     private Yggdrasil() {
     }
 
-    /**
-     * 访问服务器根地址，读 metadata 和 API 根路径。
-     * 有些服务器会在响应头里给出真正的 API 地址（x-authlib-injector-api-location）。
-     */
+    /** 解析服务器根地址与 API 根路径，优先采用响应头给出的真实地址。 */
     public static Server locate(String input) throws IOException, AuthException {
         String url = input == null ? "" : input.trim();
         if (url.isEmpty()) throw new AuthException(0, "请填写认证服务器地址");
@@ -137,10 +132,7 @@ public final class Yggdrasil {
         return resp.statusCode() == 200 || resp.statusCode() == 204;
     }
 
-    /**
-     * 启动前保证 token 可用：先 validate，过期就 refresh，失败抛给调用方提示重登。
-     * 顺带把新的 clientToken 写回账户。
-     */
+    /** 启动前确保 token 可用：失效则刷新，并把新 clientToken 写回账户。 */
     public static void ensureFresh(Data.Account account) throws IOException, AuthException {
         if (account == null || account.server == null || account.server.isEmpty()) return;
         Server server = new Server(account.server.endsWith("/") ? account.server : account.server + "/", "");

@@ -1,10 +1,8 @@
 package tcraft;
 
-import javafx.animation.FadeTransition;
 import javafx.animation.Interpolator;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
-import javafx.animation.ParallelTransition;
 import javafx.animation.ScaleTransition;
 import javafx.animation.Timeline;
 import javafx.animation.TranslateTransition;
@@ -1154,6 +1152,9 @@ public final class Ui {
         private boolean pressed;
         private Color textColor = Theme.text;
         private Runnable onAction;
+        // 按下和松开各自起一段动画，必须停掉上一段，否则旧动画结束后会把勾拉回去
+        private javafx.animation.Animation checkAnim;
+        private javafx.animation.Animation boxAnim;
 
         public Check(String text, boolean checked) {
             super(7);
@@ -1204,25 +1205,14 @@ public final class Ui {
                 pressed = true;
                 // 按下：框缩到 16.5
                 box.setBackground(fill(Theme.listHoverBg, 3));
-                int ms = aniMs(1000);
-                javafx.animation.Timeline tl = new javafx.animation.Timeline(new javafx.animation.KeyFrame(
-                        Duration.millis(Math.max(1, ms)),
-                        new javafx.animation.KeyValue(boxScale.xProperty(), 16.5 / 18.0, EASE_OUT_FLUENT_STRONG),
-                        new javafx.animation.KeyValue(boxScale.yProperty(), 16.5 / 18.0, EASE_OUT_FLUENT_STRONG)));
-                tl.play();
-                if (selected) {
-                    javafx.animation.Timeline cl = new javafx.animation.Timeline(new javafx.animation.KeyFrame(
-                            Duration.millis(Math.max(1, ms)),
-                            new javafx.animation.KeyValue(checkScale.xProperty(), 0.9, EASE_OUT_FLUENT_STRONG),
-                            new javafx.animation.KeyValue(checkScale.yProperty(), 0.9, EASE_OUT_FLUENT_STRONG)));
-                    cl.play();
-                }
+                animateBox(16.5 / 18.0, aniMs(1000), EASE_OUT_FLUENT_STRONG);
+                if (selected) animateCheck(0.9, aniMs(1000), EASE_OUT_FLUENT_STRONG, 0);
             });
             addEventHandler(javafx.scene.input.MouseEvent.MOUSE_RELEASED, e -> {
                 if (!pressed) return;
                 pressed = false;
-                releaseVisual();
                 setSelected(!selected);
+                releaseVisual();
                 if (onAction != null) onAction.run();
             });
             disabledProperty().addListener((o, was, now) -> {
@@ -1252,17 +1242,27 @@ public final class Ui {
         private void releaseVisual() {
             // 底色回白，框和勾复位
             box.setBackground(fill(Theme.halfWhite, 3));
-            int ms = aniMs(400);
-            javafx.animation.Timeline tl = new javafx.animation.Timeline(new javafx.animation.KeyFrame(
-                    Duration.millis(Math.max(1, ms)),
-                    new javafx.animation.KeyValue(boxScale.xProperty(), 1, EASE_OUT_FLUENT_STRONG),
-                    new javafx.animation.KeyValue(boxScale.yProperty(), 1, EASE_OUT_FLUENT_STRONG)));
+            animateBox(1, aniMs(400), EASE_OUT_FLUENT_STRONG);
+            animateCheck(selected ? 1 : 0, aniMs(500), EASE_OUT_FLUENT_STRONG, 0);
+        }
+
+        private void animateCheck(double target, int ms, Interpolator ease, int delay) {
+            if (checkAnim != null) checkAnim.stop();
+            Timeline tl = new Timeline(new KeyFrame(Duration.millis(Math.max(1, ms)),
+                    new KeyValue(checkScale.xProperty(), target, ease),
+                    new KeyValue(checkScale.yProperty(), target, ease)));
+            tl.setDelay(Duration.millis(delay));
+            checkAnim = tl;
             tl.play();
-            javafx.animation.Timeline cl = new javafx.animation.Timeline(new javafx.animation.KeyFrame(
-                    Duration.millis(Math.max(1, aniMs(500))),
-                    new javafx.animation.KeyValue(checkScale.xProperty(), 1, EASE_OUT_FLUENT_STRONG),
-                    new javafx.animation.KeyValue(checkScale.yProperty(), 1, EASE_OUT_FLUENT_STRONG)));
-            cl.play();
+        }
+
+        private void animateBox(double target, int ms, Interpolator ease) {
+            if (boxAnim != null) boxAnim.stop();
+            Timeline tl = new Timeline(new KeyFrame(Duration.millis(Math.max(1, ms)),
+                    new KeyValue(boxScale.xProperty(), target, ease),
+                    new KeyValue(boxScale.yProperty(), target, ease)));
+            boxAnim = tl;
+            tl.play();
         }
 
         public boolean isSelected() {
@@ -1274,29 +1274,11 @@ public final class Ui {
             selected = value;
             // 勾选 300ms 弹出，取消 135ms 收回
             if (selected) {
-                int delay = aniMs(105);
-                javafx.animation.Timeline tl = new javafx.animation.Timeline(new javafx.animation.KeyFrame(
-                        Duration.millis(Math.max(1, aniMs(300))),
-                        new javafx.animation.KeyValue(checkScale.xProperty(), 1, EASE_OUT_BACK),
-                        new javafx.animation.KeyValue(checkScale.yProperty(), 1, EASE_OUT_BACK)));
-                tl.setDelay(Duration.millis(delay));
-                tl.play();
+                animateCheck(1, aniMs(300), EASE_OUT_BACK, aniMs(105));
                 colorTween(boxBorderProperty(), currentBorder(),
                         isHover() && !isDisabled() ? Theme.accent : Theme.accentDark, aniMs(150));
             } else {
-                javafx.animation.Transition t = new javafx.animation.Transition() {
-                    {
-                        setCycleDuration(Duration.millis(Math.max(1, aniMs(135))));
-                    }
-
-                    @Override
-                    protected void interpolate(double f) {
-                        checkScale.setX(1 - f);
-                        checkScale.setY(1 - f);
-                    }
-                };
-                t.setInterpolator(fluentIn(2));
-                t.play();
+                animateCheck(0, aniMs(135), fluentIn(2), 0);
                 colorTween(boxBorderProperty(), currentBorder(), Theme.text, aniMs(150));
             }
         }
@@ -1441,8 +1423,8 @@ public final class Ui {
     public static final class SliderBar extends Pane {
         private final Region back = new Region();
         private final Region fore = new Region();
-        private final javafx.scene.shape.Ellipse dot = new javafx.scene.shape.Ellipse(5, 5);
-        private final javafx.scene.transform.Scale dotScale = new javafx.scene.transform.Scale(1, 1, 5, 5);
+        private final javafx.scene.shape.Ellipse dot = new javafx.scene.shape.Ellipse(0, 8, 5, 5);
+        private final javafx.scene.transform.Scale dotScale = new javafx.scene.transform.Scale(1, 1, 0, 8);
         private final double min;
         private final double max;
         private double value;
@@ -1465,6 +1447,10 @@ public final class Ui {
             back.setMouseTransparent(true);
             fore.setMouseTransparent(true);
             dot.setMouseTransparent(true);
+            // Pane 会把 managed 子节点按 pref 尺寸重排，滑条线和圆点必须自己定位
+            back.setManaged(false);
+            fore.setManaged(false);
+            dot.setManaged(false);
             dot.getTransforms().add(dotScale);
             getChildren().addAll(back, fore, dot);
             widthProperty().addListener((o, a, b) -> layoutValue(false));
@@ -1990,49 +1976,6 @@ public final class Ui {
 
     public static Background fill(Color color, double radius) {
         return new Background(new BackgroundFill(color, new CornerRadii(radius), Insets.EMPTY));
-    }
-
-    /** 展开或收起子块，用 maxHeight 动画；动画期间把子树缓存成贴图省掉逐帧重绘。 */
-    public static void animateExpand(javafx.scene.layout.Region node, boolean show) {
-        if (show == node.isManaged()) return;
-        node.setCache(true);
-        node.setCacheHint(CacheHint.SPEED);
-        if (show) {
-            node.setVisible(true);
-            node.setManaged(true);
-            node.setMaxHeight(javafx.scene.layout.Region.USE_COMPUTED_SIZE);
-            node.applyCss();
-            double target = Math.max(1, node.prefHeight(node.getWidth() > 1 ? node.getWidth() : 320));
-            node.setMaxHeight(0);
-            node.setOpacity(0);
-            Timeline t = new Timeline(
-                    new KeyFrame(Duration.ZERO, new KeyValue(node.maxHeightProperty(), 0),
-                            new KeyValue(node.opacityProperty(), 0)),
-                    new KeyFrame(Duration.millis(240),
-                            new KeyValue(node.maxHeightProperty(), target, EASE_OUT_FLUENT),
-                            new KeyValue(node.opacityProperty(), 1)));
-            t.setOnFinished(e -> {
-                node.setMaxHeight(javafx.scene.layout.Region.USE_COMPUTED_SIZE);
-                node.setCache(false);
-            });
-            t.play();
-        } else {
-            double from = node.getHeight() > 1 ? node.getHeight() : node.prefHeight(-1);
-            Timeline t = new Timeline(
-                    new KeyFrame(Duration.ZERO, new KeyValue(node.maxHeightProperty(), from),
-                            new KeyValue(node.opacityProperty(), 1)),
-                    new KeyFrame(Duration.millis(180),
-                            new KeyValue(node.maxHeightProperty(), 0, Interpolator.EASE_IN),
-                            new KeyValue(node.opacityProperty(), 0)));
-            t.setOnFinished(e -> {
-                node.setVisible(false);
-                node.setManaged(false);
-                node.setMaxHeight(javafx.scene.layout.Region.USE_COMPUTED_SIZE);
-                node.setOpacity(1);
-                node.setCache(false);
-            });
-            t.play();
-        }
     }
 
     public static Background glassFill(double radius) {

@@ -57,9 +57,6 @@ public final class Updates {
     private static final java.util.concurrent.atomic.AtomicLong GENERATION =
             new java.util.concurrent.atomic.AtomicLong();
 
-    /** 本次检查的开始时间。 */
-    private static volatile long startedAt;
-
     /** 后台线程写结果，FX 线程轮询读取。 */
     private static volatile Release pendingRelease;
     private static volatile Exception pendingError;
@@ -87,13 +84,12 @@ public final class Updates {
         if (checking && !manual) return;
         long generation = GENERATION.incrementAndGet();
         checking = true;
-        startedAt = System.currentTimeMillis();
         pendingRelease = null;
         pendingError = null;
         pendingGen = 0;
         Data.get().log("检查更新：" + (manual ? "手动" : "自动"));
         if (manual) win.toast("正在检查更新", "正在读取 GitHub Releases…", 0);
-        if (hint != null) hint.setText("正在检查…");
+        if (hint != null) hint.setText(Lang.t("正在检查…"));
 
         Thread thread = new Thread(() -> {
             Release release = null;
@@ -143,14 +139,13 @@ public final class Updates {
         pendingError = null;
         pendingGen = 0;
         checking = false;
-        startedAt = 0;
         try {
             if (App.SNAPSHOT_MODE || App.PERF_MODE) return;
             if (!windowAlive(win)) return;
             if (release == null) {
                 String why = reason(error);
                 Data.get().log("检查更新失败：" + (error == null ? "未知错误" : error));
-                if (hint != null) hint.setText("检查失败：" + why);
+                if (hint != null) hint.setText(Lang.tf("检查失败：%s", why));
                 if (manual) {
                     win.toast("检查更新失败", why, 3);
                     showFailure(win, why);
@@ -158,15 +153,14 @@ public final class Updates {
                 return;
             }
             Data.get().log("检查更新完成：" + release.tag);
-            if (hint != null) hint.setText("GitHub 最新版本 v" + clean(release.tag));
-            if (manual) win.toast("检查更新", "GitHub 最新版本 v" + clean(release.tag), 1);
+            if (hint != null) hint.setText(Lang.tf("GitHub 最新版本 v%s", clean(release.tag)));
+            if (manual) win.toast("检查更新", Lang.tf("GitHub 最新版本 v%s", clean(release.tag)), 1);
             handle(win, release, manual);
         } catch (Throwable t) {
             Data.get().log("更新提示失败：" + t);
             try {
                 win.toast("检查更新", "读取成功但提示失败，请到 Releases 页面查看", 2);
-            } catch (Throwable ignored) {
-            }
+            } catch (Throwable ignored) {            }
         }
     }
 

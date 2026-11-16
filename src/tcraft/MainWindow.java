@@ -17,10 +17,8 @@ import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.Scene;
-import javafx.scene.control.ContextMenu;
 import javafx.stage.Popup;
 import javafx.scene.control.Label;
-import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.effect.GaussianBlur;
@@ -1027,7 +1025,9 @@ public class MainWindow {
         badge.setCursor(Cursor.HAND);
         badgeAvatar = Ui.avatar(data.account(), 18);
         badgeName = Ui.label(data.account() == null ? "未登录" : data.account().name, 12.5, Color.WHITE);
-        badgeName.setMaxWidth(110);
+        badgeName.setMinWidth(0);
+        badgeName.setMaxWidth(90);
+        badgeName.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
         badge.getChildren().addAll(badgeAvatar, badgeName);
         badge.setOnMouseClicked(e -> showAccountDialog());
         badge.setOnMousePressed(e -> e.consume());
@@ -1041,7 +1041,7 @@ public class MainWindow {
         javafx.application.Platform.runLater(() -> adaptTitleTabs());
         if (badgeName == null || badgeAvatar == null) return;
         Data.Account a = data.account();
-        badgeName.setText(a == null ? "未登录" : a.name);
+        badgeName.setText(a == null ? Lang.t("未登录") : a.name);
         StackPane newAvatar = Ui.avatar(a, 18);
         HBox parent = (HBox) badgeName.getParent();
         parent.getChildren().set(0, newAvatar);
@@ -1485,7 +1485,7 @@ public class MainWindow {
         sb.append("root=").append(Math.round(root.getWidth())).append("x").append(Math.round(root.getHeight()))
                 .append(" rootMin=").append(Math.round(root.minWidth(-1))).append("x").append(Math.round(root.minHeight(-1)))
                 .append(" pageHost=").append(Math.round(((javafx.scene.layout.Region) pageHost).getWidth()))
-                .append(" contentMinW=").append(Math.round(((javafx.scene.layout.Region) ((javafx.scene.layout.StackPane) pageHost).getChildrenUnmodifiable().get(0)).minWidth(-1)))
+                .append(" contentMinW=").append(Math.round(((javafx.scene.layout.Region) pageHost.getChildrenUnmodifiable().get(0)).minWidth(-1)))
                 .append(" | frame=").append(root.getChildrenUnmodifiable().isEmpty() ? "-"
                         : Math.round(((javafx.scene.layout.Region) root.getChildrenUnmodifiable().get(0)).getWidth()))
                 .append(" frameMin=").append(root.getChildrenUnmodifiable().isEmpty() ? "-"
@@ -2776,7 +2776,7 @@ public class MainWindow {
     }
 
     private static String randomHint() {
-        return "你知道吗：" + HINTS[java.util.concurrent.ThreadLocalRandom.current().nextInt(HINTS.length)];
+        return Lang.t("你知道吗：") + Lang.t(HINTS[java.util.concurrent.ThreadLocalRandom.current().nextInt(HINTS.length)]);
     }
 
     private void runLaunchProgress(Data.Instance ins) {
@@ -2807,13 +2807,13 @@ public class MainWindow {
                 java.util.List<GameLauncher.MissingFile> missing = GameLauncher.scanMissing(ins);
                 if (!missing.isEmpty()) {
                     data.launchLog("启动前补全：" + missing.size() + " 个缺失文件");
-                    launchStepText("下载缺失文件 0 / " + missing.size(), 0.35);
+                    launchStepText(Lang.tf("下载缺失文件 %d / %d", 0, missing.size()), 0.35);
                     GameLauncher.downloadMissing(missing, p -> Platform.runLater(() -> {
                         setLaunchProgress(0.35 + p * 0.2);
                         int done = (int) Math.round(p * missing.size());
                         if (launchStep != null) {
-                            launchStep.setText("下载缺失文件 " + Math.min(done + 1, missing.size())
-                                    + " / " + missing.size());
+                            launchStep.setText(Lang.tf("下载缺失文件 %d / %d",
+                                    Math.min(done + 1, missing.size()), missing.size()));
                         }
                     }));
                 }
@@ -2826,7 +2826,7 @@ public class MainWindow {
                 Platform.runLater(() -> {
                     if (launchCancelled) return;
                     setLaunchProgress(1);
-                    launchStep.setText("启动完成");
+                    launchStep.setText(Lang.t("启动完成"));
                     launchPercent.setText("100 %");
                     // 成功后隐藏进度行，显示「你知道吗」
                     if (launchInfoBox != null) launchInfoBox.setVisible(false);
@@ -2850,7 +2850,7 @@ public class MainWindow {
                 // 失败弹错误窗给真实原因，不用一闪而过的 toast。
                 Errors.alert("Minecraft 启动失败", ex);
                 Platform.runLater(() -> {
-                    launchStep.setText("启动失败");
+                    launchStep.setText(Lang.t("启动失败"));
                     launchPercent.setText("");
                     PauseTransition wait = new PauseTransition(Duration.millis(1800));
                     wait.setOnFinished(ev -> closeLaunchPanel());
@@ -2874,13 +2874,15 @@ public class MainWindow {
         if (!isolationHinted.add(ins.name + "|" + run)) return;
         data.launchLog("提示：已开启版本隔离，共享目录的 mods 不会自动复制到 " + run);
         Platform.runLater(() -> toast("版本隔离已开启",
-                "本版本的 mods 在 " + run.getFileName() + " 下，共享 mods 未复制", 2));
+                Lang.tf("本版本的 mods 在 %s 下，共享 mods 未复制", run.getFileName()), 2));
     }
 
-    private void launchStepText(String step, double progress) {        Platform.runLater(() -> {
-            launchStep.setText(step);
+    private void launchStepText(String step, double progress) {
+        final String display = Lang.t(step);
+        Platform.runLater(() -> {
+            launchStep.setText(display);
             setLaunchProgress(progress);
-            data.launchLog(step); // 步骤写进首页调试日志卡
+            data.launchLog(display); // 步骤写进首页调试日志卡
         });
     }
 

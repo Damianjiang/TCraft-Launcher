@@ -14,7 +14,8 @@ public final class Shell {
 
     private static boolean isLinux() {
         String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
-        return os.contains("linux") || os.contains("nix") || os.contains("nux") || os.contains("aix");
+        return os.contains("linux") || os.contains("nix") || os.contains("nux") || os.contains("aix")
+                || os.contains("freebsd") || os.contains("openbsd") || os.contains("netbsd");
     }
 
     /** 用系统默认浏览器打开 URL。 */

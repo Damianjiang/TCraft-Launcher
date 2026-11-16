@@ -2,17 +2,16 @@ package tcraft;
 
 import java.net.URI;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.HttpURLConnection;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.security.DigestOutputStream;
+import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -24,6 +23,21 @@ import java.util.zip.ZipInputStream;
 public final class EasyTier {
 
     public static final String VERSION = "v2.6.4";
+
+    /** 发布包 SHA-256，防止镜像被替换或下载损坏。 */
+    private static final Map<String, String> SHA256 = Map.ofEntries(
+            Map.entry("windows-x86_64", "27af91e270e554709b048bd32327fefd2dfce5062ae1e8701af7550c6f525f84"),
+            Map.entry("windows-arm64", "37023f8a3451c9234b17ee2089a03dc344ce90d803b5b359cb6c46682b0549b4"),
+            Map.entry("windows-i686", "bf557daeccc5525d95b8a230c339d75554fb52d82d1e050e9a5202c92c02e09e"),
+            Map.entry("macos-x86_64", "89fc28a6e6995259d76ce3f11775220e8a21c760e94df91a6a9db30a69b6982e"),
+            Map.entry("macos-aarch64", "4be1882d1aa36d31c1d6ba0596f2cf8a097e371f8da124212324b2e0f8df7e4b"),
+            Map.entry("linux-x86_64", "61b659eaedba658fa66fe47d17e1426cdd77e5d02fa15fed447bb4357c09dfd6"),
+            Map.entry("linux-aarch64", "f533ec25a7ea714e09f645615012200278058525795cc3bb690ff011aec1a70f"),
+            Map.entry("linux-loongarch64", "40c2cd76c0fe6d4a518181ec70d750fbbba36f1a24b3b4c44d4dfc58cb233cf8"),
+            Map.entry("linux-riscv64", "58393357ff31770a45f922289874ac784f7f7be5cab50002115d29ab5bcaa64d"),
+            Map.entry("linux-armv7", "93b1d2831e45db1fd3ca1d8d68c191b300bd69d331ca1858394a0cf884363cc3"),
+            Map.entry("freebsd-13.2-x86_64", "a34d52a8890c181054d9d8cfb775a2a2c8940a7b606c262e3059e6ecd542c8fb")
+    );
 
     /** 下载镜像前缀池，最后两个是直连兜底。 */
     private static final String[] PREFIXES = {
@@ -47,8 +61,7 @@ public final class EasyTier {
             "tcp://et1.fuis.top:11010"
     };
 
-    private static Process core;
-    private static int rpc = -1;
+    private static volatile Process core;
 
     private EasyTier() {
     }
@@ -72,12 +85,18 @@ public final class EasyTier {
     public static String osTag() {
         if (isWindows()) return "windows";
         if (isMac()) return "macos";
+        if (os().contains("freebsd")) return "freebsd-13.2";
         return "linux";
     }
 
     /** 下载用的架构名，ARM64 在 Windows 叫 arm64。 */
     public static String arch() {
         String a = System.getProperty("os.arch", "").toLowerCase(Locale.ROOT);
+        if (a.contains("loongarch64")) return "loongarch64";
+        if (a.contains("riscv64")) return "riscv64";
+        if (a.contains("mips64")) return "mips64";
+        if (a.contains("mipsel")) return "mipsel";
+        if (a.contains("mips")) return "mips";
         if (a.contains("aarch64") || a.contains("arm64")) {
             // Windows 用 arm64，其他平台用 aarch64。
             return isWindows() ? "arm64" : "aarch64";
@@ -237,7 +256,7 @@ public final class EasyTier {
         if (!force && installed()) {
             String v = Files.isRegularFile(marker) ? Files.readString(marker).trim() : "";
             if (VERSION.equals(v)) {
-                p.update("联机模块已就绪", 0.35);
+                p.update(Lang.t("联机模块已就绪"), 0.35);
                 return;
             }
         }
@@ -249,27 +268,30 @@ public final class EasyTier {
         for (int i = 0; i < urls.size(); i++) {
             String url = urls.get(i);
             try {
-                p.update("正在下载联机模块…", 0.05 + 0.55 * i / urls.size());
+                p.update(Lang.t("正在下载联机模块…"), 0.05 + 0.55 * i / urls.size());
                 download(url, zip, p);
                 ok = true;
                 break;
+            } catch (InterruptedException ie) {
+                Files.deleteIfExists(zip);
+                throw ie;
             } catch (Exception e) {
                 last = e;
             }
         }
         if (!ok) {
             Files.deleteIfExists(zip);
-            throw new Exception("联机模块下载失败："
-                    + (last == null || last.getMessage() == null ? "未知网络错误" : last.getMessage()));
+            throw new Exception(Lang.tf("联机模块下载失败：%s",
+                    last == null || last.getMessage() == null ? "未知网络错误" : last.getMessage()));
         }
 
-        p.update("正在解压联机模块…", 0.7);
+        p.update(Lang.t("正在解压联机模块…"), 0.7);
         extract(zip, dir);
         Files.deleteIfExists(zip);
         Files.writeString(marker, VERSION);
-        if (!installed()) throw new Exception("联机模块解压后缺少必要文件，请重试");
+        if (!installed()) throw new Exception(Lang.t("联机模块解压后缺少必要文件，请重试"));
         markExecutable();
-        p.update("联机模块准备完成", 0.75);
+        p.update(Lang.t("联机模块准备完成"), 0.75);
     }
 
     private static void download(String url, Path target, Progress p) throws Exception {
@@ -277,25 +299,38 @@ public final class EasyTier {
         c.setConnectTimeout(12000);
         c.setReadTimeout(20000);
         c.setInstanceFollowRedirects(true);
-        c.setRequestProperty("User-Agent", "TCraftLauncher-JavaFX/1.3.7");
+        c.setRequestProperty("User-Agent", "TCraftLauncher-JavaFX/" + Build.VERSION);
         int code = c.getResponseCode();
         if (code != 200) throw new Exception("HTTP " + code);
         long total = c.getContentLengthLong();
-        try (InputStream in = c.getInputStream(); OutputStream out = Files.newOutputStream(target)) {
+        String expected = SHA256.getOrDefault(osTag() + "-" + arch(), "");
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        try (InputStream in = c.getInputStream();
+             DigestOutputStream out = new DigestOutputStream(Files.newOutputStream(target), digest)) {
             byte[] buf = new byte[65536];
             long read = 0;
             int n;
             int lastPercent = -1;
             while ((n = in.read(buf)) > 0) {
+                if (Thread.currentThread().isInterrupted()) {
+                    throw new InterruptedException("联机模块下载已取消");
+                }
                 out.write(buf, 0, n);
                 read += n;
                 if (total > 0) {
                     int percent = (int) (read * 100 / total);
                     if (percent != lastPercent) {
                         lastPercent = percent;
-                        p.update("正在下载联机模块… " + percent + "%", 0.05 + 0.65 * percent / 100.0);
+                        p.update(Lang.tf("正在下载联机模块… %d%%", percent), 0.05 + 0.65 * percent / 100.0);
                     }
                 }
+            }
+        }
+        if (!expected.isEmpty()) {
+            String actual = HexFormat.of().formatHex(digest.digest());
+            if (!expected.equalsIgnoreCase(actual)) {
+                Files.deleteIfExists(target);
+                throw new Exception(Lang.t("联机模块校验失败，请更换下载节点后重试"));
             }
         }
     }
@@ -352,45 +387,146 @@ public final class EasyTier {
         }
     }
 
-    /** 启动核心进程，macOS 非 root 时用 osascript 提权。 */
-    public static Process start(String argument) throws Exception {
+    /** 端口能不能同时绑 TCP 和 UDP。 */
+    public static boolean portAvailable(int port) {
+        if (port <= 0 || port > 65535) return false;
+        try (java.net.ServerSocket tcp = new java.net.ServerSocket(port);
+             java.net.DatagramSocket udp = new java.net.DatagramSocket(port)) {
+            return tcp.getLocalPort() == port && udp.getLocalPort() == port;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** 测单个节点地址的握手延迟（毫秒），失败返回 -1。 */
+    public static int measureNode(String address, int timeoutMs) {
+        if (address == null) return -1;
+        String raw = address.trim();
+        if (raw.isEmpty()) return -1;
+        String scheme = "";
+        String rest = raw;
+        int sep = raw.indexOf("://");
+        if (sep > 0) {
+            scheme = raw.substring(0, sep).toLowerCase(Locale.ROOT);
+            rest = raw.substring(sep + 3);
+        }
+        // HTTP(S) 节点带路径，直接测首个响应；其余走 TCP 握手
+        if (scheme.equals("http") || scheme.equals("https")) {
+            HttpURLConnection c = null;
+            try {
+                c = (HttpURLConnection) URI.create(raw).toURL().openConnection();
+                c.setConnectTimeout(timeoutMs);
+                c.setReadTimeout(timeoutMs);
+                c.setInstanceFollowRedirects(false);
+                c.setRequestMethod("HEAD");
+                long t0 = System.nanoTime();
+                int code = c.getResponseCode();
+                return code > 0 ? (int) Math.min(Integer.MAX_VALUE, (System.nanoTime() - t0) / 1_000_000) : -1;
+            } catch (Exception e) {
+                return -1;
+            } finally {
+                if (c != null) c.disconnect();
+            }
+        }
+        int slash = rest.indexOf('/');
+        String hostPort = slash >= 0 ? rest.substring(0, slash) : rest;
+        return tcpPing(hostPort, scheme, timeoutMs);
+    }
+
+    /** 并发测速一组节点，返回按输入顺序排列的地址到延迟映射，失败为 -1。 */
+    public static Map<String, Integer> measureNodes(List<String> addresses, int timeoutMs) {
+        Map<String, Integer> out = new java.util.LinkedHashMap<>();
+        List<String> unique = new ArrayList<>();
+        for (String one : addresses) {
+            if (one == null || one.isBlank()) continue;
+            String trimmed = one.trim();
+            if (!unique.contains(trimmed)) unique.add(trimmed);
+        }
+        if (unique.isEmpty()) return out;
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(
+                Math.min(8, unique.size()), r -> {
+                    Thread t = new Thread(r, "TCL-PeerSpeed");
+                    t.setDaemon(true);
+                    return t;
+                });
+        List<java.util.concurrent.Future<Integer>> futures = new ArrayList<>();
+        for (String one : unique) futures.add(pool.submit(() -> measureNode(one, timeoutMs)));
+        pool.shutdown();
+        for (int i = 0; i < unique.size(); i++) {
+            int ms = -1;
+            try {
+                ms = futures.get(i).get(timeoutMs + 800L, TimeUnit.MILLISECONDS);
+            } catch (Exception ignored) {
+            }
+            out.put(unique.get(i), ms);
+        }
+        pool.shutdownNow();
+        return out;
+    }
+
+    /** TCP 握手计时，UDP 节点也按同端口探测。 */
+    private static int tcpPing(String hostPort, String scheme, int timeoutMs) {
+        String host = hostPort;
+        int port = switch (scheme) {
+            case "http", "ws" -> 80;
+            case "https", "wss" -> 443;
+            default -> 11010;
+        };
+        if (hostPort.startsWith("[")) {
+            int end = hostPort.indexOf(']');
+            if (end < 0) return -1;
+            host = hostPort.substring(1, end);
+            if (end + 2 <= hostPort.length() && hostPort.charAt(end + 1) == ':') {
+                try {
+                    port = Integer.parseInt(hostPort.substring(end + 2));
+                } catch (Exception e) {
+                    return -1;
+                }
+            }
+        } else {
+            int colon = hostPort.lastIndexOf(':');
+            if (colon > 0 && hostPort.indexOf(':') == colon) {
+                host = hostPort.substring(0, colon);
+                try {
+                    port = Integer.parseInt(hostPort.substring(colon + 1));
+                } catch (Exception e) {
+                    return -1;
+                }
+            }
+        }
+        if (host.isEmpty() || port <= 0 || port > 65535) return -1;
+        long t0 = System.nanoTime();
+        try (java.net.Socket s = new java.net.Socket()) {
+            s.connect(new java.net.InetSocketAddress(host, port), timeoutMs);
+            return (int) Math.min(Integer.MAX_VALUE, (System.nanoTime() - t0) / 1_000_000);
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+
+    /** 启动核心进程；无 TUN 模式不需要管理员权限。 */
+    public static synchronized Process start(String argument) throws Exception {
         stop();
         Path exe = corePath();
         if (!Files.isRegularFile(exe)) throw new Exception("联机模块未安装");
         List<String> cmd = new ArrayList<>();
         cmd.add(exe.toString());
         cmd.addAll(splitArgs(argument));
-        ProcessBuilder pb;
-        if (isMac() && !isElevated()) {
-            // macOS 建 utun 要 root，只提权 core 进程，顺便清掉上次残留。
-            String shell = "pkill -f easytier-core; cd " + shellQuote(folder().toString()) + " && "
-                    + cmd.stream().map(EasyTier::shellQuote).collect(java.util.stream.Collectors.joining(" "));
-            pb = new ProcessBuilder("osascript", "-e",
-                    "do shell script " + applescriptString(shell) + " with administrator privileges");
-        } else {
-            pb = new ProcessBuilder(cmd);
-            pb.directory(folder().toFile());
-        }
+        ProcessBuilder pb = new ProcessBuilder(cmd);
+        pb.directory(folder().toFile());
         pb.redirectErrorStream(true);
-        pb.redirectOutput(ProcessBuilder.Redirect.DISCARD);
+        Path log = folder().resolve("easytier.log");
+        try {
+            if (Files.isRegularFile(log) && Files.size(log) > 5L * 1024 * 1024) Files.delete(log);
+        } catch (Exception ignored) {
+        }
+        pb.redirectOutput(ProcessBuilder.Redirect.appendTo(log.toFile()));
         core = pb.start();
         return core;
     }
 
-    /** 双引号包裹单个 token，防止注入和展开。 */
-    private static String shellQuote(String token) {
-        return "\"" + token.replace("\\", "\\\\").replace("\"", "\\\"")
-                .replace("$", "\\$").replace("`", "\\`") + "\"";
-    }
-
-    /** AppleScript 字符串转义，命令里还要再转一层。 */
-    private static String applescriptString(String shellCmd) {
-        return "\"" + shellCmd.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
-    }
-
-    /** 停止核心进程和子进程，root 起的杀不掉。 */
-    public static void stop() {
-        rpc = -1;
+    /** 停止核心进程和子进程。 */
+    public static synchronized void stop() {
         if (core == null) return;
         try {
             core.descendants().forEach(ProcessHandle::destroy);
@@ -401,12 +537,24 @@ public final class EasyTier {
         core = null;
     }
 
-        public static int rpcPort() {
-        return rpc;
+    /** 界面线程用：不阻塞地停掉核心。 */
+    public static void stopAsync() {
+        Thread t = new Thread(EasyTier::stop, "TCL-EasyTierStop");
+        t.setDaemon(true);
+        t.start();
     }
 
-    public static void rpcPort(int port) {
-        rpc = port;
+    /** 联机模块日志最后几行，崩溃时附到错误里。 */
+    public static String logTail(int lines) {
+        try {
+            Path log = folder().resolve("easytier.log");
+            if (!Files.isRegularFile(log)) return "";
+            java.util.List<String> all = Files.readAllLines(log, StandardCharsets.UTF_8);
+            int from = Math.max(0, all.size() - Math.max(1, lines));
+            return String.join("\n", all.subList(from, all.size()));
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     /** 调 CLI，阻塞带超时，返回标准输出。 */
@@ -521,45 +669,19 @@ public final class EasyTier {
         return core != null && !core.isAlive();
     }
 
-    /** 清理上次异常退出留下的核心进程。 */
+    /** 清理上次异常退出留下的本启动器核心进程。 */
     public static void killLeftovers() {
         try {
+            String own = folder().toAbsolutePath().normalize().toString().toLowerCase(Locale.ROOT);
             ProcessHandle.allProcesses()
                     .filter(h -> h.info().command().isPresent())
                     .filter(h -> {
                         String cmd = h.info().command().orElse("").toLowerCase(Locale.ROOT);
-                        return cmd.contains("easytier-core");
+                        return cmd.contains("easytier-core") && cmd.startsWith(own);
                     })
                     .forEach(ProcessHandle::destroy);
         } catch (Exception ignored) {
         }
-    }
-
-    /** 权限结果缓存，避免每次都跑 3 秒外部命令。 */
-    private static volatile Boolean elevatedCache;
-
-    /** 当前进程有没有管理员权限。 */
-    public static boolean isElevated() {
-        Boolean cached = elevatedCache;
-        if (cached != null) return cached;
-        boolean value;
-        if (!isWindows()) {
-            try {
-                value = "0".equals(runCommand("id", "-u").trim());
-            } catch (Exception e) {
-                value = "root".equals(System.getProperty("user.name"));
-            }
-        } else {
-            try {
-                String out = runCommand("net", "session");
-                value = out != null && !out.toLowerCase(Locale.ROOT).contains("拒绝访问")
-                        && !out.toLowerCase(Locale.ROOT).contains("access is denied");
-            } catch (Exception e) {
-                value = false;
-            }
-        }
-        elevatedCache = value;
-        return value;
     }
 
     private static String runCommand(String... cmd) throws Exception {
@@ -572,7 +694,7 @@ public final class EasyTier {
         return out.toString(StandardCharsets.UTF_8);
     }
 
-    /** 官方节点列表 API，邀请码里会带节点 ID。 */
+    /** 官方节点列表 API，Base64 联机码里会带节点 ID。 */
     public static final String NODES_API = "https://uptime.easytier.cn/api/nodes?page=1&per_page=1000";
 
     /** 一个发现或中继节点。 */
@@ -627,7 +749,7 @@ public final class EasyTier {
         c.setConnectTimeout(10000);
         c.setReadTimeout(15000);
         c.setInstanceFollowRedirects(true);
-        c.setRequestProperty("User-Agent", "TCraftLauncher-JavaFX/1.3.7");
+        c.setRequestProperty("User-Agent", "TCraftLauncher-JavaFX/" + Build.VERSION);
         c.setRequestProperty("Accept", "application/json");
         int code = c.getResponseCode();
         if (code != 200) throw new Exception("HTTP " + code);
@@ -677,31 +799,6 @@ public final class EasyTier {
             case "symmetriceasydec" -> 9;
             default -> 10;
         };
-    }
-
-    /** 系统能否建虚拟网卡，不能则返回原因。 */
-    public static String platformBlocker() {
-        // 模块没装时跳过检查。
-        if (!installed()) return null;
-        if (isWindows()) {
-            return Files.isRegularFile(folder().resolve("wintun.dll")) ? null
-                    : "联机模块缺少 wintun.dll，请删除联机模块目录后重试。";
-        }
-        if (isMac()) {
-            // 只确认 osascript 存在，正常 macOS 都有。
-            try {
-                Process p = new ProcessBuilder("sh", "-c", "command -v osascript").start();
-                return p.waitFor(3, TimeUnit.SECONDS) && p.exitValue() == 0 ? null
-                        : "系统缺少 osascript，无法以管理员权限启动联机内核。";
-            } catch (Exception e) {
-                return null;
-            }
-        }
-        if (!Files.isReadable(Paths.get("/dev/net/tun"))) {
-            return "系统没有可用的 /dev/net/tun，联机模块无法创建虚拟网卡。";
-        }
-        return isElevated() ? null : "Linux 创建虚拟网卡需要 root 权限：请用 sudo 启动 TCL，"
-                + "或给 easytier-core 授予 CAP_NET_ADMIN。";
     }
 
     /** 联机模块所在目录，方便打开文件夹。 */

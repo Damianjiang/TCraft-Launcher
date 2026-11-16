@@ -57,7 +57,7 @@ public class PageResourceDetail implements Page {
 
     @Override
     public double leftWidth() {
-        return 160;
+        return Lang.mode == 1 ? 190 : 160;
     }
 
     /** 左栏沿用下载分类侧栏。 */
@@ -187,14 +187,23 @@ public class PageResourceDetail implements Page {
             }
             if (!names.isEmpty()) sb.append(String.join(" / ", names)).append("  ·  ");
         }
-        sb.append(downloadText(info.downloads)).append(" 次下载");
+        sb.append(Lang.tf("%s 次下载", downloadText(info.downloads)));
         return sb.toString();
     }
 
-    /** 下载量文案，亿或万。 */
+    /** 下载量文案，英文用 K/M/B，中文用万/亿。 */
     private static String downloadText(long n) {
-        if (n >= 100_000_000L) return String.format(java.util.Locale.ROOT, "%.2f 亿", n / 100_000_000d);
-        if (n >= 10_000L) return Math.round(n / 10_000d) + " 万";
+        if (Lang.mode == 1) {
+            if (n >= 1_000_000_000L) return String.format(java.util.Locale.ROOT, "%.2fB", n / 1_000_000_000d);
+            if (n >= 1_000_000L) return String.format(java.util.Locale.ROOT, "%.2fM", n / 1_000_000d);
+            if (n >= 1_000L) return String.format(java.util.Locale.ROOT, "%.1fK", n / 1_000d);
+            return String.valueOf(n);
+        }
+        boolean tw = Lang.mode == 2;
+        if (n >= 100_000_000L) {
+            return String.format(java.util.Locale.ROOT, "%.2f %s", n / 100_000_000d, tw ? "億" : "亿");
+        }
+        if (n >= 10_000L) return Math.round(n / 10_000d) + (tw ? " 萬" : " 万");
         return String.valueOf(n);
     }
 
@@ -202,7 +211,7 @@ public class PageResourceDetail implements Page {
     private Node introButtons() {
         HBox row = new HBox(12);
         // 按钮等宽
-        StackPane web = Ui.button("转到 " + (info.isCurseForge() ? "CurseForge" : "Modrinth"),
+        StackPane web = Ui.button(Lang.t("转到 ") + (info.isCurseForge() ? "CurseForge" : "Modrinth"),
                 Ui.BTN_THEME, () -> openUrl(websiteOf()));
         StackPane copy = Ui.button("复制名称", Ui.BTN_NORMAL, this::copyName);
         favButton = Ui.button(favoriteNow() ? "取消收藏" : "收藏", Ui.BTN_NORMAL, this::toggleFavorite);
@@ -270,7 +279,7 @@ public class PageResourceDetail implements Page {
         err.setPadding(new Insets(30, 20, 30, 20));
         err.setMaxWidth(470);
         err.getChildren().add(Theme.icon("triangle-alert", 34, Color.web("#9a6512")));
-        Label msg = Ui.label("获取版本列表失败：" + loadError, 13, Theme.text);
+        Label msg = Ui.label(Lang.t("获取版本列表失败：") + loadError, 13, Theme.text);
         msg.setWrapText(true);
         msg.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
         String suffix = info.isCurseForge()
@@ -850,15 +859,15 @@ public class PageResourceDetail implements Page {
 
     /** 缺前置时的弹窗，可一并下载。 */
     private void askDownloadDeps(List<DepDownload> deps, List<String> unresolved, ResourceVersion file, Path target) {
-        StringBuilder msg = new StringBuilder("该资源需要以下前置，但在目标文件夹中未发现它们：\n");
+        StringBuilder msg = new StringBuilder(Lang.t("该资源需要以下前置，但在目标文件夹中未发现它们：\n"));
         for (int i = 0; i < deps.size(); i++) {
             msg.append(deps.get(i).name);
             if (i < deps.size() - 1) msg.append("、");
         }
         if (!unresolved.isEmpty()) {
-            msg.append("；另有以下前置无法自动解析，需要手动下载：").append(String.join("、", unresolved));
+            msg.append(Lang.tf("；另有以下前置无法自动解析，需要手动下载：%s", String.join("、", unresolved)));
         }
-        msg.append("\n是否一并下载这些前置？");
+        msg.append(Lang.t("\n是否一并下载这些前置？"));
         VBox card = new VBox(12);
         card.setPadding(new Insets(18, 20, 16, 20));
         card.setPrefWidth(430);

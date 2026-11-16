@@ -5,11 +5,8 @@ import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.control.ComboBox;
-import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
-import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
-import javafx.scene.control.TextField;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.stage.DirectoryChooser;
@@ -69,7 +66,9 @@ public class PageInstance implements Page {
             refreshList();
         });
         ComboBox<String> sort = Ui.combo(new String[]{"最近游玩", "名称 A→Z", "版本 新→旧", "安装时间"}, sortMode);
-        sort.setPrefWidth(116);
+        double sortWidth = Lang.mode == 1 ? 175 : 116;
+        sort.setPrefWidth(sortWidth);
+        sort.setMinWidth(sortWidth);
         sort.setPrefHeight(32);
         sort.setOnAction(e -> {
             sortMode = Math.max(0, sort.getSelectionModel().getSelectedIndex());
@@ -215,7 +214,7 @@ public class PageInstance implements Page {
 
     private void deleteCollection(String name) {
         Dialogs.confirm(win, "删除合集",
-                "确定要删除合集「" + name + "」吗？\n只会删掉这个标签，实例本身与其文件不受影响。",
+                Lang.tf("确定要删除合集「%s」吗？\n只会删掉这个标签，实例本身与其文件不受影响。", name),
                 () -> {
                     InstanceMeta.CollectionsStore.delete(name);
                     if (name.equals(collectionFilter)) collectionFilter = "";
@@ -432,7 +431,7 @@ public class PageInstance implements Page {
                 }),
                 Ui.MenuRow.separator(),
                 Ui.MenuRow.of("删除", "trash-2", () -> Dialogs.confirm(win, "删除实例",
-                        "确定要删除实例「" + ins.name + "」吗？\n只会从列表中移除，不会删除磁盘文件。", () -> {
+                        Lang.tf("确定要删除实例「%s」吗？\n只会从列表中移除，不会删除磁盘文件。", ins.name), () -> {
                             data.instances.remove(ins);
                             data.selectedInstance = 0;
                             data.save();
@@ -689,18 +688,18 @@ public class PageInstance implements Page {
     /** 校验新实例名。 */
     private String validateInstanceName(String name, String folder) {
         String trimmed = name == null ? "" : name.trim();
-        if (trimmed.isEmpty()) return "名称不能为空。";
-        if (trimmed.length() > 64) return "名称不能超过 64 个字符。";
+        if (trimmed.isEmpty()) return Lang.t("名称不能为空。");
+        if (trimmed.length() > 64) return Lang.t("名称不能超过 64 个字符。");
         for (char c : "\\/:*?\"<>|".toCharArray()) {
-            if (trimmed.indexOf(c) >= 0) return "名称不能包含字符：" + c;
+            if (trimmed.indexOf(c) >= 0) return Lang.tf("名称不能包含字符：%s", c);
         }
-        if (trimmed.equals(".") || trimmed.equals("..")) return "名称不合法。";
+        if (trimmed.equals(".") || trimmed.equals("..")) return Lang.t("名称不合法。");
         String base = folder != null && !folder.isEmpty() ? folder : data.gameDir;
         if (java.nio.file.Files.exists(java.nio.file.Paths.get(base, "versions", trimmed))) {
-            return "已存在同名实例。";
+            return Lang.t("已存在同名实例。");
         }
         for (Data.Instance other : data.instances) {
-            if (trimmed.equalsIgnoreCase(other.name)) return "已存在同名实例。";
+            if (trimmed.equalsIgnoreCase(other.name)) return Lang.t("已存在同名实例。");
         }
         return "";
     }

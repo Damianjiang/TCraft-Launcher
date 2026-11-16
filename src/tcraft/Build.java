@@ -29,8 +29,4 @@ public final class Build {
 
     private Build() {
     }
-
-    public static boolean hasMicrosoftAuth() {
-        return !MICROSOFT_ID.isEmpty();
-    }
 }

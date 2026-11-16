@@ -9,12 +9,9 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.*;
-import javafx.scene.paint.Color;
-import javafx.scene.shape.Circle;
 import javafx.stage.FileChooser;
 
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
@@ -286,7 +283,7 @@ public class PageAccountManager implements Page {
             return;
         }
         Data.Account a = data.accounts.get(index);
-        Dialogs.confirm(win, "删除账户", "确定要删除账户 " + a.name + " 吗？此操作不可撤销。", () -> {
+        Dialogs.confirm(win, "删除账户", Lang.tf("确定要删除账户 %s 吗？此操作不可撤销。", a.name), () -> {
             int i = data.accounts.indexOf(a);
             if (i < 0) return;
             data.accounts.remove(i);

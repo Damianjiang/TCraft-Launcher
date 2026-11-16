@@ -6,8 +6,9 @@ import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.*;
-import javafx.scene.paint.Color;
 
 import java.util.List;
 import java.util.Map;
@@ -93,8 +94,9 @@ public final class Dialogs {
                              java.util.function.Consumer<String> onOk) {
         VBox card = new VBox(0);
         card.setPadding(new Insets(22, 22, 23, 22));
-        card.setPrefWidth(430);
-        card.setMinWidth(400);
+        boolean en = Lang.mode == 1;
+        card.setPrefWidth(en ? 460 : 430);
+        card.setMinWidth(en ? 440 : 400);
         card.setBackground(Ui.fill(Theme.dialogBg, 7));
         card.setEffect(Theme.shadow(22, 4, 0.32, Theme.text));
         Label t = Ui.semi(title, 23, Theme.accentDark);
@@ -104,22 +106,24 @@ public final class Dialogs {
         TextField field = new TextField(defaultValue == null ? "" : defaultValue);
         field.setFont(Theme.font(13));
         field.setStyle("-fx-background-color: transparent; -fx-padding: 0;");
-        field.setPromptText(hint == null ? "" : hint);
+        field.setPromptText(hint == null ? "" : Lang.t(hint));
         HBox fieldBox = new HBox(field);
         fieldBox.setAlignment(Pos.CENTER_LEFT);
         fieldBox.setPadding(new Insets(8, 10, 8, 10));
         fieldBox.setBackground(Ui.fill(Theme.fieldBg, 3));
         VBox.setMargin(fieldBox, new Insets(13, 0, 17, 0));
+        Runnable submit = () -> {
+            String value = field.getText();
+            win.closeModal();
+            onOk.accept(value == null || value.trim().isEmpty() ? null : value.trim());
+        };
         HBox actions = new HBox(12);
         actions.setAlignment(Pos.CENTER_RIGHT);
         actions.getChildren().addAll(
-                Ui.button("确定", Ui.BTN_HIGHLIGHT, () -> {
-                    String value = field.getText();
-                    win.closeModal();
-                    onOk.accept(value == null || value.trim().isEmpty() ? null : value.trim());
-                }),
+                Ui.button("确定", Ui.BTN_HIGHLIGHT, submit),
                 Ui.button("取消", Ui.BTN_NORMAL, win::closeModal));
         card.getChildren().addAll(t, line, fieldBox, actions);
+        field.setOnAction(e -> submit.run());
         win.showModal(card);
     }
 
@@ -131,8 +135,10 @@ public final class Dialogs {
     public static VBox msgCard(String title) {
         VBox card = new VBox(0);
         card.setPadding(new Insets(22, 22, 18, 22));
-        card.setPrefWidth(410);
-        card.setMinWidth(400);
+        // 英文标题和按钮更长，窄卡片会把文字截成省略号
+        boolean en = Lang.mode == 1;
+        card.setPrefWidth(en ? 480 : 410);
+        card.setMinWidth(en ? 460 : 400);
         card.setBackground(Ui.fill(Theme.dialogBg, 7));
         card.setEffect(Theme.shadow(20, 4, 0.8, Theme.text));
         Label t = Ui.semi(title, 23, Theme.accentDark);
@@ -153,7 +159,7 @@ public final class Dialogs {
                 {"badge-check", "微软账号", "使用微软账号登录，支持正版皮肤与跨设备同步"},
                 {"user", "离线账号", "无需正版账号，输入玩家名即可直接游玩"},
                 {"globe", "LittleSkin / 第三方 Yggdrasil", "使用 LittleSkin 账号登录并加载其皮肤，第三方 Yggdrasil 外置登录"},
-                {"key-round", "统一通行证", "使用服务器码登录第三方服务器（对照 PageLoginNide）"},
+                {"key-round", "统一通行证", "使用服务器码登录第三方服务器"},
         };
         for (int i = 0; i < items.length; i++) {
             final int target = i;
@@ -288,7 +294,7 @@ public final class Dialogs {
         return true;
     }
 
-    /** 微软登录：粘贴回调地址换令牌。 */
+    /** 微软登录：设备码流程，浏览器授权完自动完成。 */
     public static void msLoginCard(MainWindow win) {
         if (!MsAuth.available()) {
             // 开源版没有 client id，只给说明
@@ -309,86 +315,152 @@ public final class Dialogs {
         final Data d = Data.get();
         VBox form = new VBox(10);
         form.setPadding(new Insets(15, 7, 0, 7));
-        form.getChildren().add(Ui.hint("点「打开登录页」在浏览器里登录。登录完浏览器会停在 login.live.com 的一个空白页，"
-                + "把地址栏整条链接复制到下面，点「完成登录」。", 0));
+        double wrapWidth = Lang.mode == 1 ? 430 : 360;
 
-        TextField pasted = Ui.field("粘贴登录后浏览器地址栏的整条链接");
-        pasted.setPrefHeight(32);
-        Label status = Ui.wrap(Ui.label("尚未开始", 12, Theme.gray2), 380);
+        Label hint = Ui.wrap(Ui.label("用浏览器打开微软设备登录页，输入下面的代码完成微软账号登录，"
+                + "授权后启动器会自动继续。", 13, Theme.gray2), wrapWidth);
+        hint.setLineSpacing(3);
 
-        final StackPane[] btnRef = new StackPane[1];
+        Label code = Ui.bold("获取中…", 24, Theme.accentDark);
+        Label copyHint = Ui.label("点击复制代码", 12, Theme.gray2);
+        copyHint.setOpacity(0.7);
+        VBox codeBox = new VBox(2, code, copyHint);
+        codeBox.setAlignment(Pos.CENTER_LEFT);
+        codeBox.setPadding(new Insets(10, 16, 10, 16));
+        codeBox.setBackground(Ui.fill(Theme.fieldBg, 6));
+        codeBox.setBorder(Ui.border(Theme.accentPale2, 6, 1));
+        codeBox.setCursor(javafx.scene.Cursor.HAND);
+
+        Label status = Ui.wrap(Ui.label("正在获取登录代码…", 12, Theme.gray2), wrapWidth);
+        Label error = Ui.wrap(Ui.label("", 12, Theme.red), wrapWidth);
+        error.setVisible(false);
+        error.setManaged(false);
+
+        final String[] verification = {"https://www.microsoft.com/link"};
+        final String[] userCode = {""};
+        codeBox.setOnMouseClicked(e -> {
+            if (userCode[0].isEmpty()) return;
+            ClipboardContent c = new ClipboardContent();
+            c.putString(userCode[0]);
+            Clipboard.getSystemClipboard().setContent(c);
+            win.toast("已复制登录代码", userCode[0], 1);
+        });
 
         StackPane open = Ui.button("打开登录页", Ui.BTN_THEME, () -> {
-            MsAuth.openBrowser(MsAuth.authorizeUrl());
-            status.setText("登录完成后复制地址栏的整条链接，粘到下面。");
-        });
-        StackPane done = Ui.button("完成登录", Ui.BTN_HIGHLIGHT, () -> {
-            String code = MsAuth.parseCode(pasted.getText());
-            if (code.isEmpty() || code.contains("error=")) {
-                status.setText("链接里没有 code。登录可能没走完，重新点「打开登录页」再试。");
-                return;
+            String url = verification[0];
+            // 微软的链接页支持 ?otc= 预填代码，省得手动输入
+            if ("https://www.microsoft.com/link".equals(url) && !userCode[0].isEmpty()) {
+                url += "?otc=" + userCode[0];
             }
-            btnRef[0].setDisable(true);
-            status.setText("正在换取令牌…");
-            completeMsLogin(win, d, code, status, btnRef);
+            MsAuth.openBrowser(url);
         });
-        btnRef[0] = done;
-
+        open.setDisable(true);
+        StackPane retry = Ui.button("重新获取", Ui.BTN_NORMAL, null);
+        retry.setDisable(true);
         HBox actions = new HBox(12);
         actions.setAlignment(Pos.CENTER_RIGHT);
         actions.getChildren().addAll(
-                Ui.button("取消", Ui.BTN_NORMAL, win::closeModal), open, done);
-        form.getChildren().addAll(pasted, status, actions);
+                Ui.button("取消", Ui.BTN_NORMAL, win::closeModal), retry, open);
+
+        form.getChildren().addAll(hint, codeBox, status, error, actions);
         card.getChildren().add(form);
         win.showModal(card);
+
+        final java.util.concurrent.atomic.AtomicBoolean cancelled =
+                new java.util.concurrent.atomic.AtomicBoolean(false);
+        final Thread[] worker = {null};
+        Runnable start = () -> {
+            cancelled.set(false);
+            if (worker[0] != null) worker[0].interrupt();
+            code.setText(Lang.t("获取中…"));
+            status.setText(Lang.t("正在获取登录代码…"));
+            error.setVisible(false);
+            error.setManaged(false);
+            userCode[0] = "";
+            retry.setDisable(true);
+            open.setDisable(true);
+            Thread t = new Thread(() -> {
+                try {
+                    MsAuth.DeviceCode dc = MsAuth.requestDeviceCode();
+                    verification[0] = dc.verificationUri;
+                    userCode[0] = dc.userCode;
+                    javafx.application.Platform.runLater(() -> {
+                        if (cancelled.get()) return;
+                        code.setText(dc.userCode);
+                        open.setDisable(false);
+                        status.setText(Lang.tf("等待浏览器授权，每 %d 秒自动检查一次…", dc.interval));
+                    });
+                    MsAuth.Result r = MsAuth.login(dc, cancelled::get, text ->
+                            javafx.application.Platform.runLater(() -> {
+                                if (!cancelled.get()) status.setText(Lang.t(text));
+                            }));
+                    String skin = MsAuth.saveSkin(r);
+                    javafx.application.Platform.runLater(() -> {
+                        if (!cancelled.get()) applyMsAccount(win, d, r, skin);
+                    });
+                } catch (MsAuth.CancelledException ignored) {
+                    // 窗口已经关掉
+                } catch (Exception ex) {
+                    if (cancelled.get()) return;
+                    javafx.application.Platform.runLater(() -> {
+                        status.setText(Lang.t("登录失败"));
+                        code.setText(Lang.t("获取失败"));
+                        String msg = ex.getMessage() == null ? "未知错误" : ex.getMessage();
+                        error.setText(Lang.t(msg));
+                        error.setVisible(true);
+                        error.setManaged(true);
+                        retry.setDisable(false);
+                        open.setDisable(true);
+                    });
+                    d.log("微软登录失败：" + ex.getMessage());
+                }
+            }, "TCL-MSA");
+            t.setDaemon(true);
+            worker[0] = t;
+            t.start();
+        };
+        retry.setOnMouseClicked(e -> start.run());
+        win.setModalCloseHook(() -> {
+            cancelled.set(true);
+            if (worker[0] != null) worker[0].interrupt();
+        });
+        start.run();
     }
 
-    /** 微软登录后半段：换令牌、写账户、刷新界面。 */
-    private static void completeMsLogin(MainWindow win, Data d, String code,
-                                        Label status, StackPane[] btnRef) {
-        Thread worker = new Thread(() -> {
-            try {
-                MsAuth.Result r = MsAuth.loginWithCode(code);
-                String skin = MsAuth.saveSkin(r, d.gameDir);
-                javafx.application.Platform.runLater(() -> {
-                    String name = r.name.isEmpty() ? "Player" : r.name;
-                    Data.Account target = null;
-                    for (Data.Account a : d.accounts) {
-                        if (a.name.equalsIgnoreCase(name)) {
-                            target = a;
-                            break;
-                        }
-                    }
-                    if (target == null) {
-                        target = new Data.Account(name, r.uuid,
-                                skin.isEmpty() ? "Steve.png" : skin, true);
-                        d.accounts.add(target);
-                    }
-                    target.uuid = r.uuid.isEmpty() ? target.uuid : r.uuid;
-                    target.accessToken = r.accessToken;
-                    target.refreshToken = r.refreshToken;
-                    target.expiresAt = r.expiresAt;
-                    target.userType = "msa";
-                    target.online = true;
-                    if (!skin.isEmpty()) target.skin = skin;
-                    d.selectedAccount = d.accounts.indexOf(target);
-                    d.save();
-                    win.refreshAccountBadge();
-                    win.closeModal();
-                    // 正版登录不解锁主题
-                    win.openPage(win.currentKey, false);
-                    win.toast("登录成功", name, 1);
-                });
-            } catch (Exception e) {
-                javafx.application.Platform.runLater(() -> {
-                    status.setText(e.getMessage() == null ? "登录失败" : e.getMessage());
-                    btnRef[0].setDisable(false);
-                });
-                Errors.error("微软账号登录失败", e);
+    /** 登录成功后写入账户并刷新界面。 */
+    private static void applyMsAccount(MainWindow win, Data d, MsAuth.Result r, String skin) {
+        String name = r.name.isEmpty() ? "Player" : r.name;
+        String key = normUuid(r.uuid);
+        Data.Account target = null;
+        for (Data.Account a : d.accounts) {
+            if ((!key.isEmpty() && key.equals(normUuid(a.uuid))) || a.name.equalsIgnoreCase(name)) {
+                target = a;
+                break;
             }
-        }, "TCL-MSA");
-        worker.setDaemon(true);
-        worker.start();
+        }
+        if (target == null) {
+            target = new Data.Account(name, r.uuid, skin.isEmpty() ? "Steve.png" : skin, true);
+            d.accounts.add(target);
+        }
+        target.name = name;
+        if (!r.uuid.isEmpty()) target.uuid = r.uuid;
+        target.accessToken = r.accessToken;
+        if (!r.refreshToken.isEmpty()) target.refreshToken = r.refreshToken;
+        target.expiresAt = r.expiresAt;
+        target.userType = "msa";
+        target.online = true;
+        if (!skin.isEmpty()) target.skin = skin;
+        d.selectedAccount = d.accounts.indexOf(target);
+        d.save();
+        win.refreshAccountBadge();
+        win.closeModal();
+        // 正版登录不解锁主题
+        win.openPage(win.currentKey, false);
+        win.toast("登录成功", name, 1);
+    }
+
+    private static String normUuid(String uuid) {
+        return uuid == null ? "" : uuid.replace("-", "").toLowerCase(java.util.Locale.ROOT);
     }
 
     /** 第三方 Yggdrasil 登录。 */
@@ -474,6 +546,14 @@ public final class Dialogs {
             worker.start();
         });
         lRef[0] = login;
+        Runnable submit = () -> {
+            if (login.isDisabled()) return;
+            var h = login.getOnMouseClicked();
+            if (h != null) h.handle(null);
+        };
+        server.setOnAction(e -> submit.run());
+        email.setOnAction(e -> submit.run());
+        password.setOnAction(e -> submit.run());
         HBox actions = new HBox();
         actions.setAlignment(Pos.CENTER_RIGHT);
         actions.getChildren().add(login);
@@ -656,7 +736,7 @@ public final class Dialogs {
     /** 皮肤弹窗：选来源先预览，点确定才写入 account.skin。 */
     public static void skinPicker(MainWindow win, Data.Account account) {
         boolean readonly = account.online;
-        VBox card = msgCard((readonly ? "查看皮肤" : "编辑皮肤") + " - " + account.name);
+        VBox card = msgCard(Lang.t(readonly ? "查看皮肤" : "编辑皮肤") + " - " + account.name);
         card.setPrefWidth(580);
         card.setMinWidth(580);
         VBox body = new VBox(10);

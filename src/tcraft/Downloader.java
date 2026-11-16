@@ -665,7 +665,8 @@ public final class Downloader {
         }
     }
 
-    /** 等安装器退出：实时把日志最后一行显示在任务里，取消能真正杀掉进程。 */    private static void runInstaller(Tasks.Task task, Process process, Path logFile, String loader) throws Exception {
+    /** 跟踪安装器进程：日志最后一行写进任务，取消时杀掉进程。 */
+    private static void runInstaller(Tasks.Task task, Process process, Path logFile, String loader) throws Exception {
         long start = System.currentTimeMillis();
         long lastChange = start;
         String lastLine = "";

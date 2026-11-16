@@ -482,7 +482,7 @@ public final class Theme {
 
     private static synchronized URL regenerateCss() {
         try {
-            // style.css 里这几个蓝色标记换成当前色板，走 CSS 的控件（弹层、菜单、勾选框等）就跟主题走
+            // 把 CSS 里的蓝色占位符换成当前主题色
             String css = resText("style.css");
             if (css.isEmpty()) return cssUrl;
             css = css.replace("#4890f5", hex(accentLight))

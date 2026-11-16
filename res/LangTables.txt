@@ -14,12 +14,12 @@
 设置\n分启动、联机、Java、个性化、系统几类，覆盖下载目录、内存分配、代理、界面主题与语言。界面语言支持简体中文、English、繁體中文、文言文，也可以自动跟随系统语言。	Settings\nOrganized into Launch, Multiplayer, Java, Personalization and System, covering download folder, memory allocation, proxy, UI theme and language. The UI language supports Simplified Chinese, English, Traditional Chinese and Classical Chinese, or auto-follows the system language.	設定\n分啟動、聯機、Java、個性化、系統幾類，涵蓋下載目錄、記憶體分配、代理、介面主題與語言。介面語言支援簡體中文、English、繁體中文、文言文，也可以自動跟隨系統語言。	
 确认网络通畅，并且用的是国际区账号。国内区账号请改用登录页里的「国内区」方式。	Confirm the network is stable and that you're using an international account. For a China-region account, use the Unified Pass option on the login page instead.	確認網路通暢，並且用的是國際區帳號。國內區帳號請改用登入頁裡的「國內區」方式。	
 上面这些都没解决的话，可以进 TCL 官方 QQ 群求助：\n\n  群号：1131373915\n\n入群后请说明你的系统（Windows 版本、Java 版本、Minecraft 版本）以及具体遇到了什么问题。	If none of the above helped, join the official TCL QQ group for help:\n\n  Group: 1131373915\n\nAfter joining, state your system (Windows version, Java version, Minecraft version) and exactly what went wrong.	上面這些都沒解決的話，可以進 TCL 官方 QQ 群求助：\n\n  群号：1131373915\n\n入群後請說明你的系統（Windows 版本、Java 版本、Minecraft 版本）以及具體遇到了什麼問題。	
-TCL 由 TCraft 团队开发与维护，持续更新。\n提供游戏与模组、整合包、资源包、光影的下载与管理，支持原版、Forge / NeoForge / Fabric / OptiFine / LiteLoader。\n同时提供登录、启动、联机、实例与整合包导出等完整能力。\n加入 TCraft Launcher 启动器交流群（群号 1131373915）：https://qm.qq.com/q/WaG64YE9uo，获取更新、反馈问题。	TCL is developed and maintained by the TCraft team, with ongoing updates.\nProvides download and management for games, mods, modpacks, resource packs and shaders. Supports vanilla, Forge / NeoForge / Fabric / OptiFine / LiteLoader.\nAlso offers login, launching, multiplayer, instances and modpack export.\nJoin TCraft Launcher group (QQ 1131373915): https://qm.qq.com/q/WaG64YE9uo for updates and bug reports.	TCL 由 TCraft 團隊開發與維護，持續更新。\n提供遊戲與模組、整合包、資源包、光影的下載與管理，支援原版、Forge / NeoForge / Fabric / OptiFine / LiteLoader。\n同時提供登入、啟動、聯機、執行個體與整合包匯出等完整能力。\n加入 TCraft Launcher 启动器交流群（群号 1131373915）：https://qm.qq.com/q/WaG64YE9uo，獲取更新、回饋問題。	
+TCL 由 TCraft 团队开发与维护，持续更新。\n提供游戏与模组、整合包、资源包、光影的下载与管理，支持原版、Forge / NeoForge / Fabric / OptiFine / LiteLoader。\n同时提供登录、启动、联机、实例与整合包导出等完整能力。\n加入 TCraft Launcher 启动器交流群（群号 1131373915）：https://qm.qq.com/q/UONlv4VgwE，获取更新、反馈问题。	TCL is developed and maintained by the TCraft team, with ongoing updates.\nProvides download and management for games, mods, modpacks, resource packs and shaders. Supports vanilla, Forge / NeoForge / Fabric / OptiFine / LiteLoader.\nAlso offers login, launching, multiplayer, instances and modpack export.\nJoin TCraft Launcher group (QQ 1131373915): https://qm.qq.com/q/UONlv4VgwE for updates and bug reports.	TCL 由 TCraft 團隊開發與維護，持續更新。\n提供遊戲與模組、整合包、資源包、光影的下載與管理，支援原版、Forge / NeoForge / Fabric / OptiFine / LiteLoader。\n同時提供登入、啟動、聯機、執行個體與整合包匯出等完整能力。\n加入 TCraft Launcher 启动器交流群（群号 1131373915）：https://qm.qq.com/q/UONlv4VgwE，獲取更新、回饋問題。	
 独立开发声明	Independent Development	獨立開發聲明	
 关于 TCL	About TCL	關於 TCL	
 TCL 由 TCraft 团队开发与维护，持续更新。	TCL is developed and maintained by the TCraft team, with ongoing updates.	TCL 由 TCraft 團隊開發與維護，持續更新。	
 提供游戏与模组、整合包、资源包、光影的下载与管理，支持原版、Forge / NeoForge / Fabric / OptiFine / LiteLoader，并优化了启动性能。	Provides download and management for games, mods, modpacks, resource packs and shaders. Supports vanilla, Forge / NeoForge / Fabric / OptiFine / LiteLoader, with an optimized launch experience.	提供遊戲與模組、整合包、資源包、光影的下載與管理，支援原版、Forge / NeoForge / Fabric / OptiFine / LiteLoader，並優化了啟動效能。	
-新版本在群内发布。加入 TCraft Launcher 启动器交流群（群号 1131373915） 获取更新、反馈问题。	New versions are shared in the group. Join TCraft Launcher group (QQ 1131373915): https://qm.qq.com/q/WaG64YE9uo for updates and bug reports.	新版本在群內發布。加入 TCraft Launcher 启动器交流群（群号 1131373915）：https://qm.qq.com/q/WaG64YE9uo 獲取更新、回饋問題。	
+新版本在群内发布。加入 TCraft Launcher 启动器交流群（群号 1131373915） 获取更新、反馈问题。	New versions are shared in the group. Join TCraft Launcher group (QQ 1131373915): https://qm.qq.com/q/UONlv4VgwE for updates and bug reports.	新版本在群內發布。加入 TCraft Launcher 启动器交流群（群号 1131373915）：https://qm.qq.com/q/UONlv4VgwE 獲取更新、回饋問題。	
 下载节点	Download Node	下載節點	
 连接选项	Connection Options	連線選項	
 下载方式	Download Mode	下載方式	
@@ -1411,7 +1411,7 @@ TCL 和新版 Minecraft 均不再支持 32 位系统，请重装为 64 位系统
 存档文件夹不存在！	The save folder does not exist!	存檔資料夾不存在！	
 懒人包已安装为独立 Minecraft 文件夹，版本列表中已出现该版本。	The standalone pack was installed as an independent Minecraft folder; the version now appears in the version list.	懶人包已安裝為獨立 Minecraft 資料夾，版本清單中已出現該版本。	
 由于音频设备变更，音乐播放功能在重启 TCL 后才能恢复！	Music playback will only be restored after restarting TCL due to an audio device change!	由於音訊裝置變更，音樂播放功能在重啟 TCL 後才能恢復！	
-帮助中心：加入 TCraft Launcher 启动器交流群（群号 1131373915）：https://qm.qq.com/q/WaG64YE9uo，可获取使用帮助、更新公告与问题反馈。	Help Center: join TCraft Launcher group (QQ 1131373915): https://qm.qq.com/q/WaG64YE9uo for usage help, update news and issue feedback.	幫助中心：加入 TCraft Launcher 启动器交流群（群号 1131373915）：https://qm.qq.com/q/WaG64YE9uo，可取得使用幫助、更新公告與問題回饋。	
+帮助中心：加入 TCraft Launcher 启动器交流群（群号 1131373915）：https://qm.qq.com/q/UONlv4VgwE，可获取使用帮助、更新公告与问题反馈。	Help Center: join TCraft Launcher group (QQ 1131373915): https://qm.qq.com/q/UONlv4VgwE for usage help, update news and issue feedback.	幫助中心：加入 TCraft Launcher 启动器交流群（群号 1131373915）：https://qm.qq.com/q/UONlv4VgwE，可取得使用幫助、更新公告與問題回饋。	
 复制截图失败！	Failed to copy the screenshot!	複製截圖失敗！	
 正在加载主页……	Loading the homepage…	正在載入主頁……	
 放弃吧！只需要点一下右下角的小白旗……	Give it up! Just tap that little white flag in the corner…	放棄吧！只需要點一下右下角的小白旗……	
@@ -1456,7 +1456,7 @@ TCL 无法访问缓存文件夹，可能导致程序出错或无法正常使用�
 你确定要关闭联机房间吗？	Are you sure you want to close the multiplayer room? 	你確定要關閉聯機房間嗎？	
 你尚未开启版本隔离，多个 MC 版本会共用同一个 Mod 文件夹。	You haven't enabled version isolation; multiple MC versions will share the same Mod folder. 	你尚未開啟版本隔離，多個 MC 版本會共用同一個 Mod 資料夾。	
 请根据打开的网页的说明，修改账号的出生日期（至少改为 18 岁以上）。	Follow the instructions on the opened web page to change the account's birth date (at least to 18+). 	請根據開啟網頁的說明，修改帳號的出生日期（至少改為 18 歲以上）。	
-请加入 TCraft Launcher 启动器交流群（群号 1131373915）：https://qm.qq.com/q/WaG64YE9uo 提交问题。	Join TCraft Launcher group (QQ 1131373915): https://qm.qq.com/q/WaG64YE9uo to report the issue. 	請加入 TCraft Launcher 启动器交流群（群号 1131373915）：https://qm.qq.com/q/WaG64YE9uo 提交問題。	
+请加入 TCraft Launcher 启动器交流群（群号 1131373915）：https://qm.qq.com/q/UONlv4VgwE 提交问题。	Join TCraft Launcher group (QQ 1131373915): https://qm.qq.com/q/UONlv4VgwE to report the issue. 	請加入 TCraft Launcher 启动器交流群（群号 1131373915）：https://qm.qq.com/q/UONlv4VgwE 提交問題。	
 请将 TCL 从压缩包中解压后再使用！	Please extract TCL from the archive before using it! 	請將 TCL 從壓縮包中解壓後再使用！	
 请在打开的网页中修改账号的出生日期（至少改为 18 岁以上）。	Change the account's birth date on the opened web page (at least to 18+). 	請在開啟的網頁中修改帳號的出生日期（至少改為 18 歲以上）。	
 请注意：	Note: 	請注意：	
@@ -1963,7 +1963,7 @@ Authlib-Injector 账户	Authlib-Injector Account	Authlib-Injector 帳戶
 已切换启动账户。	Launch account switched.	已切換啟動帳戶。	
 当前账户	Current account	目前帳戶	
 微软账户	Microsoft Account	微軟帳戶	
-未登录	Not logged in	未登入	
+未登录	Guest	訪客
 添加一个 Authlib-Injector（外置登录）账户	Add an authlib-injector (external login) account	新增一個 Authlib-Injector（外置登入）帳戶	
 添加一个微软正版账户	Add a Microsoft account	新增一個微軟正版帳戶	
 添加一个离线游戏账户	Add an offline game account	新增一個離線遊戲帳戶	
@@ -2082,7 +2082,7 @@ Java 8 (1.8.0_171)，64 位：C:\\Program Files (x86)\\Common Files\\Oracle\\Jav
 保存失败：	Save failed: 	儲存失敗：	
 NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.\n非 MINECRAFT 官方产品。未经 MOJANG 或 MICROSOFT 批准，也不与 MOJANG 或 MICROSOFT 关联。	NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.\nThis launcher is not an official Minecraft product. It is not approved by or associated with Mojang or Microsoft.	NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.\n非 MINECRAFT 官方產品。未經 MOJANG 或 MICROSOFT 批准，也不與 MOJANG 或 MICROSOFT 關聯。	
 Minecraft、Minecraft 徽标及相关名称、品牌、图像与音效的著作权和商标权，均归 Mojang Synergies AB 与 Microsoft 所有，本启动器不主张任何权利，也不将 Minecraft 名称用作自身的主标题或标识。\n\nTCraft Launcher（简称 TCL）由 TCraft 团队独立开发与维护，与 Mojang Studios、Microsoft、网易（Minecraft 中国代理）均无隶属、赞助、授权、合作或背书关系，也未获其审查或认可。\n\n本启动器不包含、不分发 Minecraft 游戏本体或任何游戏文件，不提供破解、盗版、绕过正版验证或规避付费的功能；游戏本体与更新始终来自官方渠道。TCL 不运营也不代理任何 Minecraft 服务器，联机功能只负责把你已连接的设备互相连通。\n\n使用本启动器即表示：你已通过官方渠道购买 Minecraft: Java Edition 并持有有效账户，已阅读并同意《Minecraft 最终用户许可协议》（EULA）与《Minecraft 使用准则》；未成年人须取得监护人同意。使用本软件的风险由你自行承担。\n\n本启动器完全免费，不出售、不租赁、不设付费解锁，也不将 Minecraft 品牌用于商业推广。任何以 TCL 名义收费的行为均与本团队无关，也不能作为获得 Minecraft 的途径。	Minecraft, the Minecraft logo and all related names, brands, images and sounds are the copyright and trademark property of Mojang Synergies AB and Microsoft. This launcher claims no rights to them and does not use the Minecraft name as its own primary title or identifier.\n\nTCraft Launcher (TCL) is independently developed and maintained by the TCraft team. It is not affiliated with, sponsored, authorised by, partnered with or endorsed by Mojang Studios, Microsoft, or NetEase (the Minecraft China publisher), and has not been reviewed or approved by them.\n\nThis launcher does not contain or distribute the Minecraft game or any of its game files, and provides no cracking, piracy, authentication-bypass or paywall-evasion features; the game and its updates always come from official channels. TCL does not operate or proxy any Minecraft server; the online-play feature only connects devices you already control.\n\nBy using this launcher you confirm that you have purchased Minecraft: Java Edition through official channels and hold a valid account, that you have read and agree to the Minecraft End User License Agreement (EULA) and the Minecraft Usage Guidelines, and that you are of legal age or have your guardian's consent. You use this software at your own risk.\n\nThis launcher is completely free. It is not sold, rented or paywalled, and does not use the Minecraft brand for commercial promotion. Any charge made in the name of TCL is unrelated to this team and does not grant access to Minecraft.	Minecraft、Minecraft 徽標及相關名稱、品牌、圖像與音效的著作權和商標權，均歸 Mojang Synergies AB 與 Microsoft 所有，本啓動器不主張任何權利，也不將 Minecraft 名稱用作自身的主標題或標識。\n\nTCraft Launcher（簡稱 TCL）由 TCraft 團隊獨立開發與維護，與 Mojang Studios、Microsoft、網易（Minecraft 中國代理）均無隸屬、贊助、授權、合作或背書關係，也未獲其審查或認可。\n\n本啓動器不包含、不分發 Minecraft 遊戲本體或任何遊戲文件，不提供破解、盜版、繞過正版驗證或規避付費的功能；遊戲本體與更新始終來自官方渠道。TCL 不運營也不代理任何 Minecraft 服務器，聯機功能只負責把你已連接的設備互相連通。\n\n使用本啓動器即表示：你已通過官方渠道購買 Minecraft: Java Edition 並持有有效賬戶，已閱讀並同意《Minecraft 最終用戶許可協議》（EULA）與《Minecraft 使用準則》；未成年人須取得監護人同意。使用本軟件的風險由你自行承擔。\n\n本啓動器完全免費，不出售、不租賃、不設付費解鎖，也不將 Minecraft 品牌用於商業推廣。任何以 TCL 名義收費的行爲均與本團隊無關，也不能作爲獲得 Minecraft 的途徑。	
-开发者、发布者与责任方均为 TCraft 团队。本软件按「现状」提供，不对使用或无法使用本软件造成的直接、间接损失承担责任；对存档、配置等文件的操作请自行备份。\n\n侵权投诉、合规问题与功能反馈：TCraft Launcher 启动器交流群（群号 1131373915）：https://qm.qq.com/q/WaG64YE9uo（本项目唯一对外渠道）。涉及 Minecraft 品牌的投诉，也可通过 https://help.minecraft.net/ 联系 Mojang。\n\nMinecraft EULA：https://www.minecraft.net/eula\nMinecraft 使用准则：https://www.minecraft.net/usage-guidelines\n本启动器使用了 Lucide 图标库（ISC 协议）等开源组件，相关权利归各自作者所有。	The developer, publisher and responsible party is the TCraft team. This software is provided as is, without liability for any direct or indirect loss arising from its use or from the inability to use it; back up your saves and configuration files before operating on them.\n\nCopyright complaints, compliance questions and feedback: TCraft Launcher group (QQ 1131373915): https://qm.qq.com/q/WaG64YE9uo (the project's only official channel). Complaints concerning the Minecraft brand may also be sent to Mojang via https://help.minecraft.net/.\n\nMinecraft EULA: https://www.minecraft.net/eula\nMinecraft Usage Guidelines: https://www.minecraft.net/usage-guidelines\nThis launcher uses open-source components such as the Lucide icon set (ISC licence); all rights remain with their respective authors.	開發者、發佈者與責任方均爲 TCraft 團隊。本軟件按「現狀」提供，不對使用或無法使用本軟件造成的直接、間接損失承擔責任；對存檔、配置等文件的操作請自行備份。\n\n侵權投訴、合規問題與功能反饋：TCraft Launcher 啟動器交流群（群號 1131373915）（本項目唯一對外渠道）。涉及 Minecraft 品牌的投訴，也可通過 https://help.minecraft.net/ 聯繫 Mojang。\n\nMinecraft EULA：https://www.minecraft.net/eula\nMinecraft 使用準則：https://www.minecraft.net/usage-guidelines\n本啓動器使用了 Lucide 圖標庫（ISC 協議）等開源組件，相關權利歸各自作者所有。	
+开发者、发布者与责任方均为 TCraft 团队。本软件按「现状」提供，不对使用或无法使用本软件造成的直接、间接损失承担责任；对存档、配置等文件的操作请自行备份。\n\n侵权投诉、合规问题与功能反馈：TCraft Launcher 启动器交流群（群号 1131373915）：https://qm.qq.com/q/UONlv4VgwE（本项目唯一对外渠道）。涉及 Minecraft 品牌的投诉，也可通过 https://help.minecraft.net/ 联系 Mojang。\n\nMinecraft EULA：https://www.minecraft.net/eula\nMinecraft 使用准则：https://www.minecraft.net/usage-guidelines\n本启动器使用了 Lucide 图标库（ISC 协议）等开源组件，相关权利归各自作者所有。	The developer, publisher and responsible party is the TCraft team. This software is provided as is, without liability for any direct or indirect loss arising from its use or from the inability to use it; back up your saves and configuration files before operating on them.\n\nCopyright complaints, compliance questions and feedback: TCraft Launcher group (QQ 1131373915): https://qm.qq.com/q/UONlv4VgwE (the project's only official channel). Complaints concerning the Minecraft brand may also be sent to Mojang via https://help.minecraft.net/.\n\nMinecraft EULA: https://www.minecraft.net/eula\nMinecraft Usage Guidelines: https://www.minecraft.net/usage-guidelines\nThis launcher uses open-source components such as the Lucide icon set (ISC licence); all rights remain with their respective authors.	開發者、發佈者與責任方均爲 TCraft 團隊。本軟件按「現狀」提供，不對使用或無法使用本軟件造成的直接、間接損失承擔責任；對存檔、配置等文件的操作請自行備份。\n\n侵權投訴、合規問題與功能反饋：TCraft Launcher 啟動器交流群（群號 1131373915）（本項目唯一對外渠道）。涉及 Minecraft 品牌的投訴，也可通過 https://help.minecraft.net/ 聯繫 Mojang。\n\nMinecraft EULA：https://www.minecraft.net/eula\nMinecraft 使用準則：https://www.minecraft.net/usage-guidelines\n本啓動器使用了 Lucide 圖標庫（ISC 協議）等開源組件，相關權利歸各自作者所有。	
 Minecraft 是 Mojang Synergies AB 的商标。\n本启动器（TCraft Launcher）由社区独立开发，与 Mojang、Minecraft 官方、Microsoft 以及网易（Minecraft 中国）均没有任何隶属或合作关系。\n本启动器不分发 Minecraft 游戏本体，也不提供盗版下载；使用本启动器即表示你已购买 Minecraft 或持有正版访问资格，并同意遵守 Minecraft 最终用户许可协议（EULA）。	Minecraft is a trademark of Mojang Synergies AB.\nThis launcher (TCraft Launcher) is independently developed by the community and is not affiliated with Mojang, Minecraft, Microsoft, or NetEase (Minecraft China) in any way.\nIt does not distribute the Minecraft game or enable piracy; by using it you confirm that you own a legitimate copy of Minecraft and agree to the Minecraft EULA.	Minecraft 是 Mojang Synergies AB 的商標。\n本啓動器（TCraft Launcher）由社區獨立開發，與 Mojang、Minecraft 官方、Microsoft 以及網易（Minecraft 中國）均沒有任何隸屬或合作關係。\n本啓動器不分發 Minecraft 遊戲本體，也不提供盜版下載；使用本啓動器即表示你已購買 Minecraft 或持有正版訪問資格，並同意遵守 Minecraft 最終用戶許可協議（EULA）。	
 Yggdrasil 认证服务器完整地址；可把 LittleSkin「外置登录」按钮拖进本行自动填入	Full Yggdrasil auth server URL; drag the LittleSkin "external login" button onto this field to fill it in	Yggdrasil 認證服務器完整地址；可把 LittleSkin「外置登錄」按鈕拖進本行自動填入	
 使用 LittleSkin 账号登录并加载其皮肤，第三方 Yggdrasil 外置登录	Signs in with a LittleSkin account and loads its skin — third-party Yggdrasil external login	使用 LittleSkin 賬號登錄並加載其皮膚，第三方 Yggdrasil 外置登錄	
@@ -2148,7 +2148,7 @@ ZGC / 分代 ZGC 内存占用更高但回收时不卡顿；G1GC 占用更低但�
 输入信息	Enter information	輸入信息	
 请填写皮肤来源所需信息	Fill in the information required by the skin source	請填寫皮膚來源所需信息	
 皮肤预览	Skin preview	皮膚預覽	
-搜索实例	Search instances	搜索實例	
+搜索实例	Search	搜尋實例	
 最近游玩	Recently played	最近遊玩	
 名称 A→Z	Name A→Z	名稱 A→Z	
 版本 新→旧	Version new→old	版本 新→舊	
@@ -2204,7 +2204,7 @@ ZGC / 分代 ZGC 内存占用更高但回收时不卡顿；G1GC 占用更低但�
 这里是当前正版账户的皮肤预览。修改后会自动刷新头像与标题栏徽章。	Preview of the current premium account's skin. Changes refresh the avatar and title-bar badge automatically.	這裏是當前正版賬戶的皮膚預覽。修改後會自動刷新頭像與標題欄徽章。	
 兑换 CDKEY	Redeem CDKEY	兌換 CDKEY	
 官网管理	Manage on website	官網管理	
-TCraft Launcher 1.2 由 TCraft 团队开发与维护，持续更新，并已在 GitHub 开源。\n提供游戏与模组、整合包、资源包、光影的下载与管理，支持原版、Forge / NeoForge / Fabric / OptiFine / LiteLoader。\n同时提供登录、启动、联机、实例与整合包导出等完整能力。\n加入 TCraft Launcher 启动器交流群（群号 1131373915）：https://qm.qq.com/q/WaG64YE9uo，获取更新、反馈问题。	TCraft Launcher 1.2 is developed and maintained by the TCraft team, updated regularly and open-sourced on GitHub.\nIt downloads and manages games, mods, modpacks, resource packs and shaders, supporting vanilla, Forge / NeoForge / Fabric / OptiFine / LiteLoader.\nLogin, launching, multiplayer, instance and modpack export are all on board.\nJoin TCraft Launcher group (QQ 1131373915): https://qm.qq.com/q/WaG64YE9uo for updates and feedback.	TCraft Launcher 1.2 由 TCraft 團隊開發與維護，持續更新，並已在 GitHub 開源。\n提供遊戲與模組、整合包、資源包、光影的下載與管理，支持原版、Forge / NeoForge / Fabric / OptiFine / LiteLoader。\n同時提供登錄、啓動、聯機、實例與整合包導出等完整能力。\n加入 TCraft Launcher 啟動器交流群（群號 1131373915），獲取更新、反饋問題。	
+TCraft Launcher 1.2 由 TCraft 团队开发与维护，持续更新，并已在 GitHub 开源。\n提供游戏与模组、整合包、资源包、光影的下载与管理，支持原版、Forge / NeoForge / Fabric / OptiFine / LiteLoader。\n同时提供登录、启动、联机、实例与整合包导出等完整能力。\n加入 TCraft Launcher 启动器交流群（群号 1131373915）：https://qm.qq.com/q/UONlv4VgwE，获取更新、反馈问题。	TCraft Launcher 1.2 is developed and maintained by the TCraft team, updated regularly and open-sourced on GitHub.\nIt downloads and manages games, mods, modpacks, resource packs and shaders, supporting vanilla, Forge / NeoForge / Fabric / OptiFine / LiteLoader.\nLogin, launching, multiplayer, instance and modpack export are all on board.\nJoin TCraft Launcher group (QQ 1131373915): https://qm.qq.com/q/UONlv4VgwE for updates and feedback.	TCraft Launcher 1.2 由 TCraft 團隊開發與維護，持續更新，並已在 GitHub 開源。\n提供遊戲與模組、整合包、資源包、光影的下載與管理，支持原版、Forge / NeoForge / Fabric / OptiFine / LiteLoader。\n同時提供登錄、啓動、聯機、實例與整合包導出等完整能力。\n加入 TCraft Launcher 啟動器交流群（群號 1131373915），獲取更新、反饋問題。	
 参考与致谢	Credits & acknowledgements	參考與致謝	
 开源地址	Source code	開源地址	
 https://github.com/Damianjiang/TCraft-Launcher\n欢迎提交 Issue 与 Pull Request，也欢迎 Star 支持。	https://github.com/Damianjiang/TCraft-Launcher\nIssues and pull requests are welcome — stars help too.	https://github.com/Damianjiang/TCraft-Launcher\n歡迎提交 Issue 與 Pull Request，也歡迎 Star 支持。	
@@ -2778,7 +2778,7 @@ options.txt 存在，但没有包含可编辑的常用选项。可以在游戏�
 1. 在实例列表点选你要玩的版本。&#10;2. 按需调内存：在启动页或「设置 → 启动」里设置 -Xmx（分配给游戏的最大内存）。一般 8G 内存机器设 4096 比较稳。&#10;3. 点「开始游戏」。游戏会从独立窗口启动，TCL 仍保持运行以便管理。	1. Pick the version to play in the instance list.\n2. Adjust memory as needed: set -Xmx (max memory for the game) on the launch page or in Settings → Launch. 4096 MB is a safe choice on 8 GB machines.\n3. Click Start. The game opens in its own window while TCL keeps running for management.	1. 在實例清單點選你要玩的版本。\n2. 按需調記憶體：在啟動頁或「設定 → 啟動」裡設定 -Xmx（分配給遊戲的最大記憶體）。一般 8G 記憶體機器設 4096 比較穩。\n3. 點「開始遊戲」。遊戲會從獨立視窗啟動，TCL 仍保持執行以便管理。	
 只连接此处填写的节点，优先级最高。\n如果你自己搭建了 EasyTier 节点，可以填在这里。\n\n使用逗号分隔多个节点，例如：\ntcp://mc.yqst.top:11010,tcp://225284.xyz:11010\n\n房主和加入者必须连接相同的节点才能互见。	Only the nodes entered here are used, with the highest priority.\nIf you host your own EasyTier nodes, enter them here.\n\nSeparate multiple nodes with commas, e.g.:\ntcp://mc.yqst.top:11010,tcp://225284.xyz:11010\n\nHost and joiners must connect to the same nodes to see each other.	只連接此處填寫的節點，優先級最高。\n如果你自己搭建了 EasyTier 節點，可以填在這裡。\n\n使用逗號分隔多個節點，例如：\ntcp://mc.yqst.top:11010,tcp://225284.xyz:11010\n\n房主和加入者必須連接相同的節點才能互見。	
 CurseForge 的 API 需要密钥才能查询世界 / 模组 / 整合包列表，缺失时这些列表会为空。\n在 https://console.curseforge.com/ 的 API 标签页生成后填入，保存后重启 TCL 生效。\n留空则回退到内置的公开示例密钥。	The CurseForge API requires a key to query worlds / mods / modpacks; without one these lists stay empty.\nGenerate it under the API tab at https://console.curseforge.com/, paste it here and restart TCL to apply.\nIf empty, a built-in public sample key is used.	CurseForge 的 API 需要金鑰才能查詢世界 / 模組 / 整合包清單，缺失時這些清單會為空。\n在 https://console.curseforge.com/ 的 API 標籤頁產生後填入，儲存後重新啟動 TCL 生效。\n留空則回退到內建的公開範例金鑰。	
-上面这些都没解决的话，可以进 TCL 官方 TCraft Launcher 启动器交流群求助：\n\n  群号：1131373915\n  点击加入：https://qm.qq.com/q/WaG64YE9uo\n\n反馈时请附上 TCL 文件夹中的 Log 文件，以便定位问题。	If none of the above helps, join the official TCraft Launcher group for support:\n\n  Group: 1131373915\n  Join: https://qm.qq.com/q/WaG64YE9uo\n\nWhen reporting, attach the Log file in the TCL folder so the issue can be located.	上面這些都沒解決的話，可以進 TCL 官方 TCraft Launcher 啟動器交流群求助：\n\n  群號：1131373915\n  點擊加入：https://qm.qq.com/q/WaG64YE9uo\n\n回報時請附上 TCL 資料夾中的 Log 檔案，以便定位問題。	
+上面这些都没解决的话，可以进 TCL 官方 TCraft Launcher 启动器交流群求助：\n\n  群号：1131373915\n  点击加入：https://qm.qq.com/q/UONlv4VgwE\n\n反馈时请附上 TCL 文件夹中的 Log 文件，以便定位问题。	If none of the above helps, join the official TCraft Launcher group for support:\n\n  Group: 1131373915\n  Join: https://qm.qq.com/q/UONlv4VgwE\n\nWhen reporting, attach the Log file in the TCL folder so the issue can be located.	上面這些都沒解決的話，可以進 TCL 官方 TCraft Launcher 啟動器交流群求助：\n\n  群號：1131373915\n  點擊加入：https://qm.qq.com/q/UONlv4VgwE\n\n回報時請附上 TCL 資料夾中的 Log 檔案，以便定位問題。	
 针对某个版本加内容，走两条路任选：\n· 在「下载 → 模组 / 资源包 / 光影」里搜名字，勾选后点「下载并开始安装」，装到你选定的版本实例里。\n· 已有本地文件：在「下载」页用「导入本地文件」把 jar / zip 拖进来	To add content to a specific version, pick either way:\n· Search by name in Download → Mods / Resource Packs / Shaders, check items and click Download & Install into the selected instance.\n· Already have local files: use Import Local Files on the Download page and drop the jar / zip in	針對某個版本加內容，走兩條路任選：\n· 在「下載 → 模組 / 資源包 / 光影」裡搜名字，勾選後點「下載並開始安裝」，裝到你選定的版本實例裡。\n· 已有本地檔案：在「下載」頁用「匯入本地檔案」把 jar / zip 拖進來	
 输入允许的 Java 版本区间，例如 [17.0.1, 25.0)。\n方括号代表包含，圆括号代表不包含。不写其中一侧代表不限制。\n\n例如：\n[21.0, ) 代表至少需要 Java 21。\n(, 18.0) 代表允许 Java 17-，但不允许 Java 18 及以上。	Enter the allowed Java version range, e.g. [17.0.1, 25.0).\nSquare brackets are inclusive, parentheses exclusive; an omitted side means unbounded.\n\nExamples:\n[21.0, ) requires Java 21 or newer.\n(, 18.0) allows Java 17- but not 18 or above.	輸入允許的 Java 版本區間，例如 [17.0.1, 25.0)。\n方括號代表包含，圓括號代表不包含。不寫其中一側代表不限制。\n\n例如：\n[21.0, ) 代表至少需要 Java 21。\n(, 18.0) 代表允許 Java 17-，但不允許 Java 18 及以上。	
 第一次打开 TCL，按顺序做三件事即可进入游戏：\n1. 确认 Java：多数版本自带匹配，若启动报 Java 相关错误，到「设置 → Java」手动指定一个 Java 路径（老版本用 Java 8，新版本用 17 或更高）。\n2. （可选）调整内存与窗口大小。\n3. 点「开始游戏」。	Opening TCL for the first time — three steps and you are in the game:\n1. Check Java: most versions match automatically; if launch reports a Java error, set a Java path in Settings → Java (Java 8 for old versions, 17+ for new).\n2. (Optional) Adjust memory and window size.\n3. Click Start.	第一次開啟 TCL，按順序做三件事即可進入遊戲：\n1. 確認 Java：多數版本自帶匹配，若啟動回報 Java 相關錯誤，到「設定 → Java」手動指定一個 Java 路徑（老版本用 Java 8，新版本用 17 或更高）。\n2. （可選）調整記憶體與視窗大小。\n3. 點「開始遊戲」。	
@@ -2789,7 +2789,7 @@ TCL 的功能规划与交互设计参考了 HMCL（Hello Minecraft! Launcher）�
 开发者、发布者与责任方均为 TCraft 团队。本软件按「现状」提供，不对使用或无法使用本软件造成的直接、间接损失承担责任；对存档、配置等文件的操作请自行备份。\n\n侵权投诉、合规问题与功能反馈：TCraft Launcher 启动器交流群（群号 1131373915）	The developer, publisher and responsible party is the TCraft team. This software is provided "as is"; no liability for direct or indirect losses arising from its use; back up saves and configs yourself.\n\nComplaints, compliance and feedback: the TCraft Launcher group (1131373915)	開發者、發布者與責任方均為 TCraft 團隊。本軟體按「現狀」提供，不對使用或無法使用本軟體造成的直接、間接損失承擔責任；對存檔、設定等檔案的操作請自行備份。\n\n侵權投訴、合規問題與功能回饋：TCraft Launcher 啟動器交流群（群號 1131373915）	
 Minecraft、Minecraft 徽标及相关名称、品牌、图像与音效的著作权和商标权，均归 Mojang Synergies AB 与 Microsoft 所有，本启动器不主张任何权利，也不将 Minecraft 名称用作自身的主标题或主品牌。	Minecraft, the Minecraft logo and related names, brands, images and sounds are the property of Mojang Synergies AB and Microsoft; this launcher claims no rights over them and does not use the Minecraft name as its own main title or brand.	Minecraft、Minecraft 徽標及相關名稱、品牌、圖像與音效的著作權和商標權，均歸 Mojang Synergies AB 與 Microsoft 所有，本啟動器不主張任何權利，也不將 Minecraft 名稱用作自身的主標題或主品牌。	
 NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.\n非 MINECRAFT 官方产品。未经 MOJANG 或 MICROSOFT 授权或关联。	NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.\n非 MINECRAFT 官方產品。未經 MOJANG 或 MICROSOFT 授權或關聯。	NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.\n非 MINECRAFT 官方產品。未經 MOJANG 或 MICROSOFT 授權或關聯。	
-上面这些都没解决的话，可以进 TCL 官方 QQ 群求助：\n\n  群号：1131373915\n  点击加入：https://qm.qq.com/q/WaG64YE9uo	If none of the above helps, join the official TCL QQ group for support:\n\n  Group: 1131373915\n  Join: https://qm.qq.com/q/WaG64YE9uo	上面這些都沒解決的話，可以進 TCL 官方 QQ 群求助：\n\n  群號：1131373915\n  點擊加入：https://qm.qq.com/q/WaG64YE9uo	
+上面这些都没解决的话，可以进 TCL 官方 QQ 群求助：\n\n  群号：1131373915\n  点击加入：https://qm.qq.com/q/UONlv4VgwE	If none of the above helps, join the official TCL QQ group for support:\n\n  Group: 1131373915\n  Join: https://qm.qq.com/q/UONlv4VgwE	上面這些都沒解決的話，可以進 TCL 官方 QQ 群求助：\n\n  群號：1131373915\n  點擊加入：https://qm.qq.com/q/UONlv4VgwE	
 TCL 由 TCraft 团队开发与维护，持续更新。\n提供游戏与模组、整合包、资源包、光影的下载与管理，支持正版 / 离线 / 第三方登录。	TCL is developed and maintained by the TCraft team, updated continuously.\nIt provides game, mod, modpack, resource pack and shader downloads and management, with premium / offline / third-party login.	TCL 由 TCraft 團隊開發與維護，持續更新。\n提供遊戲與模組、整合包、資源包、光影的下載與管理，支援正版 / 離線 / 第三方登入。	
 新版本在群内发布。加入 TCraft Launcher 启动器交流群（群号 1131373915）	New releases are posted in the group. Join the TCraft Launcher group (1131373915)	新版本在群內發布。加入 TCraft Launcher 啟動器交流群（群號 1131373915）	
 欢迎加入 TCraft 交流群！\n群号：1131373915（加群请注明来意）	Welcome to the TCraft group!\nGroup: 1131373915 (state your purpose when joining)	歡迎加入 TCraft 交流群！\n群號：1131373915（加群請註明來意）	
@@ -2805,10 +2805,10 @@ TCL 由 TCraft 团队开发与维护，持续更新。\n提供游戏与模组、
 TCraft Launcher 1.2 由 TCraft 团队开发与维护，持续更新，并已在 GitHub 开源。\n提供游戏与模组、整合包、资源包、光影的下载与管理，支持原版、Forge / NeoForge / Fabric / OptiFine 等版本的自动安装。	TCraft Launcher 1.2 is developed and maintained by the TCraft team, updated continuously and open-sourced on GitHub.\nIt provides download and management for games, mods, modpacks, resource packs and shaders, with automatic installation of Vanilla, Forge / NeoForge / Fabric / OptiFine and more.	TCraft Launcher 1.2 由 TCraft 團隊開發與維護，持續更新，並已在 GitHub 開源。\n提供遊戲與模組、整合包、資源包、光影的下載與管理，支援原版、Forge / NeoForge / Fabric / OptiFine 等版本的自動安裝。	
 TCL 的功能规划与交互设计参考了 HMCL（Hello Minecraft! Launcher）的成熟方案；版本安装、资源下载、启动参数构建等核心流程，参考了 PCL（Plain Craft Launcher，作者龙腾猫跃）的主体代码。\n感谢开源社区的智慧与贡献。	TCL’s feature planning and interaction design reference HMCL (Hello Minecraft! Launcher); core flows such as version installation, resource downloads and launch argument building reference PCL (Plain Craft Launcher by 龙腾猫跃).\nThanks to the open-source community for its wisdom and contributions.	TCL 的功能規劃與互動設計參考了 HMCL（Hello Minecraft! Launcher）的成熟方案；版本安裝、資源下載、啟動參數構建等核心流程，參考了 PCL（Plain Craft Launcher，作者龍騰貓躍）的主體代碼。\n感謝開源社群的智慧與貢獻。	
 针对某个版本加内容，走两条路任选：\n· 在「下载 → 模组 / 资源包 / 光影」里搜名字，勾选后点「下载并开始安装」，装到你选定的版本实例里。\n· 已有本地文件：在「下载」页用「导入本地文件」把 jar / zip 拖进来，同样选目标版本安装。\n装好后回到「启动」页选这个版本，点「开始游戏」即可生效。要管理某个实例的 Mod、看 Jar-in-Jar 内嵌依赖，进顶部「实例」页选对应实例，再点左侧「Mod 管理」操作。	To add content to a specific version, pick either way:\n· Search by name in Download → Mods / Resource Packs / Shaders, check items and click Download & Install — it installs into the selected instance.\n· Already have local files: use Import Local Files on the Download page and drop the jar / zip in, also picking the target version.\nWhen done, select this version on the Launch page and click Start. To manage a specific instance’s mods or view embedded Jar-in-Jar dependencies, open the Instances tab, pick the instance and use Mod Management on the left.	針對某個版本加內容，走兩條路任選：\n· 在「下載 → 模組 / 資源包 / 光影」裡搜名字，勾選後點「下載並開始安裝」，裝到你選定的版本實例裡。\n· 已有本地檔案：在「下載」頁用「匯入本地檔案」把 jar / zip 拖進來，同樣選目標版本安裝。\n裝好後回到「啟動」頁選這個版本，點「開始遊戲」即可生效。要管理某個實例的 Mod、看 Jar-in-Jar 內嵌依賴，進頂部「實例」頁選對應實例，再點左側「Mod 管理」操作。	
-上面这些都没解决的话，可以进 TCL 官方 TCraft Launcher 启动器交流群求助：\n\n  群号：1131373915\n  点击加入：https://qm.qq.com/q/WaG64YE9uo\n\n入群后请说明你的系统（Windows 版本、Java 版本、Minecraft 版本）以及具体遇到了什么问题，越详细越快定位。游戏出问题时记得带上「设置 → 日志」导出的日志，不要只发截图。	If none of the above helps, join the official TCraft Launcher group for support:\n\n  Group: 1131373915\n  Join: https://qm.qq.com/q/WaG64YE9uo\n\nWhen posting, describe your system (Windows / Java / Minecraft versions) and the exact problem in detail — the more detail, the faster the diagnosis. If the game itself crashes, attach the log exported from Settings → Log; do not only post screenshots.	上面這些都沒解決的話，可以進 TCL 官方 TCraft Launcher 啟動器交流群求助：\n\n  群號：1131373915\n  點擊加入：https://qm.qq.com/q/WaG64YE9uo\n\n入群後請說明你的系統（Windows 版本、Java 版本、Minecraft 版本）以及具體遇到了什麼問題，越詳細越快定位。遊戲出問題時記得帶上「設定 → 日誌」匯出的日誌，不要只發截圖。	
-TCraft Launcher 1.2 由 TCraft 团队开发与维护，持续更新，并已在 GitHub 开源。\n提供游戏与模组、整合包、资源包、光影的下载与管理，支持原版、Forge / NeoForge / Fabric / OptiFine / LiteLoader。\n同时提供登录、启动、联机、实例与整合包导出等完整能力。\n加入 TCraft Launcher 启动器交流群（群号 1131373915，https://qm.qq.com/q/WaG64YE9uo），获取更新、反馈问题。	TCraft Launcher 1.2 is developed and maintained by the TCraft team, updated continuously and open-sourced on GitHub.\nIt provides download and management for games, mods, modpacks, resource packs and shaders, with automatic installation of Vanilla, Forge / NeoForge / Fabric / OptiFine / LiteLoader.\nIt also offers login, launching, multiplayer, instance management and modpack export.\nJoin the TCraft Launcher group (1131373915, https://qm.qq.com/q/WaG64YE9uo) for updates and feedback.	TCraft Launcher 1.2 由 TCraft 團隊開發與維護，持續更新，並已在 GitHub 開源。\n提供遊戲與模組、整合包、資源包、光影的下載與管理，支援原版、Forge / NeoForge / Fabric / OptiFine / LiteLoader。\n同時提供登入、啟動、連線、實例與整合包匯出等完整能力。\n加入 TCraft Launcher 啟動器交流群（群號 1131373915，https://qm.qq.com/q/WaG64YE9uo），獲取更新、回報問題。	
+上面这些都没解决的话，可以进 TCL 官方 TCraft Launcher 启动器交流群求助：\n\n  群号：1131373915\n  点击加入：https://qm.qq.com/q/UONlv4VgwE\n\n入群后请说明你的系统（Windows 版本、Java 版本、Minecraft 版本）以及具体遇到了什么问题，越详细越快定位。游戏出问题时记得带上「设置 → 日志」导出的日志，不要只发截图。	If none of the above helps, join the official TCraft Launcher group for support:\n\n  Group: 1131373915\n  Join: https://qm.qq.com/q/UONlv4VgwE\n\nWhen posting, describe your system (Windows / Java / Minecraft versions) and the exact problem in detail — the more detail, the faster the diagnosis. If the game itself crashes, attach the log exported from Settings → Log; do not only post screenshots.	上面這些都沒解決的話，可以進 TCL 官方 TCraft Launcher 啟動器交流群求助：\n\n  群號：1131373915\n  點擊加入：https://qm.qq.com/q/UONlv4VgwE\n\n入群後請說明你的系統（Windows 版本、Java 版本、Minecraft 版本）以及具體遇到了什麼問題，越詳細越快定位。遊戲出問題時記得帶上「設定 → 日誌」匯出的日誌，不要只發截圖。	
+TCraft Launcher 1.2 由 TCraft 团队开发与维护，持续更新，并已在 GitHub 开源。\n提供游戏与模组、整合包、资源包、光影的下载与管理，支持原版、Forge / NeoForge / Fabric / OptiFine / LiteLoader。\n同时提供登录、启动、联机、实例与整合包导出等完整能力。\n加入 TCraft Launcher 启动器交流群（群号 1131373915，https://qm.qq.com/q/UONlv4VgwE），获取更新、反馈问题。	TCraft Launcher 1.2 is developed and maintained by the TCraft team, updated continuously and open-sourced on GitHub.\nIt provides download and management for games, mods, modpacks, resource packs and shaders, with automatic installation of Vanilla, Forge / NeoForge / Fabric / OptiFine / LiteLoader.\nIt also offers login, launching, multiplayer, instance management and modpack export.\nJoin the TCraft Launcher group (1131373915, https://qm.qq.com/q/UONlv4VgwE) for updates and feedback.	TCraft Launcher 1.2 由 TCraft 團隊開發與維護，持續更新，並已在 GitHub 開源。\n提供遊戲與模組、整合包、資源包、光影的下載與管理，支援原版、Forge / NeoForge / Fabric / OptiFine / LiteLoader。\n同時提供登入、啟動、連線、實例與整合包匯出等完整能力。\n加入 TCraft Launcher 啟動器交流群（群號 1131373915，https://qm.qq.com/q/UONlv4VgwE），獲取更新、回報問題。	
 TCL 的功能规划与交互设计参考了 HMCL（Hello Minecraft! Launcher）的成熟方案，界面与代码为独立编写，与 HMCL、PCL（Plain Craft Launcher）均无隶属、赞助或背书关系。\n图标来自 Lucide（ISC），联机能力来自 EasyTier，在此一并致谢。	TCL's feature planning and interaction design draw on HMCL (Hello Minecraft! Launcher). The UI and code are written independently; TCL has no affiliation, sponsorship or endorsement from HMCL or PCL (Plain Craft Launcher).\nIcons come from Lucide (ISC) and multiplayer from EasyTier - thanks to both.	TCL 的功能規劃與互動設計參考了 HMCL（Hello Minecraft! Launcher）的成熟方案，介面與程式碼為獨立編寫，與 HMCL、PCL（Plain Craft Launcher）均無隸屬、贊助或背書關係。\n圖示來自 Lucide（ISC），聯機能力來自 EasyTier，在此一併致謝。	
-开发者、发布者与责任方均为 TCraft 团队。本软件按「现状」提供，不对使用或无法使用本软件造成的直接、间接损失承担责任；对存档、配置等文件的操作请自行备份。\n\n侵权投诉、合规问题与功能反馈：TCraft Launcher 启动器交流群（群号 1131373915，https://qm.qq.com/q/WaG64YE9uo）（本项目唯一对外渠道）。涉及 Minecraft 品牌的投诉，也可通过 https://help.minecraft.net/ 联系 Mojang。\n\nMinecraft EULA：https://www.minecraft.net/eula\nMinecraft 使用准则：https://www.minecraft.net/usage-guidelines\n本启动器使用了 Lucide 图标库（ISC 协议）等开源组件，相关权利归各自作者所有。	The developer, publisher and responsible party is the TCraft team. This software is provided "as is"; no liability for direct or indirect losses arising from its use; back up saves and configs yourself.\n\nComplaints, compliance and feedback: the TCraft Launcher group (1131373915, https://qm.qq.com/q/WaG64YE9uo — the only official channel of this project). For Minecraft-brand complaints you may also contact Mojang via https://help.minecraft.net/.\n\nMinecraft EULA: https://www.minecraft.net/eula\nMinecraft Usage Guidelines: https://www.minecraft.net/usage-guidelines\nThis launcher uses open-source components such as the Lucide icon library (ISC); their rights belong to their respective authors.	開發者、發布者與責任方均為 TCraft 團隊。本軟體按「現狀」提供，不對使用或無法使用本軟體造成的直接、間接損失承擔責任；對存檔、設定等檔案的操作請自行備份。\n\n侵權投訴、合規問題與功能回饋：TCraft Launcher 啟動器交流群（群號 1131373915，https://qm.qq.com/q/WaG64YE9uo）（本案唯一對外渠道）。涉及 Minecraft 品牌的投訴，也可透過 https://help.minecraft.net/ 聯繫 Mojang。\n\nMinecraft EULA：https://www.minecraft.net/eula\nMinecraft 使用準則：https://www.minecraft.net/usage-guidelines\n本啟動器使用了 Lucide 圖示庫（ISC 授權）等開源元件，相關權利歸各自作者所有。	
+开发者、发布者与责任方均为 TCraft 团队。本软件按「现状」提供，不对使用或无法使用本软件造成的直接、间接损失承担责任；对存档、配置等文件的操作请自行备份。\n\n侵权投诉、合规问题与功能反馈：TCraft Launcher 启动器交流群（群号 1131373915，https://qm.qq.com/q/UONlv4VgwE）（本项目唯一对外渠道）。涉及 Minecraft 品牌的投诉，也可通过 https://help.minecraft.net/ 联系 Mojang。\n\nMinecraft EULA：https://www.minecraft.net/eula\nMinecraft 使用准则：https://www.minecraft.net/usage-guidelines\n本启动器使用了 Lucide 图标库（ISC 协议）等开源组件，相关权利归各自作者所有。	The developer, publisher and responsible party is the TCraft team. This software is provided "as is"; no liability for direct or indirect losses arising from its use; back up saves and configs yourself.\n\nComplaints, compliance and feedback: the TCraft Launcher group (1131373915, https://qm.qq.com/q/UONlv4VgwE — the only official channel of this project). For Minecraft-brand complaints you may also contact Mojang via https://help.minecraft.net/.\n\nMinecraft EULA: https://www.minecraft.net/eula\nMinecraft Usage Guidelines: https://www.minecraft.net/usage-guidelines\nThis launcher uses open-source components such as the Lucide icon library (ISC); their rights belong to their respective authors.	開發者、發布者與責任方均為 TCraft 團隊。本軟體按「現狀」提供，不對使用或無法使用本軟體造成的直接、間接損失承擔責任；對存檔、設定等檔案的操作請自行備份。\n\n侵權投訴、合規問題與功能回饋：TCraft Launcher 啟動器交流群（群號 1131373915，https://qm.qq.com/q/UONlv4VgwE）（本案唯一對外渠道）。涉及 Minecraft 品牌的投訴，也可透過 https://help.minecraft.net/ 聯繫 Mojang。\n\nMinecraft EULA：https://www.minecraft.net/eula\nMinecraft 使用準則：https://www.minecraft.net/usage-guidelines\n本啟動器使用了 Lucide 圖示庫（ISC 授權）等開源元件，相關權利歸各自作者所有。	
 无法打开	Cannot open	無法開啟	
 导出失败	Export failed	匯出失敗	
 下载失败	Download failed	下載失敗	
@@ -2831,7 +2831,7 @@ TCraft Launcher 启动失败	TCraft Launcher failed to start	TCraft Launcher 啟
 下载客户端	Downloading client	下載用戶端	
 下载依赖库	Downloading libraries	下載依賴庫	
 下载资源索引	Downloading asset index	下載資源索引	
-整合包安装：	Modpack install:	整合包安裝：	
+整合包安装：	Modpack install: 	整合包安裝：	
 下载整合包文件	Downloading modpack files	下載整合包檔案	
 安装整合包内容	Installing modpack content	安裝整合包內容	
 已刷新	Refreshed	已重新整理	
@@ -3077,7 +3077,7 @@ mods 目录中没有 Mod。Jar-in-Jar 是 Fabric 系 Mod 把依赖 jar 打进自
 选择导出位置	Choose export location	選擇匯出位置	
 Modrinth 整合包文件	Modrinth modpack file	Modrinth 整合包檔案	
 压缩文件	Archive	壓縮檔案	
-导出整合包：	Exporting modpack:	匯出整合包：	
+导出整合包：	Exporting modpack: 	匯出整合包：	
 复制导出内容	Copy exported content	複製匯出內容	
 联网查询文件信息	Look up file info online	連網查詢檔案資訊	
 生成压缩包	Build the archive	產生壓縮檔	
@@ -3450,7 +3450,6 @@ Mixin 注入失败	Mixin injection failed	Mixin 注入失敗
 常见于 Mod 与游戏版本不匹配，逐一停用最近添加的 Mod。	Usually a Mod/game version mismatch; disable the recently added Mods one by one.	常見於 Mod 與遊戲版本不符，逐一停用最近加入的 Mod。	
 已存在同名实例。	An instance with that name already exists.	已存在同名實例。	
 远古版本	Legacy	遠古版本	
- 的版本	 	 的版本
  预览版	 Snapshot	 預覽版
 正式版 	Release 	正式版 
 已安装版本	Installed versions	已安裝版本
@@ -3642,7 +3641,6 @@ TCraft Launcher 是用 JavaFX 写的开源 Minecraft 启动器，支持微软正
 欢迎提交 Issue 与 Pull Request，也欢迎 Star 支持。	Issues and pull requests are welcome — stars help too.	歡迎提交 Issue 與 Pull Request，也歡迎 Star 支持。	
 打开 GitHub 仓库	Open GitHub repository	開啟 GitHub 倉庫	
 群号 1131373915 · 获取更新、反馈问题	Group 1131373915 · updates and feedback	群號 1131373915 · 獲取更新、回饋問題	
-开发者、发布者与责任方均为 TCraft 团队。本软件按「现状」提供，不对使用或无法使用本软件造成的直接、间接损失承担责任；对存档、配置等文件的操作请自行备份。\n\n侵权投诉、合规问题与功能反馈：TCraft Launcher 启动器交流群（群号 1131373915，https://qm.qq.com/q/UONlv4VgwE）（本项目唯一对外渠道）。涉及 Minecraft 品牌的投诉，也可通过 https://help.minecraft.net/ 联系 Mojang。\n\nMinecraft EULA：https://www.minecraft.net/eula\nMinecraft 使用准则：https://www.minecraft.net/usage-guidelines\n本启动器使用了 Lucide 图标库（ISC 协议）等开源组件，相关权利归各自作者所有。	Developer, publisher and responsible party: the TCraft team. This software is provided as is, without liability for direct or indirect loss arising from its use or from the inability to use it; back up saves and configuration files before operating on them.\n\nCopyright complaints, compliance questions and feedback: the TCraft Launcher group (1131373915, https://qm.qq.com/q/UONlv4VgwE) — the project's only official channel. Complaints about the Minecraft brand may also go to Mojang via https://help.minecraft.net/.\n\nMinecraft EULA: https://www.minecraft.net/eula\nMinecraft Usage Guidelines: https://www.minecraft.net/usage-guidelines\nThis launcher uses open-source components such as the Lucide icon set (ISC); all rights remain with their respective authors.	開發者、發佈者與責任方均為 TCraft 團隊。本軟體按「現狀」提供，不對使用或無法使用本軟體造成的直接、間接損失承擔責任；對存檔、設定等檔案的操作請自行備份。\n\n侵權投訴、合規問題與功能回饋：TCraft Launcher 啟動器交流群（群號 1131373915，https://qm.qq.com/q/UONlv4VgwE）（本專案唯一對外渠道）。涉及 Minecraft 品牌的投訴，也可透過 https://help.minecraft.net/ 聯繫 Mojang。\n\nMinecraft EULA：https://www.minecraft.net/eula\nMinecraft 使用準則：https://www.minecraft.net/usage-guidelines\n本啟動器使用了 Lucide 圖示庫（ISC 授權）等開源元件，相關權利歸各自作者所有。	
 这个版本没有内置微软登录凭据，开源版去掉了正版登录。要用正版登录，请自行构建完整版并注入自己的 client id，构建说明见 docs/构建与发布.md。	This build has no bundled Microsoft login credentials; the open-source edition drops premium login. To use premium login, build the full edition yourself and inject your own client id — see docs/构建与发布.md.	這個版本沒有內建微軟登入憑證，開源版去掉了正版登入。要用正版登入，請自行建置完整版並注入自己的 client id，建置說明見 docs/构建与发布.md。	
 点「打开登录页」在浏览器里登录。登录完浏览器会停在 login.live.com 的一个空白页，把地址栏整条链接复制到下面，点「完成登录」。	Click "Open login page" to sign in with your browser. When you are done, the browser stops on a blank login.live.com page — copy the whole address bar URL below and click "Finish login".	點「開啟登入頁」在瀏覽器裡登入。登入完瀏覽器會停在 login.live.com 的一個空白頁，把網址列整條連結複製到下面，點「完成登入」。	
 开启后每个版本用 versions/版本号 当游戏目录，mods、saves、config 各自独立；libraries 与 assets 仍然共用，不会重复占空间。	Each version then uses versions/<version> as its game directory, with its own mods, saves and config; libraries and assets stay shared, so nothing is duplicated.	開啟後每個版本用 versions/版本號 當遊戲目錄，mods、saves、config 各自獨立；libraries 與 assets 仍然共用，不會重複佔空間。	
@@ -3714,3 +3712,207 @@ GitHub 没有返回可用的版本号。	GitHub did not return a usable version 
 TCL 需要 Java 才能启动游戏。列表中的第一个可用 Java 将被默认使用，点击列表项可切换当前使用的 Java。	TCL needs Java to launch the game. The first available Java in the list is used by default; click an entry to switch the active Java.	TCL 需要 Java 才能啟動遊戲。清單中的第一個可用 Java 將被預設使用，點擊清單項目可切換目前使用的 Java。	
 提示：SOCKS5 只对游戏进程生效，启动器自身的下载 / 搜索走的是 HTTP 代理通道（Clash、v2rayN 的混合端口都同时支持 HTTP，填那个端口即可）。	Note: SOCKS5 only applies to the game process. The launcher's own downloads and searches use the HTTP proxy channel (Clash and v2rayN mixed ports also accept HTTP, so use that port).	提示：SOCKS5 只對遊戲行程生效，啟動器自身的下載 / 搜尋走的是 HTTP 代理通道（Clash、v2rayN 的混合連接埠都同時支援 HTTP，填那個連接埠即可）。	
 填自建或内网的 BMCLAPI 兼容镜像根（如 http://192.168.1.10:8080），填了会一起测速；下载时「镜像优先」会自动走它。留空则只测官方源与内置 BMCLAPI。	Enter a self-hosted or intranet BMCLAPI-compatible mirror root (e.g. http://192.168.1.10:8080); it is included in the speed test and used by Mirror first. Leave empty to test only the official source and built-in BMCLAPI.	填自建或內網的 BMCLAPI 相容鏡像根（如 http://192.168.1.10:8080），填了會一起測速；下載時「鏡像優先」會自動走它。留空則只測官方來源與內建 BMCLAPI。	
+复制联机码	Copy Link Code	複製聯機碼
+粘贴朋友发给你的 Base64 联机码，加入朋友的房间。	Paste the Base64 link code your friend sent you to join their room.	貼上朋友傳給你的 Base64 聯機碼，加入朋友的房間。
+粘贴 Base64 联机码	Paste Base64 Link Code	貼上 Base64 聯機碼
+把朋友发给你的整段内容粘贴进来，识别到联机码后会自动连接。	Paste the whole message from your friend; it connects automatically once a link code is recognized.	把朋友傳給你的整段內容貼上，識別到聯機碼後會自動連線。
+使用上一次的联机码	Use the previous link code	使用上一次的聯機碼
+联机码有误	Invalid link code	聯機碼有誤
+请粘贴房主发给你的完整 Base64 联机码。	Paste the complete Base64 link code the host sent you.	請貼上房主傳給你的完整 Base64 聯機碼。
+联机码格式不正确，请让房主重新复制。	The link code is malformed; ask the host to copy it again.	聯機碼格式不正確，請讓房主重新複製。
+联机码版本过高	Link code is too new	聯機碼版本過高
+此联机码对应的 TCL 版本更高，请升级启动器。	This link code belongs to a newer TCL version; update the launcher.	此聯機碼對應的 TCL 版本較新，請更新啟動器。
+联机码缺少房间信息，请让房主重新复制。	The link code is missing room information; ask the host to copy it again.	聯機碼缺少房間資訊，請讓房主重新複製。
+已复制联机码！	Link code copied!	已複製聯機碼！
+把下面的 Base64 联机码整段发给朋友，让他们在「加入房间」里粘贴即可。	Send the whole Base64 link code below to your friends; they just paste it into Join Room.	把下面的 Base64 聯機碼整段傳給朋友，讓他們在「加入房間」貼上即可。
+在 TCL 启动器「联机 → 加入房间」中粘贴下面的 Base64 联机码，即可加入房间：	Paste the Base64 link code below into TCL's Multiplayer → Join Room to join:	在 TCL 啟動器「聯機 → 加入房間」中貼上下面的 Base64 聯機碼，即可加入房間：
+你确定要关闭联机房间吗？\n所有玩家都需要重新粘贴联机码才可加入游戏！	Close the multiplayer room?\nEvery player will need to paste the link code again to join!	你確定要關閉聯機房間嗎？\n所有玩家都需要重新貼上聯機碼才可加入遊戲！
+房间已过期：联机码里的发现节点已下线，请让房主重新创建房间！	Room expired: the discovery node in the link code went offline; ask the host to create the room again!	房間已過期：聯機碼裡的發現節點已下線，請讓房主重新建立房間！
+无法连接到房主：可能的原因是网络环境不佳、房主已关闭房间或联机码输错。	Can't reach the host: bad network, a closed room, or a wrong link code.	無法連線到房主：可能的原因是網路環境不佳、房主已關閉房間或聯機碼輸入錯誤。
+创建一个联机房间，把单人存档分享给朋友一起玩；也可以粘贴收到的 Base64 联机码，加入别人的房间。	Create a multiplayer room to share a single-player world with friends; you can also paste a Base64 link code to join someone else's room.	建立一個聯機房間，把單人存檔分享給朋友一起玩；也可以貼上收到的 Base64 聯機碼，加入別人的房間。
+正在测速节点…	Testing node latency…	正在測試節點速度…
+节点：未知	Unknown node	節點：未知
+用浏览器打开微软设备登录页，输入下面的代码完成微软账号登录，授权后启动器会自动继续。	Open the Microsoft device sign-in page in a browser, enter the code below, and the launcher continues automatically after authorization.	用瀏覽器開啟微軟裝置登入頁，輸入下面的代碼完成微軟帳號登入，授權後啟動器會自動繼續。
+点击复制代码	Click to copy code	點擊複製代碼
+获取中…	Fetching…	取得中…
+正在获取登录代码…	Requesting a sign-in code…	正在取得登入代碼…
+重新获取	Get a new code	重新取得
+已复制登录代码	Sign-in code copied	已複製登入代碼
+正在验证 Xbox 账户…	Verifying the Xbox account…	正在驗證 Xbox 帳戶…
+正在登录 Minecraft…	Signing in to Minecraft…	正在登入 Minecraft…
+正在获取游戏档案…	Fetching the game profile…	正在取得遊戲檔案…
+登录代码已过期，请重新获取。	The sign-in code expired; get a new one.	登入代碼已過期，請重新取得。
+已取消微软账号授权。	Microsoft sign-in was cancelled.	已取消微軟帳號授權。
+微软没有返回设备代码，请稍后重试	Microsoft did not return a device code; try again later	微軟沒有傳回裝置代碼，請稍後重試
+该账户已被 Xbox Live 封禁	This account is banned from Xbox Live	該帳戶已被 Xbox Live 封禁
+该账户需要先完成成人验证	This account must complete adult verification first	該帳戶需要先完成成人驗證
+该账户或启动器没有 Minecraft 登录权限	This account or launcher has no permission to sign in to Minecraft	該帳戶或啟動器沒有 Minecraft 登入權限
+该账户没有 Minecraft: Java Edition 档案	This account has no Minecraft: Java Edition profile	該帳戶沒有 Minecraft: Java Edition 檔案
+该账户还没有购买 Minecraft: Java Edition	This account does not own Minecraft: Java Edition	該帳戶尚未購買 Minecraft: Java Edition
+没有可用的续期令牌，请重新登录微软账号	No refresh token available; sign in with Microsoft again	沒有可用的續期權杖，請重新登入微軟帳號
+等待浏览器授权，每 %d 秒自动检查一次…	Waiting for browser authorization; checking every %d seconds…	等待瀏覽器授權，每 %d 秒自動檢查一次…
+这个版本没有内置微软登录凭据	This build has no bundled Microsoft sign-in credentials	這個版本沒有內建微軟登入憑證
+获取微软登录代码失败：%s	Failed to get the Microsoft sign-in code: %s	取得微軟登入代碼失敗：%s
+微软登录失败：%s	Microsoft sign-in failed: %s	微軟登入失敗：%s
+微软登录已过期：%s	Microsoft sign-in expired: %s	微軟登入已過期：%s
+请重新登录	Sign in again	請重新登入
+验证 Minecraft 令牌失败：HTTP %d	Failed to verify the Minecraft token: HTTP %d	驗證 Minecraft 權杖失敗：HTTP %d
+Xbox Live 验证失败：%s	Xbox Live verification failed: %s	Xbox Live 驗證失敗：%s
+XSTS 授权失败：HTTP %d	XSTS authorization failed: HTTP %d	XSTS 授權失敗：HTTP %d
+XSTS 授权失败（错误码 %s）	XSTS authorization failed (error %s)	XSTS 授權失敗（錯誤碼 %s）
+Minecraft 登录失败：%s	Minecraft sign-in failed: %s	Minecraft 登入失敗：%s
+无法确认游戏所有权：%s	Could not confirm game ownership: %s	無法確認遊戲所有權：%s
+获取 Minecraft 档案失败：%s	Failed to fetch the Minecraft profile: %s	取得 Minecraft 檔案失敗：%s
+把下面的 Base64 联机码整段发给朋友，让他们在「加入房间」里粘贴即可。\n%s\n%s	Send the whole Base64 link code below to your friends; they just paste it into Join Room.\n%s\n%s	把下面的 Base64 聯機碼整段傳給朋友，讓他們在「加入房間」裡貼上即可。\n%s\n%s
+如果多人游戏列表里没有自动出现房间，请选择「直接连接」，\n地址填 %s\n（可点击下方的地址复制）。\n注意：使用离线登录时不要手动输入 IP！	If the room does not appear in the multiplayer list, choose Direct Connect and use this address:\n%s\n(click the address below to copy it).\nNote: do not type the IP manually when using an offline account!	如果多人遊戲清單裡沒有自動出現房間，請選擇「直接連線」，\n位址填 %s\n（可點擊下方的位址複製）。\n注意：使用離線登入時不要手動輸入 IP！
+在 TCL 启动器「联机 → 加入房间」中粘贴下面的 Base64 联机码，即可加入房间：\n%s\n%s	Paste the Base64 link code below into TCL's Multiplayer → Join Room to join:\n%s\n%s	在 TCL 啟動器「聯機 → 加入房間」中貼上下面的 Base64 聯機碼，即可加入房間：\n%s\n%s
+节点：%s%s	Node: %s%s	節點：%s%s
+（%d ms）	 (%d ms)	（%d ms）
+%d 人	%d players	%d 人
+在单人游戏的暂停菜单选择「对局域网开放」，然后输入端口数字。\n甚至可以输入其他游戏的端口……嗯……	Choose Open to LAN in the single-player pause menu, then enter the port.\nIt even works for other games...	在單人遊戲的暫停選單選擇「對區域網路開放」，然後輸入連接埠數字。\n甚至可以輸入其他遊戲的連接埠……嗯……
+无法连接到节点：可能的原因是网络环境不佳、房主已关闭房间或联机码输错。	Can't reach the node. The network may be poor, the host may have closed the room, or the link code may be wrong.	無法連線到節點：可能的原因是網路環境不佳、房主已關閉房間或聯機碼輸入錯誤。
+已选择节点 %s	Selected node %s	已選擇節點 %s
+联机模块已就绪	Multiplayer module ready	多人連線模組已就緒
+正在下载联机模块…	Downloading the multiplayer module…	正在下載多人連線模組…
+正在下载联机模块… %d%%	Downloading the multiplayer module… %d%%	正在下載多人連線模組… %d%%
+正在解压联机模块…	Extracting the multiplayer module…	正在解壓多人連線模組…
+联机模块准备完成	Multiplayer module ready	多人連線模組準備完成
+联机模块下载失败：%s	Multiplayer module download failed: %s	多人連線模組下載失敗：%s
+Windows 创建虚拟网卡需要管理员权限：请右键以管理员身份运行 TCL。	Creating the virtual adapter on Windows requires administrator rights. Right-click TCL and run as administrator.	Windows 建立虛擬網卡需要管理員權限：請右鍵以管理員身分執行 TCL。
+Linux 创建虚拟网卡需要 root 权限：请用 sudo 启动 TCL，或给 easytier-core 授予 CAP_NET_ADMIN。	Creating a virtual adapter on Linux requires root. Start TCL with sudo, or grant CAP_NET_ADMIN to easytier-core.	Linux 建立虛擬網卡需要 root 權限：請用 sudo 啟動 TCL，或給 easytier-core 授予 CAP_NET_ADMIN。
+联机模块 CLI 在 %dms 内没有响应	The multiplayer CLI did not respond within %d ms	多人連線模組 CLI 在 %dms 內沒有回應
+打开下载页	Open download page	開啟下載頁面
+正在检查…	Checking…	正在檢查…
+检查失败：%s	Check failed: %s	檢查失敗：%s
+GitHub 最新版本 v%s	Latest GitHub version v%s	GitHub 最新版本 v%s
+读取成功但提示失败，请到 Releases 页面查看	Read succeeded but the prompt failed; check the Releases page	讀取成功但提示失敗，請到 Releases 頁面查看
+证书校验失败，可能是代理或网络工具拦截了 GitHub，关掉代理再试。	Certificate validation failed; a proxy or network tool may be blocking GitHub. Turn it off and retry.	憑證驗證失敗，可能是代理或網路工具攔截了 GitHub，關閉代理後再試。
+连接 GitHub 超时，请检查网络后再试。	Connection to GitHub timed out; check your network and retry.	連線 GitHub 逾時，請檢查網路後再試。
+不隔离（多个版本共用 mods、saves）	Not isolated (versions share mods and saves)	不隔離（多個版本共用 mods、saves）
+已隔离（%s）	Isolated (%s)	已隔離（%s）
+（版本隔离）	 (isolated)	（版本隔離）
+名称不能为空。	Name cannot be empty.	名稱不能為空。
+名称不能超过 64 个字符。	Name cannot exceed 64 characters.	名稱不能超過 64 個字元。
+名称不能包含字符：%s	Name cannot contain: %s	名稱不能包含字元：%s
+名称不合法。	Invalid name.	名稱不合法。
+即将删除：\n· %s（配置、日志、缓存、联机内核）\n\n游戏目录与存档不会被触碰。此操作不可撤销，确认后启动器立即退出。	About to delete:\n· %s (config, logs, cache, multiplayer core)\n\nGame folders and saves will not be touched. This cannot be undone, and the launcher will exit immediately.	即將刪除：\n· %s（設定、日誌、快取、聯機核心）\n\n遊戲目錄與存檔不會被觸碰。此操作不可復原，確認後啟動器立即結束。
+游戏最新日志（latest.log）	Latest game log (latest.log)	遊戲最新日誌（latest.log）
+启动器日志（当前）	Launcher log (current)	啟動器日誌（目前）
+崩溃报告	Crash report	崩潰報告
+类型：	Type: 	類型：
+名称：	Name: 	名稱：
+游戏版本：	Game version: 	遊戲版本：
+加载器：	Loader: 	載入器：
+原始整合包.mrpack	Original modpack.mrpack	原始整合包.mrpack
+原始整合包.zip	Original modpack.zip	原始整合包.zip
+共找到 %d 个内嵌依赖：	Found %d embedded dependencies:	共找到 %d 個內嵌依賴：
+以下是该项目的 Mod 版本。点击这里查看其数据包版本。	These are the Mod versions. Click here for datapack versions.	以下是該專案的 Mod 版本。點擊這裡查看其資料包版本。
+以下是该项目的数据包版本。点击这里查看其 Mod 版本。	These are the datapack versions. Click here for Mod versions.	以下是該專案的資料包版本。點擊這裡查看其 Mod 版本。
+该资源需要以下前置，但在目标文件夹中未发现它们：\n	This resource requires the following prerequisites, but they were not found in the target folder:\n	該資源需要以下前置，但在目標資料夾中未發現它們：\n
+；另有以下前置无法自动解析，需要手动下载：%s	; the following prerequisites could not be resolved automatically and must be downloaded manually: %s	；另有以下前置無法自動解析，需要手動下載：%s
+\n是否一并下载这些前置？	\nDownload these prerequisites too?	\n是否一併下載這些前置？
+未找到该整合包所需的 %d 个内容，它们可能已被原作者删除。\n缺失这些内容可能导致整合包出现异常！是否继续安装？	Could not find %d files required by this modpack; the author may have deleted them.\nMissing content may break the modpack. Continue installing?	未找到該整合包所需的 %d 個內容，它們可能已被原作者刪除。\n缺失這些內容可能導致整合包出現異常！是否繼續安裝？
+该整合包包含 %d 个标记为可选的文件，是否一并下载？	This modpack has %d optional files. Download them too?	該整合包包含 %d 個標記為可選的檔案，是否一併下載？
+准备启动	Preparing	準備啟動
+你知道吗：	Did you know: 	你知道嗎：
+检查版本文件	Checking version files	檢查版本檔案
+校验资源完整性	Verifying resources	校驗資源完整性
+构建启动参数	Building launch arguments	建構啟動參數
+启动完成	Launch complete	啟動完成
+下载缺失文件 %d / %d	Downloading missing files %d / %d	下載缺失檔案 %d / %d
+本版本的 mods 在 %s 下，共享 mods 未复制	This version's mods are in %s; shared mods were not copied	本版本的 mods 在 %s 下，共用的 mods 未複製
+游戏目录：	Game folder: 	遊戲目錄：
+（已隔离）	 (isolated)	（已隔離）
+（共用）	 (shared)	（共用）
+Minecraft 的钻石剑其实是参考了经典传说中石中剑的造型！(๑•̀ㅂ•́)و	Minecraft's diamond sword was inspired by the legendary sword in the stone! (๑•̀ㅂ•́)و	Minecraft 的鑽石劍其實是參考了經典傳說中石中劍的造型！(๑•̀ㅂ•́)و
+苦力怕是因为代码 Bug 而诞生的，原本作者只是想制作一头猪……	The creeper was born from a code bug; the author originally wanted to make a pig...	苦力怕是因為程式碼 Bug 而誕生的，原本作者只是想製作一頭豬……
+Minecraft 最初只是一个洞穴游戏，后来才变成了沙盒生存游戏。	Minecraft started as a cave game and later became a sandbox survival game.	Minecraft 最初只是一個洞穴遊戲，後來才變成了沙盒生存遊戲。
+末影人英文名 Enderman，名字来源于 Slender Man 和 Minecraft 的合成。	The name Enderman is a blend of Slender Man and Minecraft.	末影人英文名 Enderman，名字來源於 Slender Man 和 Minecraft 的合成。
+金苹果曾经需要八个金块来合成，后来才改为八个金锭。	Golden apples once required eight gold blocks, later changed to eight gold ingots.	金蘋果曾經需要八個金塊來合成，後來才改為八個金錠。
+村庄与掠夺更新让村庄拥有了职业与工作站，这一切都源于村民 AI 重写。	Village & Pillage gave villagers professions and workstations, all built on a rewritten villager AI.	村莊與掠奪更新讓村莊擁有了職業與工作站，這一切都源於村民 AI 重寫。
+红石电路的设计灵感来自于现实中的数字逻辑电路。	Redstone circuits were inspired by real-world digital logic circuits.	紅石電路的設計靈感來自於現實中的數位邏輯電路。
+Minecraft 的世界生成基于柏林噪声，这就是地形看起来自然的原因……	Minecraft's world generation uses Perlin noise, which is why terrain looks natural...	Minecraft 的世界生成基於柏林雜訊，這就是地形看起來自然的原因……
+史蒂夫的默认名字其实来自社区投票，而亚历克斯则来自另一场投票。	Steve's default name came from a community vote, and Alex from another vote.	史蒂夫的預設名字其實來自社群投票，而亞歷克斯則來自另一場投票。
+在基岩版中，玩家可以利用一些特性实现快速移动，社区称之为管道飞行。	In Bedrock Edition, players can move quickly using certain quirks, known as pipe flying.	在基岩版中，玩家可以利用一些特性實現快速移動，社群稱之為管道飛行。
+1.16 下界更新重做了整个下界群系，是史上最大的一次维度更新之一。	The 1.16 Nether Update reworked the entire Nether, one of the largest dimension updates ever.	1.16 地獄更新重做了整個地獄生態域，是史上最大的一次維度更新之一。
+Minecraft 是全球销量最高的电子游戏，没有之一。٩(ˊᗜˋ*)۶	Minecraft is the best-selling video game of all time. ٩(ˊᗜˋ*)۶	Minecraft 是全球銷量最高的電子遊戲，沒有之一。٩(ˊᗜˋ*)۶
+创造模式的物品栏曾经非常简陋，连搜索框都没有。	Creative inventory used to be very basic, without even a search box.	創造模式的物品欄曾經非常簡陋，連搜尋框都沒有。
+潜影贝的设定参考了现实中的装饰性贝壳与收纳箱的混合体。	Shulker design mixes decorative shells and storage boxes.	潛影貝的設定參考了現實中的裝飾性貝殼與收納箱的混合體。
+养蜂人村民的蜂箱会吸引蜜蜂，而且蜜蜂会记住自己的家。(•̀ᴗ•́)	Beekeeper villagers' beehives attract bees, and bees remember their home. (•̀ᴗ•́)	養蜂人村民的蜂箱會吸引蜜蜂，而且蜜蜂會記住自己的家。(•̀ᴗ•́)
+启动游戏需要 Java 17 或更高版本。可以在「设置 → Java」中点击「检测 Java 环境…」，或手动选择 javaw.exe。\n启动前会检查 Java 版本，不满足要求时会提示切换。	Minecraft requires Java 17 or newer. Click Detect Java environment in Settings → Java, or choose javaw.exe manually.\nThe launcher checks the Java version before starting and offers to switch if needed.	啟動遊戲需要 Java 17 或更高版本。可以在「設定 → Java」中點擊「偵測 Java 環境…」，或手動選擇 javaw.exe。\n啟動前會檢查 Java 版本，不滿足要求時會提示切換。
+在「实例」页左侧点击「导入整合包」，选择 .zip 或 .mrpack 文件即可。\n导入完成后会在实例列表中生成一个新的实例。	On the Instances page, click Import Modpack on the left and choose a .zip or .mrpack file.\nA new instance will appear in the list when the import finishes.	在「實例」頁左側點擊「匯入整合包」，選擇 .zip 或 .mrpack 檔案即可。\n匯入完成後會在實例清單中產生一個新的實例。
+点击标题栏的账户徽章进入账户管理，选择账户后可以更换皮肤。\n离线账户支持在本地皮肤列表中选择，也可以导入自定义皮肤图片。	Click the account badge in the title bar to open account management, then choose an account to change its skin.\nOffline accounts can pick from local skins or import a custom image.	點擊標題列的帳戶徽章進入帳戶管理，選擇帳戶後可以更換皮膚。\n離線帳戶支援在本機皮膚清單中選擇，也可以匯入自訂皮膚圖片。
+请先检查「设置 → Java」中的 Java 路径是否正确，再尝试在版本设置中降低内存分配。\n如果仍然失败，可以打开「设置 → 日志」查看详细错误信息。	Check that the Java path in Settings → Java is correct, then try lowering memory in the version settings.\nIf it still fails, open Settings → Logs for details.	請先檢查「設定 → Java」中的 Java 路徑是否正確，再嘗試在版本設定中降低記憶體分配。\n如果仍然失敗，可以開啟「設定 → 日誌」查看詳細錯誤資訊。
+版本隔离会让每个游戏版本拥有独立的 mods、saves 与配置文件，避免不同版本之间互相影响。\n默认隔离所有版本，也可以在启动设置中修改。	Version isolation gives each game version its own mods, saves and config files so versions do not affect each other.\nAll versions are isolated by default; you can change this in Launch settings.	版本隔離會讓每個遊戲版本擁有獨立的 mods、saves 與設定檔，避免不同版本之間互相影響。\n預設隔離所有版本，也可以在啟動設定中修改。
+请填写认证服务器地址	Enter the authentication server address	請填寫認證伺服器位址
+认证服务器地址格式不正确：%s	Invalid authentication server address: %s	認證伺服器位址格式不正確：%s
+这不是 Yggdrasil API 地址：%s	This is not a Yggdrasil API address: %s	這不是 Yggdrasil API 位址：%s
+服务器没有返回 accessToken	The server returned no accessToken	伺服器沒有傳回 accessToken
+用户名或密码错误	Wrong username or password	使用者名稱或密碼錯誤
+登录已过期，请重新登录	Sign-in expired; sign in again	登入已過期，請重新登入
+用户名或密码错误，或登录已过期	Wrong username or password, or the sign-in expired	使用者名稱或密碼錯誤，或登入已過期
+服务器拒绝了这次登录，请检查账号状态	The server rejected this sign-in; check the account status	伺服器拒絕了這次登入，請檢查帳號狀態
+认证服务器返回 HTTP %d	The authentication server returned HTTP %d	認證伺服器傳回 HTTP %d
+服务器返回的不是 JSON，请检查地址是否为 Yggdrasil API	The server did not return JSON; check that the address is a Yggdrasil API	伺服器傳回的不是 JSON，請檢查位址是否為 Yggdrasil API
+服务器返回的 JSON 无法解析	The server's JSON could not be parsed	伺服器傳回的 JSON 無法解析
+这个账号还没有游戏角色，请先在皮肤站创建角色	This account has no game profile yet; create one on the skin site first	這個帳號還沒有遊戲角色，請先在皮膚站建立角色
+该账号有多个角色，选一个用来启动游戏。	This account has multiple profiles; choose one for launching.	該帳號有多個角色，選一個用來啟動遊戲。
+选择角色	Choose a profile	選擇角色
+联机码里的节点地址无效，请让房主重新复制。	The node address in the link code is invalid; ask the host to copy it again.	聯機碼裡的節點位址無效，請讓房主重新複製。
+2013 | 这个秘密计划了两年的更新将游戏推向了一个新高度！	2013 | This update, secretly planned for two years, took the game to a new level!	2013 | 這個秘密計畫了兩年的更新將遊戲推向了一個新高度！
+2015 | 作为一款全年龄向的游戏，我们需要和平，需要爱与拥抱。	2015 | As a game for all ages, we need peace, love and hugs.	2015 | 作為一款全年齡向的遊戲，我們需要和平，需要愛與擁抱。
+2016 | 是时候将现代科技带入 Minecraft 了！	2016 | Time to bring modern technology into Minecraft!	2016 | 是時候將現代科技帶入 Minecraft 了！
+2019 | 我们从地下室的废墟里找到了这个开发于 1994 年的杰作！	2019 | We found this 1994 masterpiece in the ruins of a basement!	2019 | 我們從地下室的廢墟裡找到了這個開發於 1994 年的傑作！
+2020 | 我们加入了 20 亿个新的维度，让无限的想象变成了现实！	2020 | We added two billion new dimensions and made unlimited imagination real!	2020 | 我們加入了 20 億個新的維度，讓無限的想像變成了現實！
+2022 | 一次一个方块更新！迎接全新的挖掘、合成与骑乘玩法吧！	2022 | One block at a time! Enjoy brand-new mining, crafting and riding!	2022 | 一次一個方塊更新！迎接全新的挖掘、合成與騎乘玩法吧！
+2023 | 研究表明：玩家喜欢作出选择——越多越好！	2023 | Research shows players love choices — the more the better!	2023 | 研究表明：玩家喜歡作出選擇——越多越好！
+2024 | 毒马铃薯一直都被大家忽视和低估，于是我们超级加强了它！	2024 | The poisonous potato was ignored and underestimated, so we super-charged it!	2024 | 毒馬鈴薯一直都被大家忽視和低估，於是我們超級加強了它！
+2025 | 你可以合成任何东西——包括合成你的世界！	2025 | You can craft anything — including crafting your world!	2025 | 你可以合成任何東西——包括合成你的世界！
+2026 | 为什么需要物品栏？让方块们跟着你走吧！	2026 | Who needs an inventory? Let the blocks follow you!	2026 | 為什麼需要物品欄？讓方塊們跟著你走吧！
+路径不合法	Invalid path	路徑不合法
+你已经启动了 %d 次 Minecraft！	You have launched Minecraft %d times!	你已經啟動了 %d 次 Minecraft！
+正在查询 %s …	Querying %s …	正在查詢 %s …
+ · 	 · 	 · 
+ 人 · 	 players · 	 人 · 
+离线 / 无法连接：%s	Offline / cannot connect: %s	離線 / 無法連線：%s
+你尚未开启版本隔离，多个 MC 版本会共用同一个 Mod 文件夹。\n因此，游戏可能会因为读取到与当前版本不符的 Mod 而崩溃。\n推荐先在 设置 → 启动选项 → 默认版本隔离 中开启版本隔离！	Version isolation is off, so multiple Minecraft versions share one Mod folder.\nThe game may crash after reading Mods meant for another version.\nTurn on Default version isolation in Settings → Launch first!	你尚未開啟版本隔離，多個 MC 版本會共用同一個 Mod 資料夾。\n因此，遊戲可能會因為讀取到與目前版本不符的 Mod 而崩潰。\n推薦先在 設定 → 啟動選項 → 預設版本隔離 中開啟版本隔離！
+联机基于 EasyTier 虚拟局域网（与陶瓦联机同一方案），房间内只有 Minecraft 的流量会被转发。\n无需管理员权限；房主在单人游戏中「对局域网开放」后即可创建房间。	Multiplayer runs on an EasyTier virtual LAN (the same approach as Taowa multiplayer); only Minecraft traffic is forwarded.\nNo administrator rights are needed; the host just opens the single-player world to LAN and creates a room.	聯機基於 EasyTier 虛擬區域網路（與陶瓦聯機同一方案），房間內只有 Minecraft 的流量會被轉發。\n無需管理員權限；房主在單人遊戲中「對區域網路開放」後即可建立房間。
+联机模块已崩溃，请重试或查看日志。	The multiplayer module crashed; retry or check the log.	多人連線模組已崩潰，請重試或查看日誌。
+联机模块校验失败，请更换下载节点后重试	The multiplayer module failed verification; switch download nodes and retry.	多人連線模組校驗失敗，請更換下載節點後重試。
+共 %d 个，已启用 %d 个。	%d total, %d enabled.	共 %d 個，已啟用 %d 個。
+%s列表	%s List	%s清單
+这个文件夹是空的。把 %s 的 .zip 或文件夹放入 %s 后点击刷新。	This folder is empty. Put the .zip files or folders for %s into %s, then click Refresh.	這個資料夾是空的。把 %s 的 .zip 或資料夾放入 %s 後點擊重新整理。
+可清理合计	Reclaimable	可清理合計
+仅统计磁盘占用；清理操作只作用于下方勾选的可再生缓存。	Only disk usage is counted; cleanup applies only to the regenerable caches selected below.	僅統計磁碟佔用；清理操作只作用於下方勾選的可再生快取。
+LittleSkin / 第三方 Yggdrasil	LittleSkin / Third-party Yggdrasil	LittleSkin / 第三方 Yggdrasil
+使用服务器码登录第三方服务器	Sign in to a third-party server with a server code	使用伺服器碼登入第三方伺服器
+确定要删除实例「%s」吗？	Delete the instance "%s"?	確定要刪除實例「%s」嗎？
+确定要删除实例「%s」吗？\n只会从列表中移除，不会删除磁盘文件。	Delete the instance "%s"?\nIt is only removed from the list; files on disk are kept.	確定要刪除實例「%s」嗎？\n只會從清單中移除，不會刪除磁碟檔案。
+确定要删除账户 %s 吗？此操作不可撤销。	Delete the account %s? This cannot be undone.	確定要刪除帳戶 %s 嗎？此操作無法復原。
+确定要删除合集「%s」吗？\n只会删掉这个标签，实例本身与其文件不受影响。	Delete the collection "%s"?\nOnly the tag is removed; instances and their files are unaffected.	確定要刪除合集「%s」嗎？\n只會刪掉這個標籤，實例本身與其檔案不受影響。
+确定要删除服务器“%s”吗？	Delete the server "%s"?	確定要刪除伺服器「%s」嗎？
+将删除 %s 并清空当前日志显示。是否继续？	This deletes %s and clears the current log view. Continue?	將刪除 %s 並清空目前日誌顯示。是否繼續？
+删除%s	Delete %s	刪除%s
+未找到该整合包所需的 %d 个内容，它们可能已被原作者删除。\n	Could not find %d items required by this modpack; the author may have deleted them.\n	找不到該整合包所需的 %d 個內容，它們可能已被原作者刪除。\n
+目前同时存在启用和禁用的两个 Mod 文件：\n - %s\n - %s	Both an enabled and a disabled copy of the mod exist:\n - %s\n - %s	目前同時存在啟用和停用的兩個 Mod 檔案：\n - %s\n - %s
+如果多人游戏列表里没有自动出现房间，请选择「直接连接」，\n地址填 %s\n	If the room does not appear in the multiplayer list, choose Direct Connection and enter:\n%s\n	如果多人遊戲清單裡沒有自動出現房間，請選擇「直接連線」，\n位址填 %s\n
+即将删除：\n· %s（配置、日志、缓存、联机内核）\n\n	About to delete:\n· %s (config, logs, cache, networking core)\n\n	即將刪除：\n· %s（設定、日誌、快取、聯機核心）\n\n
+搜索 %s	Search %s	搜尋 %s
+正在加载 %s 列表…	Loading %s list…	正在載入 %s 清單…
+无法获取%s列表：	Failed to load the %s list: 	無法取得%s清單：
+CurseForge 的内容没有取到（%s），当前仅显示 Modrinth 的结果。	CurseForge results are unavailable (%s); showing Modrinth results only.	沒有取得 CurseForge 的內容（%s），目前僅顯示 Modrinth 的結果。
+%s · 按下载量	%s · by downloads	%s · 按下載量
+ · 第 %d 页（%d）	 · page %d (%d)	 · 第 %d 頁（%d）
+%s 次下载	%s downloads	%s 次下載
+准备下载	Preparing download	準備下載
+下载整合包内容	Downloading modpack content	下載整合包內容
+正在压缩	Compressing	正在壓縮
+正在复制	Copying	正在複製
+正在备份	Backing up	正在備份
+补抓失败文件	Retrying failed files	重試失敗檔案
+ 依赖	 dependencies	 依賴
+预下载 	Pre-downloading 	預先下載 
+运行 	Running 	執行 
+运行 %s 安装器：%s	Running %s installer: %s	執行 %s 安裝器：%s
+运行 %s 安装器（%d 秒，下载依赖较慢请稍候）	Running %s installer (%d s; dependencies may take a while)	執行 %s 安裝器（%d 秒，下載依賴較慢請稍候）
+%s下载：%s	%s download: %s	%s 下載：%s

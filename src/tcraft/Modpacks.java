@@ -546,15 +546,15 @@ public final class Modpacks {
             if (!missing.isEmpty()) {
                 data_log("整合包缺失以下文件（可能已被原作者删除）：" + missing);
                 boolean go = askInBackground(win, "整合包内容缺失",
-                        "未找到该整合包所需的 " + missing.size() + " 个内容，它们可能已被原作者删除。\n"
-                                + "缺失这些内容可能导致整合包出现异常！是否继续安装？");
+                        Lang.tf("未找到该整合包所需的 %d 个内容，它们可能已被原作者删除。\n"
+                                + "缺失这些内容可能导致整合包出现异常！是否继续安装？", missing.size()));
                 if (!go) throw new java.io.IOException("已取消");
             }
         }
         // 可选文件合并成一次询问
         if (!optional.isEmpty()) {
             boolean dl = askInBackground(win, "下载可选文件",
-                    "该整合包包含 " + optional.size() + " 个标记为可选的文件，是否一并下载？");
+                    Lang.tf("该整合包包含 %d 个标记为可选的文件，是否一并下载？", optional.size()));
             if (!dl) optional.clear();
         }
         int total = Math.max(1, fileInfos.size());

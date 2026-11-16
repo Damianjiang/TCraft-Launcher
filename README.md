@@ -56,7 +56,7 @@ TCraft Launcher（简称 **TCL**）是用 JavaFX 写的 Minecraft 启动器。�
   </tr>
   <tr>
     <td><sub>版本设置：实例信息、内存分配、Java 运行时</sub></td>
-    <td><sub>联机房间：基于 EasyTier 虚拟局域网，凭邀请码直连</sub></td>
+    <td><sub>联机房间：基于 EasyTier 用户态组网，凭 Base64 联机码直连</sub></td>
   </tr>
 </table>
 
@@ -67,11 +67,11 @@ TCraft Launcher（简称 **TCL**）是用 JavaFX 写的 Minecraft 启动器。�
 | 模块 | 能力 |
 | --- | --- |
 | 启动 | 多文件夹多实例、收藏夹、内存分配可视化、进程优先级、启动加载窗、愚人节彩蛋 |
-| 账户 | 微软正版登录（浏览器登录后把地址栏链接粘回启动器）/ 离线登录 / 外置 Authlib 登录（LittleSkin 等） |
+| 账户 | 微软正版登录（浏览器输入设备码，授权后自动完成）/ 离线登录 / 外置 Authlib 登录（LittleSkin 等） |
 | 实例 | 版本隔离（默认开启，每个版本独立 mods / 存档 / 配置，库与资源共用）、版本独立设置、Mod / 存档 / 数据包 / 资源包 / 光影 / 截图 / 服务器管理、实例复制与导出 |
 | 整合包 | CurseForge、Modrinth 整合包导入 |
 | 下载 | 原版与 Forge / NeoForge / Fabric / OptiFine 安装；Mod / 整合包 / 数据包 / 资源包 / 光影 / 世界下载；多镜像测速自动择优 |
-| 联机 | 基于 EasyTier 的虚拟局域网：创建 / 加入房间，房主「对局域网开放」后朋友凭邀请码直连 |
+| 联机 | 基于 EasyTier `--no-tun` 用户态组网：创建 / 加入房间，房主「对局域网开放」后朋友凭 Base64 联机码直连，不需要管理员权限 |
 | 皮肤 | 2D 正视图 + 3D 模型预览 |
 | 其他 | 全局搜索（Ctrl+K）、任务管理与限速、多语言切换、背景音乐、日志落盘、错误报告一键导出（报错、堆栈、诊断与最近日志） |
 
@@ -90,7 +90,7 @@ TCraft Launcher（简称 **TCL**）是用 JavaFX 写的 Minecraft 启动器。�
 - 首次启动还会按当前系统下载 JavaFX 到 **`.tcl\dependencies\<平台>\openjfx`**（约 10 MB，之后复用）
 - 内置 jar 解到 **exe 同目录的 `.tcl`**（同 HMCL 的 `./.hmcl`），不会被清理工具当临时文件删；目录写不出来时弹窗提示换位置，不改写到 `%LOCALAPPDATA%`
 - 配置、日志、皮肤与实例图标在 `.tcl` 内，首次启动从旧的 `~/.tcraft-launcher-javafx` 迁移配置
-- 联机功能首次使用会按平台自动下载 EasyTier：Windows 需要管理员权限，macOS 按弹窗授权，Linux 建议 `sudo` 运行
+- 联机功能首次使用会按平台自动下载 EasyTier 到 `.tcl\EasyTier`，并校验 SHA-256；使用 `--no-tun` 用户态组网，Windows / macOS / Linux 都不需要管理员权限
 
 ## 编译与运行
 

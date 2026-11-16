@@ -1,6 +1,5 @@
 package tcraft;
 
-import java.net.URI;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;

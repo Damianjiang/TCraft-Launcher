@@ -14,9 +14,22 @@ import javafx.util.Duration;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /** 任务管理页。 */
 public class PageTasks implements Page {
+
+    private static final Pattern RUN_WITH_LOG = Pattern.compile("^运行 (.+) 安装器：(.+)$");
+    private static final Pattern RUN_WITH_TIME = Pattern.compile("^运行 (.+) 安装器（(\\d+) 秒，下载依赖较慢请稍候）$");
+    private static final String[] COUNT_PREFIXES = {
+            "下载依赖库", "下载资源文件", "补抓失败文件", "下载整合包内容", "正在压缩", "正在复制", "正在备份"
+    };
+    private static final String[] PREFIXES = {
+            "整合包安装：", "Mod 更新 · ", "导出存档 · ", "下载整合包资源 ", "复制实例 · ",
+            "导出整合包：", "备份实例 · ", "安装游戏版本 ", "正在运行 ", "预下载 ",
+            "安装 ", "下载 ", "运行 "
+    };
 
     private final MainWindow win;
     private final Data data = Data.get();
@@ -187,7 +200,7 @@ public class PageTasks implements Page {
             root.setBackground(Ui.fill(Theme.cardBg, 14));
             root.setEffect(Theme.shadow(16, 3, 0.14, Theme.text));
 
-            Label title = Ui.bold(task.title, 14, Theme.text);
+            Label title = Ui.bold(taskText(task.title), 14, Theme.text);
             stateLabel = Ui.label(stateText(task.state), 11.5, stateColor(task.state));
             Region sp = new Region();
             HBox.setHgrow(sp, Priority.ALWAYS);
@@ -210,7 +223,7 @@ public class PageTasks implements Page {
             StackPane.setAlignment(bar, Pos.CENTER_LEFT);
             progress.setMaxWidth(Double.MAX_VALUE);
 
-            stageLabel = Ui.label(task.stage, 11.5, Theme.gray2);
+            stageLabel = Ui.label(taskText(task.stage), 11.5, Theme.gray2);
             speedLabel = Ui.label(task.speed == null ? "" : task.speed, 11.5, Theme.gray3);
 
             subs = new VBox(3);
@@ -231,7 +244,7 @@ public class PageTasks implements Page {
                 case CANCELED -> icon = Theme.icon("x", 14, Theme.gray3);
                 default -> icon = Theme.icon("refresh-cw", 14, Theme.accent);
             }
-            Label name = Ui.label(sub.name, 11.5, sub.state == Tasks.State.RUNNING ? Theme.text : Theme.gray2);
+            Label name = Ui.label(taskText(sub.name), 11.5, sub.state == Tasks.State.RUNNING ? Theme.text : Theme.gray2);
             row.getChildren().addAll(icon, name);
             return row;
         }
@@ -241,7 +254,7 @@ public class PageTasks implements Page {
             bar.widthProperty().bind(track.widthProperty().multiply(task.progress));
             stateLabel.setText(stateText(task.state));
             stateLabel.setTextFill(stateColor(task.state));
-            stageLabel.setText(task.state == Tasks.State.FAILED && task.error != null ? task.error : task.stage);
+            stageLabel.setText(taskText(task.state == Tasks.State.FAILED && task.error != null ? task.error : task.stage));
             speedLabel.setText(task.speed == null ? "" : task.speed);
             cancel.setVisible(task.state == Tasks.State.RUNNING);
             subs.getChildren().clear();
@@ -249,12 +262,47 @@ public class PageTasks implements Page {
         }
     }
 
+    /** 任务标题/阶段/子任务在运行时写入，展示时统一补翻译。 */
+    static String taskText(String s) {
+        if (s == null || s.isEmpty()) return "";
+        String exact = Lang.t(s);
+        if (!exact.equals(s)) return exact;
+
+        Matcher m = RUN_WITH_LOG.matcher(s);
+        if (m.matches()) return Lang.tf("运行 %s 安装器：%s", m.group(1), m.group(2));
+        m = RUN_WITH_TIME.matcher(s);
+        if (m.matches()) return Lang.tf("运行 %s 安装器（%d 秒，下载依赖较慢请稍候）",
+                m.group(1), Integer.parseInt(m.group(2)));
+
+        if (s.startsWith("下载 ") && s.endsWith(" 安装器")) {
+            return Lang.t("下载 ") + s.substring(3, s.length() - 4) + Lang.t(" 安装器");
+        }
+        if (s.startsWith("正在运行 ") && s.endsWith(" 安装器")) {
+            return Lang.t("正在运行 ") + s.substring(5, s.length() - 4) + Lang.t(" 安装器");
+        }
+        if (s.startsWith("预下载 ") && s.contains(" 依赖")) {
+            int i = s.indexOf(" 依赖");
+            return Lang.t("预下载 ") + s.substring(4, i) + Lang.t(" 依赖") + s.substring(i + 3);
+        }
+        int dl = s.indexOf("下载：");
+        if (dl > 0 && dl <= 6) {
+            return Lang.tf("%s下载：%s", Lang.t(s.substring(0, dl)), s.substring(dl + 3));
+        }
+        for (String p : COUNT_PREFIXES) {
+            if (s.startsWith(p + " ")) return Lang.t(p) + s.substring(p.length());
+        }
+        for (String p : PREFIXES) {
+            if (s.startsWith(p)) return Lang.t(p) + s.substring(p.length());
+        }
+        return s;
+    }
+
     private String stateText(Tasks.State state) {
         return switch (state) {
-            case RUNNING -> "进行中";
-            case DONE -> "已完成";
-            case FAILED -> "失败";
-            default -> "已取消";
+            case RUNNING -> Lang.t("进行中");
+            case DONE -> Lang.t("已完成");
+            case FAILED -> Lang.t("失败");
+            default -> Lang.t("已取消");
         };
     }
 

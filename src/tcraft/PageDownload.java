@@ -35,7 +35,7 @@ public class PageDownload implements Page {
 
     @Override
     public double leftWidth() {
-        return 160;
+        return Lang.mode == 1 ? 190 : 160;
     }
 
     @Override
@@ -196,8 +196,9 @@ public class PageDownload implements Page {
         }
         if (data.isFallbackVersions()) {
             // 兜底数据要标注出来
-            vanillaBox.getChildren().add(Ui.hint("当前是离线兜底数据：官方版本清单拉取失败，版本与时间可能不完整。"
-                    + "联网后点「刷新」即可获取真实清单。", 2));
+            vanillaBox.getChildren().add(Ui.hint(
+                    Lang.t("当前是离线兜底数据：官方版本清单拉取失败，版本与时间可能不完整。")
+                            + Lang.t("联网后点「刷新」即可获取真实清单。"), 2));
         }
         Ui.Card latest = Ui.card("最新版本");
         latest.setSpacing(0);
@@ -205,14 +206,14 @@ public class PageDownload implements Page {
         if (release != null) {
             // McVersion 是共享对象，改 lore 会污染全局
             Data.McVersion copy = new Data.McVersion(release.id, release.type, release.time);
-            copy.lore = data.isFallbackVersions() ? "离线兜底数据 · " + release.time
-                    : "最新正式版，发布于 " + release.time;
+            copy.lore = data.isFallbackVersions() ? Lang.t("离线兜底数据 · ") + release.time
+                    : Lang.t("最新正式版，发布于 ") + release.time;
             latest.add(versionRow(copy, true));
         }
         if (snapshot != null) {
             Data.McVersion copy = new Data.McVersion(snapshot.id, snapshot.type, snapshot.time);
-            copy.lore = data.isFallbackVersions() ? "离线兜底数据 · " + snapshot.time
-                    : "最新预览版，发布于 " + snapshot.time;
+            copy.lore = data.isFallbackVersions() ? Lang.t("离线兜底数据 · ") + snapshot.time
+                    : Lang.t("最新预览版，发布于 ") + snapshot.time;
             latest.add(versionRow(copy, true));
         }
         VBox.setMargin(latest, new Insets(0, 0, 15, 0));
@@ -932,7 +933,7 @@ public class PageDownload implements Page {
         final int classId = classIdOf(category);
         final boolean isMod = category.equals("Mod");
 
-        TextField search = Ui.field("搜索 " + category);
+        TextField search = Ui.field(Lang.tf("搜索 %s", Lang.t(category)));
         search.setMaxWidth(Double.MAX_VALUE);
         search.setMinWidth(0);
         Label nameLabel = Ui.label("名称", 13, Theme.text);
@@ -943,7 +944,7 @@ public class PageDownload implements Page {
         Label verLabel = Ui.label("版本", 13, Theme.text);
         ComboBox<String> versionCombo = new ComboBox<>();
         versionCombo.setEditable(true);
-        versionCombo.getItems().add("全部 (也可自行输入)");
+        versionCombo.getItems().add(Lang.t("全部 (也可自行输入)"));
         // 自动带上当前实例的原版版本
         Data.Instance cur = data.instance();
         if (cur != null) {
@@ -1017,10 +1018,10 @@ public class PageDownload implements Page {
         hintErrorText = (Label) hintError.getChildren().get(1);
         hintError.setVisible(false);
         hintError.setManaged(false);
-        resourceLoadingHost = Ui.loadingCard("正在加载 " + category + " 列表…");
+        resourceLoadingHost = Ui.loadingCard(Lang.tf("正在加载 %s 列表…", Lang.t(category)));
         page.getChildren().addAll(hintError, resourceLoadingHost, status);
 
-        Ui.Card card = Ui.card(Lang.tf("%s 资源", category));
+        Ui.Card card = Ui.card(Lang.tf("%s 资源", Lang.t(category)));
         card.setSpacing(0);
         card.setContentPadding(new Insets(4, 12, 10, 12));
         final VBox rows = new VBox(0);
@@ -1075,7 +1076,7 @@ public class PageDownload implements Page {
         StackPane searchBtn = Ui.button("搜索", Ui.BTN_HIGHLIGHT, searchAction);
         StackPane resetBtn = Ui.button("重置条件", Ui.BTN_NORMAL, () -> {
             search.setText("");
-            versionCombo.getEditor().setText("全部 (也可自行输入)");
+            versionCombo.getEditor().setText(Lang.t("全部 (也可自行输入)"));
             versionCombo.getSelectionModel().select(0);
             sourceCombo.getSelectionModel().select(0);
             tagCombo.getSelectionModel().select(0);
@@ -1091,7 +1092,7 @@ public class PageDownload implements Page {
             actions.getChildren().add(
                     Ui.button("安装已有整合包", Ui.BTN_NORMAL, () -> PageInstance.importModpack(win)));
         }
-        Ui.Card searchCard = Ui.card("搜索 " + category);
+        Ui.Card searchCard = Ui.card(Lang.tf("搜索 %s", Lang.t(category)));
         searchCard.setContentPadding(new Insets(2, 15, 12, 15));
         VBox searchBody = new VBox(10, filters, actions);
         searchBody.setMaxWidth(Double.MAX_VALUE);
@@ -1226,9 +1227,9 @@ public class PageDownload implements Page {
                     } else if (fCfError != null && wantMr) {
                         // 原始错误已带括号指引，给一句干净说明
                         String why = fCfError.contains("API Key")
-                                ? "缺少 CurseForge API Key，可在 设置 → 系统 中配置"
+                                ? Lang.t("缺少 CurseForge API Key，可在 设置 → 系统 中配置")
                                 : fCfError;
-                        partial = "CurseForge 的内容没有取到（" + why + "），当前仅显示 Modrinth 的结果。";
+                        partial = Lang.tf("CurseForge 的内容没有取到（%s），当前仅显示 Modrinth 的结果。", why);
                     }
                 }
                 if (hintError != null) {
@@ -1240,16 +1241,18 @@ public class PageDownload implements Page {
                 }
                 if (fList.isEmpty()) {
                     status.setText(fError == null
-                            ? (resourcePage == 0 ? "该分类暂无资源" : "没有更多结果")
-                            : "无法获取" + category + "列表：" + fError);
+                            ? Lang.t(resourcePage == 0 ? "该分类暂无资源" : "没有更多结果")
+                            : Lang.tf("无法获取%s列表：", Lang.t(category)) + fError);
                     rows.getChildren().add(Ui.label(fError == null ? "换个关键词或放宽筛选试试。" : fError, 12.5, Theme.gray2));
                     prev.setDisable(resourcePage <= 0);
                     next.setDisable(true);
                     pageLab.setText(String.valueOf(resourcePage + 1));
                     return;
                 }
-                status.setText((q == null || q.isEmpty() ? category + " · 按下载量" : "「" + q + "」")
-                        + " · 第 " + (resourcePage + 1) + " 页（" + fList.size() + "）");
+                status.setText((q == null || q.isEmpty()
+                        ? Lang.tf("%s · 按下载量", Lang.t(category))
+                        : "「" + q + "」")
+                        + Lang.tf(" · 第 %d 页（%d）", resourcePage + 1, fList.size()));
                 for (Resource r : fList) rows.getChildren().add(resourceRow(r));
                 prev.setDisable(resourcePage <= 0);
                 next.setDisable(!hasMore);

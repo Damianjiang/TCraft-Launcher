@@ -1,11 +1,9 @@
 package tcraft;
 
-import javafx.animation.FadeTransition;
 import javafx.animation.PauseTransition;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.geometry.Pos;
-import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.SnapshotParameters;
 import javafx.scene.control.Button;
@@ -13,7 +11,6 @@ import javafx.scene.control.Label;
 import javafx.scene.image.PixelReader;
 import javafx.scene.image.WritableImage;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
@@ -63,7 +60,7 @@ public class App extends Application {
             Lang.reload();
             Theme.applyComponentOpacity();
             ui.setStatus("正在检查资源是否齐全…", 45);
-            // 清残留 easytier-core 放后台，不挡启动
+            // 清残留 easytier-core，不挡启动
             Thread cleanup = new Thread(EasyTier::killLeftovers, "TCL-Cleanup");
             cleanup.setDaemon(true);
             cleanup.start();
@@ -385,6 +382,8 @@ public class App extends Application {
                 Dialogs.skinPicker(window, a);
             }
             else if ("nide".equals(targetDialog)) Dialogs.nideCard(window);
+            else if ("ms".equals(targetDialog)) Dialogs.msLoginCard(window);
+            else if ("ygg".equals(targetDialog)) Dialogs.yggdrasilCard(window);
             else if ("luck".equals(targetDialog) || "count".equals(targetDialog)) {
                 window.openPage("other", false);
                 PauseTransition after = new PauseTransition(Duration.millis(400));
@@ -467,6 +466,6 @@ public class App extends Application {
     @Override
     public void stop() {
         EasyTier.stop();
-        // 残留 utun 交给下次 killLeftovers。
+        // 异常残留交给下次 killLeftovers。
     }
 }

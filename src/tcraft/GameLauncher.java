@@ -414,7 +414,7 @@ public final class GameLauncher {
         vars.put("auth_xuid", "");
         vars.put("natives_directory", nativesDir.toAbsolutePath().toString());
         vars.put("launcher_name", "TCraftLauncher");
-        vars.put("launcher_version", "1.3.7");
+        vars.put("launcher_version", Build.VERSION);
         vars.put("classpath", classpathStr);
         vars.put("classpath_separator", File.pathSeparator);
         vars.put("library_directory", game.resolve("libraries").toAbsolutePath().toString());
@@ -496,7 +496,7 @@ public final class GameLauncher {
         String brand = data.get("LaunchCustomInfo", "TCL");
         if (brand == null || brand.isBlank()) brand = "TCraftLauncher";
         cmd.add("-Dminecraft.launcher.brand=" + subst(brand, vars));
-        cmd.add("-Dminecraft.launcher.version=1.3.7");
+        cmd.add("-Dminecraft.launcher.version=" + Build.VERSION);
 
         // 第三方登录注入。
         if (account != null && "nide".equals(account.userType) && account.server != null && !account.server.isEmpty()) {
@@ -851,9 +851,16 @@ public final class GameLauncher {
     /** 准备 authlib-injector.jar，失败回落 BMCLAPI。 */
     private static void ensureAuthlibInjectorJar(Path jar) throws Exception {
         Tasks.Task probe = new Tasks.Task("t");
-        String text = Downloader.getText(
-                "https://authlib-injector.yushi.moe/artifact/latest.json",
-                "https://bmclapi2.bangbang93.com/mirrors/authlib-injector/artifact/latest.json");
+        String text;
+        try {
+            text = Downloader.getText(
+                    "https://authlib-injector.yushi.moe/artifact/latest.json",
+                    "https://bmclapi2.bangbang93.com/mirrors/authlib-injector/artifact/latest.json");
+        } catch (Exception e) {
+            // 断网时已有缓存就先用，别把外置登录整个拦住
+            if (Files.isRegularFile(jar)) return;
+            throw e;
+        }
         java.util.Map<String, Object> artifact = Json.obj(Json.obj(Json.parse(text)).get("artifact"));
         String sha1 = Json.str(Json.obj(artifact.get("checksums")), "sha1", "").toLowerCase();
         String url = Json.str(artifact, "downloadUrl", "");

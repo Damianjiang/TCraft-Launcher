@@ -38,7 +38,8 @@ public class PageSetup implements Page {
 
     @Override
     public double leftWidth() {
-        return 160;
+        // 英文分类名更长，侧栏固定 160 会被截成省略号
+        return Lang.mode == 1 ? 190 : 160;
     }
 
     @Override
@@ -314,10 +315,15 @@ public class PageSetup implements Page {
         Label maxVal = Ui.bold(data.getInt("LaunchRam", 4096) + " MB", 13, Theme.text);
         Ui.SliderBar maxRam = Ui.sliderBar(512, physicalRamMb(), data.getInt("LaunchRam", 4096));
         maxRam.setPrefWidth(260);
+        maxRam.setMinWidth(120);
         Label initVal = Ui.bold(initialRamLabel(), 13, Theme.text);
         Ui.SliderBar initRam = Ui.sliderBar(0, data.getInt("LaunchRam", 4096),
                 data.getInt("LaunchRamInitial", 0));
         initRam.setPrefWidth(260);
+        initRam.setMinWidth(120);
+        // 数值标签不参与压缩，窄窗口下截断成省略号的只会是滑条
+        maxVal.setMinWidth(Region.USE_PREF_SIZE);
+        initVal.setMinWidth(Region.USE_PREF_SIZE);
         Runnable syncRamEnabled = () -> {
             boolean editable = manual.isSelected();
             maxRam.setDisable(!editable);
@@ -333,34 +339,23 @@ public class PageSetup implements Page {
         });
         initRam.setOnChanged(b -> {
             int v = (int) (Math.round(b / 256.0) * 256);
-            initVal.setText(v == 0 ? "自动（最大内存的 1/4）" : v + " MB");
+            initVal.setText(v == 0 ? "自动" : v + " MB");
             data.set("LaunchRamInitial", v);
         });
         HBox maxRow = new HBox(12, maxRam, maxVal);
         HBox initRow = new HBox(12, initRam, initVal);
         maxRow.setAlignment(Pos.CENTER_LEFT);
         initRow.setAlignment(Pos.CENTER_LEFT);
-        // 用 Ui.animateExpand 展开，直接 setVisible 会跳
-        VBox ramDetail = new VBox(0);
-        ramDetail.getChildren().addAll(Ui.settingRow("最大内存", maxRow), Ui.settingRow("初始内存", initRow));
-        boolean manualOn = manual.isSelected();
-        ramDetail.setVisible(manualOn);
-        ramDetail.setManaged(manualOn);
-        if (!manualOn) {
-            ramDetail.setMaxHeight(0);
-            ramDetail.setOpacity(0);
-        }
+        // 滑条常驻显示，自动配置时置灰，用户能看到当前内存分配而不是整块消失
+        mem.add(radios, Ui.settingRow("最大内存", maxRow), Ui.settingRow("初始内存", initRow));
         auto.setOnAction(() -> {
             data.set("LaunchRamType", 0);
             syncRamEnabled.run();
-            Ui.animateExpand(ramDetail, false);
         });
         manual.setOnAction(() -> {
             data.set("LaunchRamType", 1);
             syncRamEnabled.run();
-            Ui.animateExpand(ramDetail, true);
         });
-        mem.add(radios, ramDetail);
 
         Ui.Check optimize = Ui.checkBox("启动游戏前进行内存优化", false);
         optimize.setSelected(data.getBool("LaunchOptimizeRam", true));
@@ -465,7 +460,7 @@ public class PageSetup implements Page {
 
     private String initialRamLabel() {
         int v = data.getInt("LaunchRamInitial", 0);
-        return v == 0 ? "自动（最大内存的 1/4）" : v + " MB";
+        return v == 0 ? "自动" : v + " MB";
     }
 
     /** 用物理内存和游戏分配值填占用条。 */
@@ -980,8 +975,8 @@ public class PageSetup implements Page {
         danger.add(desc);
         danger.add(standaloneButton("卸载 TCraft Launcher", Ui.BTN_RED, 170, () ->
                 Dialogs.confirm(win, "确认卸载 TCraft Launcher",
-                        "即将删除：\n· " + appData + "（配置、日志、缓存、联机内核）\n\n"
-                                + "游戏目录与存档不会被触碰。此操作不可撤销，确认后启动器立即退出。",
+                        Lang.tf("即将删除：\n· %s（配置、日志、缓存、联机内核）\n\n"
+                                + "游戏目录与存档不会被触碰。此操作不可撤销，确认后启动器立即退出。", appData),
                         () -> {
                             // 停掉残留进程，释放内核二进制
                             try {
@@ -1150,7 +1145,7 @@ public class PageSetup implements Page {
                     }
                 }),
                 Ui.button("清理历史日志", Ui.BTN_RED, () ->
-                        Dialogs.confirm(win, "清理历史日志", "将删除 " + logFile + " 并清空当前日志显示。是否继续？", () -> {
+                        Dialogs.confirm(win, "清理历史日志", Lang.tf("将删除 %s 并清空当前日志显示。是否继续？", logFile), () -> {
                             try {
                                 Files.deleteIfExists(logFile);
                             } catch (Exception ignored) {
@@ -1291,6 +1286,7 @@ public class PageSetup implements Page {
 
         Ui.Card overview = addCard(page, "存储总览");
         Label note = Ui.label("后台计算中…", 12, Theme.gray3);
+        note.setWrapText(true);
         overview.add(note);
         VBox bars = new VBox(8);
         overview.add(bars);
@@ -1316,8 +1312,8 @@ public class PageSetup implements Page {
                         sizeBar("游戏目录", game, game + cache + logs),
                         sizeBar("启动器缓存", cache, game + cache + logs),
                         sizeBar("日志文件", logs, game + cache + logs));
-                note.setText("仅统计磁盘占用；清理操作只作用于下方勾选的可再生缓存。");
-                totalLabel.setText("可清理合计 " + bytes(cache + temp + logs));
+                note.setText(Lang.t("仅统计磁盘占用；清理操作只作用于下方勾选的可再生缓存。"));
+                totalLabel.setText(Lang.t("可清理合计") + " " + bytes(cache + temp + logs));
                 list.getChildren().setAll(
                         cacheRow("启动器下载缓存", cacheCheck, cache),
                         cacheRow("临时日志文件", logCheck, logs),
@@ -1372,7 +1368,7 @@ public class PageSetup implements Page {
     }
 
     private HBox cacheRow(String title, Ui.Check box, long size) {
-        Label lab = Ui.label(title + "    " + bytes(size), 12.5, Theme.text);
+        Label lab = Ui.label(Lang.t(title) + "    " + bytes(size), 12.5, Theme.text);
         Region sp = new Region();
         HBox.setHgrow(sp, Priority.ALWAYS);
         HBox row = new HBox(10, lab, sp, box);

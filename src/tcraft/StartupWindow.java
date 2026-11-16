@@ -189,7 +189,8 @@ public final class StartupWindow {
     }
 
     private final class Panel extends java.awt.Panel {
-        private final Image logo = loadLogo();
+        private static final long serialVersionUID = 1L;
+        private final transient Image logo = loadLogo();
 
         Panel() {
             setLayout(null);

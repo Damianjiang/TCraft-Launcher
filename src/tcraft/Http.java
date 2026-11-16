@@ -22,7 +22,7 @@ public final class Http {
     private Http() {
     }
 
-    private static final String UA = "TCraftLauncher-JavaFX/1.3.7";
+    private static final String UA = "TCraftLauncher-JavaFX/" + Build.VERSION;
 
     /** 最多试 3 次，首发加两次重试。 */
     private static final int MAX_ATTEMPTS = 3;
@@ -441,6 +441,7 @@ public final class Http {
 
     /** 非 2xx 状态，区分可重试和不可重试。 */
     private static final class StatusException extends IOException {
+        private static final long serialVersionUID = 1L;
         final int code;
         final long retryAfterMs;
 

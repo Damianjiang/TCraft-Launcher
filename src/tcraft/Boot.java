@@ -2,7 +2,6 @@ package tcraft;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 
 /** 真正入口：JavaFX 起不来时落盘并弹 AWT 提示。 */
 public final class Boot {

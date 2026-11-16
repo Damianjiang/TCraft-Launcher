@@ -231,7 +231,8 @@ public class PageInstanceSetup implements Page {
                 }),
                 Ui.button("打开文件夹", Ui.BTN_NORMAL, () -> openFolder(instanceRoot().toString())),
                 Ui.button("复制实例", Ui.BTN_NORMAL, this::copyInstance),
-                Ui.button("删除实例", Ui.BTN_RED, () -> Dialogs.confirm(win, "删除实例", "确定要删除实例「" + ins.name + "」吗？",
+                Ui.button("删除实例", Ui.BTN_RED, () -> Dialogs.confirm(win, "删除实例",
+                        Lang.tf("确定要删除实例「%s」吗？", ins.name),
                         () -> {
                             data.instances.remove(ins);
                             data.selectedInstance = 0;
@@ -248,7 +249,7 @@ public class PageInstanceSetup implements Page {
         stats.add(row("游戏版本", ins.version),
                 row("加载器", ins.loader == null || ins.loader.isEmpty() ? "原版" : ins.loader + (ins.loaderVersion == null || ins.loaderVersion.isEmpty() ? "" : " " + ins.loaderVersion)),
                 row("上次游玩", ins.lastPlayed <= 0 ? "从未启动" : Instant.ofEpochMilli(ins.lastPlayed).atZone(ZoneId.systemDefault()).format(fmt)),
-                row("游戏目录", instanceRoot().toString() + (Isolation.on(ins) ? "（版本隔离）" : "")),
+                row("游戏目录", instanceRoot().toString() + (Isolation.on(ins) ? Lang.t("（版本隔离）") : "")),
                 row("Java 路径", data.javaPath.isEmpty() ? "未找到" : data.javaPath));
 
         Ui.Card actions = addCard(page, "快捷操作");
@@ -992,7 +993,7 @@ public class PageInstanceSetup implements Page {
         // 识别 .jar、.zip、.litemod，.disabled 为禁用
         List<Path> mods = listModFiles(modsDir);
         long enabledCount = mods.stream().filter(p -> !isDisabledPack(p)).count();
-        header(page, "Mod 管理", "共 " + mods.size() + " 个，已启用 " + enabledCount + " 个。");
+        header(page, "Mod 管理", Lang.tf("共 %d 个，已启用 %d 个。", mods.size(), enabledCount));
         HBox actions = new HBox(10);
         actions.getChildren().addAll(
                 Ui.button("打开 Mod 文件夹", Ui.BTN_NORMAL, () -> {
@@ -1170,7 +1171,7 @@ public class PageInstanceSetup implements Page {
 
     /** 确认后移入回收站。 */
     private void deleteFile(Path file, String kind) {
-        Dialogs.confirm(win, "删除" + kind, Lang.tf("确定要删除 %s 吗？文件将移入回收站。", file.getFileName()), () -> {
+        Dialogs.confirm(win, Lang.tf("删除%s", Lang.t(kind)), Lang.tf("确定要删除 %s 吗？文件将移入回收站。", file.getFileName()), () -> {
             // 回收站要等 PowerShell 进程，不能放 FX 线程
             Thread worker = new Thread(() -> {
                 boolean ok = Shell.deleteToRecycleBin(file.toString());
@@ -1288,11 +1289,11 @@ public class PageInstanceSetup implements Page {
         // 文件和文件夹都算，.disabled 表示禁用
         List<Path> packs = listPacks(dir);
         long enabledCount = packs.stream().filter(p -> !isDisabledPack(p)).count();
-        header(page, label, "共 " + packs.size() + " 个，已启用 " + enabledCount + " 个。");
+        header(page, label, Lang.tf("共 %d 个，已启用 %d 个。", packs.size(), enabledCount));
         if (isShader) {
             String current = currentShader(root);
             if (!current.isEmpty()) {
-                page.getChildren().add(Ui.hint("当前使用光影包：" + current, 0));
+                page.getChildren().add(Ui.hint(Lang.t("当前使用光影包：") + current, 0));
                 VBox.setMargin(page.getChildren().get(page.getChildren().size() - 1), new Insets(0, 0, 12, 0));
             }
             if (!hasShaderLoader()) {
@@ -1313,9 +1314,12 @@ public class PageInstanceSetup implements Page {
                 Ui.button("刷新", Ui.BTN_NORMAL, () -> win.refreshRight()));
         page.getChildren().add(actions);
         VBox.setMargin(page.getChildren().get(page.getChildren().size() - 1), new Insets(0, 0, 12, 0));
-        Ui.Card card = addCard(page, label + "列表");
+        Ui.Card card = addCard(page, Lang.tf("%s列表", Lang.t(label)));
         if (packs.isEmpty()) {
-            card.add(Ui.label("这个文件夹是空的。把 " + label + " 的 .zip 或文件夹放入 " + folder + " 后点击刷新。", 12.5, Theme.gray2));
+            Label empty = Ui.label(Lang.tf("这个文件夹是空的。把 %s 的 .zip 或文件夹放入 %s 后点击刷新。",
+                    Lang.t(label), folder), 12.5, Theme.gray2);
+            empty.setWrapText(true);
+            card.add(empty);
         } else {
             for (Path pack : packs) {
                 String name = pack.getFileName().toString();
@@ -1836,7 +1840,7 @@ public class PageInstanceSetup implements Page {
                     case "上移" -> moveServer(entry, -1, refresh);
                     case "下移" -> moveServer(entry, 1, refresh);
                     case "编辑" -> editServerDialog(entry, refresh);
-                    case "删除" -> Dialogs.confirm(win, "删除服务器", "确定要删除服务器“" + entry.name + "”吗？", () -> {
+                    case "删除" -> Dialogs.confirm(win, "删除服务器", Lang.tf("确定要删除服务器“%s”吗？", entry.name), () -> {
                         serverList.remove(entry);
                         saveServers();
                         refresh.run();
@@ -2116,12 +2120,23 @@ public class PageInstanceSetup implements Page {
 
     /** 清单文件行，缺失时可下载。 */
     private void compManifestRow(Ui.Card list, String relativePath, long size, String url) {
-        Path target = instanceRoot().resolve(relativePath.replace('/', '\\'));
+        Path root = instanceRoot().toAbsolutePath().normalize();
+        Path target = root.resolve(relativePath.replace('/', java.io.File.separatorChar)).normalize();
+        if (!target.startsWith(root)) {
+            Ui.ListItem bad = new Ui.ListItem(Theme.icon("file-x", 15, Theme.gray4),
+                    relativePath, null, 40);
+            bad.title.setTextFill(Theme.gray4);
+            bad.info.setText(Lang.t("路径不合法"));
+            bad.info.setVisible(true);
+            bad.info.setManaged(true);
+            list.add(bad);
+            return;
+        }
         boolean exists = Files.isRegularFile(target);
         Ui.ListItem row = new Ui.ListItem(Theme.icon(exists ? "file-check" : "file-x", 15,
                 exists ? Theme.text : Theme.gray4), relativePath, null, 40);
         row.title.setTextFill(exists ? Theme.text : Theme.gray4);
-        String info = (size > 0 ? (size / 1024) + " KB · " : "") + (exists ? "已存在" : "缺失");
+        String info = (size > 0 ? (size / 1024) + " KB · " : "") + (exists ? Lang.t("已存在") : Lang.t("缺失"));
         row.info.setText(info);
         row.info.setVisible(true);
         row.info.setManaged(true);
@@ -2265,7 +2280,7 @@ public class PageInstanceSetup implements Page {
             jijTip.setText("该 Mod 不包含内嵌依赖（Jar-in-Jar）。");
             return;
         }
-        jijTip.setText("共找到 " + jars.size() + " 个内嵌依赖：");
+        jijTip.setText(Lang.tf("共找到 %d 个内嵌依赖：", jars.size()));
         for (String[] jar : jars) {
             String entryName = jar[0];
             long size;

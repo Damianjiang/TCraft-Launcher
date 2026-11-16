@@ -9,7 +9,6 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.*;
 
 import java.io.File;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Locale;
@@ -289,7 +288,7 @@ public class PageOther implements Page {
         VBox linkBody = new VBox(15);
         linkBody.setPadding(new Insets(10, 0, 4, 0));
         linkBody.getChildren().addAll(
-                Ui.label("创建一个联机房间，把单人存档分享给朋友一起玩；也可以输入收到的邀请码，加入别人的房间。", 12.5, Theme.gray1),
+                Ui.label("创建一个联机房间，把单人存档分享给朋友一起玩；也可以粘贴收到的 Base64 联机码，加入别人的房间。", 12.5, Theme.gray1),
                 Ui.button("打开联机", Ui.BTN_HIGHLIGHT, () -> win.openPage("link", true)));
         ((Label) linkBody.getChildren().get(0)).setWrapText(true);
         linkCard.add(linkBody);
@@ -520,7 +519,7 @@ public class PageOther implements Page {
     /** 启动次数弹窗，读的是游戏启动计数。 */
     private void showLaunchCount() {
         int count = data.getInt("SystemLaunchCount", 0);
-        Dialogs.message(win, "启动次数", "你已经启动了 " + count + " 次 Minecraft！");
+        Dialogs.message(win, "启动次数", Lang.tf("你已经启动了 %d 次 Minecraft！", count));
     }
 
     private void customDownload(TextField url, TextField name) {
@@ -531,7 +530,8 @@ public class PageOther implements Page {
         }
         String n = name.getText() == null ? "" : name.getText().trim();
         if (n.isEmpty()) n = u.substring(u.lastIndexOf('/') + 1);
-        if (n.isEmpty()) n = "download";
+        n = n.replaceAll("[\\\\/:*?\"<>|]", "_");
+        if (n.isEmpty() || ".".equals(n) || "..".equals(n)) n = "download";
         final String nameFinal = n;
         final String urlFinal = u;
         Thread dl = new Thread(() -> {
@@ -624,18 +624,18 @@ public class PageOther implements Page {
     private void queryServer(TextField addr, Label result) {
         String host = addr.getText() == null ? "" : addr.getText().trim();
         if (host.isEmpty()) return;
-        result.setText("正在查询 " + host + " …");
+        result.setText(Lang.tf("正在查询 %s …", host));
         final String hostFinal = host;
         // 真实 SLP 查询：握手、状态响应、延迟
         Thread worker = new Thread(() -> {
             Servers.PingResult ping = Servers.ping(hostFinal, 3000);
             String info;
             if (ping.online) {
-                info = "在线 · " + ping.version + " · " + ping.players + "/" + ping.maxPlayers
-                        + " 人 · " + ping.latency + " ms" + (ping.motd.isEmpty() ? "" : "\n" + ping.motd);
+                info = Lang.t("在线 · ") + ping.version + Lang.t(" · ") + ping.players + "/" + ping.maxPlayers
+                        + Lang.t(" 人 · ") + ping.latency + " ms" + (ping.motd.isEmpty() ? "" : "\n" + ping.motd);
             } else {
-                info = "离线 / 无法连接：" + (ping.errorMessage == null || ping.errorMessage.isEmpty()
-                        ? "服务器没有响应状态查询" : ping.errorMessage);
+                info = Lang.tf("离线 / 无法连接：%s", ping.errorMessage == null || ping.errorMessage.isEmpty()
+                        ? Lang.t("服务器没有响应状态查询") : ping.errorMessage);
             }
             javafx.application.Platform.runLater(() -> result.setText(info));
         }, "TCL-ServerQuery");
