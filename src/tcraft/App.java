@@ -304,8 +304,9 @@ public class App extends Application {
             if (a.startsWith("--blur=")) blurArg = a.substring(7);  // 改背景模糊半径
         }
         final boolean openLang = langMenu;
-        SNAPSHOT_MODE = true; // 截图链路，不回写用户状态
+        // 只有真的带截图参数才进截图模式，否则正常启动会被当成自检
         if (page == null && dialog == null && !openLang) return;
+        SNAPSHOT_MODE = true; // 截图链路，不回写用户状态
         final String targetPage = page;
         final String targetDialog = dialog;
         final String targetSel = selArg;

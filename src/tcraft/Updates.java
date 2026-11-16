@@ -113,9 +113,10 @@ public final class Updates {
         thread.setDaemon(true);
         thread.start();
 
-        // 超时只在后台打标记，不碰界面
+        // 超时只在后台打标记，不碰界面；已有结果或已收尾就别再覆盖
         TIMEOUT.schedule(() -> {
-            if (generation != GENERATION.get()) return;
+            if (generation != GENERATION.get() || !checking) return;
+            if (pendingGen == generation) return;
             pendingError = new IOException("连接超时");
             pendingGen = generation;
             Data.get().log("检查更新超时：12 秒没有返回");
