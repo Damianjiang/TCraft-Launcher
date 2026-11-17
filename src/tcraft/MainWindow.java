@@ -127,6 +127,9 @@ public class MainWindow {
     /** 顶部语言弹层。 */
     private Popup langPopup;
 
+    /** 拖入文件/文件夹时的提示层。 */
+    private StackPane dropLayer;
+
     /** 次级页标题层：返回键 + 页名，只切透明度。 */
     private HBox titleInner;
     private javafx.scene.Node leftGroup;
@@ -178,7 +181,7 @@ public class MainWindow {
         });
         shot.play();
     }
-    private int extraShown = 0;
+    private int extraShown = -1;
 
     public MainWindow(Stage stage) {
         this.stage = stage;
@@ -218,6 +221,7 @@ public class MainWindow {
         stage.setAlwaysOnTop(false);
         restoreWindowBounds();
         installResize(scene);
+        installDropTarget(scene);
         scene.addEventFilter(KeyEvent.KEY_PRESSED, e -> {
             if (e.isControlDown() && e.getCode() == KeyCode.K) {
                 showGlobalSearch();
@@ -339,9 +343,13 @@ public class MainWindow {
             boolean april = PageLaunch.isAprilEnabled() && "launch".equals(currentKey);
             setExtraVisible(btnExtraApril, april);
         }
-        extraShown = 0;
-        for (Node n : extraRight.getChildren()) if (n.isVisible()) extraShown++;
-        StackPane.setMargin(toastList, new Insets(0, 20, extraShown > 0 ? 72 : 20, 0));
+        int shown = 0;
+        for (Node n : extraRight.getChildren()) if (n.isVisible()) shown++;
+        // 每 250ms 调一次，只有数量变化才改边距，避免无谓布局
+        if (shown != extraShown) {
+            extraShown = shown;
+            StackPane.setMargin(toastList, new Insets(0, 20, shown > 0 ? 72 : 20, 0));
+        }
     }
 
     /** 立即重算右下角按钮可见性。 */
@@ -545,8 +553,6 @@ public class MainWindow {
             view.setMouseTransparent(true);
             // UniformToFill 效果，JavaFX 得用 viewport 模拟。
             player.setOnReady(() -> applyVideoViewport(view));
-            body.widthProperty().addListener((o, a, b) -> applyVideoViewport(view));
-            body.heightProperty().addListener((o, a, b) -> applyVideoViewport(view));
             // 视频层跟随背景不透明度。
             view.setOpacity(data.getInt("UiBackgroundOpacity", 1000) / 1000.0);
             // 视频层夹在背景图和内容之间。
@@ -675,7 +681,6 @@ public class MainWindow {
 
     private void buildFrame() {
         frame = new StackPane();
-        // 主体铺满根节点。
         frame.setMaxWidth(Double.MAX_VALUE);
         frame.setMaxHeight(Double.MAX_VALUE);
         // 投影放独立底板，避免整窗逐帧重绘
@@ -695,6 +700,9 @@ public class MainWindow {
         frameBox.setClip(clip);
         titleBar = buildTitleBar();
         body = buildBody();
+        // 尺寸监听只挂一次，切视频时直接复用当前 vidBack
+        body.widthProperty().addListener((o, a, b) -> applyVideoViewport(vidBack));
+        body.heightProperty().addListener((o, a, b) -> applyVideoViewport(vidBack));
         VBox.setVgrow(body, Priority.ALWAYS);
         frameBox.getChildren().addAll(titleBar, body);
 
@@ -714,7 +722,23 @@ public class MainWindow {
         searchLayer.setVisible(false);
         searchLayer.setBackground(Ui.fill(Color.web("#000000", 0.20), 0));
 
-        StackPane overlayLayer = new StackPane(modalLayer, searchLayer);
+        dropLayer = new StackPane();
+        dropLayer.setVisible(false);
+        dropLayer.setMouseTransparent(true);
+        dropLayer.setBackground(Ui.fill(Color.web("#000000", 0.10), 0));
+        VBox dropCard = new VBox(6);
+        dropCard.setPadding(new Insets(16, 26, 18, 26));
+        dropCard.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
+        dropCard.setAlignment(Pos.CENTER);
+        dropCard.setBackground(Ui.fill(Theme.cardBg, 14));
+        dropCard.setBorder(Ui.border(Theme.accent, 14, 2));
+        dropCard.setEffect(Theme.shadow(22, 4, 0.24, Theme.text));
+        dropCard.getChildren().addAll(
+                Ui.bold("松开鼠标开始导入", 16, Theme.text),
+                Ui.label("整合包 .zip / .mrpack，或包含 .minecraft 的游戏目录", 12, Theme.gray2));
+        dropLayer.getChildren().add(dropCard);
+
+        StackPane overlayLayer = new StackPane(modalLayer, searchLayer, dropLayer);
         overlayLayer.setPickOnBounds(false);
         Rectangle overlayClip = new Rectangle();
         overlayClip.setArcWidth(windowRadius() * 2);
@@ -2481,23 +2505,6 @@ public class MainWindow {
         langPopup = Ui.menuCard(anchor, rows);
     }
 
-    /** 关闭语言弹层：85ms 淡出后再 hide。 */
-    private void closeLanguageMenu() {
-        if (langPopup == null) return;
-        Popup popup = langPopup;
-        langPopup = null;
-        Node card = popup.getContent().isEmpty() ? null : popup.getContent().get(0);
-        if (card == null) {
-            popup.hide();
-            return;
-        }
-        Timeline out = new Timeline(
-                new KeyFrame(Duration.ZERO, new KeyValue(card.opacityProperty(), card.getOpacity())),
-                new KeyFrame(Duration.millis(85), new KeyValue(card.opacityProperty(), 0)));
-        out.setOnFinished(e -> popup.hide());
-        out.play();
-    }
-
     public void rebuildUi() {
         String keep = currentKey;
         if (currentPage != null) currentPage.onHide();
@@ -2970,6 +2977,50 @@ public class MainWindow {
         pt.play();
     }
 
+    /** 拖入整合包文件或游戏目录：和按钮走同一套导入流程。 */
+    private void installDropTarget(Scene scene) {
+        scene.setOnDragOver(e -> {
+            var files = e.getDragboard().getFiles();
+            if (!files.isEmpty() && isDropCandidate(files.get(0))) {
+                e.acceptTransferModes(javafx.scene.input.TransferMode.COPY);
+                if (dropLayer != null) dropLayer.setVisible(true);
+                e.consume();
+            }
+        });
+        scene.setOnDragExited(e -> hideDropHint());
+        scene.setOnDragDropped(e -> {
+            hideDropHint();
+            var files = e.getDragboard().getFiles();
+            if (files.isEmpty()) return;
+            boolean done = false;
+            java.io.File file = files.get(0);
+            if (file.isDirectory()) {
+                PageInstance.addGameFolder(this, file.toPath());
+                done = true;
+            } else {
+                String name = file.getName().toLowerCase(java.util.Locale.ROOT);
+                if (name.endsWith(".zip") || name.endsWith(".mrpack")) {
+                    PageInstance.importModpack(this, file.toPath());
+                    done = true;
+                } else {
+                    toast("无法识别拖入的文件", "支持 .zip / .mrpack 整合包或游戏目录", 2);
+                }
+            }
+            e.setDropCompleted(done);
+            e.consume();
+        });
+    }
+
+    private static boolean isDropCandidate(java.io.File file) {
+        if (file.isDirectory()) return true;
+        String name = file.getName().toLowerCase(java.util.Locale.ROOT);
+        return name.endsWith(".zip") || name.endsWith(".mrpack");
+    }
+
+    private void hideDropHint() {
+        if (dropLayer != null) dropLayer.setVisible(false);
+    }
+
     private void installResize(Scene scene) {
         scene.addEventFilter(MouseEvent.MOUSE_MOVED, e -> {
             if (closing) return;
@@ -3051,9 +3102,5 @@ public class MainWindow {
     public void openResourceDetail(ResourceInfo info) {
         pendingResource = info;
         openPage("resourceDetail", true);
-    }
-
-    public Data.Instance selectedInstance() {
-        return data.instance();
     }
 }

@@ -77,14 +77,6 @@ public final class Errors {
         window = w;
     }
 
-    public static void detach() {
-        window = null;
-        synchronized (QUEUE) {
-            QUEUE.clear();
-        }
-        showing = false;
-    }
-
     /** 默认档，出错并询问是否反馈。 */
     public static void error(String brief, Throwable ex) {
         error(brief, ex, Behavior.ALERT_FEEDBACK);
@@ -521,13 +513,11 @@ public final class Errors {
     }
 
     /** 令牌和本机用户名不能进日志或剪贴板。 */
-    private static String sanitize(String s) {
+    static String sanitize(String s) {
         if (s == null || s.isEmpty()) return "";
-        String out = s;
+        String out = Redact.apply(s);
         String home = System.getProperty("user.home");
         if (home != null && !home.isEmpty()) out = out.replace(home, "<HOME>");
-        out = out.replaceAll("(?i)(access[_-]?token[=:]{1,3})[A-Za-z0-9._-]{12,}", "$1<TOKEN>");
-        out = out.replaceAll("(?i)(Bearer\\s+)[A-Za-z0-9._-]{12,}", "$1<TOKEN>");
         return out;
     }
 
@@ -543,13 +533,13 @@ public final class Errors {
         try {
             Path dir = Resources.home();
             Files.createDirectories(dir);
-            String entry = "[" + LocalDateTime.now() + "] " + title + " — " + headline
-                    + "\n" + detail + "\n\n";
-            Files.writeString(dir.resolve("errors.log"), sanitize(entry), StandardCharsets.UTF_8,
+            String entry = sanitize("[" + LocalDateTime.now() + "] " + title + " — " + headline
+                    + "\n" + detail + "\n\n");
+            Files.writeString(dir.resolve("errors.log"), entry, StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE, StandardOpenOption.APPEND);
             // crash.txt 单独留一份堆栈。
             Files.writeString(dir.resolve("crash.txt"),
-                    "[" + LocalDateTime.now() + "] " + title + " — " + headline + "\n" + detail + "\n",
+                    sanitize("[" + LocalDateTime.now() + "] " + title + " — " + headline + "\n" + detail + "\n"),
                     StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
         } catch (Throwable ignored) {
         }

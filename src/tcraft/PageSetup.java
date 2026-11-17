@@ -1181,11 +1181,22 @@ public class PageSetup implements Page {
         Label status = Ui.label("实时监听 launcher.log…", 11.5, Theme.gray3);
         live.add(status);
         final Timeline[] tick = new Timeline[1];
+        final String[] lastKey = {""};
         tick[0] = new Timeline(new KeyFrame(javafx.util.Duration.millis(600), e -> {
             if (page.getScene() == null) {
                 tick[0].stop();
                 return;
             }
+            // 文件大小和筛选条件都没变就不重读整份日志
+            long size;
+            try {
+                size = Files.size(logFile);
+            } catch (Exception ex) {
+                size = 0;
+            }
+            String key = size + "|" + level.getSelectionModel().getSelectedIndex() + "|" + filter.getText();
+            if (key.equals(lastKey[0])) return;
+            lastKey[0] = key;
             String[] lines = readLogLines(logFile);
             String text = filterLog(lines, level.getSelectionModel().getSelectedIndex(), filter.getText());
             if (!text.equals(view.getText())) {
@@ -1272,7 +1283,8 @@ public class PageSetup implements Page {
             String content = all && Files.isRegularFile(source)
                     ? Files.readString(source, java.nio.charset.StandardCharsets.UTF_8)
                     : String.join("\n", data.log);
-            Files.writeString(file.toPath(), content, java.nio.charset.StandardCharsets.UTF_8);
+            // 旧版本日志可能残留未脱敏的令牌
+            Files.writeString(file.toPath(), Redact.apply(content), java.nio.charset.StandardCharsets.UTF_8);
             win.toast("导出完成", file.getName(), 1);
         } catch (Exception e) {
             win.toast("导出失败", e.getMessage(), 3);
@@ -1331,20 +1343,29 @@ public class PageSetup implements Page {
         actions.getChildren().addAll(
                 Ui.button("清理所选缓存", Ui.BTN_RED, () ->
                         Dialogs.confirm(win, "清理所选缓存",
-                                "将删除：\n· " + (cacheCheck.isSelected() ? cacheDir : "（跳过）启动器下载缓存")
+                                "将删除：\n· " + (cacheCheck.isSelected() ? "启动器下载缓存" : "（跳过）启动器下载缓存")
                                         + "\n· " + (logCheck.isSelected() ? "临时日志文件" : "（跳过）临时日志文件")
                                         + "\n· " + (tempCheck.isSelected() ? "临时文件（.tmp / .part）" : "（跳过）临时文件")
                                         + "\n\n不会删除游戏存档与已安装版本。是否继续？",
                                 () -> {
-                                    long freed = 0;
-                                    if (cacheCheck.isSelected()) {
-                                        freed += dirSize(cacheDir, 20000);
-                                        deleteDir(cacheDir);
-                                    }
-                                    if (tempCheck.isSelected()) freed += deleteTemp(cacheDir);
-                                    if (logCheck.isSelected()) freed += deleteLogs(base);
-                                    win.toast("清理完成", "已释放 " + bytes(freed), 1);
-                                    if (refresh[0] != null) refresh[0].run();
+                                    boolean clearCache = cacheCheck.isSelected();
+                                    boolean clearTemp = tempCheck.isSelected();
+                                    boolean clearLog = logCheck.isSelected();
+                                    // 删文件可能很慢，放后台，完成后再回 UI
+                                    new Thread(() -> {
+                                        long freed = 0;
+                                        if (clearCache) {
+                                            freed += dirSize(cacheDir, 20000);
+                                            deleteDir(cacheDir);
+                                        }
+                                        if (clearTemp) freed += deleteTemp(cacheDir);
+                                        if (clearLog) freed += deleteLogs(base);
+                                        long total = freed;
+                                        Platform.runLater(() -> {
+                                            win.toast("清理完成", "已释放 " + bytes(total), 1);
+                                            if (refresh[0] != null) refresh[0].run();
+                                        });
+                                    }, "TCL-Cache-Clean").start();
                                 }, true)),
                 Ui.button("检查无用文件", Ui.BTN_NORMAL, () -> new Thread(() -> {
                     long[] result = scanJunk(cacheDir, base);

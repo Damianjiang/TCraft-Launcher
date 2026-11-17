@@ -98,6 +98,7 @@ public final class Yggdrasil {
     /** 用户名密码登录。clientToken 为空就生成一个。 */
     public static Session authenticate(Server server, String username, String password, String clientToken)
             throws IOException, AuthException {
+        requireSecure(server);
         String token = clientToken == null || clientToken.isEmpty()
                 ? UUID.randomUUID().toString() : clientToken;
         String body = "{\"agent\":{\"name\":\"Minecraft\",\"version\":1},"
@@ -176,6 +177,18 @@ public final class Yggdrasil {
 
     private static Profile profile(Map<String, Object> m) {
         return new Profile(Json.str(m, "id", ""), Json.str(m, "name", ""));
+    }
+
+    /** 密码只能发给 HTTPS 或本机地址，避免明文传输。 */
+    private static void requireSecure(Server server) throws AuthException {
+        try {
+            URI uri = URI.create(server.apiRoot);
+            if ("https".equalsIgnoreCase(uri.getScheme())) return;
+            String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase();
+            if ("localhost".equals(host) || "127.0.0.1".equals(host) || "::1".equals(host)) return;
+        } catch (Exception ignored) {
+        }
+        throw new AuthException(0, Lang.t("认证服务器不是 HTTPS 地址，密码会明文传输，请改用 https:// 开头的地址"));
     }
 
     /** 把服务器的英文错误翻成一句能看懂的话。 */

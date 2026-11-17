@@ -159,28 +159,35 @@ public final class GameLauncher {
         if (files.isEmpty()) return;
         // 并发补全，串行太慢。
         int threads = Math.max(1, Math.min(8, files.size()));
-        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(threads);
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(threads, r -> {
+            Thread t = new Thread(r, "TCL-MissingFile");
+            t.setDaemon(true);
+            return t;
+        });
         java.util.concurrent.atomic.AtomicInteger done = new java.util.concurrent.atomic.AtomicInteger();
         List<java.util.concurrent.Future<?>> futures = new ArrayList<>();
-        for (MissingFile f : files) {
-            futures.add(pool.submit(() -> {
-                Downloader.downloadFileTo(null, f.url, f.target, f.desc);
-                int n = done.incrementAndGet();
-                progress.accept(n / (double) files.size());
-                return null;
-            }));
-        }
         Exception first = null;
-        for (java.util.concurrent.Future<?> future : futures) {
-            try {
-                future.get();
-            } catch (java.util.concurrent.ExecutionException e) {
-                if (first == null) {
-                    first = e.getCause() instanceof Exception ex ? ex : new Exception(e.getCause());
+        try {
+            for (MissingFile f : files) {
+                futures.add(pool.submit(() -> {
+                    Downloader.downloadFileTo(null, f.url, f.target, f.desc);
+                    int n = done.incrementAndGet();
+                    progress.accept(n / (double) files.size());
+                    return null;
+                }));
+            }
+            for (java.util.concurrent.Future<?> future : futures) {
+                try {
+                    future.get();
+                } catch (java.util.concurrent.ExecutionException e) {
+                    if (first == null) {
+                        first = e.getCause() instanceof Exception ex ? ex : new Exception(e.getCause());
+                    }
                 }
             }
+        } finally {
+            pool.shutdownNow();
         }
-        pool.shutdown();
         if (first != null) throw first;
     }
 
@@ -571,13 +578,12 @@ public final class GameLauncher {
         } else {
             cmd.addAll(resolveArgs(gameArgs, vars, features));
         }
-        if (fullscreen) cmd.add("--fullscreen"); // 全屏
+        if (fullscreen) cmd.add("--fullscreen");
         String extraGame = data.get("LaunchGameArgs", "");
         if (!extraGame.isEmpty()) {
             for (String a : extraGame.trim().split("\\s+")) if (!a.isEmpty()) cmd.add(subst(a, vars));
         }
         if (serverIp != null && !serverIp.trim().isEmpty()) {
-            // 直连服务器。
             String[] parts = serverIp.trim().split(":");
             cmd.add("--server");
             cmd.add(parts[0]);

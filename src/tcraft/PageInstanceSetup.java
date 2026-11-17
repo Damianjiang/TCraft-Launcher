@@ -494,7 +494,7 @@ public class PageInstanceSetup implements Page {
             return;
         }
         StringBuilder sb = new StringBuilder();
-        for (String[] item : diagDisplay) sb.append(item[0]).append(System.lineSeparator());
+        for (String[] item : diagDisplay) sb.append(Redact.apply(item[0])).append(System.lineSeparator());
         javafx.scene.input.ClipboardContent c = new javafx.scene.input.ClipboardContent();
         c.putString(sb.toString());
         javafx.scene.input.Clipboard.getSystemClipboard().setContent(c);
@@ -516,7 +516,7 @@ public class PageInstanceSetup implements Page {
         if (file == null) return;
         try {
             StringBuilder sb = new StringBuilder();
-            for (String[] item : diagAll) sb.append(diagDesensitize(item[0])).append(System.lineSeparator());
+            for (String[] item : diagAll) sb.append(Redact.apply(diagDesensitize(item[0]))).append(System.lineSeparator());
             Files.writeString(file.toPath(), sb.toString(), StandardCharsets.UTF_8);
             win.toast("日志已导出（已脱敏）。", "", 1);
             openFolder(file.getParent().toString());
@@ -2729,7 +2729,6 @@ public class PageInstanceSetup implements Page {
                         String relative = game.relativize(file).toString().replace('\\', '/');
                         for (String skip : new String[]{"assets/", "versions/", "libraries/",
                                 "structureCacheV1/", ".fabric/", ".git/", "avatar-cache/", "cosmetic-cache/"}) {
-                            if (relative.startsWith(skip) && !relative.contains("/")) return;
                             if (relative.startsWith(skip)) return;
                         }
                         if (!matchesRules(effRules, relative)) return;
@@ -2808,6 +2807,7 @@ public class PageInstanceSetup implements Page {
 
                 Path payloadRoot = cache.resolve("modpack");
                 copyExtraFiles(payloadRoot);
+                if (exportIncludeLauncher) packLauncherFiles(payloadRoot);
                 if (exportIncludeLauncherCustom) packLauncherCustom(payloadRoot);
 
                 task.subs.get(2).state = Tasks.State.RUNNING;
@@ -2865,7 +2865,9 @@ public class PageInstanceSetup implements Page {
                         });
                     }
                 }
-                Files.walk(cache).sorted(java.util.Comparator.reverseOrder()).forEach(p -> p.toFile().delete());
+                try (var walk = Files.walk(cache)) {
+                    walk.sorted(java.util.Comparator.reverseOrder()).forEach(p -> p.toFile().delete());
+                }
                 task.subs.get(2).state = Tasks.State.DONE;
                 javafx.application.Platform.runLater(() -> {
                     win.toast("导出完成", fTarget.getName(), 1);
@@ -2989,29 +2991,8 @@ public class PageInstanceSetup implements Page {
         }, "TCL-Backup").start();
     }
 
-    private void regionGrow(Region r) {
-        HBox.setHgrow(r, Priority.ALWAYS);
-    }
-
     private void openFolder(String path) {
-            Shell.openFolder(path);
-        }
-
-    /** 目录打包成 zip。 */
-    private static void zipDirectory(Path dir, Path target) throws Exception {
-        try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(target))) {
-            try (var walk = Files.walk(dir)) {
-                walk.filter(Files::isRegularFile).forEach(file -> {
-                    try {
-                        String entryName = dir.relativize(file).toString().replace("\\", "/");
-                        zip.putNextEntry(new ZipEntry(entryName));
-                        Files.copy(file, zip);
-                        zip.closeEntry();
-                    } catch (Exception ignored) {
-                    }
-                });
-            }
-        }
+        Shell.openFolder(path);
     }
 
     /** 配置导入的规则覆盖，非 null 时替代勾选规则。 */
@@ -3161,12 +3142,19 @@ public class PageInstanceSetup implements Page {
 
     /** 把启动脚本和资源打到根目录。 */
     private void packLauncherFiles(Path payloadRoot) throws Exception {
-        Path base = Theme.root();
+        Path base = Resources.appDir();
         for (String script : new String[]{"TCraftLauncher.bat", "TCraftLauncher-debug.bat", "TCraftLauncher.sh"}) {
             Path src = base.resolve(script);
             if (Files.isRegularFile(src)) {
                 Files.copy(src, payloadRoot.resolve(script), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             }
+        }
+        // 当前启动器本体（exe 或 jar），让整合包拿到就能直接运行
+        Path self = Resources.jar();
+        if (self != null && Files.isRegularFile(self)) {
+            String name = self.getFileName().toString().toLowerCase();
+            String target = name.endsWith(".exe") ? "TCraftLauncher.exe" : "TCraftLauncher.jar";
+            Files.copy(self, payloadRoot.resolve(target), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         }
         // 资源目录
         Path res = base.resolve("res");
@@ -3174,9 +3162,8 @@ public class PageInstanceSetup implements Page {
         // 说明文件
         String readme = "TCraft Launcher JavaFX 版整合包附带的启动器文件说明" + System.lineSeparator()
                 + System.lineSeparator()
-                + "本压缩包内含启动脚本与资源文件。运行启动器还需要：" + System.lineSeparator()
-                + "1. 已安装 Java 17 或更高版本（含 JavaFX，可直接使用启动器发行包）；" + System.lineSeparator()
-                + "2. 启动器程序目录（out/ 与 lib/），请从发行包补齐，或直接使用完整安装的启动器。" + System.lineSeparator()
+                + "本压缩包已包含启动器程序、启动脚本与资源文件。" + System.lineSeparator()
+                + "运行需要 Java 17 或更高版本；首次启动会自动下载 JavaFX 运行库。" + System.lineSeparator()
                 + System.lineSeparator()
                 + "整合包游戏文件位于 overrides 目录（Modrinth 格式请先导入 .mrpack）。" + System.lineSeparator();
         Files.writeString(payloadRoot.resolve("启动器文件说明.txt"), readme, StandardCharsets.UTF_8);

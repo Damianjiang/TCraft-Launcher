@@ -306,9 +306,7 @@ public final class Resources {
             int n;
             while ((n = in.read(buf)) > 0) md.update(buf, 0, n);
         }
-        StringBuilder sb = new StringBuilder();
-        for (byte b : md.digest()) sb.append(String.format("%02x", b));
-        return sb.toString();
+        return java.util.HexFormat.of().formatHex(md.digest());
     }
 
     /** JavaFX 平台 jar 里的 DLL/dylib/so 放到同目录供 java.library.path 使用。 */

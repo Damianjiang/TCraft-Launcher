@@ -76,31 +76,6 @@ public final class Shell {
         }
     }
 
-    /** 打开文件夹并选中文件。 */
-    public static boolean revealFile(String path) {
-        if (path == null || path.isBlank()) return false;
-        try {
-            if (isMac()) {
-                new ProcessBuilder("open", "-R", path).start();
-                return true;
-            }
-            if (isLinux()) {
-                // xdg-open 只能打开目录本身
-                File f = new File(path);
-                File dir = f.isDirectory() ? f : f.getParentFile();
-                if (dir != null) {
-                    new ProcessBuilder("xdg-open", dir.getAbsolutePath()).start();
-                    return true;
-                }
-                return false;
-            }
-            new ProcessBuilder("explorer.exe", "/select,", path).start();
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
     /** 删除到回收站。 */
     public static boolean deleteToRecycleBin(String path) {
         if (path == null || path.isBlank()) return false;

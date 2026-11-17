@@ -149,11 +149,6 @@ public final class Skin3D extends Region {
         autoTimer.stop();
     }
 
-    /** 当前模型面数，自检用。 */
-    public int faceCount() {
-        return faces.size();
-    }
-
     /** 读皮肤像素建颜色表。 */
     private void readPixels() {
         if (skin == null) {

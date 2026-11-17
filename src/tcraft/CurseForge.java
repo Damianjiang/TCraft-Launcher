@@ -28,6 +28,7 @@ public final class CurseForge {
 
     public static class Project {
         public long id;
+        public int classId;
         public String name = "";
         public String slug = "";
         public String summary = "";
@@ -57,6 +58,7 @@ public final class CurseForge {
             Map<String, Object> m = Json.obj(o);
             Project p = new Project();
             p.id = (long) Json.num(m, "id", 0);
+            p.classId = (int) Json.num(m, "classId", 0);
             p.name = Json.str(m, "name", "");
             p.slug = Json.str(m, "slug", "");
             p.summary = Json.str(m, "summary", "");
@@ -89,6 +91,7 @@ public final class CurseForge {
         Map<String, Object> m = Json.obj(root.get("data"));
         Project p = new Project();
         p.id = (long) Json.num(m, "id", 0);
+        p.classId = (int) Json.num(m, "classId", 0);
         p.name = Json.str(m, "name", "");
         p.slug = Json.str(m, "slug", "");
         p.summary = Json.str(m, "summary", "");

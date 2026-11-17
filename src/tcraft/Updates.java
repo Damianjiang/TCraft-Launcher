@@ -160,7 +160,8 @@ public final class Updates {
             Data.get().log("更新提示失败：" + t);
             try {
                 win.toast("检查更新", "读取成功但提示失败，请到 Releases 页面查看", 2);
-            } catch (Throwable ignored) {            }
+            } catch (Throwable ignored) {
+            }
         }
     }
 

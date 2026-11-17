@@ -624,8 +624,7 @@ public final class EasyTier {
         public boolean self() {
             return type == PEER_SELF;
         }
-
-            }
+    }
 
     /** 查询当前连上的节点。 */
     public static List<Peer> peers(int port) throws Exception {
@@ -799,10 +798,5 @@ public final class EasyTier {
             case "symmetriceasydec" -> 9;
             default -> 10;
         };
-    }
-
-    /** 联机模块所在目录，方便打开文件夹。 */
-    public static Path moduleFolder() {
-        return folder();
     }
 }

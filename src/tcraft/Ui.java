@@ -5,7 +5,6 @@ import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
 import javafx.animation.ScaleTransition;
 import javafx.animation.Timeline;
-import javafx.animation.TranslateTransition;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.CacheHint;
@@ -115,10 +114,6 @@ public final class Ui {
         HBox h = new HBox(spacing, nodes);
         h.setAlignment(Pos.CENTER_LEFT);
         return h;
-    }
-
-    public static VBox col(double spacing, Node... nodes) {
-        return new VBox(spacing, nodes);
     }
 
     public static Region line(Color color, double height) {
@@ -1307,11 +1302,6 @@ public final class Ui {
                 new javafx.beans.property.SimpleBooleanProperty(false);
         private Runnable onAction;
 
-        /** 选中态属性，可做绑定。 */
-        public javafx.beans.property.BooleanProperty selectedProperty() {
-            return selectedProp;
-        }
-
         public RadioBox(String text, boolean checked) {
             super(7);
             setAlignment(Pos.CENTER_LEFT);
@@ -1431,9 +1421,6 @@ public final class Ui {
         private boolean dragging;
         private Color lineColor = Theme.accentPale;
         private java.util.function.DoubleConsumer onChanged;
-        private java.util.function.Function<Double, String> hintFn;
-        private javafx.stage.Popup hintPopup;
-        private Label hintLabel;
         private javafx.animation.Transition moveAnim;
 
         public SliderBar(double min, double max, double value) {
@@ -1453,9 +1440,9 @@ public final class Ui {
             dot.setManaged(false);
             dot.getTransforms().add(dotScale);
             getChildren().addAll(back, fore, dot);
-            widthProperty().addListener((o, a, b) -> layoutValue(false));
+            widthProperty().addListener((o, a, b) -> layoutValue());
             applyColor(lineColor);
-            layoutValue(false);
+            layoutValue();
             addEventHandler(javafx.scene.input.MouseEvent.MOUSE_ENTERED, e -> {
                 if (!dragging) colorTween(this::applyColor, lineColor, Theme.accent, aniMs(40));
             });
@@ -1473,12 +1460,10 @@ public final class Ui {
                 tl.play();
                 colorTween(this::applyColor, lineColor, Theme.accent, aniMs(40));
                 jumpTo(e.getX());
-                showHint();
             });
             addEventHandler(javafx.scene.input.MouseEvent.MOUSE_DRAGGED, e -> {
                 if (!dragging) return;
                 jumpTo(e.getX());
-                showHint();
             });
             addEventHandler(javafx.scene.input.MouseEvent.MOUSE_RELEASED, e -> {
                 dragging = false;
@@ -1488,7 +1473,6 @@ public final class Ui {
                         new javafx.animation.KeyValue(dotScale.yProperty(), 1, EASE_OUT_FLUENT)));
                 tl.play();
                 colorTween(this::applyColor, lineColor, isHover() ? Theme.accent : Theme.accentPale, aniMs(100));
-                hideHint();
             });
             disabledProperty().addListener((o, was, now) ->
                     applyColor(now ? Theme.gray5 : (dragging || isHover() ? Theme.accent : Theme.accentPale)));
@@ -1525,7 +1509,7 @@ public final class Ui {
                 int ms = Math.max(1, (int) ((1 - Math.pow(1 - delta, 3)) * 300));
                 animateTo(ms);
             } else {
-                layoutValue(false);
+                layoutValue();
             }
             if (onChanged != null) onChanged.accept(value);
         }
@@ -1534,12 +1518,7 @@ public final class Ui {
             this.onChanged = c;
         }
 
-        public void setHintFn(java.util.function.Function<Double, String> fn) {
-            this.hintFn = fn;
-        }
-
         private void animateTo(int ms) {
-            double fromW = fore.getWidth();
             double fromX = dot.getLayoutX();
             double trackW = Math.max(0, getWidth() - 10);
             double targetX = (value - min) / (max - min) * trackW;
@@ -1561,45 +1540,12 @@ public final class Ui {
             moveAnim.play();
         }
 
-        private void layoutValue(boolean animate) {
+        private void layoutValue() {
             double trackW = Math.max(0, getWidth() - 10);
             double x = (value - min) / (max - min) * trackW;
             fore.resizeRelocate(0, 7, Math.max(0, x + 0.5), 2);
             back.resizeRelocate(x + 0.5, 7.5, Math.max(0, getWidth() - 10 - x), 1);
             dot.setLayoutX(x);
-        }
-
-        private void showHint() {
-            if (hintFn == null) return;
-            if (hintPopup == null) {
-                hintLabel = new Label();
-                hintLabel.setFont(Theme.font(12));
-                hintLabel.setTextFill(Theme.text);
-                hintLabel.setPadding(new Insets(5, 7, 5, 7));
-                javafx.scene.layout.BorderStroke bs = new javafx.scene.layout.BorderStroke(
-                        Theme.text, javafx.scene.layout.BorderStrokeStyle.SOLID,
-                        new javafx.scene.layout.CornerRadii(3), new javafx.scene.layout.BorderWidths(1.5));
-                javafx.scene.layout.BorderStroke[] strokes = {bs};
-                javafx.scene.layout.BorderPane bp = new javafx.scene.layout.BorderPane(hintLabel);
-                bp.setBorder(new javafx.scene.layout.Border(strokes));
-                bp.setBackground(fill(Color.WHITE, 3));
-                bp.setEffect(Theme.shadow(4, 2, 0.4, Color.BLACK));
-                hintPopup = new javafx.stage.Popup();
-                hintPopup.setAutoFix(true);
-                hintPopup.getContent().add(bp);
-            }
-            String text = hintFn.apply(value);
-            hintLabel.setText(text);
-            if (!hintPopup.isShowing()) {
-                javafx.geometry.Bounds b = dot.localToScreen(dot.getBoundsInLocal());
-                if (b == null) return;
-                double w = hintLabel.prefWidth(-1) + 16;
-                hintPopup.show(dot, b.getMinX() - w / 2 + 5, b.getMaxY() + 5);
-            }
-        }
-
-        private void hideHint() {
-            if (hintPopup != null) hintPopup.hide();
         }
     }
 
@@ -1693,10 +1639,6 @@ public final class Ui {
 
         public void setText(String s) {
             field.setText(s);
-        }
-
-        public void textChanged(java.util.function.Consumer<String> c) {
-            field.textProperty().addListener((o, a, b) -> c.accept(b == null ? "" : b));
         }
     }
 
@@ -2001,15 +1943,6 @@ public final class Ui {
     public static Border border(Color color, double radius, double width) {
         return new Border(new BorderStroke(color, BorderStrokeStyle.SOLID, new CornerRadii(radius),
                 new BorderWidths(width)));
-    }
-
-        public static void translateY(Node node, double from, double to, int ms) {
-        node.setTranslateY(from);
-        TranslateTransition tt = new TranslateTransition(Duration.millis(ms), node);
-        tt.setFromY(from);
-        tt.setToY(to);
-        tt.setInterpolator(Interpolator.EASE_OUT);
-        tt.play();
     }
 
     /** 统一悬浮提示，350ms 后出现。 */

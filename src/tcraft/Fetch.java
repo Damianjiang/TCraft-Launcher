@@ -153,18 +153,28 @@ public final class Fetch {
         }
     }
 
-    /** 盯着读流的心跳，超时就 close，让阻塞的 read 抛异常。 */
-    private static final class IdleGuard extends Thread {
+    /** 盯着读流的心跳，超时就 close，让阻塞的 read 抛异常。共用一个守护线程。 */
+    private static final java.util.concurrent.ScheduledExecutorService WATCHDOG =
+            java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "TCL-Fetch-Idle");
+                t.setDaemon(true);
+                return t;
+            });
+
+    private static final class IdleGuard {
         private final InputStream in;
         private final long timeoutMs;
         private volatile long last = System.currentTimeMillis();
         private volatile boolean stopped;
+        private java.util.concurrent.ScheduledFuture<?> task;
 
         IdleGuard(InputStream in, long timeoutMs) {
-            super("TCL-Fetch-Idle");
-            setDaemon(true);
             this.in = in;
             this.timeoutMs = timeoutMs;
+        }
+
+        void start() {
+            task = WATCHDOG.scheduleAtFixedRate(this::check, 500, 500, TimeUnit.MILLISECONDS);
         }
 
         void touch() {
@@ -173,23 +183,16 @@ public final class Fetch {
 
         void close() {
             stopped = true;
-            interrupt();
+            if (task != null) task.cancel(false);
         }
 
-        @Override
-        public void run() {
-            while (!stopped) {
-                try {
-                    Thread.sleep(500);
-                } catch (InterruptedException e) {
-                    return;
-                }
-                if (System.currentTimeMillis() - last <= timeoutMs) continue;
-                try {
-                    in.close();
-                } catch (IOException ignored) {
-                }
-                return;
+        private void check() {
+            if (stopped || System.currentTimeMillis() - last <= timeoutMs) return;
+            stopped = true;
+            if (task != null) task.cancel(false);
+            try {
+                in.close();
+            } catch (IOException ignored) {
             }
         }
     }

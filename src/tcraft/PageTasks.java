@@ -191,6 +191,7 @@ public class PageTasks implements Page {
         final Label speedLabel;
         final VBox subs;
         final StackPane cancel;
+        private String subSig = "";
 
         TaskCard(Tasks.Task task) {
             this.task = task;
@@ -218,7 +219,8 @@ public class PageTasks implements Page {
             bar = new Rectangle();
             bar.setHeight(6);
             bar.setFill(Theme.accent);
-            bar.widthProperty().bind(track.widthProperty().multiply(task.progress));
+            track.widthProperty().addListener((o, a, b) ->
+                    bar.setWidth(Math.max(0, b.doubleValue() * task.progress)));
             StackPane progress = new StackPane(track, bar);
             StackPane.setAlignment(bar, Pos.CENTER_LEFT);
             progress.setMaxWidth(Double.MAX_VALUE);
@@ -250,13 +252,17 @@ public class PageTasks implements Page {
         }
 
         void update() {
-            bar.widthProperty().unbind();
-            bar.widthProperty().bind(track.widthProperty().multiply(task.progress));
+            bar.setWidth(Math.max(0, track.getWidth() * Math.max(0, Math.min(1, task.progress))));
             stateLabel.setText(stateText(task.state));
             stateLabel.setTextFill(stateColor(task.state));
             stageLabel.setText(taskText(task.state == Tasks.State.FAILED && task.error != null ? task.error : task.stage));
             speedLabel.setText(task.speed == null ? "" : task.speed);
             cancel.setVisible(task.state == Tasks.State.RUNNING);
+            // 子任务状态没变就不重建节点，避免每 450ms 清空重加
+            StringBuilder sig = new StringBuilder();
+            for (Tasks.SubTask sub : task.subs) sig.append(sub.state).append(':').append(sub.name).append('|');
+            if (sig.toString().equals(subSig)) return;
+            subSig = sig.toString();
             subs.getChildren().clear();
             for (Tasks.SubTask sub : task.subs) subs.getChildren().add(subRow(sub));
         }

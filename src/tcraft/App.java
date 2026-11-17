@@ -38,11 +38,6 @@ public class App extends Application {
         Boot.main(args); // 走 Boot，JavaFX 起不来还能提示
     }
 
-    /** crash.txt 路径。 */
-    private static java.nio.file.Path configCrashPath() {
-        return Resources.home().resolve("crash.txt");
-    }
-
     @Override
     public void start(Stage stage) {
         StartupWindow splash = Boot.startupWindow;

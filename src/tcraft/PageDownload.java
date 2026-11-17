@@ -1,7 +1,6 @@
 package tcraft;
 
 import javafx.animation.RotateTransition;
-import javafx.animation.PauseTransition;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -27,7 +26,6 @@ public class PageDownload implements Page {
 
     private final MainWindow win;
     private final Data data = Data.get();
-    private PauseTransition debounce;
 
     public PageDownload(MainWindow win) {
         this.win = win;

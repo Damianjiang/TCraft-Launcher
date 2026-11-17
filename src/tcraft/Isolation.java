@@ -47,13 +47,6 @@ public final class Isolation {
         };
     }
 
-    /** 隔离目录不存在就建出来。 */
-    public static Path ensureRun(Data.Instance ins) throws java.io.IOException {
-        Path run = run(ins);
-        java.nio.file.Files.createDirectories(run);
-        return run;
-    }
-
     /** 版本是不是正式版，清单里没有就按版本号形状判断。 */
     public static boolean isRelease(String version) {
         if (version == null || version.isEmpty()) return true;

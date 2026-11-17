@@ -328,14 +328,6 @@ public class ResourceVersion {
         }
     }
 
-    /** 文件大小显示。 */
-    public static String fmtSize(long bytes) {
-        if (bytes < 0) return "";
-        if (bytes < 1024) return bytes + " B";
-        if (bytes < 1024 * 1024) return String.format("%.1f KB", bytes / 1024d);
-        return String.format("%.2f MB", bytes / 1024d / 1024d);
-    }
-
     private static List<String> strList(Object arr) {
         List<String> out = new ArrayList<>();
         for (Object o : Json.arr(arr)) {

@@ -1,5 +1,6 @@
 package tcraft;
 
+import javafx.animation.PauseTransition;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
@@ -11,6 +12,7 @@ import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
+import javafx.util.Duration;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -25,6 +27,7 @@ public class PageInstance implements Page {
     private final boolean selectMode;
     private boolean gridView;
     private String query = "";
+    private PauseTransition searchDebounce;
     private int sortMode = 0;
     /** 当前合集筛选，空串表示全部。 */
     private String collectionFilter = "";
@@ -63,7 +66,12 @@ public class PageInstance implements Page {
         Ui.SearchBox search = Ui.searchBox("搜索实例");
         search.textProperty().addListener((o, a, b) -> {
             query = b == null ? "" : b.toLowerCase();
-            refreshList();
+            // 连续输入时只重建一次列表，避免每个按键都重排
+            if (searchDebounce == null) {
+                searchDebounce = new PauseTransition(Duration.millis(180));
+                searchDebounce.setOnFinished(e -> refreshList());
+            }
+            searchDebounce.playFromStart();
         });
         ComboBox<String> sort = Ui.combo(new String[]{"最近游玩", "名称 A→Z", "版本 新→旧", "安装时间"}, sortMode);
         double sortWidth = Lang.mode == 1 ? 175 : 116;
@@ -125,12 +133,6 @@ public class PageInstance implements Page {
         VBox.setVgrow(scroll, Priority.ALWAYS);
         VBox.setMargin(scroll, new Insets(4, 25, 14, 25));
 
-        StackPane listBack = new StackPane();
-        listBack.setBackground(Ui.fill(Theme.cardBg, 8));
-        listBack.setMaxWidth(Double.MAX_VALUE);
-        scroll.setContent(listBack);
-        listBack.getProperties().put("scroll", scroll);
-
         page.getChildren().addAll(toolbar, collectionBar, scroll);
         this.refreshRunner = () -> {
             refreshCollectionBar();
@@ -145,6 +147,11 @@ public class PageInstance implements Page {
     }
 
     private Runnable refreshRunner;
+
+    @Override
+    public void onHide() {
+        if (searchDebounce != null) searchDebounce.stop();
+    }
 
     private void refreshList() {
         if (refreshRunner != null) refreshRunner.run();
@@ -825,8 +832,9 @@ public class PageInstance implements Page {
         win.toast("开始备份", ins.name + " → " + out.getName(), 1);
         Thread worker = new Thread(() -> {
             try (java.util.zip.ZipOutputStream zos = new java.util.zip.ZipOutputStream(
-                    new java.io.BufferedOutputStream(java.nio.file.Files.newOutputStream(out.toPath())))) {
-                java.nio.file.Files.walk(src).filter(java.nio.file.Files::isRegularFile).forEach(f -> {
+                    new java.io.BufferedOutputStream(java.nio.file.Files.newOutputStream(out.toPath())));
+                 var walk = java.nio.file.Files.walk(src)) {
+                walk.filter(java.nio.file.Files::isRegularFile).forEach(f -> {
                     try {
                         String rel = src.relativize(f).toString().replace('\\', '/');
                         zos.putNextEntry(new java.util.zip.ZipEntry(rel));
@@ -882,22 +890,15 @@ public class PageInstance implements Page {
         VBox.setMargin(addHead, new Insets(18, 0, 6, 4));
         panel.getChildren().add(addHead);
 
-        Ui.ListItem addFolder = new Ui.ListItem(Theme.icon("folder-plus", 17, Theme.text), "添加已有文件夹", "导入现有的 .minecraft", 38);
-        Ui.tooltip(addFolder, "将一个已有的 Minecraft 文件夹添加到列表");
+        Ui.ListItem addFolder = new Ui.ListItem(Theme.icon("folder-plus", 17, Theme.text), "添加游戏目录", "导入现有的 .minecraft", 38);
+        Ui.tooltip(addFolder, "将一个已有的 Minecraft 文件夹添加到列表，也可以直接把文件夹拖进窗口");
         addFolder.setOnMouseClicked(e -> {
             DirectoryChooser chooser = new DirectoryChooser();
             chooser.setTitle("选择 .minecraft 文件夹");
             File file = chooser.showDialog(win.stage);
-            if (file != null) {
-                data.folders.add(new Data.FolderItem(file.getName(), file.getAbsolutePath()));
-                data.gameDir = file.getAbsolutePath();
-                scanVersions(data, file.toPath());
-                data.save();
-                win.openPage(win.currentKey, false);
-                win.toast("已添加文件夹", file.getAbsolutePath(), 1);
-            }
+            if (file != null) addGameFolder(win, file.toPath());
         });
-        Ui.ListItem importPack = new Ui.ListItem(Theme.icon("package-plus", 17, Theme.text), "导入整合包", "支持 .zip 整合包", 38);
+        Ui.ListItem importPack = new Ui.ListItem(Theme.icon("package-plus", 17, Theme.text), "导入整合包", "支持 .zip / .mrpack，可直接拖入窗口", 38);
         Ui.tooltip(importPack, "在当前选择的 Minecraft 文件夹下安装整合包");
         importPack.setOnMouseClicked(e -> importModpack(win));
         panel.getChildren().addAll(addFolder, importPack);
@@ -916,13 +917,16 @@ public class PageInstance implements Page {
     private static void scanVersions(Data data, java.nio.file.Path gameDir) {
         java.nio.file.Path versions = gameDir.resolve("versions");
         if (!java.nio.file.Files.isDirectory(versions)) return;
+        String folderKey = gameDir.toAbsolutePath().normalize().toString();
         try (var stream = java.nio.file.Files.list(versions)) {
             stream.filter(java.nio.file.Files::isDirectory).forEach(dir -> {
                 String name = dir.getFileName().toString();
                 if (!java.nio.file.Files.isRegularFile(dir.resolve(name + ".json"))) return;
                 boolean exists = false;
                 for (Data.Instance i : data.instances) {
-                    if (i.folder != null && i.folder.equals(gameDir.toString())
+                    String folder = i.folder == null || i.folder.isEmpty() ? "" : java.nio.file.Paths.get(i.folder)
+                            .toAbsolutePath().normalize().toString();
+                    if (folder.equalsIgnoreCase(folderKey)
                             && (i.name.equals(name) || name.equals(i.version))) exists = true;
                 }
                 if (exists) return;
@@ -932,7 +936,7 @@ public class PageInstance implements Page {
                 String icon = "Fabric".equals(loader) ? "Fabric.png" : "Forge".equals(loader) ? "CobbleStone.png"
                         : "NeoForge".equals(loader) ? "NeoForge.png" : "Grass.png";
                 data.instances.add(new Data.Instance(name, name, loader, "",
-                        "已导入的版本", icon, System.currentTimeMillis(), false, gameDir.toString()));
+                        "已导入的版本", icon, System.currentTimeMillis(), false, folderKey));
             });
         } catch (Exception ignored) {
         }
@@ -945,13 +949,19 @@ public class PageInstance implements Page {
         chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Minecraft 整合包", "*.zip", "*.mrpack"));
         File file = chooser.showOpenDialog(win.stage);
         if (file == null) return;
+        importModpack(win, file.toPath());
+    }
+
+    /** 从文件路径开始导入，拖拽和文件选择共用同一套流程。 */
+    static void importModpack(MainWindow win, java.nio.file.Path packPath) {
+        File file = packPath.toFile();
         win.toast("正在预读整合包", file.getName(), 0);
-        new Thread(() -> {
-            Modpacks.PackInfo info = Modpacks.readInfo(file.toPath());
+        Thread thread = new Thread(() -> {
+            Modpacks.PackInfo info = Modpacks.readInfo(packPath);
             javafx.application.Platform.runLater(() -> {
                 if (!info.valid) {
                     Dialogs.confirm(win, "无法识别整合包",
-                            "无法从该压缩包中识别出整合包清单。\n当前支持 Modrinth (.mrpack)、CurseForge (.zip) 与 MCBBS (mcbbs.packmeta) 格式。",
+                            "无法从该压缩包中识别出整合包清单。\n当前支持 Modrinth (.mrpack)、CurseForge (.zip)、MultiMC、HMCL 与 MCBBS 格式。",
                             () -> {
                             });
                     return;
@@ -972,14 +982,60 @@ public class PageInstance implements Page {
                 Dialogs.confirm(win, "导入整合包", sb.toString(), () ->
                         Dialogs.input(win, "输入版本名称", "", info.name, name -> {
                             if (name == null) return;
-                            Modpacks.installLocal(win, file.toPath(), info, name);
+                            Modpacks.installLocal(win, packPath, info, name);
                         }));
             });
-        }, "TCL-Modpack-Preview").start();
+        }, "TCL-Modpack-Preview");
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    /** 添加已有游戏目录；按钮选择和拖入文件夹共用。 */
+    static void addGameFolder(MainWindow win, java.nio.file.Path dragged) {
+        Data data = Data.get();
+        java.nio.file.Path target = resolveGameDir(dragged);
+        if (target == null) {
+            win.toast("无法识别游戏目录", "请选择包含 .minecraft、versions 或 mods/saves 的文件夹。", 2);
+            return;
+        }
+        String path = target.toAbsolutePath().normalize().toString();
+        Data.FolderItem existing = null;
+        for (Data.FolderItem folder : data.folders) {
+            if (java.nio.file.Paths.get(folder.path).toAbsolutePath().normalize().toString().equalsIgnoreCase(path)) {
+                existing = folder;
+                break;
+            }
+        }
+        if (existing == null) {
+            String name = target.getFileName() == null ? "游戏目录" : target.getFileName().toString();
+            data.folders.add(new Data.FolderItem(name, path));
+        }
+        data.gameDir = path;
+        scanVersions(data, target);
+        data.save();
+        win.openPage(win.currentKey, false);
+        win.toast(existing == null ? "已添加游戏目录" : "已切换游戏目录", path, 1);
+    }
+
+    /** 识别拖入的目录：.minecraft 本体、上级目录或带常见游戏文件的目录。 */
+    private static java.nio.file.Path resolveGameDir(java.nio.file.Path path) {
+        if (path == null || !java.nio.file.Files.isDirectory(path)) return null;
+        if (java.nio.file.Files.isDirectory(path.resolve("versions"))) return path;
+        java.nio.file.Path nested = path.resolve(".minecraft");
+        if (java.nio.file.Files.isDirectory(nested.resolve("versions"))) return nested;
+        String name = path.getFileName() == null ? "" : path.getFileName().toString();
+        if (".minecraft".equalsIgnoreCase(name)) return path;
+        if (java.nio.file.Files.isRegularFile(path.resolve("options.txt"))
+                || java.nio.file.Files.isRegularFile(path.resolve("launcher_profiles.json"))
+                || java.nio.file.Files.isDirectory(path.resolve("mods"))
+                || java.nio.file.Files.isDirectory(path.resolve("saves"))) {
+            return path;
+        }
+        return null;
     }
 
     private static void openFolder(String path) {
-            Shell.openFolder(path);
-        }
+        Shell.openFolder(path);
+    }
 
 }

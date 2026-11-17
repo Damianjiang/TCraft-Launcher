@@ -576,7 +576,7 @@ Bangumi 番剧主页（作者：wzyaeu）	Bangumi Anime Homepage (by wzyaeu)	Ban
 未找到任何版本的游戏，请先下载任意版本的游戏。\n若有已存在的游戏，请在左边的列表中选择添加文件夹，选择 .minecraft 文件夹将其导入。	No game version found. Download any version first.\nIf you already have a game, pick "Add folder" in the left list and select your .minecraft folder to import it.	未找到任何版本的遊戲，請先下載任意版本的遊戲。\n若有已存在的遊戲，請在左邊的清單中選擇「新增資料夾」，選擇 .minecraft 資料夾將其匯入。	
 文件夹列表	Folder list	資料夾清單	
 添加或导入	Add or import	新增或匯入	
-添加已有文件夹	Add an existing folder	新增既有資料夾	
+添加游戏目录	Add game folder	新增遊戲資料夾
 新建 .minecraft 文件夹	Create a new .minecraft folder	建立新的 .minecraft 資料夾	
 在 TCL 当前所在文件夹下创建新的 .minecraft 文件夹	Creates a new .minecraft folder under TCL's current location	在 TCL 目前所在資料夾下建立新的 .minecraft 資料夾	
 将一个已有的 Minecraft 文件夹添加到列表	Add an existing Minecraft folder to the list	將一個既有的 Minecraft 資料夾加入清單	
@@ -3916,3 +3916,11 @@ CurseForge 的内容没有取到（%s），当前仅显示 Modrinth 的结果。
 运行 %s 安装器：%s	Running %s installer: %s	執行 %s 安裝器：%s
 运行 %s 安装器（%d 秒，下载依赖较慢请稍候）	Running %s installer (%d s; dependencies may take a while)	執行 %s 安裝器（%d 秒，下載依賴較慢請稍候）
 %s下载：%s	%s download: %s	%s 下載：%s
+认证服务器不是 HTTPS 地址，密码会明文传输，请改用 https:// 开头的地址	The authentication server is not HTTPS; your password would be sent in plain text. Please use an https:// address.	認證伺服器不是 HTTPS 位址，密碼會以明文傳輸，請改用 https:// 開頭的位址
+松开鼠标开始导入	Release to start importing	放開滑鼠開始匯入
+无法识别游戏目录	Not a game folder	無法辨識遊戲目錄
+请选择包含 .minecraft、versions 或 mods/saves 的文件夹。	Pick a folder containing .minecraft, versions, or mods/saves.	請選擇包含 .minecraft、versions 或 mods/saves 的資料夾。
+无法识别拖入的文件	Unsupported file	無法辨識拖入的檔案
+支持 .zip / .mrpack 整合包或游戏目录	Drop a .zip / .mrpack modpack or a game folder	支援 .zip / .mrpack 整合包或遊戲目錄
+已添加游戏目录	Game folder added	已新增遊戲目錄
+已切换游戏目录	Switched game folder	已切換遊戲目錄

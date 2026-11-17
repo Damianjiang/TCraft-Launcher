@@ -233,8 +233,6 @@ public final class Data {
     public final List<Favorite> favorites = new ArrayList<>();
     public int selectedAccount = 0;
     public int selectedInstance = 0;
-    public String selectedTab = "launch";
-    public boolean rememberLastPage = true;
     public String gameDir;
     public String javaPath = "";
     public String downloadCategory = "原版游戏";
@@ -249,7 +247,7 @@ public final class Data {
 
     /** 记一条带时间戳的启动日志。 */
     public void launchLog(String line) {
-        String stamped = "[" + LocalDateTime.now().toLocalTime().withNano(0) + "] " + line;
+        String stamped = Redact.apply("[" + LocalDateTime.now().toLocalTime().withNano(0) + "] " + line);
         launchLog.add(stamped);
         if (launchLog.size() > 500) launchLog.remove(0);
         log(line);
@@ -788,10 +786,6 @@ public final class Data {
         }
     }
 
-    public Properties props() {
-        return props;
-    }
-
     public void load() {
         try {
             if (!Files.exists(configPath)) {
@@ -958,12 +952,32 @@ public final class Data {
             props.setProperty("favorite.count", String.valueOf(favorites.size()));
             for (int i = 0; i < favorites.size(); i++) props.setProperty("favorite." + i, favorites.get(i).encode());
             props.setProperty("SystemLanguage", String.valueOf(Lang.mode));
-            try (OutputStream out = Files.newOutputStream(configPath)) {
+            // 先写临时文件再原子替换，避免写一半时崩溃把配置清空
+            Path tmp = configPath.resolveSibling(configPath.getFileName() + ".tmp");
+            try (OutputStream out = Files.newOutputStream(tmp,
+                    java.nio.file.StandardOpenOption.CREATE,
+                    java.nio.file.StandardOpenOption.TRUNCATE_EXISTING,
+                    java.nio.file.StandardOpenOption.WRITE)) {
                 props.store(out, "TCraft Launcher JavaFX");
             }
+            try {
+                Files.move(tmp, configPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                        java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+            } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                Files.move(tmp, configPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+            restrictPermissions(configPath);
         } catch (IOException e) {
-            // 落盘失败要报出来
             Errors.error("保存配置失败（账户、实例与设置可能不会被保留）", e);
+        }
+    }
+
+    /** 配置文件里有令牌，POSIX 下只给当前用户读写。 */
+    private static void restrictPermissions(Path file) {
+        try {
+            Files.setPosixFilePermissions(file, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
+        } catch (Exception ignored) {
+            // Windows 走用户目录默认 ACL
         }
     }
 
@@ -1068,7 +1082,7 @@ public final class Data {
     private volatile Thread logWriter;
 
     public void log(String line) {
-        String stamped = "[" + LocalDateTime.now().toLocalTime().withNano(0) + "] " + line;
+        String stamped = Redact.apply("[" + LocalDateTime.now().toLocalTime().withNano(0) + "] " + line);
         log.add(stamped);
         if (log.size() > 500) log.remove(0);
         if (getBool("SystemDebugMode", false)) System.out.println("[TCL] " + stamped);
@@ -1102,6 +1116,11 @@ public final class Data {
                     batch.append(System.lineSeparator()).append(next);
                 }
                 Files.createDirectories(file.getParent());
+                // 单份日志超过 4MB 就滚动，避免长期运行把磁盘写满
+                if (Files.isRegularFile(file) && Files.size(file) > 4L * 1024 * 1024) {
+                    Files.move(file, file.resolveSibling("launcher.log.1"),
+                            java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                }
                 Files.writeString(file, batch + System.lineSeparator(), StandardCharsets.UTF_8,
                         java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
             } catch (InterruptedException e) {

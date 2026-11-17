@@ -105,7 +105,7 @@ public final class Boot {
                 sb.append("（暂无日志）\n");
             }
             // 带 BOM，记事本和 QQ 里直接打开不乱码
-            Files.writeString(file, "\uFEFF" + sb, java.nio.charset.StandardCharsets.UTF_8);
+            Files.writeString(file, "\uFEFF" + Redact.apply(sb.toString()), java.nio.charset.StandardCharsets.UTF_8);
             try {
                 java.awt.Desktop.getDesktop().open(dir.toFile());
             } catch (Throwable ignored) {
@@ -120,10 +120,9 @@ public final class Boot {
             Path dir = Resources.home();
             Files.createDirectories(dir);
             Path crash = dir.resolve("crash.txt");
-            try (java.io.PrintWriter pw = new java.io.PrintWriter(Files.newBufferedWriter(
-                    crash, java.nio.charset.StandardCharsets.UTF_8))) {
-                t.printStackTrace(pw);
-            }
+            java.io.StringWriter sw = new java.io.StringWriter();
+            t.printStackTrace(new java.io.PrintWriter(sw));
+            Files.writeString(crash, Redact.apply(sw.toString()), java.nio.charset.StandardCharsets.UTF_8);
             return crash;
         } catch (Exception e) {
             return null;

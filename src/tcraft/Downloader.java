@@ -266,51 +266,58 @@ public final class Downloader {
         task.threads = threads;
         task.remainingFiles = totalAssets;
         Tasks.INSTANCE.changed();
-        ExecutorService pool = Executors.newFixedThreadPool(threads);
+        ExecutorService pool = Executors.newFixedThreadPool(threads, r -> {
+            Thread t = new Thread(r, "TCL-Asset");
+            t.setDaemon(true);
+            return t;
+        });
         List<Future<?>> futures = new ArrayList<>();
-        for (Object value : objects.values()) {
-            Map<String, Object> obj = Json.obj(value);
-            String hash = Json.str(obj, "hash", "");
-            if (hash.length() < 2) continue;
-            long expectedSize = (long) parseNum(Json.str(obj, "size", "0"), 0);
-            Path target = game.resolve("assets").resolve("objects").resolve(hash.substring(0, 2)).resolve(hash);
-            futures.add(pool.submit(() -> {
-                if (task.canceled) return;
-                try {
-                    if (!assetReady(target, expectedSize)) {
-                        Files.deleteIfExists(target);
-                        String assetUrl = Data.get().getInt("SystemDownloadSource", 0) == 1
-                                ? "https://resources.download.minecraft.net/" + hash.substring(0, 2) + "/" + hash
-                                : bmcl() + "/assets/" + hash.substring(0, 2) + "/" + hash;
-                        try {
-                            downloadFile(null, assetUrl, target, 0, 0, hash);
-                        } catch (Exception first) {
-                            // 并发大时 CDN 偶尔拒连，退避后重试一次。
-                            Thread.sleep(600);
+        try {
+            for (Object value : objects.values()) {
+                Map<String, Object> obj = Json.obj(value);
+                String hash = Json.str(obj, "hash", "");
+                if (hash.length() < 2) continue;
+                long expectedSize = (long) parseNum(Json.str(obj, "size", "0"), 0);
+                Path target = game.resolve("assets").resolve("objects").resolve(hash.substring(0, 2)).resolve(hash);
+                futures.add(pool.submit(() -> {
+                    if (task.canceled) return;
+                    try {
+                        if (!assetReady(target, expectedSize)) {
                             Files.deleteIfExists(target);
-                            downloadFile(null, assetUrl, target, 0, 0, hash);
+                            String assetUrl = Data.get().getInt("SystemDownloadSource", 0) == 1
+                                    ? "https://resources.download.minecraft.net/" + hash.substring(0, 2) + "/" + hash
+                                    : bmcl() + "/assets/" + hash.substring(0, 2) + "/" + hash;
+                            try {
+                                downloadFile(null, assetUrl, target, 0, 0, hash);
+                            } catch (Exception first) {
+                                // 并发大时 CDN 偶尔拒连，退避后重试一次。
+                                Thread.sleep(600);
+                                Files.deleteIfExists(target);
+                                downloadFile(null, assetUrl, target, 0, 0, hash);
+                            }
+                            if (!assetReady(target, expectedSize)) throw new IOException("文件不完整");
                         }
-                        if (!assetReady(target, expectedSize)) throw new IOException("文件不完整");
+                    } catch (Exception e) {
+                        retryQueue.add(new String[]{hash, String.valueOf(expectedSize)});
                     }
-                } catch (Exception e) {
-                    retryQueue.add(new String[]{hash, String.valueOf(expectedSize)});
-                }
-                int n = assetDone.incrementAndGet();
-                task.remainingFiles = Math.max(0, totalAssets - n);
-                task.progress = 0.55 + 0.40 * n / (double) totalAssets;
-                task.stage = "下载资源文件 " + n + " / " + totalAssets;
-                if (n % 40 == 0) {
-                    Tasks.INSTANCE.changed();
-                }
-            }));
-        }
-        for (Future<?> f : futures) {
-            try {
-                f.get();
-            } catch (Exception ignored) {
+                    int n = assetDone.incrementAndGet();
+                    task.remainingFiles = Math.max(0, totalAssets - n);
+                    task.progress = 0.55 + 0.40 * n / (double) totalAssets;
+                    task.stage = "下载资源文件 " + n + " / " + totalAssets;
+                    if (n % 40 == 0) {
+                        Tasks.INSTANCE.changed();
+                    }
+                }));
             }
+            for (Future<?> f : futures) {
+                try {
+                    f.get();
+                } catch (Exception ignored) {
+                }
+            }
+        } finally {
+            pool.shutdownNow();
         }
-        pool.shutdown();
         check(task);
         // 失败文件补抓一轮，避免卡在最后几个文件。
         if (!retryQueue.isEmpty()) {

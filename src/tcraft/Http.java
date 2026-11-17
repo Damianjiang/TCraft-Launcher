@@ -44,9 +44,6 @@ public final class Http {
     private static final ExecutorService POOL = idlePool(
             Math.max(4, Math.min(8, Runtime.getRuntime().availableProcessors())), "TCL-Net");
 
-    /** 图标下载池。 */
-    private static final ExecutorService ICON_POOL = idlePool(10, "TCL-Icon");
-
     /** 重试延时调度线程。 */
     private static final ExecutorService ASYNC = Executors.newCachedThreadPool(r -> {
         Thread t = new Thread(r, "TCL-Http");
@@ -90,16 +87,6 @@ public final class Http {
     /** 代理变了就重建客户端。 */
     public static void rebuild() {
         client = build();
-    }
-
-    /** 有没有设 SOCKS 代理，JDK 不支持。 */
-    public static boolean socksConfigured() {
-        try {
-            String h = System.getProperty("socksProxyHost", "");
-            return h != null && !h.isEmpty();
-        } catch (Exception e) {
-            return false;
-        }
     }
 
     /** 代理选择器，遇到 SOCKS 就退回直连。 */
@@ -155,15 +142,6 @@ public final class Http {
 
     public static ExecutorService pool() {
         return POOL;
-    }
-
-    public static ExecutorService iconPool() {
-        return ICON_POOL;
-    }
-
-    /** 在共享池里跑一个任务，不等待。 */
-    public static void run(Runnable task) {
-        POOL.execute(task);
     }
 
     public static String get(String url) throws IOException {
@@ -228,11 +206,17 @@ public final class Http {
 
     /** 按编码和 Content-Type 解码响应体。 */
     private static String readText(InputStream raw, HttpResponse<?> resp) throws IOException {
-        InputStream in = raw;
         String encoding = resp.headers().firstValue("content-encoding").orElse("");
-        if (encoding.toLowerCase().contains("gzip")) in = new java.util.zip.GZIPInputStream(raw);
-        // 20 秒没有新数据就当连接假死，交给外层重试，避免整个任务挂住
-        byte[] bytes = Fetch.readAll(in, 20_000);
+        byte[] bytes;
+        if (encoding.toLowerCase().contains("gzip")) {
+            // gzip 流要显式关，释放 inflater 的本地内存
+            try (InputStream in = new java.util.zip.GZIPInputStream(raw)) {
+                bytes = Fetch.readAll(in, 20_000);
+            }
+        } else {
+            // 20 秒没有新数据就当连接假死，交给外层重试，避免整个任务挂住
+            bytes = Fetch.readAll(raw, 20_000);
+        }
         String type = resp.headers().firstValue("content-type").orElse("");
         java.nio.charset.Charset cs = StandardCharsets.UTF_8;
         int idx = type.toLowerCase().indexOf("charset=");

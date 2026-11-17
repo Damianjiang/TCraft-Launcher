@@ -17,9 +17,6 @@ import java.util.UUID;
 /** 账户管理、确认框这类通用弹窗。 */
 public final class Dialogs {
 
-    private static final String[] SKINS = {"Steve.png", "Alex.png", "Ari.png", "Efe.png", "Kai.png",
-            "Makena.png", "Noor.png", "Sunny.png", "Zuri.png"};
-
     private Dialogs() {
     }
 

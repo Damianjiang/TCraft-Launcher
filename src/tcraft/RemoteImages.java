@@ -12,7 +12,6 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
@@ -28,10 +27,6 @@ public final class RemoteImages {
     private static final Map<String, Long> FAILED = new ConcurrentHashMap<>();
     /** 正在加载的 key 对应的等待回调。 */
     private static final Map<String, List<Consumer<Image>>> WAITERS = new ConcurrentHashMap<>();
-
-    private static final AtomicLong HITS = new AtomicLong();
-    private static final AtomicLong DISK_HITS = new AtomicLong();
-    private static final AtomicLong MISSES = new AtomicLong();
 
     private static volatile Path diskDir;
     private static volatile boolean diskChecked;
@@ -58,12 +53,6 @@ public final class RemoteImages {
         return true;
     }
 
-    /** 缓存命中统计。 */
-    public static String stats() {
-        return "图标缓存：内存命中 " + HITS.get() + " · 磁盘命中 " + DISK_HITS.get()
-                + " · 网络 " + MISSES.get() + " · 内存条目 " + CACHE.size();
-    }
-
     /** 异步取图，同一 URL 只加载一次，回调在 FX 线程。 */
     public static void load(String url, double decodeSize, Consumer<Image> callback) {
         if (url == null || url.isEmpty()) {
@@ -73,7 +62,6 @@ public final class RemoteImages {
         String k = key(url, decodeSize);
         Image cached = CACHE.get(k);
         if (cached != null) {
-            HITS.incrementAndGet();
             fire(callback, cached);
             return;
         }
@@ -90,10 +78,8 @@ public final class RemoteImages {
                 .supplyAsync(() -> readDisk(url), Http.pool())
                 .thenCompose(bytes -> {
                     if (bytes != null && bytes.length > 0) {
-                        DISK_HITS.incrementAndGet();
                         return CompletableFuture.completedFuture(bytes);
                     }
-                    MISSES.incrementAndGet();
                     return Http.getBytesAsync(url).thenApply(downloaded -> {
                         writeDisk(url, downloaded);
                         return downloaded;
@@ -110,9 +96,10 @@ public final class RemoteImages {
                                 ? Long.MAX_VALUE : System.currentTimeMillis() + RETRY_AFTER_MS;
                         FAILED.put(url, until);
                     } else {
-                        if (CACHE.size() > MEMORY_LIMIT) CACHE.clear();
+                        if (CACHE.size() > MEMORY_LIMIT) trimCache();
                         CACHE.put(k, img);
                     }
+                    if (FAILED.size() > 2000) trimFailed();
                     final Image result = img;
                     List<Consumer<Image>> pending = WAITERS.remove(k);
                     if (pending == null) return;
@@ -120,18 +107,6 @@ public final class RemoteImages {
                         for (Consumer<Image> cb : pending) cb.accept(result);
                     });
                 });
-    }
-
-    /** 预取，让图早点到。 */
-    public static void prefetch(List<String> urls, double size) {
-        if (urls == null) return;
-        for (String url : urls) {
-            if (url == null || url.isEmpty()) continue;
-            if (cached(url, size) != null || failed(url)) continue;
-            load(url, size, img -> {
-                // 只为落缓存
-            });
-        }
     }
 
     private static Path dir() {
@@ -157,12 +132,27 @@ public final class RemoteImages {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-1");
             byte[] hash = md.digest(url.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            StringBuilder sb = new StringBuilder(hash.length * 2);
-            for (byte b : hash) sb.append(String.format("%02x", b));
-            return d.resolve(sb.toString());
+            return d.resolve(java.util.HexFormat.of().formatHex(hash));
         } catch (Exception e) {
             return null;
         }
+    }
+
+    /** 超过上限时只淘汰四分之一，避免一次性清空导致界面集中重下。 */
+    private static void trimCache() {
+        int target = MEMORY_LIMIT * 3 / 4;
+        java.util.Iterator<String> it = CACHE.keySet().iterator();
+        while (CACHE.size() > target && it.hasNext()) {
+            it.next();
+            it.remove();
+        }
+    }
+
+    /** 清掉过期的失败记录，永久失败保留。 */
+    private static void trimFailed() {
+        long now = System.currentTimeMillis();
+        FAILED.entrySet().removeIf(e -> e.getValue() != Long.MAX_VALUE && e.getValue() <= now);
+        if (FAILED.size() > 4000) FAILED.clear();
     }
 
     private static byte[] readDisk(String url) {

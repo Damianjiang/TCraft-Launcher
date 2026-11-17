@@ -127,10 +127,6 @@ public final class Theme {
         return skinDir().resolve(fileName);
     }
 
-    public static Path iconFile(String fileName) {
-        return iconDir().resolve(fileName);
-    }
-
     /** jar 内资源索引：小写相对路径 -> 实际路径。 */
     private static java.util.Map<String, String> resourceIndex;
 
@@ -166,10 +162,6 @@ public final class Theme {
     private static String resourcePath(String relative) {
         if (relative == null) return null;
         return resourceIndex().get(("res/" + relative).toLowerCase(java.util.Locale.ROOT));
-    }
-
-    public static boolean resExists(String relative) {
-        return resourcePath(relative) != null;
     }
 
     public static URL resUrl(String relative) {
@@ -663,21 +655,6 @@ public final class Theme {
         return p;
     }
 
-    private static List<String> attrs(String svg, String tag, String attr) {
-        List<String> out = new ArrayList<>();
-        int idx = 0;
-        String open = "<" + tag;
-        while ((idx = svg.indexOf(open, idx)) >= 0) {
-            int end = svg.indexOf(">", idx);
-            if (end < 0) break;
-            String seg = svg.substring(idx, end);
-            String val = attr(seg, attr);
-            if (val != null) out.add(val);
-            idx = end;
-        }
-        return out;
-    }
-
     private static List<String[]> elems(String svg, String tag) {
         List<String[]> out = new ArrayList<>();
         int idx = 0;
@@ -732,7 +709,7 @@ public final class Theme {
         return ds;
     }
 
-        public static ImageView headImage(Image skin, double size) {
+    public static ImageView headImage(Image skin, double size) {
         ImageView iv = new ImageView(skin);
         iv.setViewport(new javafx.geometry.Rectangle2D(8, 8, 8, 8));
         iv.setFitWidth(size);

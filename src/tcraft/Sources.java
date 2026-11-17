@@ -70,11 +70,6 @@ public final class Sources {
         return out;
     }
 
-    /** 清空测速结果，重新测。 */
-    public static void invalidate() {
-        SPEED.clear();
-    }
-
     /** URL 速度，没测过返回 -1。 */
     public static double speedOf(String url) {
         Double k = cached(host(url));

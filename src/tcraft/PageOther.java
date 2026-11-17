@@ -265,7 +265,6 @@ public class PageOther implements Page {
                         VBox.setMargin(card, new Insets(0, 0, 14, 0));
                         page.getChildren().add(card);
                     }
-                    page.getChildren().remove(status);
                     if (count == 0) page.getChildren().add(Ui.label("暂时没有可显示的新闻。", 12, Theme.gray3));
                 });
             } catch (Exception ex) {
