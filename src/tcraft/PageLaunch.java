@@ -20,15 +20,12 @@ import javafx.util.Duration;
 
 import java.time.LocalTime;
 
-/** 主页右侧：日志卡、问候语、启动按钮和下拉菜单。 */
 public class PageLaunch implements Page {
 
     private final MainWindow win;
     private final Data data = Data.get();
-    /** 自动关闭后的 250ms 防误触窗口。 */
     private long menuClosedTick = 0;
     private Popup menuPopup;
-    /** 箭头旋转动画和当前朝向。 */
     private javafx.animation.Animation chevronSpin;
     private Node menuChevron;
 
@@ -38,14 +35,11 @@ public class PageLaunch implements Page {
     private final javafx.geometry.Point2D[] aprilSpeed = {new javafx.geometry.Point2D(0, 0)};
     private final javafx.geometry.Point2D[] aprilOffset = {new javafx.geometry.Point2D(0, 0)};
     private double aprilTraveled;
-    /** 鼠标静止的 tick 计数。 */
     private int aprilIdleCount = 0;
     private javafx.geometry.Point2D aprilMouseLast = null;
-    /** 累计位移超过 2500 弹一次「放弃吧」。 */
     private double aprilGiveUpDistance = -1500;
     private Node aprilButtonNode;
 
-    /** 4 月 1 日且今年还没触发过。 */
     public static boolean isAprilEnabled() {
         java.time.LocalDate now = java.time.LocalDate.now();
         return now.getMonthValue() == 4 && now.getDayOfMonth() == 1
@@ -66,7 +60,6 @@ public class PageLaunch implements Page {
         root.setAlignment(Pos.TOP_LEFT);
         root.setPickOnBounds(false);
 
-        // 下边留 150 给启动按钮
         ScrollPane scroll = Ui.scroll(new StackPane());
         VBox panMain = new VBox(15);
         panMain.setPadding(new Insets(25, 25, 150, 25));
@@ -74,7 +67,6 @@ public class PageLaunch implements Page {
         panMain.setMaxWidth(Double.MAX_VALUE);
         scroll.setContent(panMain);
 
-        // 启动日志卡只在调试模式显示
         if (data.getBool("SystemDebugMode", false)) {
             Ui.Card logCard = Ui.card("启动日志");
             logCard.setMaxWidth(Double.MAX_VALUE);
@@ -82,9 +74,8 @@ public class PageLaunch implements Page {
             lines.setPadding(new Insets(0, 15, 13, 15));
             java.util.List<String> logs = data.launchLog.isEmpty()
                     ? java.util.List.of("暂无启动日志。")
-                    : data.launchLog;
-            int from = Math.max(0, logs.size() - 30);
-            for (String line : logs.subList(from, logs.size())) {
+                    : data.launchLog.snapshot(30);
+            for (String line : logs) {
                 Label l = Ui.label(line, 12, Theme.gray2);
                 l.setWrapText(true);
                 l.setMaxWidth(Double.MAX_VALUE);
@@ -95,7 +86,6 @@ public class PageLaunch implements Page {
         }
         root.getChildren().add(scroll);
 
-        // 右下角按钮区
         VBox bottom = new VBox(10);
         bottom.setAlignment(Pos.BOTTOM_RIGHT);
         bottom.setPrefWidth(330);
@@ -104,13 +94,11 @@ public class PageLaunch implements Page {
         StackPane.setAlignment(bottom, Pos.BOTTOM_RIGHT);
         StackPane.setMargin(bottom, new Insets(0, 30, 25, 0));
 
-        // 问候语按小时分段
         VBox greetBox = new VBox(3);
         greetBox.setAlignment(Pos.BOTTOM_RIGHT);
         String greeting = greeting();
         Data.Account account = data.account();
         String name = account == null ? "" : account.name;
-        // 阴影偏移约 (0.7, 0.7)
         Label greet = name.isEmpty() ? Ui.semi(greeting, 19, Color.WHITE)
                 : Ui.semi(greeting + "，" + name, 19, Color.WHITE);
         greet.setEffect(new DropShadow(4, 0.7, 0.7, Color.web("#000000", 0.65)));
@@ -124,7 +112,6 @@ public class PageLaunch implements Page {
         greetBox.getChildren().addAll(greet, sub);
         bottom.getChildren().add(greetBox);
 
-        // 启动按钮和 48px 连体下拉
         HBox launchRow = new HBox(6);
         launchRow.setAlignment(Pos.CENTER_RIGHT);
         Data.Instance instance = data.instance();
@@ -138,7 +125,6 @@ public class PageLaunch implements Page {
         return root;
     }
 
-    /** 问候语按小时分段。 */
     private String greeting() {
         int hour = LocalTime.now().getHour();
         if (hour <= 5) return "夜深了";
@@ -147,7 +133,6 @@ public class PageLaunch implements Page {
         return "晚上好";
     }
 
-    /** 启动按钮，文案和可用状态由状态机决定。 */
     private StackPane buildLaunchButton(Data.Instance instance) {
         StackPane btn = new StackPane();
         btn.setPrefHeight(54);
@@ -156,11 +141,9 @@ public class PageLaunch implements Page {
         btn.setCursor(Cursor.HAND);
         btn.setEffect(Theme.shadow(10, 3, 0.25, Color.web("#1a2233")));
 
-        // 没实例走下载，有实例走启动
         boolean has = instance != null;
         Label main = Ui.semi(has ? "启动游戏" : "下载游戏", 14, Color.WHITE);
-        main.setTranslateY(-7.5); // padding 下 15，文字中心上移 7.5
-        // 版本名贴底居中
+        main.setTranslateY(-7.5);
         Label version = Ui.label(has ? instance.name : "未找到可用的游戏版本", 11, Color.web("#ffffff", 0.95));
         version.setMaxWidth(Double.MAX_VALUE);
         version.setAlignment(Pos.CENTER);
@@ -169,21 +152,18 @@ public class PageLaunch implements Page {
         StackPane.setMargin(version, new Insets(0, 15, 10, 15));
         btn.getChildren().addAll(main, version);
 
-        // 常态主题色，悬停提亮一档
         applyBtnBg(btn, Theme.accentDark);
-        Ui.animateBg(btn, Theme.accentDark, Theme.accentDark, 1); // 初始化背景，幂等
+        Ui.animateBg(btn, Theme.accentDark, Theme.accentDark, 1);
         btn.addEventHandler(MouseEvent.MOUSE_ENTERED, e -> Ui.animateBg(btn, Theme.accentDark, Theme.accent, 100));
         btn.addEventHandler(MouseEvent.MOUSE_EXITED, e -> Ui.animateBg(btn, Theme.accent, Theme.accentDark, 100));
-        btn.addEventHandler(MouseEvent.MOUSE_PRESSED, e -> Ui.scale(btn, 0.96)); // 按下缩放 0.96
+        btn.addEventHandler(MouseEvent.MOUSE_PRESSED, e -> Ui.scale(btn, 0.96));
         btn.addEventHandler(MouseEvent.MOUSE_RELEASED, e -> Ui.scale(btn, 1));
 
         btn.setOnMouseClicked(e -> {
             if (isAprilEnabled() && !aprilGiveup()) {
-                // 愚人节分支，复位后继续启动
                 aprilSurrender();
             }
             if (!has) {
-                // 没实例跳下载页
                 win.openPage("download", true);
             } else {
                 win.launchGame();
@@ -198,11 +178,9 @@ public class PageLaunch implements Page {
         btn.setBackground(new Background(new BackgroundFill(c, new CornerRadii(8), Insets.EMPTY)));
     }
 
-    /** 连体下拉按钮，48×54。 */
     private StackPane buildMenuButton(Data.Instance instance) {
         Node chevron = Theme.icon("chevron-down", 30, Color.WHITE);
         menuChevron = chevron;
-        // 背景和阴影单独一层，旋转时圆角不会被切
         Region bg = new Region();
         bg.setBackground(Ui.fill(Theme.accentDark, 10));
         bg.setEffect(Theme.shadow(10, 3, 0.25, Color.web("#1a2233")));
@@ -216,7 +194,6 @@ public class PageLaunch implements Page {
         return menu;
     }
 
-    /** 箭头跟菜单状态走：展开朝上、收起朝下，连点不会和状态脱节。 */
     private void spinChevron(boolean menuOpen) {
         if (menuChevron == null) return;
         if (chevronSpin != null) chevronSpin.stop();
@@ -228,10 +205,8 @@ public class PageLaunch implements Page {
         chevronSpin = rt;
     }
 
-    /** 回弹缓动。 */
     private static final Interpolator OUT_BACK = Ui.EASE_OUT_BACK;
 
-    /** 开关菜单，250ms 内挡掉误触。 */
     private void toggleLaunchMenu(Node anchor) {
         if (menuPopup != null && menuPopup.isShowing()) {
             closeLaunchMenu(menuPopup);
@@ -243,9 +218,8 @@ public class PageLaunch implements Page {
 
     private void openLaunchMenu(Node anchor) {
         Data.Instance instance = data.instance();
-        // 没实例时禁用版本设置
         boolean hasInstance = instance != null;
-        // 连点兜底：上一张还挂着就先收掉，防止叠两层
+        // 连点兜底：上一张还挂着就先收掉，不能叠两层
         if (menuPopup != null && menuPopup.isShowing()) menuPopup.hide();
         Popup popup = new Popup();
         popup.setAutoHide(true);
@@ -255,11 +229,10 @@ public class PageLaunch implements Page {
         card.setPadding(new Insets(8));
         card.setPrefWidth(204);
         card.setMinWidth(204);
-        card.setBackground(Ui.fill(Theme.cardBg, 10));
+        card.setBackground(Ui.fill(Ui.popupBg(), 10));
         card.setEffect(Theme.shadow(18, 3, 0.35, Theme.text));
         Ui.ListItem select = new Ui.ListItem(Theme.icon("layers", 17, Theme.text), "版本选择", null, 42);
         select.setOnMouseClicked(e -> {
-            // 走统一收起，箭头才跟得上状态
             closeLaunchMenu(popup);
             win.openVersionSelect();
         });
@@ -274,14 +247,21 @@ public class PageLaunch implements Page {
             setup.setOpacity(0.45);
         }
         card.getChildren().addAll(select, setup);
-        // 展开动画初值
+        if (data.getBool("UiHiddenFunctionSelect", false)) {
+            select.setVisible(false);
+            select.setManaged(false);
+            setup.setVisible(false);
+            setup.setManaged(false);
+        } else if (data.getBool("UiHiddenFunctionInstanceModify", false)) {
+            setup.setVisible(false);
+            setup.setManaged(false);
+        }
         card.setOpacity(0);
         card.setScaleX(0.94);
         card.setScaleY(0.94);
         card.setTranslateY(10);
         popup.getContent().add(card);
         popup.setOnHidden(e -> menuClosedTick = System.currentTimeMillis());
-        // 卡片贴在按钮上方，高度按内容实测，内容变了也不会飘
         javafx.geometry.Bounds b = anchor.localToScreen(anchor.getBoundsInLocal());
         double cardH = Math.max(90, card.prefHeight(-1));
         popup.show(anchor, b.getMinX() + b.getWidth() - 204, b.getMinY() - 6 - cardH);
@@ -298,7 +278,6 @@ public class PageLaunch implements Page {
         in.play();
     }
 
-    /** 收起动画。 */
     private void closeLaunchMenu(Popup popup) {
         spinChevron(false);
         Node card = popup.getContent() != null && !popup.getContent().isEmpty()
@@ -317,7 +296,8 @@ public class PageLaunch implements Page {
         scale.play();
     }
 
-    /** 进入逃跑模式。 */
+    private javafx.scene.Scene aprilScene;
+
     private void startAprilEscape(StackPane btn) {
         if (aprilTimer != null) return;
         data.log("愚人节彩蛋：启动按钮开始躲避鼠标");
@@ -328,6 +308,9 @@ public class PageLaunch implements Page {
             });
             return;
         }
+        // 先清掉旧 handler，页面反复重建时会重复挂
+        if (aprilScene != null && aprilScene.getRoot() != null) aprilScene.getRoot().setOnMouseMoved(null);
+        aprilScene = scene;
         scene.getRoot().setOnMouseMoved(e -> {
             aprilMouse[0] = new javafx.geometry.Point2D(e.getSceneX(), e.getSceneY());
         });
@@ -342,11 +325,9 @@ public class PageLaunch implements Page {
         aprilTimer.start();
     }
 
-    /** 单步物理。 */
     private void aprilStep(StackPane btn, javafx.scene.Scene scene) {
         javafx.geometry.Point2D mouse = aprilMouse[0];
         if (mouse == null) return;
-        // 静止 5 秒后回归起始位
         if (aprilMouseLast != null && aprilMouseLast.distance(mouse) < 0.5) {
             aprilIdleCount++;
         } else {
@@ -361,6 +342,8 @@ public class PageLaunch implements Page {
                 b.getMinX() + btn.getWidth() / 2 + aprilOffset[0].getX(),
                 b.getMinY() + btn.getHeight() / 2 + aprilOffset[0].getY());
         javafx.geometry.Point2D vec = mouse.subtract(center);
+        // 鼠标恰好压在按钮中心时 normalize 会出 NaN，把整个变换污染掉
+        if (vec.magnitude() < 1e-6) return;
         javafx.geometry.Point2D dir = vec.normalize();
         javafx.geometry.Point2D direction = dir.multiply(-1);
         double dist = Math.hypot(Math.max(0, Math.abs(vec.getX()) - w), Math.max(0, Math.abs(vec.getY()) - h));
@@ -368,7 +351,6 @@ public class PageLaunch implements Page {
         double accMag = Math.max(0, -0.65 - Math.log((dist / difficulty + 0.4) / 200)) * difficulty;
         javafx.geometry.Point2D acc = direction.multiply(accMag);
         if (idle) {
-            // 离原位超过 250 才拉回
             javafx.geometry.Bounds bodyScene = win.body.localToScene(win.body.getBoundsInLocal());
             javafx.geometry.Point2D safe = mouse.subtract(
                     bodyScene.getMinX() + w, bodyScene.getMinY() + win.body.getHeight() - h * 3);
@@ -388,13 +370,11 @@ public class PageLaunch implements Page {
         aprilTraveled += v;
         javafx.geometry.Point2D offset = aprilOffset[0].add(speed);
 
-        // 按移动方向做挤压拉伸
         double sx = clamp(1 - (Math.abs(direction.getX()) - Math.abs(direction.getY())) * (v / 160), 0.2, 1.8);
         double sy = clamp(1 - (Math.abs(direction.getY()) - Math.abs(direction.getX())) * (v / 100), 0.2, 1.8);
         btn.setScaleX(sx);
         btn.setScaleY(sy);
 
-        // 每 2500 位移提示一次放弃
         aprilGiveUpDistance += v;
         if (aprilGiveUpDistance > 2500) {
             aprilGiveUpDistance = 0;
@@ -407,7 +387,6 @@ public class PageLaunch implements Page {
             win.toast(hints[java.util.concurrent.ThreadLocalRandom.current().nextInt(hints.length)], "", 2);
         }
 
-        // 越界后从对侧进入并反向踢一脚
         javafx.geometry.Bounds bodyScene = win.body.localToScene(win.body.getBoundsInLocal());
         double bodyW = bodyScene.getWidth(), bodyH = bodyScene.getHeight();
         javafx.geometry.Point2D abs = center.add(speed);
@@ -435,7 +414,6 @@ public class PageLaunch implements Page {
         return v < min ? min : (v > max ? max : v);
     }
 
-    /** 投降：记年份并复位按钮。 */
     private void aprilSurrender() {
         stopAprilEscape();
         if (aprilButtonNode != null) {
@@ -447,13 +425,18 @@ public class PageLaunch implements Page {
         aprilOffset[0] = new javafx.geometry.Point2D(0, 0);
         aprilSpeed[0] = new javafx.geometry.Point2D(0, 0);
         data.set("AprilYear", java.time.LocalDate.now().getYear());
-        win.refreshExtraButtons(); // 刷新右下角悬浮按钮
+        win.refreshExtraButtons();
     }
 
     private void stopAprilEscape() {
         if (aprilTimer != null) {
             aprilTimer.stop();
             aprilTimer = null;
+        }
+        // handler 挂在 scene 根上且捕获了页面实例，不清会跟着整个窗口活着
+        if (aprilScene != null) {
+            if (aprilScene.getRoot() != null) aprilScene.getRoot().setOnMouseMoved(null);
+            aprilScene = null;
         }
     }
 

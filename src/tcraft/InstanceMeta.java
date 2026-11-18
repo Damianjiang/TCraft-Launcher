@@ -7,13 +7,11 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
-/** 实例元数据：颜色标签和合集归属，存在实例目录的 Setup.ini。 */
 public final class InstanceMeta {
 
     private InstanceMeta() {
     }
 
-    /** 颜色标签预设：中文名 + 十六进制值。 */
     public static final String[][] COLOR_TAGS = {
             {"红色", "#e74c3c"},
             {"橙色", "#e67e22"},
@@ -25,45 +23,65 @@ public final class InstanceMeta {
             {"灰色", "#95a5a6"}
     };
 
-    /** 合集名不能出现的字符，| 会分隔合集。 */
     private static final String INVALID_NAME_CHARS = ":|\r\n";
 
-    /** 实例版本目录。 */
     public static Path versionDir(Data.Instance ins) {
         String folder = ins.folder != null && !ins.folder.isEmpty() ? ins.folder : Data.get().gameDir;
         return Paths.get(folder).resolve("versions").resolve(ins.version);
     }
 
-    /** 实例的 TCL\Setup.ini。 */
     public static Path setupIni(Data.Instance ins) {
         return versionDir(ins).resolve("TCL").resolve("Setup.ini");
     }
 
-    /** 读一个键；文件或键不存在就返回空串。 */
+    // 一次列表刷新会对每个实例读 2-3 遍 Setup.ini，按 lastModified 缓存整份内容
+    private static final java.util.concurrent.ConcurrentHashMap<String, CachedIni> INI_CACHE =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static final class CachedIni {
+        final long modified;
+        final java.util.Map<String, String> values;
+
+        CachedIni(long modified, java.util.Map<String, String> values) {
+            this.modified = modified;
+            this.values = values;
+        }
+    }
+
+    private static java.util.Map<String, String> loadIni(Path file) throws Exception {
+        long modified = Files.getLastModifiedTime(file).toMillis();
+        String key = file.toAbsolutePath().toString();
+        CachedIni cached = INI_CACHE.get(key);
+        if (cached != null && cached.modified == modified) return cached.values;
+        List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
+        // 去掉 UTF-8 BOM
+        if (!lines.isEmpty() && lines.get(0).startsWith("\uFEFF")) {
+            lines.set(0, lines.get(0).substring(1));
+        }
+        java.util.Map<String, String> values = new java.util.HashMap<>();
+        for (String line : lines) {
+            String trimmed = line.trim();
+            int eq = trimmed.indexOf('=');
+            if (eq <= 0) continue;
+            values.put(trimmed.substring(0, eq).trim().toLowerCase(java.util.Locale.ROOT),
+                    trimmed.substring(eq + 1).trim());
+        }
+        INI_CACHE.put(key, new CachedIni(modified, values));
+        return values;
+    }
+
     public static String read(Data.Instance ins, String key) {
         try {
             Path file = setupIni(ins);
             if (!Files.isRegularFile(file)) return "";
-            List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
-            // 去掉 UTF-8 BOM。
-            if (!lines.isEmpty() && lines.get(0).startsWith("\uFEFF")) {
-                lines.set(0, lines.get(0).substring(1));
-            }
-            for (String line : lines) {
-                String trimmed = line.trim();
-                int eq = trimmed.indexOf('=');
-                if (eq <= 0) continue;
-                if (trimmed.substring(0, eq).trim().equalsIgnoreCase(key)) {
-                    return trimmed.substring(eq + 1).trim();
-                }
-            }
+            String value = loadIni(file).get(key.toLowerCase(java.util.Locale.ROOT));
+            return value == null ? "" : value;
         } catch (Exception e) {
             Errors.error("读取实例设置失败：" + ins.name + " / " + key, e, Errors.Behavior.NONE);
         }
         return "";
     }
 
-    /** 写一个键，value 为空表示删除，文件里其他行保留。 */
     public static void write(Data.Instance ins, String key, String value) {
         try {
             Path file = setupIni(ins);
@@ -90,8 +108,10 @@ public final class InstanceMeta {
             if (!replaced && value != null && !value.isEmpty()) out.add(key + "=" + value);
             Files.createDirectories(file.getParent());
             Files.write(file, out, StandardCharsets.UTF_8);
+            INI_CACHE.remove(file.toAbsolutePath().toString());
         } catch (Exception e) {
-            Errors.error("保存实例设置失败：" + ins.name + " / " + key, e);
+            // brief 会被 Errors.briefText 再做一次 Lang.t，查不到表时原样返回，先译不吃亏
+            Errors.error(Lang.t("保存实例设置失败：") + ins.name + " / " + key, e);
         }
     }
 
@@ -101,7 +121,6 @@ public final class InstanceMeta {
         return raw.startsWith("#") ? raw : "#" + raw;
     }
 
-    /** 设颜色标签，空串表示清除。 */
     public static void setColorTag(Data.Instance ins, String hex) {
         write(ins, "ColorTag", hex == null ? "" : hex.trim());
     }
@@ -144,7 +163,6 @@ public final class InstanceMeta {
         setCollections(ins, owned);
     }
 
-    /** 合集清单，存在启动器数据目录的 Collections.json。 */
     public static final class CollectionsStore {
 
         private CollectionsStore() {
@@ -195,7 +213,6 @@ public final class InstanceMeta {
             }
         }
 
-        /** 合集不存在时创建，返回是否新建。 */
         public static boolean ensure(String name) {
             String trimmed = name == null ? "" : name.trim();
             if (trimmed.isEmpty()) return false;
@@ -206,7 +223,6 @@ public final class InstanceMeta {
             return true;
         }
 
-        /** 校验合集名，返回空串表示合法。 */
         public static String validateName(String name, String ignore) {
             String trimmed = name == null ? "" : name.trim();
             if (trimmed.isEmpty()) return "合集名不能为空。";
@@ -218,7 +234,6 @@ public final class InstanceMeta {
             return "";
         }
 
-        /** 重命名合集，同时把各实例上的归属改掉。 */
         public static void rename(String oldName, String newName) {
             String trimmed = newName == null ? "" : newName.trim();
             if (oldName == null || oldName.isEmpty() || trimmed.isEmpty()) return;
@@ -236,7 +251,6 @@ public final class InstanceMeta {
             }
         }
 
-        /** 删合集，只删标签，不动实例本身。 */
         public static void delete(String name) {
             if (name == null || name.isEmpty()) return;
             List<String> items = listAll();

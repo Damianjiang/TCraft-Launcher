@@ -18,35 +18,37 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-/** 整合包安装：Modrinth、CurseForge、MCBBS。 */
 public final class Modpacks {
 
     private Modpacks() {
     }
 
-    /** 预读信息。 */
     public static class PackInfo {
         public boolean valid;
-        /** CurseForge / Modrinth / MCBBS。 */
         public String typeName = "";
         public String name = "";
         public String mcVersion = "";
-        /** 加载器名，跟 Data.Instance.loader 一致。 */
         public String loader = "";
         public String loaderVersion = "";
-        /** 包里声明了但没法支持的加载器。 */
         public List<String> unsupportedLoaders = new ArrayList<>();
         public long sizeBytes;
+        public String readError = "";
     }
 
-    /** 只读预读整合包信息，失败返回 valid=false。 */
+    // 识别失败与压缩包损坏共用 readError 字段，调用方靠它区分弹窗文案，须恒等比较
+    static String unrecognizedError() {
+        return Lang.t("无法识别整合包格式（压缩包里没有清单文件）");
+    }
+
     public static PackInfo readInfo(Path file) {
         PackInfo info = new PackInfo();
         try (ZipFile zip = new ZipFile(file.toFile())) {
             info.sizeBytes = Files.size(file);
             String base = baseFolder(zip);
-            if (base == null) return info;
-            // 按清单文件判断类型
+            if (base == null) {
+                info.readError = unrecognizedError();
+                return info;
+            }
             ZipEntry mcbbs = entry(zip, base + "mcbbs.packmeta");
             ZipEntry mmc = entry(zip, base + "mmc-pack.json");
             ZipEntry index = entry(zip, base + "modrinth.index.json");
@@ -56,7 +58,6 @@ public final class Modpacks {
                 info.typeName = "MCBBS";
                 parseMcbbs(readJson(zip, mcbbs), info);
             } else if (mmc != null) {
-                // MultiMC 的 components 加 instance.cfg 里的名字
                 info.typeName = "MultiMC";
                 parseMmc(readJson(zip, mmc), info);
                 ZipEntry cfg = entry(zip, base + "instance.cfg");
@@ -87,7 +88,8 @@ public final class Modpacks {
                     parseMcbbs(json, info);
                 }
             } else {
-                return info; // 没有可识别的清单
+                info.readError = unrecognizedError();
+                return info;
             }
             if (info.name.isEmpty()) {
                 info.name = file.getFileName().toString().replaceAll("\\.(zip|mrpack|rar)$", "");
@@ -95,6 +97,8 @@ public final class Modpacks {
             normalizeLoaderVersion(info);
             info.valid = !info.mcVersion.isEmpty();
         } catch (Exception e) {
+            // readError 经 PageInstance 弹窗展示，整串查不到表，创建处翻译
+            info.readError = Lang.tf("压缩包损坏或读取失败：%s", e.getMessage() == null ? e.toString() : e.getMessage());
             Data.get().log("预读整合包失败：" + e.getMessage());
         }
         return info;
@@ -106,7 +110,6 @@ public final class Modpacks {
         java.util.Map<String, Object> minecraft = Json.obj(json.get("minecraft"));
         info.mcVersion = Json.str(minecraft, "version", info.mcVersion).trim();
         List<Object> loaders = Json.arr(minecraft.get("modLoaders"));
-        // 只认 primary 的加载器
         String primaryId = "";
         for (Object o : loaders) {
             java.util.Map<String, Object> l = Json.obj(o);
@@ -172,7 +175,6 @@ public final class Modpacks {
         }
     }
 
-    /** 去掉加载器版本里可能带的 MC 前缀，如 1.20.1-47.2.0 → 47.2.0。 */
     private static String loaderVersion(String version, PackInfo info) {
         String v = version == null ? "" : version.trim();
         if (!info.mcVersion.isEmpty() && v.startsWith(info.mcVersion + "-")) {
@@ -185,13 +187,11 @@ public final class Modpacks {
         info.loaderVersion = loaderVersion(info.loaderVersion, info);
     }
 
-    /** 解析 CurseForge 风格的加载器 id。 */
     private static void parseLoaderId(String id, PackInfo info) {
         if (id == null || id.isBlank()) return;
         String text = id.trim();
         String lower = text.toLowerCase();
         if (lower.startsWith("forge-")) {
-            // 老格式 forge-1.12.2-recommended 定不出具体版本
             if (lower.endsWith("-recommended") || lower.endsWith("-latest")) {
                 info.unsupportedLoaders.add(text);
                 return;
@@ -209,7 +209,6 @@ public final class Modpacks {
         }
     }
 
-    /** 解析 MultiMC mmc-pack.json 里的 components。 */
     private static void parseMmc(java.util.Map<String, Object> json, PackInfo info) {
         if (json == null) return;
         for (Object o : Json.arr(json.get("components"))) {
@@ -235,14 +234,12 @@ public final class Modpacks {
         }
     }
 
-    /** 解析 modpack.json，只有 gameVersion，没有加载器。 */
     private static void parseHmcl(java.util.Map<String, Object> json, PackInfo info) {
         if (json == null) return;
         info.name = Json.str(json, "name", info.name);
         info.mcVersion = Json.str(json, "gameVersion", "").trim();
     }
 
-    /** HMCL 包没写版本/加载器时从 minecraft/pack.json 补。 */
     private static void parseHmclPack(ZipFile zip, String base, PackInfo info) {
         try {
             ZipEntry pack = entry(zip, base + "minecraft/pack.json");
@@ -291,7 +288,6 @@ public final class Modpacks {
                     return;
                 }
             }
-            // 再退回 inheritsFrom，例如 1.20.1-forge-47.2.0
             String inherits = Json.str(json, "inheritsFrom", "").trim();
             String lower = inherits.toLowerCase(java.util.Locale.ROOT);
             int neo = lower.indexOf("-neoforge-");
@@ -318,7 +314,6 @@ public final class Modpacks {
         }
     }
 
-    /** 网络安装：先下整合包文件，再走安装流程。 */
     public static void installFromNetwork(MainWindow win, ResourceVersion packFile, ResourceInfo info, String instanceName) {
         String name = instanceName == null ? "" : instanceName.trim();
         String error = instanceNameError(name);
@@ -355,7 +350,6 @@ public final class Modpacks {
         thread.start();
     }
 
-    /** 本地文件安装。 */
     public static void installLocal(MainWindow win, Path packPath, PackInfo info, String instanceName) {
         String name = instanceName == null ? "" : instanceName.trim();
         String error = instanceNameError(name);
@@ -383,14 +377,13 @@ public final class Modpacks {
         thread.start();
     }
 
-    /** 版本名只允许单层目录名，且不能和已有实例重名。 */
     static String instanceNameError(String name) {
         String value = name == null ? "" : name.trim();
         if (value.isEmpty()) return "名称不能为空。";
         if (value.length() > 64) return "名称不能超过 64 个字符。";
         if (value.equals(".") || value.equals("..")) return "名称不合法。";
         for (char c : "\\/:*?\"<>|".toCharArray()) {
-            if (value.indexOf(c) >= 0) return "名称不能包含字符：" + c;
+            if (value.indexOf(c) >= 0) return Lang.tf("名称不能包含字符：%s", c);
         }
         if (value.endsWith(".") || value.endsWith(" ")) return "名称不能以点或空格结尾。";
         String upper = value.toUpperCase(java.util.Locale.ROOT);
@@ -418,7 +411,6 @@ public final class Modpacks {
             data.log("整合包安装失败：" + task.error);
             Platform.runLater(() -> win.toast("整合包安装失败", task.error, 3));
         }
-        // 清理半成品实例
         cleanupInstance(data, instanceName);
     }
 
@@ -444,7 +436,6 @@ public final class Modpacks {
         }
     }
 
-    /** 从压缩包安装内容，之后触发 MC 和加载器安装。 */
     private static void installFromZip(MainWindow win, Path zipPath, String instanceName, Tasks.Task task,
                                        int fromSub) throws Exception {
         Data data = Data.get();
@@ -479,7 +470,7 @@ public final class Modpacks {
                 contentDirs.add(base + ".minecraft");
             } else if (index != null) {
                 parseModrinth(readJson(zip, index), info);
-                // Modrinth 客户端覆盖优先，和 HMCL 一样先 client-overrides 再 overrides
+                // 与 HMCL 一致：client-overrides 优先于 overrides
                 contentDirs.add(base + "client-overrides");
                 contentDirs.add(base + "overrides");
             } else if (manifest != null) {
@@ -506,25 +497,27 @@ public final class Modpacks {
                 throw new Exception("该整合包使用了 TCL 不支持的加载器：" + String.join("、", info.unsupportedLoaders));
             }
 
-            // 解压并覆盖文件
             task.stage = "解压整合包文件";
             task.progress = 0.05;
             Tasks.INSTANCE.changed();
             extractContent(zip, tempDir, versionFolder, base, info, contentDirs);
+            // PreCommand 实际从本机配置（Data.json）读取执行（GameLauncher.java:674 附近），
+            // 不经 Setup.ini；这里清掉包内自带实例设置里的危险项
+            sanitizeImportedInstanceSettings(versionFolder);
 
-            // 下载整合包内容
             if (index != null) {
                 downloadModrinthContent(win, zip, index, versionFolder, task);
             } else if (info.typeName.equals("HMCL") || info.typeName.equals("MultiMC")) {
-                // 这类包的内容全在覆盖目录里。
+                // 这类包的内容全在覆盖目录里
                 task.progress = 0.6;
             } else if (isMcbbs) {
                 downloadMcbbsContent(win, mcbbsJson, versionFolder, task);
             } else if (manifest != null) {
                 downloadCurseForgeContent(win, readJson(zip, manifest), versionFolder, task);
             }
+            // 内容下载阶段也可能写进 TCL/（比如包里带 nide8auth.jar），下载完再清一遍
+            sanitizeImportedInstanceSettings(versionFolder);
 
-            // 解压 saves 里的世界 zip。
             task.stage = "整理文件";
             Path saves = versionFolder.resolve("saves");
             if (Files.isDirectory(saves)) {
@@ -542,14 +535,13 @@ public final class Modpacks {
             }
             task.progress = 0.85;
 
-            // 设置图标
             String iconPath = "";
             java.util.List<String> iconCandidates = new ArrayList<>(java.util.List.of("icon.png", "pack.png", "logo.png", "icon.jpg", "logo.jpg"));
-            // instance.cfg 的 iconKey 指向包里的图标
             if (info.typeName.equals("MultiMC") && tempDir.resolve(base + "instance.cfg").toFile().exists()) {
                 for (String line : Files.readString(tempDir.resolve(base + "instance.cfg"), StandardCharsets.UTF_8).split("\n")) {
                     if (line.startsWith("iconKey=") && !line.substring(8).isBlank()) {
-                        iconCandidates.add(0, line.substring(8).trim() + ".png");
+                        String key = safeIconName(line.substring(8));
+                        if (!key.isEmpty()) iconCandidates.add(0, key + ".png");
                         break;
                     }
                 }
@@ -575,12 +567,14 @@ public final class Modpacks {
                 }
             }
 
-            // 登记实例：内容在 versions/<实例名>，用自己的版本 json 继承加载器版本
-            String desc = info.typeName + " 整合包 · MC " + info.mcVersion
-                    + (info.loader.isEmpty() ? "" : "，" + info.loader + " " + info.loaderVersion);
+            // 登记实例：内容在 versions/，用自己的版本 json 继承加载器版本
+            // desc 会持久化进实例元数据，创建时翻译；旧实例保持创建时的语言
+            String desc = info.typeName + Lang.t(" 整合包 · MC ") + info.mcVersion
+                    + (info.loader.isEmpty() ? "" : Lang.t("，") + info.loader + " " + info.loaderVersion);
             Data.Instance instance = new Data.Instance(instanceName, instanceName,
                     info.loader.isEmpty() ? "原版" : info.loader, info.loaderVersion, desc,
                     iconPath, System.currentTimeMillis(), false, data.gameDir, Isolation.ON);
+            instance.addedAt = System.currentTimeMillis();
             for (Data.Instance ins : data.instances) {
                 if (instanceName.equals(ins.name)) {
                     data.instances.remove(ins);
@@ -594,33 +588,91 @@ public final class Modpacks {
             if (idx < task.subs.size()) task.subs.get(idx).state = Tasks.State.DONE;
             task.stage = "安装游戏版本 " + info.mcVersion
                     + (info.loader.isEmpty() ? "" : " · " + info.loader);
+            task.progress = 0.92;
+            Tasks.INSTANCE.changed();
 
-            // 把 MC 和加载器装进游戏目录，装完写一份继承加载器版本的实例 json
+            // 游戏版本装完才置 DONE，否则实例 json 还没写，启动会提示找不到版本文件
             String loader = info.loader.isEmpty() ? "原版" : info.loader;
-            Downloader.startInstall(win, new Data.McVersion(info.mcVersion, "release", ""), loader,
-                    Paths.get(data.gameDir), info.loaderVersion, null, actual -> {
-                        if (actual == null || actual.isEmpty()) return;
-                        try {
-                            Path dir = Paths.get(data.gameDir, "versions", instanceName);
-                            Files.createDirectories(dir);
-                            String json = "{\"id\":" + Json.quote(instanceName)
-                                    + ",\"inheritsFrom\":" + Json.quote(actual)
-                                    + ",\"type\":\"release\"}";
-                            Files.writeString(dir.resolve(instanceName + ".json"), json, StandardCharsets.UTF_8);
-                            data.save();
-                            win.refreshRight();
-                            data.log("整合包版本已就绪：" + instanceName + " → " + actual);
-                        } catch (Exception e) {
-                            data.log("写整合包版本 json 失败：" + e.getMessage());
-                        }
-                    });
+            String actual;
+            try {
+                actual = Downloader.install(task, new Data.McVersion(info.mcVersion, "release", ""), loader,
+                        data, win, Paths.get(data.gameDir), info.loaderVersion, null);
+            } catch (Exception e) {
+                if (task.canceled) {
+                    task.state = Tasks.State.CANCELED;
+                    task.stage = "已取消";
+                    return;
+                }
+                // 内容已解压，不删实例目录，只报失败原因
+                task.state = Tasks.State.FAILED;
+                task.error = Lang.tf("整合包内容已解压，但游戏版本安装失败：%s",
+                        e.getMessage() == null ? Lang.t("网络错误") : e.getMessage());
+                task.stage = "游戏版本安装失败";
+                data.log(task.error);
+                String msg = task.error;
+                Platform.runLater(() -> win.toast("整合包内容已就绪，游戏版本未装完", msg, 3));
+                return;
+            }
+            if (actual != null && !actual.isEmpty()) {
+                try {
+                    Path dir = Paths.get(data.gameDir, "versions", instanceName);
+                    Files.createDirectories(dir);
+                    String json = "{\"id\":" + Json.quote(instanceName)
+                            + ",\"inheritsFrom\":" + Json.quote(actual)
+                            + ",\"type\":\"release\"}";
+                    Files.writeString(dir.resolve(instanceName + ".json"), json, StandardCharsets.UTF_8);
+                    data.save();
+                    Platform.runLater(win::refreshRight);
+                    data.log("整合包版本已就绪：" + instanceName + " → " + actual);
+                } catch (Exception e) {
+                    data.log("写整合包版本 json 失败：" + e.getMessage());
+                }
+            }
             task.progress = 1;
             task.state = Tasks.State.DONE;
-            task.stage = "整合包内容就绪";
-            data.log("整合包内容安装完成：" + instanceName + "，已开始安装游戏版本 " + info.mcVersion);
+            task.stage = "整合包安装完成";
+            data.log("整合包安装完成：" + instanceName + " → " + actual);
         } finally {
             deleteRecursive(tempDir);
         }
+    }
+
+    // 清掉包内自带实例设置里的命令与附加参数，这些只能本机自己填
+    private static void sanitizeImportedInstanceSettings(Path versionFolder) {
+        try {
+            Path ini = versionFolder.resolve("TCL").resolve("Setup.ini");
+            if (!Files.isRegularFile(ini)) return;
+            List<String> lines = Files.readAllLines(ini, StandardCharsets.UTF_8);
+            List<String> kept = new ArrayList<>();
+            List<String> dropped = new ArrayList<>();
+            for (String line : lines) {
+                String t = line.trim();
+                int eq = t.indexOf('=');
+                String key = eq > 0 ? t.substring(0, eq).trim().toLowerCase(java.util.Locale.ROOT) : "";
+                if (eq > 0 && (key.equals("precommand") || key.equals("precommandwait")
+                        || key.equals("jvmargs") || key.equals("gameargs"))) {
+                    dropped.add(key);
+                    continue;
+                }
+                kept.add(line);
+            }
+            if (!dropped.isEmpty()) {
+                Files.write(ini, kept, StandardCharsets.UTF_8);
+                Data.get().log("整合包自带实例设置中的 " + String.join("、", dropped)
+                        + " 已被忽略（只允许本机手动设置）");
+            }
+        } catch (Exception e) {
+            Data.get().log("检查整合包实例设置失败：" + e.getMessage());
+        }
+    }
+
+    // 只接受纯文件名，../、斜杠和 UNC 一律不要
+    private static String safeIconName(String raw) {
+        String name = raw == null ? "" : raw.trim();
+        if (name.isEmpty()) return "";
+        if (!name.matches("[A-Za-z0-9][A-Za-z0-9._-]{0,63}")) return "";
+        if (name.equals(".") || name.equals("..")) return "";
+        return name;
     }
 
     private static void downloadModrinthContent(MainWindow win, ZipFile zip, ZipEntry indexEntry,
@@ -632,7 +684,6 @@ public final class Modpacks {
         for (Object o : files) {
             if (task.canceled) throw new java.io.IOException("已取消");
             java.util.Map<String, Object> f = Json.obj(o);
-            // 跳过服务端专用文件
             java.util.Map<String, Object> env = Json.obj(f.get("env"));
             if (!env.isEmpty() && "unsupported".equalsIgnoreCase(Json.str(env, "client", ""))) continue;
             String relPath = Json.str(f, "path", "");
@@ -640,7 +691,12 @@ public final class Modpacks {
             java.util.Map<String, Object> hashes = Json.obj(f.get("hashes"));
             String sha1 = Json.str(hashes, "sha1", "");
             Path target = versionFolder.resolve(relPath).normalize();
-            if (!target.startsWith(versionFolder)) continue; // 防路径穿越
+            if (!target.startsWith(versionFolder)) continue; // 路径可能带 ../，别写穿
+            // TCL/ 是启动器的配置目录，nide8auth.jar、authlib-injector.jar 等会被 -javaagent 挂进游戏 JVM
+            if (target.startsWith(versionFolder.resolve("TCL"))) {
+                data_log("跳过写向 TCL 目录的整合包内容：" + relPath);
+                continue;
+            }
             List<String> urls = new ArrayList<>();
             for (Object u : Json.arr(f.get("downloads"))) urls.add(String.valueOf(u));
             if (!urls.isEmpty() && !Files.isRegularFile(target)) {
@@ -671,7 +727,6 @@ public final class Modpacks {
         all.addAll(optional);
         if (all.isEmpty()) return;
         List<Object> fileInfos = CurseForge.filesByIds(all);
-        // 文件缺失就提示
         if (fileInfos.size() < all.size()) {
             java.util.Set<String> found = new java.util.HashSet<>();
             for (Object o : fileInfos) {
@@ -689,7 +744,6 @@ public final class Modpacks {
                 if (!go) throw new java.io.IOException("已取消");
             }
         }
-        // 可选文件合并成一次询问
         java.util.Set<Long> skipOptional = new java.util.HashSet<>();
         if (!optional.isEmpty()) {
             boolean dl = askInBackground(win, "下载可选文件",
@@ -715,23 +769,36 @@ public final class Modpacks {
                 modules.add(Json.str(Json.obj(m), "name", ""));
             }
             String sub = inferModuleTarget(modules, rv.fileName);
-            // jar 默认就是 mod；资源包/光影/世界再查项目分类，避免放进 mods
             String lower = rv.fileName.toLowerCase(java.util.Locale.ROOT);
             if (!lower.endsWith(".jar") && !lower.endsWith(".litemod")) {
                 long modId = (long) Json.num(f, "modId", 0);
                 if (modId > 0) {
-                    int classId = classCache.computeIfAbsent(modId, id -> {
-                        try {
-                            return CurseForge.projectInfo(id).classId;
-                        } catch (Exception e) {
-                            return 0;
-                        }
-                    });
+                    // 分类查不到就中止安装，不能把材质包静默装进 mods
+                    int classId;
+                    try {
+                        classId = classCache.computeIfAbsent(modId, id -> {
+                            try {
+                                return CurseForge.projectInfo(id).classId;
+                            } catch (Exception e) {
+                                throw new RuntimeException(e.getMessage() == null ? "网络错误" : e.getMessage(), e);
+                            }
+                        });
+                    } catch (RuntimeException re) {
+                        Throwable cause = re.getCause() != null ? re.getCause() : re;
+                        // 消息最终进 task.error 展示，创建处翻译
+                        throw new java.io.IOException(Lang.tf("项目分类获取失败（id=%s）：%s", modId,
+                                cause.getMessage() == null ? Lang.t("网络错误") : cause.getMessage()), cause);
+                    }
                     sub = targetForClass(classId, sub);
                 }
             }
             Path target = versionFolder.resolve(sub).resolve(rv.fileName).normalize();
-            if (!target.startsWith(versionFolder)) continue; // 防止文件名带 ../ 写穿目录
+            if (!target.startsWith(versionFolder)) continue; // 文件名可能带 ../，别写穿目录
+            // TCL/ 是启动器的配置目录，不允许被整合包内容写穿
+            if (target.startsWith(versionFolder.resolve("TCL"))) {
+                data_log("跳过写向 TCL 目录的整合包内容：" + target.getFileName());
+                continue;
+            }
             if (!Files.isRegularFile(target)) {
                 Files.createDirectories(target.getParent());
                 tryDownload(task, rv.downloadUrls, target, rv.hash);
@@ -758,6 +825,11 @@ public final class Modpacks {
             var hashes = Json.obj(source.get("hashes"));
             Path target = versionFolder.resolve(relPath).normalize();
             if (!target.startsWith(versionFolder)) continue;
+            // TCL/ 是启动器的配置目录，不允许被整合包内容写穿
+            if (target.startsWith(versionFolder.resolve("TCL"))) {
+                data_log("跳过写向 TCL 目录的整合包内容：" + relPath);
+                continue;
+            }
             if (!Files.isRegularFile(target)) {
                 Files.createDirectories(target.getParent());
                 tryDownload(task, List.of(url), target, Json.str(hashes, "sha1", ""));
@@ -769,10 +841,9 @@ public final class Modpacks {
         }
     }
 
-    /** 按 CurseForge 文件的 modules 推断保存目录。 */
     static String inferModuleTarget(List<String> modules, String fileName) {
         String lower = fileName == null ? "" : fileName.toLowerCase();
-        // jar 先按 mod 处理，避免 jar 里的 assets/data 目录被误判成资源包/数据包
+        // jar 优先按 mod 归类，内部 assets/data 模块名会误判
         if (lower.endsWith(".jar") || lower.endsWith(".litemod")) return "mods";
         if (lower.endsWith(".mrpack")) return "modpacks";
         for (String m : modules) {
@@ -785,7 +856,6 @@ public final class Modpacks {
         return "mods";
     }
 
-    /** CurseForge 项目分类对应的保存目录，未知分类沿用文件名推断。 */
     private static String targetForClass(int classId, String fallback) {
         return switch (classId) {
             case CurseForge.CLASS_RESOURCEPACK -> "resourcepacks";
@@ -796,7 +866,6 @@ public final class Modpacks {
         };
     }
 
-    /** 后台线程等用户点「继续 / 取消」。 */
     private static boolean askInBackground(MainWindow win, String title, String message) {
         CountDownLatch latch = new CountDownLatch(1);
         AtomicBoolean ok = new AtomicBoolean(false);
@@ -839,7 +908,6 @@ public final class Modpacks {
         return ok.get();
     }
 
-    /** 判断包内根目录。 */
     private static String baseFolder(ZipFile zip) {
         String[] markers = {"modrinth.index.json", "manifest.json", "mcbbs.packmeta",
                 "mmc-pack.json", "modpack.json", "instance.cfg"};
@@ -871,12 +939,30 @@ public final class Modpacks {
     }
 
     private static java.util.Map<String, Object> readJson(ZipFile zip, ZipEntry entry) throws Exception {
+        if (entry.getSize() > 10L * 1024 * 1024) {
+            throw new java.io.IOException(Lang.tf("整合包清单文件过大：%s（%d 字节）",
+                    entry.getName(), entry.getSize()));
+        }
         try (InputStream in = zip.getInputStream(entry)) {
-            return Json.obj(Json.parse(new String(in.readAllBytes(), StandardCharsets.UTF_8)));
+            byte[] bytes = in.readNBytes(10 * 1024 * 1024 + 1);
+            if (bytes.length > 10 * 1024 * 1024) {
+                // 流式条目 getSize 可能是 -1，用实际读到的长度
+                throw new java.io.IOException(Lang.tf("整合包清单文件过大：%s（%d 字节）",
+                        entry.getName(), bytes.length));
+            }
+            String text = new String(bytes, StandardCharsets.UTF_8);
+            try {
+                return Json.obj(Json.parse(text));
+            } catch (Json.MalformedException e) {
+                throw new java.io.IOException(Lang.tf("整合包清单 JSON 损坏：%s，%s", entry.getName(),
+                        e.getMessage() == null ? Lang.t("格式不合法") : e.getMessage()), e);
+            } catch (RuntimeException e) {
+                throw new java.io.IOException(Lang.tf("整合包清单 JSON 无法解析：%s，%s", entry.getName(),
+                        e.getMessage() == null ? Lang.t("格式不合法") : e.getMessage()), e);
+            }
         }
     }
 
-    /** 解压包，并把各格式的覆盖目录复制到实例目录。 */
     static void extractContent(ZipFile zip, Path tempDir, Path versionFolder, String base,
                                PackInfo info, List<String> contentDirs) throws Exception {
         extractZip(zip, tempDir);
@@ -970,5 +1056,4 @@ public final class Modpacks {
     private static void data_log(Object msg) {
         Data.get().log(String.valueOf(msg));
     }
-
 }

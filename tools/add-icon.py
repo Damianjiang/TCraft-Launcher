@@ -32,7 +32,7 @@ def align(v, a):
 
 def build_icons(images, first_id=1):
     """构造 RT_ICON 数据 与 RT_GROUP_ICON 数据"""
-    icons = []  # (id, bytes)
+    icons = []
     entries = []
     for i, (w, h, colors, planes, bpp, payload) in enumerate(images):
         rid = first_id + i
@@ -49,14 +49,13 @@ def build_rsrc_section(images):
     """返回 (rsrc_bytes, 资源目录大小)"""
     icons, grp = build_icons(images)
 
-    # 资源树：类型 -> ID -> 语言 -> 数据
     tree = {
         RT_ICON: {rid: {LANG_ZH: ("icon", data)} for rid, data in icons},
         RT_GROUP_ICON: {1: {LANG_ZH: ("group", grp)}},
     }
 
     # 先排目录，再排数据项，最后放数据本身
-    dirs = []      # (offset, [(name, is_dir, target)])
+    dirs = []
     datas = []
 
     def walk(node, base):
@@ -104,7 +103,6 @@ def build_rsrc_section(images):
                 struct.pack_into("<II", buf, off, name, 0)
             off += 8
 
-    # 叶子改成指向数据项，不带 0x80000000
     de_cursor = 0
 
     def fix(node, base):
@@ -123,7 +121,6 @@ def build_rsrc_section(images):
 
     fix(tree, 0)
 
-    # 写数据项（OffsetToData 先填节内偏移，调用方再加 rva）
     for i, (b, o) in enumerate(zip(datas, blob_offsets)):
         struct.pack_into("<IIII", buf, de_base + i * 16, o, len(b), 0, 0)
         buf[o:o + len(b)] = b
@@ -153,7 +150,6 @@ def inject(src, dst, ico_path):
     images = parse_ico(open(ico_path, "rb").read())
     rsrc, rsrc_size, de_base, blobs = build_rsrc_section(images)
 
-    # 新节位置
     last = sec_table + (nsec - 1) * 40
     last_va = struct.unpack_from("<I", data, last + 12)[0]
     last_vsz = struct.unpack_from("<I", data, last + 8)[0]
@@ -168,19 +164,16 @@ def inject(src, dst, ico_path):
         inner = struct.unpack_from("<I", fixed, pos)[0]
         struct.pack_into("<I", fixed, pos, inner + new_va)
 
-    # 写节表项
     sh = sec_table + nsec * 40
     name = b".rsrc\0\0\0"
-    chars = 0x40000040  # INITIALIZED_DATA | MEM_READ
+    chars = 0x40000040
     struct.pack_into("<8sIIIIIIHHI", data, sh, name, len(fixed), new_va, raw_size, raw_off,
                      0, 0, 0, 0, chars)
 
-    # 新节数据
     data += b"\0" * (raw_off - len(data))
     data += bytes(fixed)
     data += b"\0" * (raw_size - len(fixed))
 
-    # 头部字段
     struct.pack_into("<H", data, pe + 6, nsec + 1)
     struct.pack_into("<I", data, opt + 56, align(new_va + len(fixed), secalign))
     init_data = struct.unpack_from("<I", data, opt + 8)[0]

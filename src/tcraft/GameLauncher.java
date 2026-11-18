@@ -14,13 +14,11 @@ import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-/** 解析版本 JSON 并拉起 Minecraft。 */
 public final class GameLauncher {
 
     private GameLauncher() {
     }
 
-    /** 系统物理内存 MB，取不到用 8192。 */
     private static long physicalMemoryMb() {
         try {
             com.sun.management.OperatingSystemMXBean os =
@@ -32,26 +30,38 @@ public final class GameLauncher {
         return 8192;
     }
 
-    /** 启动前校验缺失文件。 */
     public static class MissingFile {
         public final String url;
         public final Path target;
         public final long size;
         public final String desc;
+        public final String sha1;
 
         MissingFile(String url, Path target, long size, String desc) {
+            this(url, target, size, desc, "");
+        }
+
+        MissingFile(String url, Path target, long size, String desc, String sha1) {
             this.url = url;
             this.target = target;
             this.size = size;
             this.desc = desc;
+            this.sha1 = sha1 == null ? "" : sha1;
         }
     }
 
-    /** 读版本继承链，最底层版本在前。 */
     private static List<Map<String, Object>> readChain(Path game, String version) throws Exception {
         List<Map<String, Object>> chain = new ArrayList<>();
         String current = version;
+        java.util.Set<String> visited = new java.util.HashSet<>();
         while (current != null && !current.isEmpty()) {
+            // 版本 ID 直接拿来拼路径，带分隔符或 .. 的都当伪造版本处理
+            if (current.contains("\\") || current.contains("/") || current.contains("..")) {
+                throw new Exception(Lang.t("版本 ID 含非法字符：") + current);
+            }
+            if (!visited.add(current) || visited.size() > 16) {
+                throw new Exception(Lang.t("版本继承链存在循环或过深：") + current);
+            }
             Path p = game.resolve("versions").resolve(current).resolve(current + ".json");
             if (!Files.isRegularFile(p)) break;
             Map<String, Object> json = Json.obj(Json.parse(Files.readString(p, StandardCharsets.UTF_8)));
@@ -61,23 +71,40 @@ public final class GameLauncher {
         return chain;
     }
 
-    /** 基础游戏目录：libraries、assets 和版本文件都在这儿。 */
+    private static String autoJava(Data.Instance instance) throws Exception {
+        List<Map<String, Object>> chain = readChain(gameDirOf(instance), instance.version);
+        int required = 0;
+        for (Map<String, Object> j : chain) {
+            required = Math.max(required, (int) parseNum(
+                    Json.str(Json.obj(j.get("javaVersion")), "majorVersion", "0"), 0));
+        }
+        if (required <= 0) return "";
+        String best = "";
+        int bestMajor = Integer.MAX_VALUE;
+        for (Data.JavaRuntime rt : Data.get().scanJavaRuntimes()) {
+            if (rt.major() >= required && rt.major() < bestMajor) {
+                best = rt.path();
+                bestMajor = rt.major();
+            }
+        }
+        return best;
+    }
+
     private static Path gameDirOf(Data.Instance instance) {
         return Isolation.base(instance);
     }
 
-    /** 游戏运行目录：开了隔离就是 versions/&lt;版本&gt;。 */
-    private static Path runDirOf(Data.Instance instance) {
+    public static Path runDirOf(Data.Instance instance) {
         return Isolation.run(instance);
     }
 
-    /** 启动前校验依赖库、natives、客户端 jar 和资源索引。 */
     public static List<MissingFile> scanMissing(Data.Instance instance) throws Exception {
         Path game = gameDirOf(instance);
-        List<MissingFile> out = new ArrayList<>();
+        // 按 target 绝对路径去重：继承链里同一个库可能出现多次，重复条目会让 downloadMissing 双写同一 .part
+        Map<Path, MissingFile> out = new java.util.LinkedHashMap<>();
         List<Map<String, Object>> chain = readChain(game, instance.version);
         if (chain.isEmpty()) throw new Exception("版本 JSON 无效或不存在：" + instance.version);
-        // 依赖库，含旧版 natives。
+        // 依赖库，含旧版 natives
         List<String> allLibNames = new ArrayList<>();
         for (Map<String, Object> j : chain) {
             for (Object o : Json.arr(j.get("libraries"))) {
@@ -93,12 +120,22 @@ public final class GameLauncher {
                 Map<String, Object> downloads = Json.obj(lib.get("downloads"));
                 Map<String, Object> artifact = Json.obj(downloads.get("artifact"));
                 String path = Json.str(artifact, "path", "");
-                // 只有 classifiers 没有 artifact 的库不处理。
                 String url = Json.str(artifact, "url", "");
+                if (path.isEmpty()) {
+                    // 旧式库只有 name + url 基地址，按 maven 约定拼相对路径（LiteLoader 等）
+                    String base = Json.str(lib, "url", "");
+                    if (!base.isEmpty() && !libName.isEmpty()) {
+                        if (!base.endsWith("/")) base += "/";
+                        path = nameToPath(libName);
+                        url = base + path;
+                    }
+                }
                 if (!path.isEmpty() && !url.isEmpty()
                         && !Files.isRegularFile(game.resolve("libraries").resolve(path))) {
-                    out.add(new MissingFile(url, game.resolve("libraries").resolve(path),
-                            (long) parseNum(Json.str(artifact, "size", "0"), 0), "依赖库 " + path));
+                    out.putIfAbsent(game.resolve("libraries").resolve(path).toAbsolutePath().normalize(),
+                            new MissingFile(url, game.resolve("libraries").resolve(path),
+                                    (long) parseNum(Json.str(artifact, "size", "0"), 0), "依赖库 " + path,
+                                    Json.str(artifact, "sha1", "")));
                 }
                 Map<String, Object> nativesMap = Json.obj(lib.get("natives"));
                 if (!nativesMap.isEmpty()) {
@@ -110,14 +147,15 @@ public final class GameLauncher {
                         String rel = Json.str(nat, "path", "");
                         if (!rel.isEmpty() && !Files.isRegularFile(game.resolve("libraries").resolve(rel))) {
                             String nativeUrl = Json.str(nat, "url", "");
-                            out.add(new MissingFile(nativeUrl, game.resolve("libraries").resolve(rel),
-                                    (long) parseNum(Json.str(nat, "size", "0"), 0), "依赖库 " + rel));
+                            out.putIfAbsent(game.resolve("libraries").resolve(rel).toAbsolutePath().normalize(),
+                                    new MissingFile(nativeUrl, game.resolve("libraries").resolve(rel),
+                                            (long) parseNum(Json.str(nat, "size", "0"), 0), "依赖库 " + rel,
+                                            Json.str(nat, "sha1", "")));
                         }
                     }
                 }
             }
         }
-        // 客户端 jar 沿继承链找。
         boolean clientOk = false;
         for (Map<String, Object> j : chain) {
             String id = Json.str(j, "id", "");
@@ -132,32 +170,41 @@ public final class GameLauncher {
                 Map<String, Object> client = Json.obj(Json.obj(j.get("downloads")).get("client"));
                 String url = Json.str(client, "url", "");
                 if (!url.isEmpty()) {
-                    out.add(new MissingFile(url, game.resolve("versions").resolve(id).resolve(id + ".jar"),
-                            (long) parseNum(Json.str(client, "size", "0"), 0), "客户端 " + id + ".jar"));
+                    out.putIfAbsent(game.resolve("versions").resolve(id).resolve(id + ".jar")
+                                    .toAbsolutePath().normalize(),
+                            new MissingFile(url, game.resolve("versions").resolve(id).resolve(id + ".jar"),
+                                    (long) parseNum(Json.str(client, "size", "0"), 0), "客户端 " + id + ".jar",
+                                    Json.str(client, "sha1", "")));
                     break;
                 }
             }
         }
-        // 资源索引
         for (Map<String, Object> j : chain) {
             Map<String, Object> assetIndex = Json.obj(j.get("assetIndex"));
             String id = Json.str(assetIndex, "id", "");
             String url = Json.str(assetIndex, "url", "");
             if (!id.isEmpty() && !url.isEmpty()
                     && !Files.isRegularFile(game.resolve("assets").resolve("indexes").resolve(id + ".json"))) {
-                out.add(new MissingFile(url, game.resolve("assets").resolve("indexes").resolve(id + ".json"),
-                        (long) parseNum(Json.str(assetIndex, "size", "0"), 0), "资源索引 " + id + ".json"));
+                out.putIfAbsent(game.resolve("assets").resolve("indexes").resolve(id + ".json")
+                                .toAbsolutePath().normalize(),
+                        new MissingFile(url, game.resolve("assets").resolve("indexes").resolve(id + ".json"),
+                                (long) parseNum(Json.str(assetIndex, "size", "0"), 0), "资源索引 " + id + ".json",
+                                Json.str(assetIndex, "sha1", "")));
                 break;
             }
         }
-        return out;
+        return new ArrayList<>(out.values());
     }
 
-    /** 下载缺失文件，进度按文件均分。 */
     public static void downloadMissing(List<MissingFile> files, java.util.function.DoubleConsumer progress)
             throws Exception {
+        downloadMissing(files, progress, () -> false);
+    }
+
+    public static void downloadMissing(List<MissingFile> files, java.util.function.DoubleConsumer progress,
+                                       java.util.function.BooleanSupplier cancelled) throws Exception {
         if (files.isEmpty()) return;
-        // 并发补全，串行太慢。
+        // 并发补全，串行太慢
         int threads = Math.max(1, Math.min(8, files.size()));
         java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(threads, r -> {
             Thread t = new Thread(r, "TCL-MissingFile");
@@ -170,19 +217,35 @@ public final class GameLauncher {
         try {
             for (MissingFile f : files) {
                 futures.add(pool.submit(() -> {
-                    Downloader.downloadFileTo(null, f.url, f.target, f.desc);
+                    if (cancelled.getAsBoolean()) throw new java.util.concurrent.CancellationException("已取消");
+                    Downloader.downloadFileTo(null, f.url, f.target, f.desc, f.sha1);
                     int n = done.incrementAndGet();
                     progress.accept(n / (double) files.size());
                     return null;
                 }));
             }
+            boolean canceled = false;
             for (java.util.concurrent.Future<?> future : futures) {
+                // 取消就立刻掐掉线程池：已排队的任务不许再启动，正在跑的被中断后按取消收尾
+                if (!canceled && cancelled.getAsBoolean()) {
+                    canceled = true;
+                    pool.shutdownNow();
+                }
                 try {
                     future.get();
                 } catch (java.util.concurrent.ExecutionException e) {
-                    if (first == null) {
-                        first = e.getCause() instanceof Exception ex ? ex : new Exception(e.getCause());
+                    if (!canceled && cancelled.getAsBoolean()) {
+                        canceled = true;
+                        pool.shutdownNow();
                     }
+                    if (first == null) {
+                        // 取消路径只抛 CancellationException，真失败才用真实原因，调用方靠类型区分
+                        first = canceled
+                                ? new java.util.concurrent.CancellationException("已取消")
+                                : e.getCause() instanceof Exception ex ? ex : new Exception(e.getCause());
+                    }
+                } catch (java.util.concurrent.CancellationException e) {
+                    if (first == null) first = e;
                 }
             }
         } finally {
@@ -195,25 +258,65 @@ public final class GameLauncher {
         return launch(instance, null);
     }
 
-    /** serverIp 不为空就直连该服务器。 */
+    private static void applyGameLanguage(Path run) {
+        if (!Data.get().getBool("ToolHelpChinese", true)) return;
+        Path options = run.resolve("options.txt");
+        if (!Files.isRegularFile(options)) return;
+        try {
+            List<String> lines = Files.readAllLines(options, java.nio.charset.StandardCharsets.UTF_8);
+            boolean changed = false;
+            boolean hasLang = false;
+            for (int i = 0; i < lines.size(); i++) {
+                String line = lines.get(i);
+                if (line.startsWith("lang:")) {
+                    hasLang = true;
+                    String value = line.substring(5).trim();
+                    if (value.isEmpty() || "en_us".equals(value) || "en_US".equals(value)) {
+                        lines.set(i, "lang:zh_cn");
+                        changed = true;
+                    }
+                }
+            }
+            if (!hasLang) {
+                lines.add("lang:zh_cn");
+                changed = true;
+            }
+            if (changed) Files.write(options, lines, java.nio.charset.StandardCharsets.UTF_8);
+        } catch (Exception ignored) {
+        }
+    }
+
     public static Process launch(Data.Instance instance, String serverIp) throws Exception {
         Data data = Data.get();
-        if (data.javaPath == null || data.javaPath.isEmpty() || !Files.isRegularFile(Paths.get(data.javaPath))) {
+        // 实例指定的 Java 优先，其次全局
+        String instanceJava = data.getInstance("Java", "");
+        String javaExe = "@auto".equals(instanceJava) ? autoJava(instance) : instanceJava;
+        if (javaExe.isEmpty() || !Files.isRegularFile(Paths.get(javaExe))) javaExe = data.javaPath;
+        if (javaExe == null || javaExe.isEmpty() || !Files.isRegularFile(Paths.get(javaExe))) {
             throw new Exception("未找到可用的 Java，请先在设置中选择 Java 路径");
         }
-        String javaExe = data.javaPath;
-        if (data.getBool("LaunchAdvanceNoJavaw", false) && javaExe.toLowerCase().endsWith("javaw.exe")) {
+        // 高性能显卡先把 Java 路径登记进注册表
+        if (data.getBool("LaunchAdvanceGraphicCard", false) && Shell.windows()) {
+            Shell.preferHighPerformanceGpu(javaExe);
+        }
+        boolean showConsole = data.getInstanceBool("Console", false)
+                || data.getBool("LaunchAdvanceNoJavaw", false);
+        if (showConsole && javaExe.toLowerCase().endsWith("javaw.exe")) {
             Path console = Paths.get(javaExe.substring(0, javaExe.length() - 9) + "java.exe");
             if (Files.isRegularFile(console)) javaExe = console.toString();
+        } else if (!showConsole && javaExe.toLowerCase().endsWith("java.exe")) {
+            Path w = Paths.get(javaExe.substring(0, javaExe.length() - 8) + "javaw.exe");
+            if (Files.isRegularFile(w)) javaExe = w.toString();
         }
         Path game = gameDirOf(instance);
         Path run = runDirOf(instance);
         try {
             Files.createDirectories(run);
         } catch (Exception e) {
-            throw new Exception("无法创建游戏目录：" + run, e);
+            throw new Exception(Lang.t("无法创建游戏目录：") + run, e);
         }
         Path versionDir = game.resolve("versions").resolve(instance.version);
+        applyGameLanguage(run);
         Path jsonPath = versionDir.resolve(instance.version + ".json");
         if (!Files.isRegularFile(jsonPath)) {
             throw new Exception("未找到版本文件：" + jsonPath);
@@ -224,7 +327,7 @@ public final class GameLauncher {
         Map<String, Object> merged = new LinkedHashMap<>();
         for (Map<String, Object> j : chain) merged.putAll(j);
 
-        // Java 版本不够时直接报错。
+        // Java 版本不够时直接报错
         int requiredJava = 0;
         for (Map<String, Object> j : chain) {
             requiredJava = Math.max(requiredJava,
@@ -238,7 +341,6 @@ public final class GameLauncher {
             }
         }
 
-        // 现代版本的 natives 是普通 jar，直接进 classpath。
         Map<String, Map<String, Object>> libs = new LinkedHashMap<>();
         for (Map<String, Object> j : chain) {
             for (Object o : Json.arr(j.get("libraries"))) {
@@ -247,7 +349,7 @@ public final class GameLauncher {
                 libs.put(Json.str(lib, "name", String.valueOf(libs.size())), lib);
             }
         }
-        // 同一个 artifact 有 arm64 natives 时排除非 arm64 的。
+        // 同一个 artifact 有 arm64 natives 时排除非 arm64 的
         List<String> libNames = new ArrayList<>(libs.keySet());
         List<Path> classpath = new ArrayList<>();
         Path nativesDir = versionDir.resolve("natives");
@@ -263,17 +365,17 @@ public final class GameLauncher {
             boolean nativeArtifact = libName.contains(":natives-");
             if (nativeArtifact && !nativeArtifactMatches(libName, libNames)) continue;
             Map<String, Object> nativesMap = Json.obj(lib.get("natives"));
-            // 老版本只有 classifier，Forge 库没有下载元数据。
             if (path.isEmpty() && nativesMap.isEmpty()) path = nameToPath(libName);
             if (!path.isEmpty()) {
                 Path jar = game.resolve("libraries").resolve(path);
                 if (Files.isRegularFile(jar)) {
                     classpath.add(jar);
-                } else if (!artifactUrl.isEmpty()) {
+                } else if (!artifactUrl.isEmpty() || !Json.str(lib, "url", "").isEmpty()) {
+                    // 旧式库靠 lib.url 基地址补全，缺了不能再静默跳过，否则启动后必 NoClassDefFound
                     missingLibs.add(path);
                 }
             }
-            // 旧版 natives 解压到 java.library.path。
+            // 旧版 natives 解压到 java.library.path
             if (!nativesMap.isEmpty()) {
                 String classifier = Json.str(nativesMap, osName(), "")
                         .replace("${arch}", is64Bit() ? "64" : "32");
@@ -290,11 +392,11 @@ public final class GameLauncher {
             }
         }
         if (!missingLibs.isEmpty()) {
-            throw new Exception("缺少 " + missingLibs.size() + " 个依赖库（重新启动一次将自动补全）："
+            throw new Exception(Lang.t("缺少 ") + missingLibs.size()
+                    + Lang.t(" 个依赖库（重新启动一次将自动补全）：")
                     + String.join("、", missingLibs.subList(0, Math.min(3, missingLibs.size()))));
         }
 
-        // 客户端 jar 沿继承链找。
         Path clientJar = null;
         for (int i = chain.size() - 1; i >= 0; i--) {
             String id = Json.str(chain.get(i), "id", "");
@@ -313,13 +415,13 @@ public final class GameLauncher {
         String assetsDir = prepareAssetsRoot(game, assetIndex).toAbsolutePath().toString();
         String classpathStr = String.join(File.pathSeparator, classpath.stream().map(Path::toString).toList());
         // 把用户指定的 jar 或目录插到 classpath 最前面
-        String classpathHead = data.get("LaunchAdvanceClasspathHead", "");
+        String classpathHead = data.getInstance("ClasspathHead",
+                data.get("LaunchAdvanceClasspathHead", ""));
         if (classpathHead != null && !classpathHead.isBlank()) {
             classpathStr = classpathHead.trim() + File.pathSeparator + classpathStr;
         }
 
         Data.Account account = data.account();
-        // 微软令牌大约 24 小时过期：过期或状态不明时验证一次，失效就续期
         if (account != null && "msa".equals(account.userType)) {
             boolean overdue = account.expiresAt == 0 || System.currentTimeMillis() > account.expiresAt;
             boolean valid = true;
@@ -327,7 +429,6 @@ public final class GameLauncher {
                 try {
                     valid = MsAuth.validate(account.accessToken);
                 } catch (Exception ignored) {
-                    // 网络异常先不拦，让游戏自己试
                 }
             }
             if (!valid) {
@@ -338,19 +439,18 @@ public final class GameLauncher {
                     account.expiresAt = r.expiresAt;
                     data.save();
                 } catch (Exception e) {
-                    throw new Exception("微软登录已失效：" + e.getMessage(), e);
+                    throw new Exception(Lang.t("微软登录已失效：") + e.getMessage(), e);
                 }
             }
         }
-        // 外置登录的 token 会过期，启动前先续一次，失效就让用户重登
         if (account != null && "legacy".equals(account.userType)
                 && account.server != null && !account.server.isEmpty()) {
             try {
                 Yggdrasil.ensureFresh(account);
             } catch (Yggdrasil.AuthException e) {
-                throw new Exception("外置登录已失效：" + e.getMessage() + "。请在「账户」里重新登录。", e);
+                throw new Exception(Lang.t("外置登录已失效：") + e.getMessage() + Lang.t("。请在「账户」里重新登录。"), e);
             } catch (java.io.IOException e) {
-                throw new Exception("连接认证服务器失败：" + e.getMessage() + "，请检查网络或代理设置。", e);
+                throw new Exception(Lang.t("连接认证服务器失败：") + e.getMessage() + Lang.t("，请检查网络或代理设置。"), e);
             }
         }
         String username = account == null ? "Player" : account.name;
@@ -360,19 +460,18 @@ public final class GameLauncher {
                 && !account.accessToken.isEmpty() ? account.accessToken : "0";
         String userType = account != null && account.userType != null && !account.userType.isEmpty()
                 ? account.userType : (account != null && account.online ? "msa" : "legacy");
-        // 外置登录在游戏里按微软账户处理，authlib-injector 才知道去该服务器验证
         boolean externalAuth = account != null && "legacy".equals(userType)
                 && account.server != null && !account.server.isEmpty();
         String gameUserType = externalAuth ? "msa" : userType;
-        // 统一通行证基于旧版 authlib-injector，只认 mojang
         if (account != null && "nide".equals(userType)
                 && account.server != null && !account.server.isEmpty()) {
             gameUserType = "mojang";
         }
-        int ram = Math.max(512, data.getInt("InstanceRam", 0) > 0
-                ? data.getInt("InstanceRam", 4096) : data.getInt("LaunchRam", 4096));
-        // 自动按物理内存的 1/4 分配。
-        if (data.getInt("LaunchRamType", 0) == 0 && data.getInt("InstanceRam", 0) <= 0) {
+        int insRam = data.getInstanceInt("Ram", 0);
+        int ramType = data.getInstanceInt("RamType", data.getInt("LaunchRamType", 0));
+        int ram = Math.max(512, insRam > 0 ? insRam : data.getInt("LaunchRam", 4096));
+        // 自动按物理内存的 1/4 分配
+        if (ramType == 0) {
             long totalMb = physicalMemoryMb();
             ram = (int) Math.max(2048, Math.min(8192, totalMb / 4));
             if (instance.loader != null && !instance.loader.isEmpty() && !"原版".equals(instance.loader)) {
@@ -380,17 +479,20 @@ public final class GameLauncher {
             }
             ram = (int) (Math.round(ram / 512.0) * 512);
         }
-        int initialRam = data.getInt("LaunchRamInitial", 0);
+        int initialRam = data.getInstanceInt("RamInitial", data.getInt("LaunchRamInitial", 0));
+        if (initialRam > ram) initialRam = 0;
 
-        // 0 全屏 / 1 默认 / 2 同启动器 / 3 自定义 / 4 最大化
-        int windowType = data.getInt("LaunchWindowType", 1);
-        int winW = (int) parseNum(data.get("LaunchWindowWidth", "854"), 854);
-        int winH = (int) parseNum(data.get("LaunchWindowHeight", "480"), 480);
-        boolean fullscreen = windowType == 0;
-        if (windowType == 2) {
+        int winType = data.getInstanceInt("WindowType", -1);
+        if (winType < 0) winType = data.getInt("LaunchWindowType", 1);
+        int winW = (int) parseNum(data.getInstance("WindowWidth",
+                data.get("LaunchWindowWidth", "854")), 854);
+        int winH = (int) parseNum(data.getInstance("WindowHeight",
+                data.get("LaunchWindowHeight", "480")), 480);
+        boolean fullscreen = winType == 0;
+        if (winType == 2) {
             winW = (int) parseNum(data.get("Window.Width", "854"), 854);
             winH = (int) parseNum(data.get("Window.Height", "600"), 600);
-        } else if (windowType == 4) {
+        } else if (winType == 4) {
             try {
                 javafx.geometry.Rectangle2D bounds = javafx.stage.Screen.getPrimary().getVisualBounds();
                 winW = (int) bounds.getWidth();
@@ -400,7 +502,7 @@ public final class GameLauncher {
                 winH = 1080;
             }
         }
-        boolean customResolution = (windowType == 2 || windowType == 3 || windowType == 4)
+        boolean customResolution = (winType == 2 || winType == 3 || winType == 4)
                 && winW > 0 && winH > 0;
 
         Map<String, String> vars = new LinkedHashMap<>();
@@ -416,7 +518,6 @@ public final class GameLauncher {
         vars.put("user_type", gameUserType);
         vars.put("version_type", "release");
         vars.put("user_properties", "{}");
-        // 这些变量不补会以字面量进游戏参数。
         vars.put("clientid", "");
         vars.put("auth_xuid", "");
         vars.put("natives_directory", nativesDir.toAbsolutePath().toString());
@@ -432,7 +533,6 @@ public final class GameLauncher {
         vars.put("quickPlayMultiplayer", "");
         vars.put("quickPlayRealms", "");
 
-        // 现代版本用 features 控制可选参数。
         Map<String, Boolean> features = new java.util.HashMap<>();
         features.put("is_demo_user", false);
         features.put("has_custom_resolution", customResolution);
@@ -445,12 +545,24 @@ public final class GameLauncher {
         int xms = lockMemory ? ram : (initialRam > 0 ? Math.min(initialRam, ram) : Math.max(256, ram / 4));
         List<String> cmd = new ArrayList<>();
         cmd.add(javaExe);
+        // macOS 上 GLFW 必须运行在进程主线程
+        if ("osx".equals(osName())) cmd.add("-XstartOnFirstThread");
+        // 渲染器实例优先；mesa-loader 以 javaagent 注入
+        int renderer = data.getInstanceInt("Renderer", -1);
+        if (renderer < 0) renderer = data.getInt("LaunchAdvanceRenderer", 0);
+        if (Shell.windows() && renderer > 0) {
+            Path agent = Mesa.ensure();
+            cmd.add("-javaagent:" + agent.toAbsolutePath() + "=" + Mesa.driverName(renderer));
+        }
         cmd.add("-Xmx" + ram + "M");
         cmd.add("-Xms" + xms + "M");
+        // AlwaysPreTouch 启动时就把堆页全部触碰一遍，免得游戏中途扩堆卡顿
+        if (lockMemory) cmd.add("-XX:+AlwaysPreTouch");
         cmd.add("-Dfile.encoding=UTF-8");
-        // 0 ZGC / 1 分代 ZGC / 2 G1 / 3 不指定 / 4 调优 G1
         int javaMajor = Data.javaMajor(javaExe);
-        switch (data.getInt("LaunchAdvanceGC", 4)) {
+        int gcMode = data.getInstanceInt("GC", -1);
+        if (gcMode < 0) gcMode = data.getInt("LaunchAdvanceGC", 4);
+        switch (gcMode) {
             case 0 -> {
                 if (javaMajor >= 15) cmd.add("-XX:+UseZGC");
                 else cmd.add("-XX:+UseG1GC");
@@ -464,7 +576,7 @@ public final class GameLauncher {
                 }
             }
             case 2 -> cmd.add("-XX:+UseG1GC");
-            case 3 -> { /* 交给用户自己写 */ }
+            case 3 -> {   }
             default -> {
                 cmd.add("-XX:+UseG1GC");
                 cmd.add("-XX:+UnlockExperimentalVMOptions");
@@ -483,7 +595,7 @@ public final class GameLauncher {
             }
             default -> { }
         }
-        // 把当前代理同步给游戏 JVM。
+        // 把当前代理同步给游戏 JVM
         if (data.getBool("SystemHttpProxyForGame", false)) {
             int proxyMode = data.getInt("SystemHttpProxyType", 1);
             String host = data.get("SystemProxyHost", "");
@@ -500,12 +612,11 @@ public final class GameLauncher {
                 }
             }
         }
-        String brand = data.get("LaunchCustomInfo", "TCL");
+        String brand = data.getInstance("Info", data.get("LaunchCustomInfo", "TCL"));
         if (brand == null || brand.isBlank()) brand = "TCraftLauncher";
         cmd.add("-Dminecraft.launcher.brand=" + subst(brand, vars));
         cmd.add("-Dminecraft.launcher.version=" + Build.VERSION);
 
-        // 第三方登录注入。
         if (account != null && "nide".equals(account.userType) && account.server != null && !account.server.isEmpty()) {
             Path nideJar = game.resolve("TCL").resolve("nide8auth.jar");
             ensureNideAgentJar(nideJar, account.server);
@@ -517,18 +628,18 @@ public final class GameLauncher {
             cmd.add("-Dauthlibinjector.side=client"); // 参数顺序跟 nide8auth 一致
             cmd.add("-javaagent:" + authJar.toAbsolutePath() + "=" + account.server);
         }
-        String customTitle = data.get("InstanceWindowTitle", data.get("LaunchWindowTitle", ""));
+        String customTitle = data.getInstance("WindowTitle",
+                data.get("InstanceWindowTitle", data.get("LaunchWindowTitle", "")));
         if (!customTitle.isEmpty()) cmd.add("-Dminecraft.window.title=" + subst(customTitle, vars));
 
         List<Object> jvmArgs = new ArrayList<>();
         for (Map<String, Object> j : chain) {
-            // arguments 是对象，不是数组。
             Object arguments = j.get("arguments");
             if (arguments instanceof Map<?, ?> argsMap) {
                 jvmArgs.addAll(Json.arr(Json.obj(argsMap).get("jvm")));
             }
         }
-        // 新版 java.library.path 指向 natives 子目录。
+        // 新版 java.library.path 指向 natives 子目录
         Path javaNativeFolder = nativesDir;
         for (Object o : jvmArgs) {
             String value = o instanceof String s ? s : null;
@@ -554,9 +665,9 @@ public final class GameLauncher {
         } else {
             for (String arg : resolveArgs(jvmArgs, vars, features)) cmd.add(arg);
         }
-        String extraJvm = data.get("InstanceJvmArgs", data.get("LaunchJvmArgs", ""));
+        String extraJvm = data.getInstance("JvmArgs", data.get("InstanceJvmArgs", data.get("LaunchJvmArgs", "")));
         if (!extraJvm.isEmpty()) {
-            for (String a : extraJvm.trim().split("\\s+")) if (!a.isEmpty()) cmd.add(subst(a, vars));
+            for (String a : splitArgs(extraJvm)) cmd.add(subst(a, vars));
         }
         cmd.add(mainClass);
 
@@ -567,21 +678,20 @@ public final class GameLauncher {
             gameArgs.addAll(ga);
         }
         if (!legacy.isEmpty()) {
-            // 旧版本没有 feature 参数，尺寸自己补。
             if (customResolution) {
                 cmd.add("--width");
                 cmd.add(String.valueOf(winW));
                 cmd.add("--height");
                 cmd.add(String.valueOf(winH));
             }
-            for (String a : legacy.trim().split("\\s+")) cmd.add(subst(a, vars));
+            for (String a : splitArgs(legacy)) cmd.add(subst(a, vars));
         } else {
             cmd.addAll(resolveArgs(gameArgs, vars, features));
         }
         if (fullscreen) cmd.add("--fullscreen");
-        String extraGame = data.get("LaunchGameArgs", "");
+        String extraGame = data.getInstance("GameArgs", data.get("LaunchGameArgs", ""));
         if (!extraGame.isEmpty()) {
-            for (String a : extraGame.trim().split("\\s+")) if (!a.isEmpty()) cmd.add(subst(a, vars));
+            for (String a : splitArgs(extraGame)) cmd.add(subst(a, vars));
         }
         if (serverIp != null && !serverIp.trim().isEmpty()) {
             String[] parts = serverIp.trim().split(":");
@@ -594,7 +704,7 @@ public final class GameLauncher {
             data.launchLog("直连服务器：" + serverIp);
         }
 
-        String pre = data.get("LaunchPreCommand", "");
+        String pre = data.getInstance("PreCommand", data.get("LaunchPreCommand", ""));
         if (!pre.isEmpty()) {
             try {
                 boolean win = System.getProperty("os.name", "").toLowerCase().contains("win");
@@ -602,8 +712,36 @@ public final class GameLauncher {
                 String arg = win ? "/c" : "-c";
                 Process preProcess = new ProcessBuilder(shell, arg, pre).directory(run.toFile())
                         .redirectErrorStream(true).start();
-                if (data.getBool("LaunchPreCommandWait", true)) {
-                    preProcess.waitFor();
+                // 输出必须有人消费，不然命令打印多了管道塞满就互相等死；只排水，EOF 即退出
+                Thread consumer = new Thread(() -> {
+                    try (BufferedReader br = new BufferedReader(
+                            new InputStreamReader(preProcess.getInputStream(), StandardCharsets.UTF_8))) {
+                        while (br.readLine() != null) {
+                        }
+                    } catch (Exception ignored) {
+                    }
+                }, "TCL-PreCommand");
+                consumer.setDaemon(true);
+                consumer.start();
+                if (data.getInstanceBool("PreCommandWait", data.getBool("LaunchPreCommandWait", true))) {
+                    if (!preProcess.waitFor(5, java.util.concurrent.TimeUnit.MINUTES)) {
+                        preProcess.descendants().forEach(ProcessHandle::destroyForcibly);
+                        preProcess.destroyForcibly();
+                        data.launchLog("启动前命令超过 5 分钟未结束，已强制结束：" + pre);
+                    }
+                } else {
+                    // 不等它结束也得兜底强杀，不然命令挂死会一直占着管道；销毁不放在排水线程里，免得和上面的等待竞态
+                    Thread reaper = new Thread(() -> {
+                        try {
+                            if (!preProcess.waitFor(10, java.util.concurrent.TimeUnit.SECONDS)) {
+                                preProcess.descendants().forEach(ProcessHandle::destroyForcibly);
+                                preProcess.destroyForcibly();
+                            }
+                        } catch (Exception ignored) {
+                        }
+                    }, "TCL-PreCommand-Reap");
+                    reaper.setDaemon(true);
+                    reaper.start();
                 }
                 data.launchLog("已执行启动前命令：" + pre);
             } catch (Exception e) {
@@ -611,12 +749,14 @@ public final class GameLauncher {
             }
         }
 
-        // 启动前先回收启动器内存。
-        if (data.getBool("LaunchOptimizeRam", true)) {
+        // 启动前先回收启动器内存
+        boolean optimizeRam = data.getInstanceBool("OptimizeRam", data.getBool("LaunchOptimizeRam", true));
+        if (optimizeRam) {
             System.gc();
             try {
                 Thread.sleep(80);
-            } catch (InterruptedException ignored) {
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             }
         }
         ProcessBuilder builder = new ProcessBuilder(cmd);
@@ -643,7 +783,6 @@ public final class GameLauncher {
         return rulesAllow(item, java.util.Collections.emptyMap());
     }
 
-    /** 规则判定：os、arch、features 都要匹配。 */
     private static boolean rulesAllow(Map<String, Object> item, Map<String, Boolean> features) {
         List<Object> rules = Json.arr(item.get("rules"));
         if (rules.isEmpty()) return true;
@@ -671,7 +810,6 @@ public final class GameLauncher {
         return allow;
     }
 
-    /** Mojang 版本清单里的系统名：windows / osx / linux。 */
     private static String osName() {
         String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
         if (os.contains("win")) return "windows";
@@ -713,7 +851,6 @@ public final class GameLauncher {
         return out;
     }
 
-    /** 判断 natives 是否匹配当前平台和架构。 */
     static boolean nativeArtifactMatches(String libName, List<String> allNames) {
         int i = libName.indexOf(":natives-");
         if (i < 0) return true;
@@ -756,7 +893,6 @@ public final class GameLauncher {
         }
     }
 
-    /** 旧版资源索引要复制成目录结构。 */
     private static Path prepareAssetsRoot(Path game, String assetId) {
         Path assets = game.resolve("assets");
         Path indexFile = assets.resolve("indexes").resolve(assetId + ".json");
@@ -767,13 +903,21 @@ public final class GameLauncher {
             boolean mapToResources = Json.bool(index, "map_to_resources", false);
             if (!virtual && !mapToResources) return assets;
             Path target = mapToResources ? game.resolve("resources") : assets.resolve("virtual").resolve(assetId);
+            Path targetNorm = target.normalize();
             Map<String, Object> objects = Json.obj(index, "objects");
             for (Map.Entry<String, Object> e : objects.entrySet()) {
                 Map<String, Object> obj = Json.obj(e.getValue());
                 String hash = Json.str(obj, "hash", "");
-                if (hash.length() < 2) continue;
+                if (!hash.matches("[0-9a-f]{40}")) {
+                    Data.get().log("资源索引条目哈希不合法，已跳过：" + e.getKey());
+                    continue;
+                }
                 Path source = assets.resolve("objects").resolve(hash.substring(0, 2)).resolve(hash);
-                Path dest = target.resolve(e.getKey());
+                Path dest = targetNorm.resolve(e.getKey()).normalize();
+                if (!dest.startsWith(targetNorm)) {
+                    Data.get().log("资源索引条目路径越界，已跳过：" + e.getKey());
+                    continue;
+                }
                 if (!Files.isRegularFile(source) || Files.isRegularFile(dest)) continue;
                 Files.createDirectories(dest.getParent());
                 Files.copy(source, dest);
@@ -789,6 +933,42 @@ public final class GameLauncher {
         for (Map.Entry<String, String> e : vars.entrySet()) {
             out = out.replace("${" + e.getKey() + "}", e.getValue());
         }
+        return out;
+    }
+
+    // 按空白切分参数，引号内的空格不切分，引号本身不保留
+    static List<String> splitArgs(String text) {
+        List<String> out = new ArrayList<>();
+        if (text == null || text.isEmpty()) return out;
+        StringBuilder cur = new StringBuilder();
+        char quote = 0;
+        boolean quoted = false;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (quote != 0) {
+                if (c == '\\' && quote == '"' && i + 1 < text.length()
+                        && (text.charAt(i + 1) == '"' || text.charAt(i + 1) == '\\')) {
+                    cur.append(text.charAt(++i));
+                } else if (c == quote) {
+                    quote = 0;
+                } else {
+                    cur.append(c);
+                }
+            } else if (c == '"' || c == '\'') {
+                quote = c;
+                quoted = true;
+            } else if (Character.isWhitespace(c)) {
+                if (quoted || cur.length() > 0) {
+                    out.add(cur.toString());
+                    cur.setLength(0);
+                    quoted = false;
+                }
+            } else {
+                cur.append(c);
+            }
+        }
+        // 引号未闭合时把剩余内容当成一个参数，宁可少切也不要丢参数
+        if (quoted || cur.length() > 0) out.add(cur.toString());
         return out;
     }
 
@@ -811,7 +991,6 @@ public final class GameLauncher {
         }
     }
 
-    /** natives 解压失败要往上抛。 */
     private static void extractNatives(Path jar, Path dir) throws Exception {
         Files.createDirectories(dir);
         try (ZipInputStream zip = new ZipInputStream(Files.newInputStream(jar))) {
@@ -828,7 +1007,6 @@ public final class GameLauncher {
         }
     }
 
-    /** 准备 nide8auth.jar，按 jarHash 校验。 */
     private static void ensureNideAgentJar(Path jar, String serverCode) throws Exception {
         Tasks.Task probe = new Tasks.Task("t");
         String jarHash = "";
@@ -842,6 +1020,8 @@ public final class GameLauncher {
             }
             throw new Exception("获取统一通行证下载信息失败：" + e.getMessage());
         }
+        // API 没给 hash 时直接用本地，不然每次启动都会整包重下（对齐 authlib-injector 的做法）
+        if (Files.isRegularFile(jar) && jarHash.isEmpty()) return;
         if (Files.isRegularFile(jar) && sha1Of(jar).equalsIgnoreCase(jarHash)) return;
         try {
             Modrinth.downloadUrl(probe, "https://login.mc-user.com:233/index/jar", jar, jarHash);
@@ -854,7 +1034,6 @@ public final class GameLauncher {
         }
     }
 
-    /** 准备 authlib-injector.jar，失败回落 BMCLAPI。 */
     private static void ensureAuthlibInjectorJar(Path jar) throws Exception {
         Tasks.Task probe = new Tasks.Task("t");
         String text;
@@ -863,7 +1042,6 @@ public final class GameLauncher {
                     "https://authlib-injector.yushi.moe/artifact/latest.json",
                     "https://bmclapi2.bangbang93.com/mirrors/authlib-injector/artifact/latest.json");
         } catch (Exception e) {
-            // 断网时已有缓存就先用，别把外置登录整个拦住
             if (Files.isRegularFile(jar)) return;
             throw e;
         }

@@ -12,30 +12,29 @@ import javafx.scene.control.TreeView;
 import javafx.scene.effect.Effect;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.input.ScrollEvent;
+import javafx.collections.ListChangeListener;
 import javafx.util.Duration;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
-/** 滚轮平滑滚动：先累积像素目标，再逐帧写入 vvalue。 */
 final class SmoothScroll {
 
-    /** 防重复安装。 */
     private static final Object KEY = new Object();
+    private static final Object WHEEL_KEY = new Object();
 
-    /** 滚轮 delta 到像素的倍率。 */
-    private static final double WHEEL_SPEED = 3.0;
+    static final double DEFAULT_WHEEL_SPEED = 3.0;
 
-    /** 临界阻尼弹簧的角频率。 */
     private static final double OMEGA = 20.0;
 
-    /** 足够接近时直接吸附。 */
     private static final double SNAP = 0.25;
 
-    /** 单帧最大积分时长。 */
     private static final double MAX_FRAME = 0.05;
 
-    /** 积分子步长。 */
     private static final double SUB_STEP = 0.008;
 
     private final ScrollPane pane;
@@ -44,31 +43,38 @@ final class SmoothScroll {
     private final AnimationTimer timer;
     private long lastFrame;
     private boolean ticking;
-    /** 自己写入 vvalue 时置位。 */
     private boolean writing;
-    /** 滚动期间临时摘掉的特效。 */
     private final List<EffectNode> suspended = new ArrayList<>();
     private PauseTransition restoreDelay;
     private boolean effectsSuspended;
+    // 带大特效的节点缓存，内容树变了才重扫，不然每次滚轮都全树递归
+    private List<EffectNode> effectCache;
+    private final Map<Parent, ListChangeListener<Node>> effectWatchers = new HashMap<>();
 
     static void install(ScrollPane pane) {
+        install(pane, DEFAULT_WHEEL_SPEED);
+    }
+
+    // 滚轮系数每 pane 一份，弹窗小框传 2.1 对齐 WPF MyMsgText 的 DeltaMult=0.7
+    static void install(ScrollPane pane, double wheelSpeed) {
         if (pane == null || pane.getProperties().get(KEY) instanceof SmoothScroll) return;
+        pane.getProperties().put(WHEEL_KEY, wheelSpeed);
         SmoothScroll scroll = new SmoothScroll(pane);
         pane.getProperties().put(KEY, scroll);
-        // 过滤阶段先拦下，避免原生 skin 再滚一次
+        // 过滤阶段先拦下，不然原生 skin 会再滚一次
         pane.addEventFilter(ScrollEvent.SCROLL, scroll::onScroll);
-        // 按下滚动条或列表项时停止缓动
         pane.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> scroll.stop());
+        pane.contentProperty().addListener((o, a, b) -> scroll.invalidateEffectCache());
         pane.sceneProperty().addListener((o, a, b) -> {
             if (b == null) {
                 scroll.stop();
                 scroll.resumeEffects();
+                scroll.dropEffectCache();
             }
         });
         pane.visibleProperty().addListener((o, a, b) -> {
             if (!b) scroll.stop();
         });
-        // 外部改位置时让位，同时进入滚动降载
         pane.vvalueProperty().addListener((o, a, b) -> {
             if (!scroll.writing) {
                 scroll.stop();
@@ -93,20 +99,24 @@ final class SmoothScroll {
         };
     }
 
+    private double wheelSpeed() {
+        Object v = pane.getProperties().get(WHEEL_KEY);
+        return v instanceof Double d && d > 0 ? d : DEFAULT_WHEEL_SPEED;
+    }
+
     private void onScroll(ScrollEvent e) {
         if (e.getEventType() != ScrollEvent.SCROLL || e.isConsumed()) return;
-        // 子控件自带滚动区时优先给它
         if (insideNestedScroller(e.getTarget())) return;
         double dx = e.getDeltaX();
         double dy = e.getDeltaY();
         if (dx == 0 && dy == 0) return;
-        // Shift + 滚轮是横向滚动
         if (e.isShiftDown() && dx == 0) {
             dx = dy;
             dy = 0;
         }
-        double px = -dx * WHEEL_SPEED;
-        double py = -dy * WHEEL_SPEED;
+        double speed = wheelSpeed();
+        double px = -dx * speed;
+        double py = -dy * speed;
         // 只有横向溢出时让滚轮横移
         if (py != 0 && overflow(false) <= 0.5 && overflow(true) > 0.5) {
             px = py;
@@ -116,7 +126,6 @@ final class SmoothScroll {
             px = 0;
         }
 
-        // 触摸板/触屏直接跟手
         boolean gesture = e.isDirect() || e.getTouchCount() > 0 || e.isInertia();
         boolean moved;
         if (gesture || instant()) {
@@ -133,7 +142,6 @@ final class SmoothScroll {
         }
     }
 
-    /** 事件目标是否落在自带滚动能力的子控件里。 */
     private boolean insideNestedScroller(javafx.event.EventTarget target) {
         Node node = target instanceof Node n ? n : null;
         while (node != null && node != pane) {
@@ -141,14 +149,12 @@ final class SmoothScroll {
                     || node instanceof TableView || node instanceof TreeView) {
                 return true;
             }
-            // 子 ScrollPane 自己处理
             if (node instanceof ScrollPane) return true;
             node = node.getParent();
         }
         return false;
     }
 
-    /** 关闭动画时直接跳。 */
     private static boolean instant() {
         return Data.get().getInt("UiAnimSpeed", 100) <= 0;
     }
@@ -167,7 +173,6 @@ final class SmoothScroll {
         }
         double next = clamp(axis.target + delta, 0, over);
         boolean moved = Math.abs(next - position) > 0.01;
-        // 反向滚轮先卸掉旧速度，掉头更跟手
         if (moved && axis.velocity * delta < 0 && Math.abs(axis.velocity) > 150) {
             axis.velocity = 0;
         }
@@ -199,7 +204,6 @@ final class SmoothScroll {
             stopTimer();
             return;
         }
-        // 动画未结束前不恢复特效
         if (restoreDelay != null) restoreDelay.stop();
         double dt = lastFrame == 0 ? 1.0 / 60 : Math.min(MAX_FRAME, (now - lastFrame) / 1e9);
         lastFrame = now;
@@ -219,7 +223,6 @@ final class SmoothScroll {
             return false;
         }
         double goal = clamp(axis.target, 0, over);
-        // 临界阻尼弹簧：起步从静止缓慢加速，结束自然减速，多格滚轮之间速度连续
         double stiffness = omega * omega;
         double damping = 2 * omega;
         int steps = Math.max(1, (int) Math.ceil(dt / SUB_STEP));
@@ -243,7 +246,6 @@ final class SmoothScroll {
         return true;
     }
 
-    /** 滚动速度跟随动画设置。 */
     private static double omega() {
         int speed = Data.get().getInt("UiAnimSpeed", 100);
         double scale = Math.min(1.6, Math.max(0.6, speed / 100.0));
@@ -265,7 +267,6 @@ final class SmoothScroll {
         }
     }
 
-    /** 内容相对视口多出来的像素。 */
     private double overflow(boolean horizontal) {
         Node content = pane.getContent();
         if (content == null) return 0;
@@ -276,7 +277,6 @@ final class SmoothScroll {
         return Math.max(0, contentSize - viewSize);
     }
 
-    /** 当前滚动位置，单位是像素。 */
     private double position(boolean horizontal) {
         double over = overflow(horizontal);
         double min = horizontal ? pane.getHmin() : pane.getVmin();
@@ -302,7 +302,6 @@ final class SmoothScroll {
         if (effectsSuspended) restartRestore();
     }
 
-    /** 滚动时摘掉大块阴影，停下后恢复。 */
     private void suspendEffects() {
         if (effectsSuspended) {
             restartRestore();
@@ -311,23 +310,102 @@ final class SmoothScroll {
         Node content = pane.getContent();
         if (content == null) return;
         effectsSuspended = true;
-        collectEffects(content);
-        for (EffectNode node : suspended) node.node.setEffect(null);
+        if (effectCache != null && staleCache()) dropEffectCache();
+        if (effectCache == null) scanEffects(content);
+        suspendCached();
         restartRestore();
     }
 
-    private void collectEffects(Node node) {
+    // 缓存里的节点特效被外部换掉/清掉就整批重扫，别拿旧集合挂起
+    private boolean staleCache() {
+        for (EffectNode node : effectCache) {
+            if (holdsNode(node.node)) continue; // 挂起中被我们置空的，不算失效
+            if (node.node.getEffect() != node.effect) return true;
+        }
+        return false;
+    }
+
+    private boolean holdsNode(Node node) {
+        for (EffectNode n : suspended) {
+            if (n.node == node) return true;
+        }
+        return false;
+    }
+
+    private void suspendCached() {
+        for (EffectNode node : effectCache) {
+            if (node.node.getEffect() != null) {
+                node.node.setEffect(null);
+                suspended.add(node);
+            }
+        }
+    }
+
+    private void scanEffects(Node root) {
+        detachEffectWatchers();
+        List<EffectNode> found = new ArrayList<>();
+        Set<Node> held = null;
+        if (effectsSuspended && !suspended.isEmpty()) {
+            held = new HashSet<>();
+            for (EffectNode n : suspended) held.add(n.node);
+        }
+        collectEffects(root, found, held);
+        effectCache = found;
+    }
+
+    private void collectEffects(Node node, List<EffectNode> out, Set<Node> held) {
         Effect effect = node.getEffect();
+        if (effect == null && held != null && held.contains(node)) {
+            // 挂起中被我们摘掉特效的节点按原特效留在缓存里
+            for (EffectNode n : suspended) {
+                if (n.node == node) {
+                    effect = n.effect;
+                    break;
+                }
+            }
+        }
         if (effect != null) {
-            // 只摘大块节点，小卡片开销低
             javafx.geometry.Bounds bounds = node.getLayoutBounds();
             if (bounds.getWidth() * bounds.getHeight() >= 200_000) {
-                suspended.add(new EffectNode(node, effect));
+                out.add(new EffectNode(node, effect));
             }
         }
         if (node instanceof Parent parent) {
-            for (Node child : parent.getChildrenUnmodifiable()) collectEffects(child);
+            watchChildren(parent);
+            for (Node child : parent.getChildrenUnmodifiable()) collectEffects(child, out, held);
         }
+    }
+
+    private void watchChildren(Parent parent) {
+        if (effectWatchers.containsKey(parent)) return;
+        ListChangeListener<Node> listener = c -> invalidateEffectCache();
+        effectWatchers.put(parent, listener);
+        parent.getChildrenUnmodifiable().addListener(listener);
+    }
+
+    private void detachEffectWatchers() {
+        if (effectWatchers.isEmpty()) return;
+        for (Map.Entry<Parent, ListChangeListener<Node>> entry : effectWatchers.entrySet()) {
+            entry.getKey().getChildrenUnmodifiable().removeListener(entry.getValue());
+        }
+        effectWatchers.clear();
+    }
+
+    // 内容树变了缓存就作废；挂起期间变更要立刻补扫，别漏掉新出现的大特效
+    private void invalidateEffectCache() {
+        if (effectCache == null && effectWatchers.isEmpty()) return;
+        effectCache = null;
+        detachEffectWatchers();
+        if (!effectsSuspended) return;
+        Node content = pane.getContent();
+        if (content == null) return;
+        scanEffects(content);
+        suspendCached();
+    }
+
+    private void dropEffectCache() {
+        effectCache = null;
+        detachEffectWatchers();
     }
 
     private void restartRestore() {
@@ -345,7 +423,6 @@ final class SmoothScroll {
         effectsSuspended = false;
         if (restoreDelay != null) restoreDelay.stop();
         for (EffectNode node : suspended) {
-            // 期间被别处改过的节点尊重新状态，不强行回滚
             if (node.node.getEffect() == null) node.node.setEffect(node.effect);
         }
         suspended.clear();
@@ -355,7 +432,6 @@ final class SmoothScroll {
         return v < min ? min : Math.min(v, max);
     }
 
-    /** 一个方向的弹簧状态。 */
     private static final class Axis {
         double current;
         double target;
@@ -363,7 +439,6 @@ final class SmoothScroll {
         boolean active;
     }
 
-    /** 记下被临时摘掉的特效，停下后挂回。 */
     private static final class EffectNode {
         final Node node;
         final Effect effect;

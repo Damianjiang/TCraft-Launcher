@@ -19,12 +19,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-/** EasyTier 联机模块的安装与运行封装。 */
 public final class EasyTier {
 
     public static final String VERSION = "v2.6.4";
 
-    /** 发布包 SHA-256，防止镜像被替换或下载损坏。 */
     private static final Map<String, String> SHA256 = Map.ofEntries(
             Map.entry("windows-x86_64", "27af91e270e554709b048bd32327fefd2dfce5062ae1e8701af7550c6f525f84"),
             Map.entry("windows-arm64", "37023f8a3451c9234b17ee2089a03dc344ce90d803b5b359cb6c46682b0549b4"),
@@ -39,7 +37,6 @@ public final class EasyTier {
             Map.entry("freebsd-13.2-x86_64", "a34d52a8890c181054d9d8cfb775a2a2c8940a7b606c262e3059e6ecd542c8fb")
     );
 
-    /** 下载镜像前缀池，最后两个是直连兜底。 */
     private static final String[] PREFIXES = {
             "https://gh-proxy.com/https://github.com/EasyTier/EasyTier/releases/download/",
             "https://gh.monlor.com/https://github.com/EasyTier/EasyTier/releases/download/",
@@ -54,7 +51,6 @@ public final class EasyTier {
             "https://github.com/EasyTier/EasyTier/releases/download/"
     };
 
-    /** 公共节点。 */
     public static final String[] PUBLIC_PEERS = {
             "https://etnode.zkitefly.eu.org/node1",
             "tcp://225284.xyz:11010",
@@ -89,7 +85,6 @@ public final class EasyTier {
         return "linux";
     }
 
-    /** 下载用的架构名，ARM64 在 Windows 叫 arm64。 */
     public static String arch() {
         String a = System.getProperty("os.arch", "").toLowerCase(Locale.ROOT);
         if (a.contains("loongarch64")) return "loongarch64";
@@ -98,7 +93,7 @@ public final class EasyTier {
         if (a.contains("mipsel")) return "mipsel";
         if (a.contains("mips")) return "mips";
         if (a.contains("aarch64") || a.contains("arm64")) {
-            // Windows 用 arm64，其他平台用 aarch64。
+            // Windows 用 arm64，其他平台用 aarch64
             return isWindows() ? "arm64" : "aarch64";
         }
         if (a.contains("arm")) return "armv7";
@@ -122,7 +117,6 @@ public final class EasyTier {
         return isWindows() ? "easytier-cli.exe" : "easytier-cli";
     }
 
-    /** 联机模块目录：<启动器目录>/EasyTier/ */
     public static Path folder() {
         return Resources.home().resolve("EasyTier");
     }
@@ -135,29 +129,26 @@ public final class EasyTier {
         return folder().resolve(cliName());
     }
 
-    /** core 和 cli 都在，才算装好。 */
     public static boolean installed() {
         return Files.isRegularFile(corePath()) && Files.isRegularFile(cliPath());
     }
 
-    /** 下载节点下拉框用的镜像主机名。 */
     public static String[] mirrorHosts() {
+        // 仅作下拉展示与日志（下载走 PREFIXES 原始值），兜底标签翻译不影响功能
         String[] out = new String[PREFIXES.length];
         for (int i = 0; i < PREFIXES.length; i++) {
-            String host = "节点 " + (i + 1);
+            String host = Lang.t("节点 ") + (i + 1);
             try {
                 host = java.net.URI.create(PREFIXES[i]).getHost();
             } catch (Exception ignored) {
             }
-            out[i] = host == null ? "节点 " + (i + 1) : host;
+            out[i] = host == null ? Lang.t("节点 ") + (i + 1) : host;
         }
         return out;
     }
 
-    /** 最快节点缓存，-2 表示还没测过。 */
     private static volatile int cachedBestNode = -2;
 
-    /** 并发测速各镜像，最快的写进缓存，全挂返回 -1。 */
     public static synchronized int measureFastestNode(boolean force) {
         Data d = Data.get();
         if (!force && cachedBestNode != -2) return cachedBestNode;
@@ -169,8 +160,9 @@ public final class EasyTier {
             }
         }
         String file = "easytier-" + osTag() + "-" + arch() + "-" + VERSION + ".zip";
+        int threads = Math.min(6, PREFIXES.length);
         java.util.concurrent.ExecutorService pool =
-                java.util.concurrent.Executors.newFixedThreadPool(Math.min(6, PREFIXES.length), r -> {
+                java.util.concurrent.Executors.newFixedThreadPool(threads, r -> {
                     Thread t = new Thread(r, "TCL-NodeSpeed");
                     t.setDaemon(true);
                     return t;
@@ -206,10 +198,15 @@ public final class EasyTier {
             }));
         }
         pool.shutdown();
+        // 每个任务在任务体内自计时，get 的等待只多不少：单任务上限（连接 2.5s + 读取 3.5s）+ 排队轮数余量，
+        // 固定 6s 会把排在后面的任务误判为不可用
+        long perTaskMs = 7000;
+        int rounds = (PREFIXES.length + threads - 1) / threads;
+        long getTimeoutMs = perTaskMs * (rounds + 1);
         int best = -1, bestMs = Integer.MAX_VALUE;
         for (java.util.concurrent.Future<int[]> f : futures) {
             try {
-                int[] res = f.get(6, TimeUnit.SECONDS);
+                int[] res = f.get(getTimeoutMs, TimeUnit.MILLISECONDS);
                 if (res[1] < bestMs) {
                     bestMs = res[1];
                     best = res[0];
@@ -221,7 +218,6 @@ public final class EasyTier {
         cachedBestNode = best;
         if (best >= 0) {
             String host = mirrorHosts()[best];
-            // 只记最快节点下标，下载时置顶。
             d.set("LinkBestNode", String.valueOf(best));
             d.save();
             d.log("联机下载节点测速：" + host + " " + bestMs + " ms");
@@ -231,7 +227,6 @@ public final class EasyTier {
         return best;
     }
 
-    /** 生成下载地址列表，最快节点置顶。 */
     public static List<String> downloadUrls() {
         String file = "easytier-" + osTag() + "-" + arch() + "-" + VERSION + ".zip";
         List<String> prefixes = new ArrayList<>();
@@ -248,7 +243,6 @@ public final class EasyTier {
         return urls;
     }
 
-    /** 缺失或版本不符时下载解压，force 时强制重下。 */
     public static void ensureInstalled(boolean force, Progress p) throws Exception {
         Path dir = folder();
         Files.createDirectories(dir);
@@ -282,12 +276,15 @@ public final class EasyTier {
         if (!ok) {
             Files.deleteIfExists(zip);
             throw new Exception(Lang.tf("联机模块下载失败：%s",
-                    last == null || last.getMessage() == null ? "未知网络错误" : last.getMessage()));
+                    last == null || last.getMessage() == null ? Lang.t("未知网络错误") : last.getMessage()));
         }
 
         p.update(Lang.t("正在解压联机模块…"), 0.7);
-        extract(zip, dir);
-        Files.deleteIfExists(zip);
+        try {
+            extract(zip, dir);
+        } finally {
+            Files.deleteIfExists(zip);
+        }
         Files.writeString(marker, VERSION);
         if (!installed()) throw new Exception(Lang.t("联机模块解压后缺少必要文件，请重试"));
         markExecutable();
@@ -295,6 +292,12 @@ public final class EasyTier {
     }
 
     private static void download(String url, Path target, Progress p) throws Exception {
+        // 没有内置校验值就不下载：core/dll 会被直接执行，不能接受无法校验的二进制
+        String expected = SHA256.getOrDefault(osTag() + "-" + arch(), "");
+        if (expected.isEmpty()) {
+            throw new Exception(Lang.tf("当前平台（%s-%s）没有内置的联机模块校验值，出于安全考虑已取消下载",
+                    osTag(), arch()));
+        }
         HttpURLConnection c = (HttpURLConnection) URI.create(url).toURL().openConnection();
         c.setConnectTimeout(12000);
         c.setReadTimeout(20000);
@@ -303,7 +306,6 @@ public final class EasyTier {
         int code = c.getResponseCode();
         if (code != 200) throw new Exception("HTTP " + code);
         long total = c.getContentLengthLong();
-        String expected = SHA256.getOrDefault(osTag() + "-" + arch(), "");
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         try (InputStream in = c.getInputStream();
              DigestOutputStream out = new DigestOutputStream(Files.newOutputStream(target), digest)) {
@@ -313,7 +315,7 @@ public final class EasyTier {
             int lastPercent = -1;
             while ((n = in.read(buf)) > 0) {
                 if (Thread.currentThread().isInterrupted()) {
-                    throw new InterruptedException("联机模块下载已取消");
+                    throw new InterruptedException(Lang.t("联机模块下载已取消"));
                 }
                 out.write(buf, 0, n);
                 read += n;
@@ -326,16 +328,13 @@ public final class EasyTier {
                 }
             }
         }
-        if (!expected.isEmpty()) {
-            String actual = HexFormat.of().formatHex(digest.digest());
-            if (!expected.equalsIgnoreCase(actual)) {
-                Files.deleteIfExists(target);
-                throw new Exception(Lang.t("联机模块校验失败，请更换下载节点后重试"));
-            }
+        String actual = HexFormat.of().formatHex(digest.digest());
+        if (!expected.equalsIgnoreCase(actual)) {
+            Files.deleteIfExists(target);
+            throw new Exception(Lang.t("联机模块校验失败，请更换下载节点后重试"));
         }
     }
 
-    /** 只留 core 和 cli 相关文件，跳过 GUI。 */
     private static void extract(Path zip, Path dir) throws Exception {
         List<Path> temp = new ArrayList<>();
         try (ZipInputStream in = new ZipInputStream(Files.newInputStream(zip))) {
@@ -355,8 +354,7 @@ public final class EasyTier {
                 temp.add(out);
             }
         }
-        if (temp.isEmpty()) throw new Exception("压缩包内容为空");
-        // 带版本后缀的文件名统一改成固定名。
+        if (temp.isEmpty()) throw new Exception(Lang.t("压缩包内容为空"));
         for (Path f : temp) {
             String base = f.getFileName().toString();
             String lower = base.toLowerCase(Locale.ROOT);
@@ -370,7 +368,6 @@ public final class EasyTier {
         }
     }
 
-    /** 找一个空闲端口，分配失败就逐个探测。 */
     public static int freePort() {
         try (java.net.ServerSocket s = new java.net.ServerSocket(0)) {
             s.setReuseAddress(true);
@@ -383,11 +380,10 @@ public final class EasyTier {
                 } catch (Exception ignored) {
                 }
             }
-            throw new IllegalStateException("找不到可用的联机端口（25000~27000 均被占用）", e);
+            throw new IllegalStateException(Lang.t("找不到可用的联机端口（25000~27000 均被占用）"), e);
         }
     }
 
-    /** 端口能不能同时绑 TCP 和 UDP。 */
     public static boolean portAvailable(int port) {
         if (port <= 0 || port > 65535) return false;
         try (java.net.ServerSocket tcp = new java.net.ServerSocket(port);
@@ -398,7 +394,6 @@ public final class EasyTier {
         }
     }
 
-    /** 测单个节点地址的握手延迟（毫秒），失败返回 -1。 */
     public static int measureNode(String address, int timeoutMs) {
         if (address == null) return -1;
         String raw = address.trim();
@@ -410,7 +405,7 @@ public final class EasyTier {
             scheme = raw.substring(0, sep).toLowerCase(Locale.ROOT);
             rest = raw.substring(sep + 3);
         }
-        // HTTP(S) 节点带路径，直接测首个响应；其余走 TCP 握手
+        // HTTP(S) 节点带路径，直接测首个响应
         if (scheme.equals("http") || scheme.equals("https")) {
             HttpURLConnection c = null;
             try {
@@ -433,7 +428,6 @@ public final class EasyTier {
         return tcpPing(hostPort, scheme, timeoutMs);
     }
 
-    /** 并发测速一组节点，返回按输入顺序排列的地址到延迟映射，失败为 -1。 */
     public static Map<String, Integer> measureNodes(List<String> addresses, int timeoutMs) {
         Map<String, Integer> out = new java.util.LinkedHashMap<>();
         List<String> unique = new ArrayList<>();
@@ -464,7 +458,6 @@ public final class EasyTier {
         return out;
     }
 
-    /** TCP 握手计时，UDP 节点也按同端口探测。 */
     private static int tcpPing(String hostPort, String scheme, int timeoutMs) {
         String host = hostPort;
         int port = switch (scheme) {
@@ -504,11 +497,10 @@ public final class EasyTier {
         }
     }
 
-    /** 启动核心进程；无 TUN 模式不需要管理员权限。 */
     public static synchronized Process start(String argument) throws Exception {
         stop();
         Path exe = corePath();
-        if (!Files.isRegularFile(exe)) throw new Exception("联机模块未安装");
+        if (!Files.isRegularFile(exe)) throw new Exception(Lang.t("联机模块未安装"));
         List<String> cmd = new ArrayList<>();
         cmd.add(exe.toString());
         cmd.addAll(splitArgs(argument));
@@ -525,26 +517,27 @@ public final class EasyTier {
         return core;
     }
 
-    /** 停止核心进程和子进程。 */
     public static synchronized void stop() {
         if (core == null) return;
         try {
             core.descendants().forEach(ProcessHandle::destroy);
             core.destroy();
-            if (!core.waitFor(3, TimeUnit.SECONDS)) core.destroyForcibly();
+            if (!core.waitFor(3, TimeUnit.SECONDS)) {
+                // 温和请求没杀干净就强杀一轮，连子进程一起，不然端口和网卡还被占着
+                core.descendants().forEach(ProcessHandle::destroyForcibly);
+                core.destroyForcibly();
+            }
         } catch (Exception ignored) {
         }
         core = null;
     }
 
-    /** 界面线程用：不阻塞地停掉核心。 */
     public static void stopAsync() {
         Thread t = new Thread(EasyTier::stop, "TCL-EasyTierStop");
         t.setDaemon(true);
         t.start();
     }
 
-    /** 联机模块日志最后几行，崩溃时附到错误里。 */
     public static String logTail(int lines) {
         try {
             Path log = folder().resolve("easytier.log");
@@ -557,10 +550,9 @@ public final class EasyTier {
         }
     }
 
-    /** 调 CLI，阻塞带超时，返回标准输出。 */
     public static String runCli(String argument, int timeoutMs) throws Exception {
         Path exe = cliPath();
-        if (!Files.isRegularFile(exe)) throw new Exception("联机模块 CLI 未安装");
+        if (!Files.isRegularFile(exe)) throw new Exception(Lang.t("联机模块 CLI 未安装"));
         ProcessBuilder pb = new ProcessBuilder(exe.toString());
         for (String part : splitArgs(argument)) pb.command().add(part);
         pb.directory(folder().toFile());
@@ -579,13 +571,12 @@ public final class EasyTier {
         reader.start();
         if (!p.waitFor(timeoutMs, TimeUnit.MILLISECONDS)) {
             p.destroyForcibly();
-            throw new Exception("联机模块 CLI 在 " + timeoutMs + "ms 内没有响应");
+            throw new Exception(Lang.t("联机模块 CLI 在 ") + timeoutMs + Lang.t("ms 内没有响应"));
         }
         reader.join(1000);
         return out.toString(StandardCharsets.UTF_8);
     }
 
-    /** 把一串启动参数按空格切开，支持双引号包裹。 */
     private static List<String> splitArgs(String s) {
         List<String> list = new ArrayList<>();
         if (s == null) return list;
@@ -607,7 +598,6 @@ public final class EasyTier {
         return list;
     }
 
-    /** 自己 / 客户端 / 房主 / 其他。 */
     public static final int PEER_SELF = 0, PEER_CLIENT = 1, PEER_SERVER = 2, PEER_MISC = 3;
 
     public static class Peer {
@@ -615,10 +605,8 @@ public final class EasyTier {
         public String hostname = "";
         public String ipv4 = "";
         public String cost = "";
-        /** 延迟毫秒，0 表示还没测出来。 */
         public double ping;
         public boolean relay;
-        /** 0~9 是 EasyTier NAT 类型，6 是 Symmetric，10 表示还没获取。 */
         public int natType = 10;
 
         public boolean self() {
@@ -626,7 +614,6 @@ public final class EasyTier {
         }
     }
 
-    /** 查询当前连上的节点。 */
     public static List<Peer> peers(int port) throws Exception {
         String text = runCli("-o json -p 127.0.0.1:" + port + " peer", 4000);
         List<Peer> list = new ArrayList<>();
@@ -645,7 +632,7 @@ public final class EasyTier {
             } else if (p.hostname.startsWith("Client")) {
                 p.type = PEER_CLIENT;
             } else if ("10.114.114.114".equals(p.ipv4)) {
-                p.type = PEER_SERVER; // 只认这个固定 IP 作为房主
+                p.type = PEER_SERVER;
             } else {
                 p.type = PEER_MISC;
             }
@@ -658,17 +645,15 @@ public final class EasyTier {
                 } catch (Exception ignored) {
                 }
             }
-            list.add(p); // 自己的节点也要留着
+            list.add(p);
         }
         return list;
     }
 
-    /** 联机模块进程还在不在，用来检测崩溃。 */
     public static boolean crashed() {
         return core != null && !core.isAlive();
     }
 
-    /** 清理上次异常退出留下的本启动器核心进程。 */
     public static void killLeftovers() {
         try {
             String own = folder().toAbsolutePath().normalize().toString().toLowerCase(Locale.ROOT);
@@ -689,23 +674,19 @@ public final class EasyTier {
         try (InputStream in = p.getInputStream()) {
             in.transferTo(out);
         }
-        p.waitFor(3, TimeUnit.SECONDS);
+        if (!p.waitFor(3, TimeUnit.SECONDS)) p.destroyForcibly();
         return out.toString(StandardCharsets.UTF_8);
     }
 
-    /** 官方节点列表 API，Base64 联机码里会带节点 ID。 */
     public static final String NODES_API = "https://uptime.easytier.cn/api/nodes?page=1&per_page=1000";
 
-    /** 一个发现或中继节点。 */
     public static class Node {
         public int id;
         public String address = "";
         public boolean allowRelay;
-        /** 负载，越小越好，已按 usage × 可用率折算。 */
         public double load;
     }
 
-    /** 拉取官方节点，只留 active 且带国内 MC 中继标签的。 */
     public static List<Node> fetchNodes(int preferId, List<String> blacklist) throws Exception {
         String text = httpGet(NODES_API);
         Map<String, Object> root = Json.obj(Json.parse(text));
@@ -759,7 +740,6 @@ public final class EasyTier {
         }
     }
 
-    /** 补可执行位，macOS 去 quarantine。 */
     public static void markExecutable() {
         try {
             corePath().toFile().setExecutable(true, false);
@@ -776,12 +756,10 @@ public final class EasyTier {
             try {
                 runCommand("xattr", "-dr", "com.apple.quarantine", folder().toString());
             } catch (Exception ignored) {
-                // 没有 xattr 就忽略，命令行程序一般不会被拦
             }
         }
     }
 
-    /** NAT 类型名转枚举序数，未知返回 10。 */
     public static int natTypeOf(String name) {
         if (name == null) return 10;
         String n = name.trim().toLowerCase(Locale.ROOT).replace("_", "");

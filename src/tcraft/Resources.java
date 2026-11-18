@@ -17,11 +17,10 @@ import java.util.List;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
-/** 配置目录与 JavaFX 运行库准备。 */
 public final class Resources {
 
     private static final String MODULES = "javafx.controls,javafx.graphics,javafx.base,javafx.media";
-    private static final String JFX_VERSION = "21.0.4";
+    private static final String JFX_VERSION = "17.0.21";
     private static final String[] JFX_MODULES = {"base", "graphics", "controls", "media"};
 
     private Resources() {
@@ -29,7 +28,6 @@ public final class Resources {
 
     private static Path homeDir;
 
-    /** 配置、日志、皮肤和下载依赖的根目录。 */
     public static synchronized Path home() {
         if (homeDir != null) return homeDir;
         Path dir = resolveHome();
@@ -52,7 +50,6 @@ public final class Resources {
         return dir;
     }
 
-    /** 把旧目录的配置搬到 .tcl，只搬一次。 */
     private static void migrateLegacy(Path legacy, Path target) {
         Path marker = target.resolve(".migrated");
         if (Files.exists(marker)) return;
@@ -98,12 +95,14 @@ public final class Resources {
         String os = System.getProperty("os.name", "").toLowerCase();
         String arch = System.getProperty("os.arch", "").toLowerCase();
         boolean arm = arch.contains("aarch64") || arch.contains("arm64");
-        if (os.contains("win")) return "win";
+        boolean x86 = arch.equals("x86") || arch.equals("i386") || arch.equals("ia32");
+        if (os.contains("win")) return arm ? "win-arm64" : x86 ? "win-x86" : "win";
         if (os.contains("mac")) return arm ? "mac-aarch64" : "mac";
-        return arm ? "linux-aarch64" : "linux";
+        if (arm) return "linux-aarch64";
+        if (x86) return "linux-x86";
+        return "linux";
     }
 
-    /** 自己所在的 jar，开发模式返回 null。 */
     public static Path jar() {
         try {
             Path p = Paths.get(Resources.class.getProtectionDomain().getCodeSource().getLocation().toURI());
@@ -113,12 +112,18 @@ public final class Resources {
         }
     }
 
-    /** 程序目录，jar 的上级。 */
     public static Path appDir() {
         Path jar = jar();
         if (jar != null) {
             Path parent = jar.getParent();
-            return parent == null ? Paths.get("").toAbsolutePath() : parent;
+            if (parent == null) return Paths.get("").toAbsolutePath();
+            Path up = parent.getParent();
+            if (up != null && (Files.isRegularFile(up.resolve("TCraftLauncher.exe"))
+                    || Files.isRegularFile(up.resolve("TCraftLauncher.sh"))
+                    || Files.isRegularFile(up.resolve("TCraftLauncher.bat")))) {
+                return up;
+            }
+            return parent;
         }
         try {
             Path p = Paths.get(Resources.class.getProtectionDomain().getCodeSource().getLocation().toURI());
@@ -134,7 +139,6 @@ public final class Resources {
         }
     }
 
-    /** 没有 JavaFX 时按平台下载依赖，然后带 module-path 重启。 */
     public static void bootstrap(String[] args, StartupWindow ui) throws Exception {
         if (jar() == null) return; // 开发模式由 IDE 提供 JavaFX
         ui.setStatus("正在检查运行环境…", 10);
@@ -147,6 +151,33 @@ public final class Resources {
         relaunch(jar(), rt, platform(), args);
     }
 
+    public static Path iconFile(String name) {
+        Path dir = home().resolve("res").resolve("images");
+        Path out = dir.resolve(name);
+        if (Files.isRegularFile(out)) return out;
+        try (InputStream in = Resources.class.getResourceAsStream("/res/images/" + name)) {
+            if (in == null) return null;
+            Files.createDirectories(dir);
+            Files.copy(in, out, StandardCopyOption.REPLACE_EXISTING);
+            return out;
+        } catch (Exception e) {
+            return Files.isRegularFile(out) ? out : null;
+        }
+    }
+
+    public static Path launchTarget() {
+        Path dir = appDir();
+        String os = System.getProperty("os.name", "").toLowerCase();
+        String[] names = os.contains("win")
+                ? new String[]{"TCraftLauncher.exe", "TCraftLauncher.bat"}
+                : new String[]{"TCraftLauncher.sh", "TCraftLauncher.command"};
+        for (String n : names) {
+            Path p = dir.resolve(n);
+            if (Files.isRegularFile(p)) return p;
+        }
+        return null;
+    }
+
     private static boolean fxPresent() {
         try {
             Class.forName("javafx.application.Application", false, Resources.class.getClassLoader());
@@ -156,7 +187,6 @@ public final class Resources {
         }
     }
 
-    /** 首次运行下载当前平台的 JavaFX，已有缓存直接复用。 */
     private static Path ensureJavaFx(StartupWindow ui) throws Exception {
         ui.setStatus("正在检查资源是否齐全…", 15);
         String plat = platform();
@@ -165,51 +195,111 @@ public final class Resources {
             case "mac" -> "mac";
             case "mac-aarch64" -> "mac-aarch64";
             case "linux" -> "linux";
+            // 异常消息直接展示给用户，整串查表必失败，片段各自 Lang.t
+            case "win-arm64" -> throw new IOException(
+                    Lang.t("OpenJFX 17 没有 Windows ARM64 原生包。请使用 x64 版 Java 运行启动器（Windows 会自动模拟），")
+                            + Lang.t("或把 JavaFX 17 放到 ") + home().resolve("dependencies").resolve("win-arm64").resolve("openjfx"));
+            case "win-x86" -> throw new IOException(
+                    Lang.t("OpenJFX 17 没有 32 位 Windows 原生包。请安装 64 位 Java 后重新启动启动器。"));
+            case "linux-x86" -> throw new IOException(
+                    Lang.t("OpenJFX 17 没有 32 位 Linux 原生包。请安装 64 位 Java 后重新启动启动器。"));
             case "linux-aarch64" -> "linux-aarch64";
-            default -> throw new IOException("暂不支持当前系统：" + System.getProperty("os.name")
+            default -> throw new IOException(Lang.t("暂不支持当前系统：") + System.getProperty("os.name")
                     + " / " + System.getProperty("os.arch"));
         };
+        String version = JFX_VERSION;
         Path dir = home().resolve("dependencies").resolve(plat).resolve("openjfx");
         Files.createDirectories(dir);
-        String marker = JFX_VERSION + "-" + classifier;
+        String marker = version + "-" + classifier;
         Path ready = dir.resolve(".ready");
-        boolean complete = Files.isRegularFile(ready)
-                && marker.equals(Files.readString(ready).trim());
-        if (complete) {
-            for (String module : JFX_MODULES) {
-                if (!Files.isRegularFile(dir.resolve(jarName(module, classifier)))) {
-                    complete = false;
-                    break;
-                }
+        // 清掉非当前版本的 jar，同名模块多版本会让启动失败
+        removeStaleJfxJars(dir, classifier, version);
+        // .ready 不可信，按 jar 内 javafx.properties 校验；旧 JavaFX 21 jar 在 JDK 17 下会直接失败
+        boolean jarsPresent = true;
+        for (String module : JFX_MODULES) {
+            if (!Files.isRegularFile(dir.resolve(jarName(module, classifier, version)))) {
+                jarsPresent = false;
+                break;
             }
         }
-        if (complete) {
+        if (jarsPresent && jarVersionMatches(dir.resolve(jarName("base", classifier, version)), version)) {
+            extractAllNatives(dir, classifier, version);
+            if (!marker.equals(Files.isRegularFile(ready) ? Files.readString(ready).trim() : "")) {
+                Files.writeString(ready, marker);
+            }
             ui.setStatus("资源检查完成", 70);
             return dir;
+        }
+        // 版本不符或文件残缺时清掉旧 jar，17 和 21 混用起不来
+        for (String module : JFX_MODULES) {
+            Files.deleteIfExists(dir.resolve(jarName(module, classifier, version)));
         }
 
         for (int i = 0; i < JFX_MODULES.length; i++) {
             String module = JFX_MODULES[i];
-            Path target = dir.resolve(jarName(module, classifier));
+            Path target = dir.resolve(jarName(module, classifier, version));
             if (Files.isRegularFile(target) && Files.size(target) > 0) continue;
             int base = 20 + i * 70 / JFX_MODULES.length;
             int span = 70 / JFX_MODULES.length;
-            downloadArtifact(module, classifier, target, ui, base, span);
+            downloadArtifact(module, classifier, version, target, ui, base, span);
         }
         ui.setStatus("正在准备运行库…", 92);
-        for (String module : JFX_MODULES) {
-            extractNatives(dir.resolve(jarName(module, classifier)), dir);
-        }
+        extractAllNatives(dir, classifier, version);
         Files.writeString(ready, marker);
         return dir;
     }
 
-    private static String jarName(String module, String classifier) {
-        return "javafx-" + module + "-" + JFX_VERSION + "-" + classifier + ".jar";
+    private static String jarName(String module, String classifier, String version) {
+        return "javafx-" + module + "-" + version + "-" + classifier + ".jar";
     }
 
-    /** 先试国内镜像，再试 Maven Central。 */
-    private static void downloadArtifact(String module, String classifier, Path target,
+    private static void removeStaleJfxJars(Path dir, String classifier, String version) {
+        java.util.Set<String> keep = new java.util.HashSet<>();
+        for (String module : JFX_MODULES) keep.add(jarName(module, classifier, version));
+        try (java.nio.file.DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
+            for (Path p : stream) {
+                String name = p.getFileName().toString();
+                if (name.endsWith(".part")) {
+                    Files.deleteIfExists(p);
+                } else if (name.startsWith("javafx-") && name.endsWith(".jar")
+                        && !keep.contains(name)) {
+                    Files.deleteIfExists(p);
+                }
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static void extractAllNatives(Path dir, String classifier, String version) throws IOException {
+        Path marker = dir.resolve(".natives");
+        String expected = version + "-" + classifier;
+        if (Files.isRegularFile(marker) && expected.equals(Files.readString(marker).trim())) {
+            return;
+        }
+        for (String module : JFX_MODULES) {
+            extractNatives(dir.resolve(jarName(module, classifier, version)), dir);
+        }
+        Files.writeString(marker, expected);
+    }
+
+    private static boolean jarVersionMatches(Path jar, String expected) {
+        if (!Files.isRegularFile(jar)) return false;
+        try (JarFile jf = new JarFile(jar.toFile())) {
+            JarEntry en = jf.getJarEntry("javafx.properties");
+            if (en == null) return false;
+            try (InputStream in = jf.getInputStream(en)) {
+                String text = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                for (String line : text.split("\\R")) {
+                    if (!line.startsWith("javafx.version=")) continue;
+                    return expected.equals(line.substring("javafx.version=".length()).trim());
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return false;
+    }
+
+    private static void downloadArtifact(String module, String classifier, String version, Path target,
                                          StartupWindow ui, int base, int span) throws Exception {
         List<String> repos = new ArrayList<>();
         if (System.getProperty("user.country", "").equalsIgnoreCase("CN")) {
@@ -220,16 +310,16 @@ public final class Resources {
 
         Exception last = null;
         for (String repo : repos) {
-            String url = repo + "/org/openjfx/javafx-" + module + "/" + JFX_VERSION + "/"
-                    + jarName(module, classifier);
+            String url = repo + "/org/openjfx/javafx-" + module + "/" + version + "/"
+                    + jarName(module, classifier, version);
             try {
-                download(url, target, ui, "正在下载 JavaFX " + module + "…", base, span);
+                download(url, target, ui, Lang.t("正在下载 JavaFX ") + module + "…", base, span);
                 return;
             } catch (Exception e) {
                 last = e;
             }
         }
-        throw new IOException("JavaFX " + module + " 下载失败", last);
+        throw new IOException("JavaFX " + module + Lang.t(" 下载失败"), last);
     }
 
     private static void download(String url, Path target, StartupWindow ui, String label,
@@ -265,13 +355,13 @@ public final class Resources {
                     }
                 }
             }
+            // .sha1 拿不到就当这个源坏了，换下一个仓库重试；没有校验值的 jar 不能落盘
             String expected = fetchText(url + ".sha1");
-            if (expected != null) {
-                String actual = sha1(tmp);
-                if (!actual.equalsIgnoreCase(expected)) {
-                    Files.deleteIfExists(tmp);
-                    throw new IOException("SHA1 校验失败：" + url);
-                }
+            if (expected == null) throw new IOException("拿不到 .sha1 校验值：" + url);
+            String actual = sha1(tmp);
+            if (!actual.equalsIgnoreCase(expected)) {
+                Files.deleteIfExists(tmp);
+                throw new IOException("SHA1 校验失败：" + url);
             }
             Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
         } finally {
@@ -309,7 +399,6 @@ public final class Resources {
         return java.util.HexFormat.of().formatHex(md.digest());
     }
 
-    /** JavaFX 平台 jar 里的 DLL/dylib/so 放到同目录供 java.library.path 使用。 */
     private static void extractNatives(Path jar, Path dir) throws IOException {
         if (!Files.isRegularFile(jar)) return;
         try (JarFile jf = new JarFile(jar.toFile())) {
@@ -321,7 +410,7 @@ public final class Resources {
                 String low = name.toLowerCase(java.util.Locale.ROOT);
                 if (!low.endsWith(".dll") && !low.endsWith(".dylib") && !low.endsWith(".so")) continue;
                 Path out = dir.resolve(name);
-                if (Files.isRegularFile(out) && en.getSize() > 0 && Files.size(out) == en.getSize()) continue;
+                // 旧 JavaFX 21 留下的同名 DLL 一律覆盖，不然 17 jar 配到 21 本地库
                 try (InputStream in = jf.getInputStream(en)) {
                     Files.copy(in, out, StandardCopyOption.REPLACE_EXISTING);
                 }
@@ -329,7 +418,22 @@ public final class Resources {
         }
     }
 
-    /** 换一个带着 JavaFX 的 JVM 跑，自己退出。 */
+    private static String modulePath(Path rt, String plat) throws IOException {
+        String classifier = switch (plat) {
+            case "win" -> "win";
+            case "mac" -> "mac";
+            case "mac-aarch64" -> "mac-aarch64";
+            case "linux" -> "linux";
+            case "linux-aarch64" -> "linux-aarch64";
+            default -> throw new IOException(Lang.t("没有 JavaFX 17 运行库：") + plat);
+        };
+        List<String> paths = new ArrayList<>();
+        for (String module : JFX_MODULES) {
+            paths.add(rt.resolve(jarName(module, classifier, JFX_VERSION)).toString());
+        }
+        return String.join(File.pathSeparator, paths);
+    }
+
     private static void relaunch(Path jar, Path rt, String plat, String[] args) throws IOException {
         String os = System.getProperty("os.name", "").toLowerCase();
         String exe = os.contains("win") ? "javaw.exe" : "java";
@@ -339,8 +443,10 @@ public final class Resources {
         cmd.add("-Dtcraft.dir=" + home());
         cmd.add("-Dfile.encoding=UTF-8");
         cmd.add("-Djava.library.path=" + rt);
-        cmd.add("--module-path=" + rt);
+        cmd.add("--module-path=" + modulePath(rt, plat));
         cmd.add("--add-modules=" + MODULES);
+        // MainWindow 反射查 GraphicsPipeline，需要开放 com.sun.prism
+        cmd.add("--add-exports=javafx.graphics/com.sun.prism=ALL-UNNAMED");
         cmd.add("-cp");
         cmd.add(jar.toString());
         cmd.add("tcraft.Boot");
@@ -356,5 +462,4 @@ public final class Resources {
         pb.start();
         System.exit(0);
     }
-
 }

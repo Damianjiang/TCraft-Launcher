@@ -23,14 +23,13 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** 资源详情整页：简介、筛选、版本文件列表。 */
 public class PageResourceDetail implements Page {
 
     private final MainWindow win;
     private final Data data = Data.get();
     private final ResourceInfo info;
 
-    private List<ResourceVersion> allVersions; // null 表示还没加载完
+    private List<ResourceVersion> allVersions;
     private String loadError = "";
     private boolean loadFailed = false;
 
@@ -38,7 +37,6 @@ public class PageResourceDetail implements Page {
     private boolean groupedDrop, groupedFold;
 
     private static final Map<String, String> CACHED_FOLDER = new ConcurrentHashMap<>();
-    /** 前置项目信息，按 id 存 名称、slug、简介、图标、类型。 */
     private final Map<String, String[]> depProjects = new ConcurrentHashMap<>();
     private final Map<String, CurseForge.Project> depProjectsCf = new ConcurrentHashMap<>();
 
@@ -60,7 +58,6 @@ public class PageResourceDetail implements Page {
         return Lang.mode == 1 ? 190 : 160;
     }
 
-    /** 左栏沿用下载分类侧栏。 */
     @Override
     public Node left() {
         VBox panel = new VBox(0);
@@ -97,14 +94,12 @@ public class PageResourceDetail implements Page {
         page.setMaxWidth(Double.MAX_VALUE);
         scroll.setContent(page);
 
-        // 用 add() 加内容，直接加子节点会叠在一起
         Ui.Card intro = Ui.card(null);
         intro.setContentPadding(new Insets(14, 20, 14, 20));
         intro.add(introResourceItem(), introButtons());
         VBox.setMargin(intro, new Insets(0, 0, 15, 0));
         page.getChildren().add(intro);
 
-        // Mod 与数据包互跳提示
         hintAlternativeText = Ui.label("", 12.5, Color.web("#1c5aa8"));
         hintAlternativeText.setWrapText(true);
         hintAlternative = Ui.hint("", 0);
@@ -138,7 +133,6 @@ public class PageResourceDetail implements Page {
         return scroll;
     }
 
-    /** 资源项放在简介卡里，不可交互。 */
     private Node introResourceItem() {
         HBox row = new HBox(12);
         row.setAlignment(Pos.CENTER_LEFT);
@@ -160,7 +154,7 @@ public class PageResourceDetail implements Page {
             desc.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
             desc.setWrapText(false);
             desc.setMinWidth(0);
-            desc.setMaxWidth(420); // 窗口 842 宽时不会顶出卡片
+            desc.setMaxWidth(420);
             texts.getChildren().add(desc);
         }
         texts.getChildren().add(Ui.label(metaLine(), 11.5, Theme.gray2));
@@ -175,7 +169,6 @@ public class PageResourceDetail implements Page {
         return row;
     }
 
-    /** 简介卡的元信息行：加载器 + 下载量。 */
     private String metaLine() {
         StringBuilder sb = new StringBuilder();
         List<String> ls = info.loaders();
@@ -191,7 +184,6 @@ public class PageResourceDetail implements Page {
         return sb.toString();
     }
 
-    /** 下载量文案，英文用 K/M/B，中文用万/亿。 */
     private static String downloadText(long n) {
         if (Lang.mode == 1) {
             if (n >= 1_000_000_000L) return String.format(java.util.Locale.ROOT, "%.2fB", n / 1_000_000_000d);
@@ -207,10 +199,8 @@ public class PageResourceDetail implements Page {
         return String.valueOf(n);
     }
 
-    /** 简介卡按钮行。 */
     private Node introButtons() {
         HBox row = new HBox(12);
-        // 按钮等宽
         StackPane web = Ui.button(Lang.t("转到 ") + (info.isCurseForge() ? "CurseForge" : "Modrinth"),
                 Ui.BTN_THEME, () -> openUrl(websiteOf()));
         StackPane copy = Ui.button("复制名称", Ui.BTN_NORMAL, this::copyName);
@@ -231,17 +221,15 @@ public class PageResourceDetail implements Page {
         panLoadHost.setManaged(true);
         panResults.getChildren().clear();
         String pid = info.projectId.isEmpty() ? info.slug : info.projectId;
-        new Thread(() -> {
+        Threads.start("TCL-ResourceDetail-Files", () -> {
             try {
                 List<ResourceVersion> list = new ArrayList<>();
                 if (info.isCurseForge()) {
-                    // CurseForge 走 /mods/{id}/files
                     for (Object o : CurseForge.projectFiles(Long.parseLong(pid))) {
                         ResourceVersion v = ResourceVersion.fromCurseForgeJson(Json.obj(o), expectedType());
                         if (!v.downloadUrls.isEmpty()) list.add(v);
                     }
                 } else {
-                    // Modrinth 走 /project/{id}/version
                     for (Object o : Modrinth.projectVersions(pid)) {
                         ResourceVersion v = ResourceVersion.fromModrinthJson(Json.obj(o), expectedType());
                         if (!v.downloadUrls.isEmpty()) list.add(v);
@@ -260,10 +248,9 @@ public class PageResourceDetail implements Page {
                     showLoadError();
                 });
             }
-        }, "TCL-ResourceDetail-Files").start();
+        });
     }
 
-    /** 加载态卡片。 */
     private Ui.Card loadingCard() {
         Ui.Card card = Ui.card(null);
         card.setContentPadding(new Insets(18, 22, 16, 22));
@@ -272,7 +259,6 @@ public class PageResourceDetail implements Page {
         return card;
     }
 
-    /** 失败状态。 */
     private void showLoadError() {
         VBox err = new VBox(12);
         err.setAlignment(Pos.CENTER);
@@ -301,13 +287,11 @@ public class PageResourceDetail implements Page {
         panLoadHost.setManaged(true);
     }
 
-    /** 类型筛选基准，初始值就是搜索分类。 */
     private String expectedType() {
         String t = info.resourceType == null || info.resourceType.isEmpty() ? info.projectType : info.resourceType;
         return t.isEmpty() ? "mod" : t;
     }
 
-    /** 解析前置项目。 */
     private void resolveDependencies(List<ResourceVersion> list) {
         List<String> ids = new ArrayList<>();
         for (ResourceVersion v : list) {
@@ -317,12 +301,20 @@ public class PageResourceDetail implements Page {
         }
         if (ids.isEmpty()) return;
         if (info.isCurseForge()) {
-            // CurseForge 没有批量接口，只能并发逐个查
+            // CurseForge 没有批量接口，只能并发逐个查；限 8 并发，25s 没回来的按未解析处理
             java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(ids.size());
+            java.util.concurrent.Semaphore gate = new java.util.concurrent.Semaphore(8);
             for (String id : ids) {
                 Http.pool().execute(() -> {
                     try {
-                        depProjectsCf.put(id, CurseForge.projectInfo(Long.parseLong(id)));
+                        gate.acquire();
+                        try {
+                            depProjectsCf.put(id, CurseForge.projectInfo(Long.parseLong(id)));
+                        } finally {
+                            gate.release();
+                        }
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
                     } catch (Exception e) {
                         data.log("未找到 ID " + id + " 的前置信息：" + e.getMessage());
                     } finally {
@@ -331,7 +323,9 @@ public class PageResourceDetail implements Page {
                 });
             }
             try {
-                latch.await();
+                if (!latch.await(25, java.util.concurrent.TimeUnit.SECONDS)) {
+                    data.log("前置项目信息获取超时，未完成的前置按无法解析处理");
+                }
             } catch (InterruptedException ie) {
                 Thread.currentThread().interrupt();
             }
@@ -362,7 +356,6 @@ public class PageResourceDetail implements Page {
         }
     }
 
-    /** 把前置 ID 填进文件的 Dependencies。 */
     private void fillDependencies(List<ResourceVersion> list, String depId) {
         for (ResourceVersion v : list) {
             if (v.rawDependencies.contains(depId) && !v.dependencies.contains(depId)) {
@@ -379,13 +372,12 @@ public class PageResourceDetail implements Page {
         return fallback;
     }
 
-    /** 当前类型的版本集合。 */
     private List<ResourceVersion> getResults() {
         List<ResourceVersion> results = allVersions;
         String target = expectedType();
         List<ResourceVersion> out = new ArrayList<>();
         if (target.equals("shader") || target.equals("resourcepack")) {
-            return new ArrayList<>(results); // 光影和资源包不筛选，筛了会滤掉原版光影
+            return new ArrayList<>(results);
         }
         for (ResourceVersion r : results) {
             if (r.resourceType.equals(target)) out.add(r);
@@ -398,7 +390,6 @@ public class PageResourceDetail implements Page {
         panLoadHost.setVisible(false);
         panLoadHost.setManaged(false);
 
-        // 筛选器达到 9 个就升级分组规则
         boolean[] dropFlags = {false, false, true, true};
         boolean[] foldFlags = {false, true, false, true};
         int chosen = dropFlags.length - 1;
@@ -422,7 +413,6 @@ public class PageResourceDetail implements Page {
             filters.add(0, "全部");
             panFilter.getChildren().clear();
             final List<String> chosenFilters = filters;
-            // 优先选目标版本所在分组
             String autoGroup = null;
             if (!info.targetVersion.isEmpty()) {
                 boolean has = false;
@@ -497,7 +487,6 @@ public class PageResourceDetail implements Page {
                     continue;
                 }
                 String verName = ResourceVersion.groupedName(gv, false, false);
-                // 至少两个加载器且是 Mod 时才按加载器拆卡
                 List<String> loaders = new ArrayList<>();
                 if (info.loaders().size() > 1 && v.resourceType.equals("mod") && ResourceVersion.isStandard(verName)) {
                     for (String l : v.loaders) {
@@ -528,7 +517,6 @@ public class PageResourceDetail implements Page {
         List<Ui.Card> cards = new ArrayList<>();
         for (Map.Entry<String, List<ResourceVersion>> pair : dict.entrySet()) {
             if (pair.getValue().isEmpty()) continue;
-            // 跳过与目标卡同名的基础卡
             if (pair.getKey().equals(targetCardName.replace("（所选版本）", ""))) continue;
             Ui.Card card = Ui.card(pair.getKey());
             card.setCollapsible(true);
@@ -537,7 +525,6 @@ public class PageResourceDetail implements Page {
             stack.setSpacing(2);
             buildCardContent(stack, pair.getValue());
             card.add(stack);
-            // 目标卡展开，其余折叠
             if (pair.getKey().equals(targetCardName)) card.setCollapsed(false);
             else card.setCollapsed(true);
             cards.add(card);
@@ -554,7 +541,6 @@ public class PageResourceDetail implements Page {
         updateHintAlternative();
     }
 
-    /** 排序：置顶、特殊版本后置、版本号降序。 */
     private Comparator<String> cardSorter(String topmost) {
         return (x, y) -> {
             if (x.equals(y)) return 0;
@@ -571,7 +557,6 @@ public class PageResourceDetail implements Page {
         };
     }
 
-    /** 去掉首个空格前的词。 */
     private static String stripFirstWord(String s) {
         int i = s.indexOf(' ');
         return i >= 0 ? s.substring(i + 1) : s;
@@ -581,7 +566,6 @@ public class PageResourceDetail implements Page {
         List<ResourceVersion> sorted = new ArrayList<>(versions);
         sorted.sort((a, b) -> b.releaseDate.compareToIgnoreCase(a.releaseDate));
         boolean hasDuplicates = distinctCount(sorted, v -> v.display) != sorted.size();
-        // 前置信息，整合包跳过
         List<String> deps = new ArrayList<>();
         if (!expectedType().equals("modpack")) {
             for (ResourceVersion v : sorted) {
@@ -612,12 +596,10 @@ public class PageResourceDetail implements Page {
         return lab;
     }
 
-    /** 版本文件行。 */
     private Node versionRow(ResourceVersion v, boolean isBadDisplay) {
         Node icon = releaseIcon(v.releaseType);
         Ui.ListItem row = new Ui.ListItem(icon, v.title(isBadDisplay), v.infoLine(isBadDisplay), 42);
         if (expectedType().equals("modpack")) {
-            // 整合包点整行即安装
             row.setOnMouseClicked(e -> installModpack(v));
             StackPane save = Ui.iconButton("save", 28, 15, "另存为", () -> save(v));
             save.addEventHandler(MouseEvent.MOUSE_CLICKED, MouseEvent::consume);
@@ -673,7 +655,6 @@ public class PageResourceDetail implements Page {
         String other = target.equals("mod") ? "datapack" : target.equals("datapack") ? "mod" : "";
         boolean show = false;
         if (!other.isEmpty() && allVersions != null) {
-            // 另一类型有版本才显示
             for (ResourceVersion v : allVersions) {
                 if (v.resourceType.equals(other)) {
                     show = true;
@@ -707,7 +688,6 @@ public class PageResourceDetail implements Page {
         };
     }
 
-    /** 保存子目录，数据包为空串。 */
     private String subFolder(String type) {
         return switch (type) {
             case "modpack" -> "modpacks";
@@ -719,13 +699,11 @@ public class PageResourceDetail implements Page {
         };
     }
 
-    /** 实例加载器转 Modrinth 名，原版返回空串。 */
     private String instanceLoaderKey(Data.Instance ins) {
         if (ins == null || ins.loader == null || ins.loader.isEmpty() || ins.loader.equals("原版")) return "";
         return ins.loader.toLowerCase();
     }
 
-    /** 任一支持版本匹配即可。 */
     private boolean versionCompatible(List<String> gameVersions, String vanilla) {
         if (gameVersions.isEmpty() || gameVersions.contains("未知版本")) return true;
         if (vanilla == null || vanilla.isEmpty()) return true;
@@ -738,7 +716,6 @@ public class PageResourceDetail implements Page {
         return false;
     }
 
-    /** 实例的游戏目录，隔离时是 versions/&lt;版本&gt;。 */
     private String folderOf(Data.Instance ins) {
         return Isolation.run(ins).toString();
     }
@@ -767,7 +744,6 @@ public class PageResourceDetail implements Page {
         return false;
     }
 
-    /** 默认保存位置依次取缓存、当前实例、最近实例、MC 根目录。 */
     private String findDefaultFolder(ResourceVersion file) {
         String type = file.resourceType;
         String sub = subFolder(type);
@@ -778,7 +754,6 @@ public class PageResourceDetail implements Page {
         if (current != null && instanceSuitable(current, file, allowed)) {
             return Paths.get(folderOf(current), sub).toString();
         }
-        // 按最近修改时间排序
         List<Data.Instance> suitable = new ArrayList<>();
         for (Data.Instance ins : data.instances) {
             if (instanceSuitable(ins, file, allowed)) suitable.add(ins);
@@ -791,17 +766,33 @@ public class PageResourceDetail implements Page {
         return data.gameDir;
     }
 
-    /** 保存或另存为。 */
+    private String preferredFileName(ResourceVersion file, String original) {
+        int mode = Data.get().getInt("ToolDownloadTranslateV2", 0);
+        if (mode <= 0) return original;
+        String ext = "." + extOf(file);
+        String originalBase = original.endsWith(ext)
+                ? original.substring(0, original.length() - ext.length()) : original;
+        String title = (file.display == null || file.display.isBlank() ? originalBase : file.display)
+                .replaceAll("[\\\\/:*?\"<>|~]", "-").trim();
+        String version = file.version == null ? "" : file.version.replaceAll("[\\\\/:*?\"<>|~]", "-").trim();
+        return switch (mode) {
+            case 1 -> title + (version.isEmpty() ? "" : "-" + version) + ext;
+            case 2 -> title + ext;
+            case 3 -> originalBase + (version.isEmpty() ? "" : "-" + version) + ext;
+            case 4 -> title + "-" + originalBase + ext;
+            default -> original;
+        };
+    }
+
     private void save(ResourceVersion file) {
         String type = file.resourceType;
         String desc = typeName(type);
         if (type.equals("modpack")) {
-            // 整合包直接选保存位置
             Platform.runLater(() -> {
                 FileChooser chooser = new FileChooser();
-                chooser.setTitle("选择保存位置");
+                chooser.setTitle(Lang.t("选择保存位置"));
                 chooser.setInitialFileName(file.fileName);
-                chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(desc + "文件", "*." + extOf(file)));
+                chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(Lang.t(desc + "文件"), "*." + extOf(file)));
                 File target = chooser.showSaveDialog(win.stage);
                 if (target == null) return;
                 startDownloadTask(desc, file, target.toPath(), new ArrayList<>());
@@ -809,10 +800,9 @@ public class PageResourceDetail implements Page {
             return;
         }
         win.toast("正在查找适合的游戏版本……", info.name, 0);
-        new Thread(() -> {
+        Threads.start("TCL-ResourceDetail-Save", () -> {
             try {
                 String defaultFolder = findDefaultFolder(file);
-                // 只对 Mod 检查前置
                 List<DepDownload> depFiles = new ArrayList<>();
                 List<String> unresolvedNames = new ArrayList<>();
                 if (type.equals("mod") && !file.rawDependencies.isEmpty()) {
@@ -828,17 +818,18 @@ public class PageResourceDetail implements Page {
                     }
                 }
                 // Mod 文件名里的 ~ 会导致 Mixin 加载失败
-                String fileName = type.equals("mod") ? file.fileName.replace("~", "-") : file.fileName;
+                String rawName = type.equals("mod") ? file.fileName.replace("~", "-") : file.fileName;
+                final String fileName = preferredFileName(file, rawName);
                 final String folder = defaultFolder;
                 final List<DepDownload> deps = depFiles;
                 final List<String> unresolved = unresolvedNames;
                 Platform.runLater(() -> {
                     FileChooser chooser = new FileChooser();
-                    chooser.setTitle("选择保存位置");
+                    chooser.setTitle(Lang.t("选择保存位置"));
                     File init = new File(folder);
                     if (init.isDirectory()) chooser.setInitialDirectory(init);
                     chooser.setInitialFileName(fileName);
-                    chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(desc + "文件", "*." + extOf(file)));
+                    chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(Lang.t(desc + "文件"), "*." + extOf(file)));
                     File target = chooser.showSaveDialog(win.stage);
                     if (target == null) return;
                     if (!deps.isEmpty()) {
@@ -854,10 +845,9 @@ public class PageResourceDetail implements Page {
                 data.log("保存资源文件失败：" + e.getMessage());
                 Platform.runLater(() -> win.toast("保存失败", e.getMessage() == null ? "未知错误" : e.getMessage(), 3));
             }
-        }, "TCL-ResourceDetail-Save").start();
+        });
     }
 
-    /** 缺前置时的弹窗，可一并下载。 */
     private void askDownloadDeps(List<DepDownload> deps, List<String> unresolved, ResourceVersion file, Path target) {
         StringBuilder msg = new StringBuilder(Lang.t("该资源需要以下前置，但在目标文件夹中未发现它们：\n"));
         for (int i = 0; i < deps.size(); i++) {
@@ -902,9 +892,7 @@ public class PageResourceDetail implements Page {
         }
     }
 
-    /** 建下载任务并启动。 */
     private void startDownloadTask(String desc, ResourceVersion file, Path target, List<DepDownload> deps) {
-        // 记住这次的位置，下次默认用
         if (target.getParent() != null) {
             CACHED_FOLDER.put(file.resourceType, target.getParent().toString());
         }
@@ -918,7 +906,7 @@ public class PageResourceDetail implements Page {
         if (worldZip) task.subs.add(new Tasks.SubTask("安装世界存档"));
         Tasks.INSTANCE.add(task);
         win.openPage("tasks", true);
-        new Thread(() -> {
+        Threads.start("TCL-ResourceSave-" + file.fileName, () -> {
             try {
                 task.subs.get(0).state = Tasks.State.RUNNING;
                 task.stage = "下载 " + file.fileName;
@@ -928,10 +916,16 @@ public class PageResourceDetail implements Page {
                     task.subs.get(1).state = Tasks.State.RUNNING;
                     task.stage = "下载前置文件";
                     Path dir = target.getParent();
+                    Path dirAbs = dir.toAbsolutePath().normalize();
                     int i = 0;
                     for (DepDownload d : deps) {
                         if (task.canceled) throw new java.io.IOException("已取消");
-                        Path depTarget = dir.resolve(d.version.fileName.replace("~", "-"));
+                        // 远端 fileName 直接拼路径可能带 ../，归一化后必须还落在目标目录
+                        Path depTarget = dir.resolve(d.version.fileName.replace("~", "-")).toAbsolutePath().normalize();
+                        if (!depTarget.startsWith(dirAbs)) {
+                            data.log("前置文件名包含非法路径，已跳过：" + d.version.fileName);
+                            continue;
+                        }
                         tryDownload(task, d.version.downloadUrls, depTarget, d.version.hash);
                         i++;
                         task.subs.get(1).progress = i / (double) deps.size();
@@ -967,10 +961,9 @@ public class PageResourceDetail implements Page {
             } finally {
                 Tasks.INSTANCE.changed();
             }
-        }, "TCL-ResourceSave-" + file.fileName).start();
+        });
     }
 
-    /** 多地址回退下载。 */
     private void tryDownload(Tasks.Task task, List<String> urls, Path target, String sha1) throws Exception {
         Exception last = null;
         for (String url : urls) {
@@ -986,7 +979,6 @@ public class PageResourceDetail implements Page {
         throw new java.io.IOException("没有可用的下载地址");
     }
 
-    /** 解压 zip 到目录。 */
     private static void unzipTo(Path zip, Path targetDir) throws java.io.IOException {
         try (java.util.zip.ZipFile zf = new java.util.zip.ZipFile(zip.toFile())) {
             var entries = zf.entries();
@@ -1020,7 +1012,7 @@ public class PageResourceDetail implements Page {
         for (String depId : version.rawDependencies) {
             if (depId == null || depId.trim().isEmpty()) continue;
             String key = info.platform + ":" + depId;
-            if (!visited.add(key)) continue; // 访问去重
+            if (!visited.add(key)) continue;
             try {
                 String depName;
                 if (info.isCurseForge()) {
@@ -1038,7 +1030,7 @@ public class PageResourceDetail implements Page {
                     }
                     depName = p[0];
                 }
-                if (isDependencyInstalled(targetFolder, depId, depName)) continue; // 已装就算满足
+                if (isDependencyInstalled(targetFolder, depId, depName)) continue;
                 ResourceVersion depVersion = selectDependencyVersion(depId, version, targetFolder);
                 if (depVersion == null) {
                     data.log("前置 " + depName + " 没有适用于目标的版本，视为无法解析");
@@ -1057,7 +1049,6 @@ public class PageResourceDetail implements Page {
         }
     }
 
-    /** 用文件名相似度判断前置是否已装，宁可漏判。 */
     private boolean isDependencyInstalled(String folder, String depId, String depName) {
         try {
             if (folder == null || folder.isEmpty()) return false;
@@ -1075,7 +1066,7 @@ public class PageResourceDetail implements Page {
             for (String raw : new String[]{slug, depName}) {
                 if (raw == null || raw.isEmpty()) continue;
                 String k = raw.toLowerCase().replaceAll("[^a-z0-9]", "");
-                if (k.length() >= 4) keys.add(k); // 过短的键容易误匹配
+                if (k.length() >= 4) keys.add(k);
             }
             if (keys.isEmpty()) return false;
             File[] files = dir.listFiles();
@@ -1093,7 +1084,6 @@ public class PageResourceDetail implements Page {
         }
     }
 
-    /** 按发行类型和时间挑前置版本。 */
     private ResourceVersion selectDependencyVersion(String depId, ResourceVersion mainFile, String targetFolder) throws Exception {
         List<ResourceVersion> versions = new ArrayList<>();
         if (info.isCurseForge()) {
@@ -1106,7 +1096,6 @@ public class PageResourceDetail implements Page {
                 versions.add(ResourceVersion.fromModrinthJson(Json.obj(o), expectedType()));
             }
         }
-        // 按目标文件夹反查所属实例
         String instanceVanilla = null;
         String instanceLoader = "";
         if (targetFolder != null && !targetFolder.isEmpty()) {
@@ -1127,7 +1116,7 @@ public class PageResourceDetail implements Page {
             if (!v.loaders.isEmpty() && !effectiveLoader.isEmpty() && !v.loaders.contains(effectiveLoader)) continue;
             boolean ok;
             if (instanceVanilla == null) {
-                ok = false; // 没实例时要求和主文件支持同一版本
+                ok = false;
                 for (String gv : v.gameVersions) {
                     if (mainFile.gameVersions.contains(gv)) {
                         ok = true;
@@ -1151,7 +1140,6 @@ public class PageResourceDetail implements Page {
     }
 
     private void installModpack(ResourceVersion file) {
-        // 清洗版本名
         String packName = info.name
                 .replaceAll("\\.(zip|rar|mrpack)$", "")
                 .replace("\\", "＼").replace("/", "／").replace("|", "｜")
@@ -1190,8 +1178,9 @@ public class PageResourceDetail implements Page {
 
     private void copyName() {
         String text = info.name + (info.slug.isEmpty() || info.slug.equals(info.name) ? "" : " " + info.slug);
-        java.awt.Toolkit.getDefaultToolkit().getSystemClipboard().setContents(
-                new java.awt.datatransfer.StringSelection(text), null);
+        javafx.scene.input.ClipboardContent cc = new javafx.scene.input.ClipboardContent();
+        cc.putString(text);
+        javafx.scene.input.Clipboard.getSystemClipboard().setContent(cc);
         win.toast("已复制名称", text, 1);
     }
 
@@ -1233,7 +1222,6 @@ public class PageResourceDetail implements Page {
     }
 
     private Node iconNode(String url, double size) {
-        // 远程图走 RemoteImages，本地图直接读资源
         String u = url == null ? "" : url.trim();
         StackPane box = new StackPane();
         box.setMinSize(size, size);
@@ -1266,7 +1254,6 @@ public class PageResourceDetail implements Page {
         return iv;
     }
 
-    /** 静默打开文件所在文件夹。 */
     private void openFolderQuiet(Path dir) {
         if (dir == null) return;
         try {

@@ -15,13 +15,14 @@ import java.util.Map;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
-/** servers.dat 的 NBT 读写和 SLP 状态查询。 */
 public final class Servers {
 
     public static class Entry {
         public String name = "";
         public String ip = "";
         public String icon = "";
+        // listRead 捕获的原始 NBT 字段（name/ip/icon 之外），listWrite 原样写回；新建的条目为 null
+        public java.util.Map<String, Object> extra;
     }
 
     public static class PingResult {
@@ -37,13 +38,11 @@ public final class Servers {
     private Servers() {
     }
 
-    /** 读 servers.dat，自动识别 gzip。 */
     public static List<Entry> listRead(Path indie) throws Exception {
         List<Entry> result = new ArrayList<>();
         Path file = indie.resolve("servers.dat");
         if (!Files.isRegularFile(file)) return result;
         try (InputStream raw = new java.io.BufferedInputStream(Files.newInputStream(file))) {
-            // 先看魔数判断 gzip
             raw.mark(2);
             byte[] magic = raw.readNBytes(2);
             raw.reset();
@@ -59,16 +58,34 @@ public final class Servers {
             for (Object o : list) {
                 if (!(o instanceof Map<?, ?> tag)) continue;
                 Entry e = new Entry();
-                e.name = str(tag.get("name"));
-                e.ip = str(tag.get("ip"));
-                e.icon = str(tag.get("icon"));
+                Map<String, Object> extra = new java.util.LinkedHashMap<>();
+                for (Map.Entry<?, ?> f : tag.entrySet()) {
+                    String key = String.valueOf(f.getKey());
+                    Object value = f.getValue();
+                    if ("name".equals(key)) {
+                        e.name = str(value);
+                    } else if ("ip".equals(key)) {
+                        e.ip = str(value);
+                    } else if ("icon".equals(key)) {
+                        // 文件里的 icon 是 PNG 字节数组：转 base64 给界面解码，原数组留在 extra 按原类型写回
+                        if (value instanceof byte[] bytes) {
+                            e.icon = java.util.Base64.getEncoder().encodeToString(bytes);
+                            extra.put(key, value);
+                        } else {
+                            e.icon = str(value);
+                        }
+                    } else {
+                        // 新版 MC 的 hidden 等标记也在条目里，丢了会导致游戏端设置被抹掉
+                        extra.put(key, value);
+                    }
+                }
+                e.extra = extra.isEmpty() ? null : extra;
                 result.add(e);
             }
         }
         return result;
     }
 
-    /** 写 servers.dat，gzip 压缩。 */
     public static void listWrite(Path indie, List<Entry> servers) throws Exception {
         Path file = indie.resolve("servers.dat");
         ByteArrayOutputStream buf = new ByteArrayOutputStream();
@@ -86,10 +103,26 @@ public final class Servers {
             w.writeByte(8);
             w.writeString("ip");
             w.writeString(s.ip);
-            if (s.icon != null && !s.icon.isEmpty()) {
+            if (s.extra != null && s.extra.get("icon") instanceof byte[] bytes) {
+                // MC 只认 ByteArray 类型的 icon，从文件里读出来的按原类型写回
+                w.writeByte(7);
+                w.writeString("icon");
+                w.writeByteArray(bytes);
+            } else if (s.icon != null && !s.icon.isEmpty()) {
                 w.writeByte(8);
                 w.writeString("icon");
                 w.writeString(s.icon);
+            }
+            // 未知字段按捕获顺序写回，条目数设上限防调用方塞垃圾
+            if (s.extra != null && s.extra.size() <= 64) {
+                for (Map.Entry<String, Object> f : s.extra.entrySet()) {
+                    if ("icon".equals(f.getKey())) continue;
+                    int type = NbtWriter.typeOf(f.getValue());
+                    if (type < 0) continue;
+                    w.writeByte(type);
+                    w.writeString(f.getKey());
+                    w.writePayload(f.getValue());
+                }
             }
             w.writeByte(0);
         }
@@ -103,9 +136,10 @@ public final class Servers {
         return o == null ? "" : String.valueOf(o);
     }
 
-    /** 最小 NBT 读取器。 */
     private static final class NbtReader {
         private final InputStream in;
+        private final byte[] len2 = new byte[2];
+        private final byte[] len4 = new byte[4];
         private final byte[] len8 = new byte[8];
 
         NbtReader(InputStream in) {
@@ -119,11 +153,15 @@ public final class Servers {
         }
 
         short readShort() throws java.io.IOException {
-            return (short) (((in.read() & 0xff) << 8) | (in.read() & 0xff));
+            int n = in.readNBytes(len2, 0, 2);
+            if (n < 2) throw new java.io.EOFException("NBT 读取越界");
+            return (short) (((len2[0] & 0xff) << 8) | (len2[1] & 0xff));
         }
 
         int readInt() throws java.io.IOException {
-            return (in.read() & 0xff) << 24 | (in.read() & 0xff) << 16 | (in.read() & 0xff) << 8 | (in.read() & 0xff);
+            int n = in.readNBytes(len4, 0, 4);
+            if (n < 4) throw new java.io.EOFException("NBT 读取越界");
+            return (len4[0] & 0xff) << 24 | (len4[1] & 0xff) << 16 | (len4[2] & 0xff) << 8 | (len4[3] & 0xff);
         }
 
         long readLong() throws java.io.IOException {
@@ -153,8 +191,14 @@ public final class Servers {
             }
         }
 
-        /** 读指定类型的负载，不含类型和名称。 */
         Object readPayload(int type) throws Exception {
+            return readPayload(type, 0);
+        }
+
+        Object readPayload(int type, int depth) throws Exception {
+            // servers.dat 不该有深嵌套，超限的基本是构造出来的文件
+            // 消息经 PageInstanceSetup toast 原样展示，片段各自 Lang.t
+            if (depth > 128) throw new Exception(Lang.t("NBT 嵌套过深"));
             switch (type) {
                 case 1 -> {
                     return (byte) readByte();
@@ -176,7 +220,7 @@ public final class Servers {
                 }
                 case 7 -> {
                     int len = readInt();
-                    if (len < 0) throw new java.io.EOFException("NBT 字节数组长度异常");
+                    if (len < 0 || len > 1024 * 1024) throw new java.io.EOFException(Lang.t("NBT 字节数组长度异常：") + len);
                     return in.readNBytes(len);
                 }
                 case 8 -> {
@@ -186,7 +230,7 @@ public final class Servers {
                     int elemType = readByte();
                     int count = readInt();
                     List<Object> out = new ArrayList<>();
-                    for (int i = 0; i < count; i++) out.add(readPayload(elemType));
+                    for (int i = 0; i < count; i++) out.add(readPayload(elemType, depth + 1));
                     return out;
                 }
                 case 10 -> {
@@ -195,23 +239,25 @@ public final class Servers {
                         int t = readByte();
                         if (t == 0) break;
                         String name = readString();
-                        map.put(name, readPayload(t));
+                        map.put(name, readPayload(t, depth + 1));
                     }
                     return map;
                 }
                 case 11 -> {
                     int len = readInt();
+                    if (len < 0 || len > 1048576) throw new java.io.EOFException(Lang.t("NBT 数组长度异常：") + len);
                     int[] arr = new int[len];
                     for (int i = 0; i < len; i++) arr[i] = readInt();
                     return arr;
                 }
                 case 12 -> {
                     int len = readInt();
+                    if (len < 0 || len > 1048576) throw new java.io.EOFException(Lang.t("NBT 数组长度异常：") + len);
                     long[] arr = new long[len];
                     for (int i = 0; i < len; i++) arr[i] = readLong();
                     return arr;
                 }
-                default -> throw new Exception("未知的 NBT 标签类型：" + type);
+                default -> throw new Exception(Lang.t("未知的 NBT 标签类型：") + type);
             }
         }
     }
@@ -243,6 +289,70 @@ public final class Servers {
             byte[] buf = (value == null ? "" : value).getBytes(StandardCharsets.UTF_8);
             writeShort(buf.length);
             s.write(buf);
+        }
+
+        void writeLong(long v) throws java.io.IOException {
+            writeInt((int) (v >> 32));
+            writeInt((int) v);
+        }
+
+        void writeByteArray(byte[] b) throws java.io.IOException {
+            writeInt(b.length);
+            s.write(b);
+        }
+
+        // 和 NbtReader 一一对应：一种 NBT 标签类型只映射一种 Java 类型，写回时才能还原
+        static int typeOf(Object v) {
+            if (v instanceof Byte) return 1;
+            if (v instanceof Short) return 2;
+            if (v instanceof Integer) return 3;
+            if (v instanceof Long) return 4;
+            if (v instanceof Float) return 5;
+            if (v instanceof Double) return 6;
+            if (v instanceof byte[]) return 7;
+            if (v instanceof String) return 8;
+            if (v instanceof List) return 9;
+            if (v instanceof Map) return 10;
+            if (v instanceof int[]) return 11;
+            if (v instanceof long[]) return 12;
+            return -1;
+        }
+
+        // 写无名字段的负载（列表元素 / compound 内字段）
+        void writePayload(Object v) throws java.io.IOException {
+            if (v instanceof Byte b) writeByte(b);
+            else if (v instanceof Short sh) writeShort(sh);
+            else if (v instanceof Integer i) writeInt(i);
+            else if (v instanceof Long l) writeLong(l);
+            else if (v instanceof Float f) writeInt(Float.floatToIntBits(f));
+            else if (v instanceof Double d) writeLong(Double.doubleToLongBits(d));
+            else if (v instanceof byte[] b) writeByteArray(b);
+            else if (v instanceof String str) writeString(str);
+            else if (v instanceof List<?> list) {
+                int elemType = 0;
+                for (Object e : list) {
+                    elemType = typeOf(e);
+                    break;
+                }
+                writeByte(elemType);
+                writeInt(list.size());
+                for (Object e : list) writePayload(e);
+            } else if (v instanceof Map<?, ?> map) {
+                for (Map.Entry<?, ?> e : map.entrySet()) {
+                    int type = typeOf(e.getValue());
+                    if (type < 0) continue;
+                    writeByte(type);
+                    writeString(String.valueOf(e.getKey()));
+                    writePayload(e.getValue());
+                }
+                writeByte(0);
+            } else if (v instanceof int[] a) {
+                writeInt(a.length);
+                for (int x : a) writeInt(x);
+            } else if (v instanceof long[] a) {
+                writeInt(a.length);
+                for (long x : a) writeLong(x);
+            }
         }
     }
 
@@ -291,7 +401,6 @@ public final class Servers {
         s.flush();
     }
 
-    /** 提取 MOTD，递归拼 extra。 */
     private static String motdFromJson(Object desc) {
         if (desc == null) return "";
         if (desc instanceof String s) return s;
@@ -305,7 +414,6 @@ public final class Servers {
         return String.valueOf(desc);
     }
 
-    /** 查询服务器状态，没端口时先查 SRV。 */
     public static PingResult ping(String address, int timeout) {
         PingResult result = new PingResult();
         String host = address.trim();
@@ -329,7 +437,6 @@ public final class Servers {
         } else if (host.endsWith("]")) {
             host = host.substring(1, host.length() - 1);
         }
-        // 没端口时查 _minecraft._tcp
         if (port == 25565 && !host.matches("^(\\d{1,3}\\.){3}\\d{1,3}$") && !host.startsWith("localhost")) {
             String[] srv = srvResolve(host);
             if (srv != null) {
@@ -356,11 +463,27 @@ public final class Servers {
             sendPacket(client.getOutputStream(), new byte[]{0});
             InputStream stream = client.getInputStream();
             int packetLength = readVarInt(stream);
+            // 能解析的响应包长不超过 1MB+6，超过这个数的一定是垃圾数据
+            if (packetLength <= 0 || packetLength > 2 * 1024 * 1024) {
+                throw new Exception(Lang.t("意外的状态响应包长度：") + packetLength);
+            }
             int packetId = readVarInt(stream);
-            if (packetId != 0) throw new Exception("意外的状态响应包 ID：" + packetId);
+            if (packetId != 0) throw new Exception(Lang.t("意外的状态响应包 ID：") + packetId);
             String json = readMcString(stream);
             result.latency = (int) ((System.nanoTime() - start) / 1_000_000);
-            Map<String, Object> root = Json.obj(Json.parse(json));
+            Map<String, Object> root;
+            try {
+                root = Json.obj(Json.parse(json));
+            } catch (RuntimeException e) {
+                // 含 tcraft.Json.MalformedException：垃圾 JSON 按离线处理，报真实原因
+                result.errorMessage = Lang.t("服务器状态解析失败：") + (e.getMessage() == null || e.getMessage().isBlank()
+                        ? Lang.t("响应不是有效的 JSON") : e.getMessage());
+                return result;
+            }
+            if (root.isEmpty()) {
+                result.errorMessage = Lang.t("服务器状态响应格式异常");
+                return result;
+            }
             result.online = true;
             result.version = Json.str(Json.obj(root.get("version")), "name", "");
             Map<String, Object> players = Json.obj(root.get("players"));
@@ -379,7 +502,6 @@ public final class Servers {
         return result;
     }
 
-    /** 查 SRV 记录，失败返回 null 表示直连。 */
     private static String[] srvResolve(String host) {
         java.net.HttpURLConnection c = null;
         try {
@@ -410,7 +532,6 @@ public final class Servers {
         }
     }
 
-    /** 连接失败转成中文短语。 */
     private static String friendly(Exception e) {
         if (e instanceof java.net.ConnectException ce) {
             return "连接被拒绝";

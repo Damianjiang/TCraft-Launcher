@@ -8,7 +8,6 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** 各加载器的版本列表，来自官方元数据。 */
 public final class Loaders {
 
     private Loaders() {
@@ -28,28 +27,23 @@ public final class Loaders {
     public static final String CLEANROOM = "Cleanroom";
     public static final String LABYMOD = "LabyMod";
 
-    /** Cleanroom / LabyMod 的官方安装器地址。 */
     public static String installerUrl(String loader, String channel) {
         switch (loader) {
             case CLEANROOM:
-                // Cleanroom 的安装器在 GitHub Releases
                 return "https://github.com/CleanroomMC/Cleanroom/releases/download/" + channel + "/cleanroom-" + channel + "-installer.jar";
             case LABYMOD:
-                // LabyMod 安装器地址
                 return "https://releases.labymod.net/api/v1/installer/" + channel + "/java";
             default:
                 return "";
         }
     }
 
-    /** 安装器文件名。 */
     public static String installerName(String loader, String channel) {
         if (CLEANROOM.equals(loader)) return "cleanroom-" + channel + "-installer.jar";
         if (LABYMOD.equals(loader)) return "LabyMod4" + ("snapshot".equals(channel) ? "Snapshot" : "Production") + "Installer.jar";
         return "";
     }
 
-    /** 某 MC 版本下可用的加载器版本，旧的在前。 */
     public static List<String> versions(String loader, String mc) throws Exception {
         String key = loader + "@" + mc;
         synchronized (CACHE) {
@@ -77,7 +71,6 @@ public final class Loaders {
         return list;
     }
 
-    /** 某加载器在指定 MC 版本下有没有可用版本。 */
     public static boolean available(String loader, String mc) {
         try {
             return !versions(loader, mc).isEmpty();
@@ -89,16 +82,16 @@ public final class Loaders {
     private static List<String> liteloader(String mc) throws Exception {
         String json = get("https://dl.liteloader.com/versions/versions.json");
         Map<String, Object> versions = Json.obj(Json.parse(json), "versions");
-        // 每个 MC 版本只有一条 LiteLoader。
         Map<String, Object> entry = Json.obj(versions.get(mc));
         Object node = firstValue(Json.obj(entry, "artefacts"), Json.obj(entry, "snapshots"), "com.mumfrey:liteloader");
-        if (node == null) throw new Exception("LiteLoader 没有适用于 Minecraft " + mc + " 的版本");
+        if (node == null) {
+            throw new Exception(Lang.t("LiteLoader 没有适用于 Minecraft ") + mc + Lang.t(" 的版本"));
+        }
         List<String> out = new ArrayList<>();
         out.add(mc);
         return out;
     }
 
-    /** 从 artefacts 或 snapshots 取节点。 */
     private static Object firstValue(Map<String, Object> a, Map<String, Object> b, String key) {
         return a.containsKey(key) ? a.get(key) : b.get(key);
     }
@@ -114,7 +107,7 @@ public final class Loaders {
                 if (!v.isEmpty()) out.add(v);
             }
         }
-        // 没有适用版本就返回空列表，网络失败才抛异常。
+        // 没有适用版本就返回空列表，网络失败才抛异常
         return out;
     }
 
@@ -124,7 +117,6 @@ public final class Loaders {
         List<String> out = new ArrayList<>();
         for (Object o : arr) {
             Map<String, Object> m = Json.obj(o);
-            // 显示名去掉 HD_U 和末尾的 .0
             String mcversion = Json.str(m, "mcversion", "");
             if (!mcversion.equals(mc)) continue;
             String type = Json.str(m, "type", "").replace("HD_U", "").replace("_", " ");
@@ -132,11 +124,12 @@ public final class Loaders {
             String display = (mcversion + " " + type + " " + patch).replace(".0 ", " ").trim();
             out.add(display.replaceFirst(java.util.regex.Pattern.quote(mc) + "\\s+", ""));
         }
-        if (out.isEmpty()) throw new Exception("OptiFine 没有适用于 Minecraft " + mc + " 的版本");
+        if (out.isEmpty()) {
+            throw new Exception(Lang.t("OptiFine 没有适用于 Minecraft ") + mc + Lang.t(" 的版本"));
+        }
         return out;
     }
 
-    /** OptiFine 各版本的真实文件名。 */
     public static Map<String, String> optifineFiles(String mc) throws Exception {
         String json = get("https://bmclapi2.bangbang93.com/optifine/versionList");
         List<Object> arr = Json.arr(Json.parse(json));
@@ -151,7 +144,9 @@ public final class Loaders {
             display = display.replaceFirst(java.util.regex.Pattern.quote(mc) + "\\s+", "");
             out.put(display, Json.str(m, "filename", ""));
         }
-        if (out.isEmpty()) throw new Exception("OptiFine 没有适用于 Minecraft " + mc + " 的版本");
+        if (out.isEmpty()) {
+            throw new Exception(Lang.t("OptiFine 没有适用于 Minecraft ") + mc + Lang.t(" 的版本"));
+        }
         return out;
     }
 
@@ -182,14 +177,14 @@ public final class Loaders {
                 }
             }
         }
-        if (out.isEmpty()) throw new Exception("Fabric API 没有适用于 Minecraft " + mc + " 的版本");
+        if (out.isEmpty()) {
+            throw new Exception(Lang.t("Fabric API 没有适用于 Minecraft ") + mc + Lang.t(" 的版本"));
+        }
         return out;
     }
 
-    /** 附加载器 Mod 的下载地址，找不到返回 null。 */
     public static String[] modFile(String loader, String mc, String version) throws Exception {
         if (FABRICAPI.equals(loader)) {
-            // 取 Modrinth 的 primary jar
             for (Object o : Modrinth.projectVersions("fabric-api")) {
                 Map<String, Object> obj = Json.obj(o);
                 if (!version.equals(Json.str(obj, "version_number", ""))) continue;
@@ -212,7 +207,6 @@ public final class Loaders {
             return null;
         }
         if (OPTIFABRIC.equals(loader)) {
-            // CurseForge 项目 322385，需要 API Key
             for (Object o : CurseForge.projectFiles(322385)) {
                 Map<String, Object> m = Json.obj(o);
                 Map<String, Object> dl = Json.obj(m, "download");
@@ -227,7 +221,6 @@ public final class Loaders {
         return null;
     }
 
-    /** Cleanroom 版本列表，来自 GitHub Releases。 */
     private static List<String> cleanroom(String mc) throws Exception {
         String json = get("https://api.github.com/repos/CleanroomMC/Cleanroom/releases");
         List<Object> arr = Json.arr(Json.parse(json));
@@ -240,7 +233,6 @@ public final class Loaders {
         return out;
     }
 
-    /** LabyMod 两个渠道，mc 参数用不上。 */
     private static List<String> labyMod(String mc) throws Exception {
         List<String> out = new ArrayList<>();
         out.add("production");
@@ -248,14 +240,12 @@ public final class Loaders {
             get("https://releases.r2.labymod.net/api/v1/manifest/snapshot/latest.json");
             out.add("snapshot");
         } catch (Exception ignored) {
-            // 快照不可用就只列 production
         }
         return out;
     }
 
     private static List<String> forge(String mc) throws Exception {
         List<String> out = new ArrayList<>();
-        // 镜像的 Forge 版本表只有几十 KB，官方 maven-metadata.xml 又大又慢
         try {
             String json = get(Downloader.bmcl() + "/forge/minecraft/" + mc);
             for (Object o : Json.arr(Json.parse(json))) {
@@ -272,12 +262,13 @@ public final class Loaders {
             Matcher m = Pattern.compile("<version>([^<]+)</version>").matcher(xml);
             while (m.find()) {
                 String v = m.group(1);
-                // 版本形如 1.21.1-52.0.2，只留当前 MC 版本的
                 if (v.startsWith(mc + "-")) out.add(v.substring(mc.length() + 1));
             }
         }
-        if (out.isEmpty()) throw new Exception("Forge 没有适用于 Minecraft " + mc + " 的版本");
-        out.sort(Loaders::compareVersions); // 旧到新
+        if (out.isEmpty()) {
+            throw new Exception(Lang.t("Forge 没有适用于 Minecraft ") + mc + Lang.t(" 的版本"));
+        }
+        out.sort(Loaders::compareVersions);
         return out;
     }
 
@@ -285,7 +276,6 @@ public final class Loaders {
         String prefix = neoforgePrefix(mc);
         if (prefix == null) throw new Exception("NeoForge 只支持 1.20.2 及之后的版本");
         List<String> out = new ArrayList<>();
-        // 官方 API 在国内经常连不上，先读镜像的 maven-metadata.xml
         try {
             String xml = get(Downloader.bmcl() + "/maven/net/neoforged/neoforge/maven-metadata.xml",
                     "https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge");
@@ -308,12 +298,13 @@ public final class Loaders {
                 if (v.startsWith(prefix)) out.add(v);
             }
         }
-        if (out.isEmpty()) throw new Exception("NeoForge 没有适用于 Minecraft " + mc + " 的版本");
+        if (out.isEmpty()) {
+            throw new Exception(Lang.t("NeoForge 没有适用于 Minecraft ") + mc + Lang.t(" 的版本"));
+        }
         out.sort(Loaders::compareVersions);
         return out;
     }
 
-    /** MC 版本转 NeoForge 版本前缀。 */
     static String neoforgePrefix(String mc) {
         if (mc == null) return null;
         String[] p = mc.split("\\.");
@@ -340,16 +331,14 @@ public final class Loaders {
             if (!v.isEmpty()) out.add(v);
         }
         if (out.isEmpty()) throw new Exception("Fabric 没有适用于 Minecraft " + mc + " 的加载器版本");
-        Collections.reverse(out); // 按旧到新显示
+        Collections.reverse(out);
         return out;
     }
 
     private static String get(String... urls) throws Exception {
-        // 版本清单都不小，走 gzip；多个源按速度择优
         return Downloader.getText(urls);
     }
 
-    /** 版本号按数字段比较，47.0.10 排在 47.0.9 后面。 */
     private static int compareVersions(String a, String b) {
         String[] x = a.split("[^0-9]+");
         String[] y = b.split("[^0-9]+");

@@ -1,12 +1,13 @@
 package tcraft;
 
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
-/** 多语言：简体 / English / 繁體，由 LangTables.txt 驱动。 */
 public final class Lang {
 
-    public static int mode = 0; // 0 = 简中, 1 = English, 2 = 繁體
+    public static int mode = 0;
+    public static int setting = 0;
     private static final Map<String, String[]> TABLE = new HashMap<>();
 
     static {
@@ -19,7 +20,7 @@ public final class Lang {
     public static void reload() {
         TABLE.clear();
         try {
-            String text = Theme.resText("LangTables.txt");
+            String text = loadTableText();
             if (text.isEmpty()) return;
             // 记事本保存的 UTF-8 可能带 BOM，不去掉第一条词条会失配
             if (text.charAt(0) == '\uFEFF') text = text.substring(1);
@@ -27,7 +28,6 @@ public final class Lang {
                 if (line.isEmpty()) continue;
                 String[] cols = line.split("\t", -1);
                 if (cols.length < 2) continue;
-                // 表里换行写成 \n，读回来还原
                 String zh = unescape(cols[0]);
                 if (zh.isEmpty() || TABLE.containsKey(zh)) continue;
                 String en = unescape(cols[1]);
@@ -36,6 +36,47 @@ public final class Lang {
             }
         } catch (Exception ignored) {
         }
+    }
+
+    // 自带资源读取：Boot/StartupWindow 在 JavaFX 之前就要读表，
+    // 不能经过 Theme（其静态字段初始化 javafx.scene.paint.Color，无 JavaFX 时直接 NoClassDefFoundError）
+    private static String loadTableText() {
+        try {
+            Path code = java.nio.file.Paths.get(
+                    Lang.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+            if (java.nio.file.Files.isRegularFile(code)) {
+                // 单文件版：res 打包在 jar 内
+                try (java.util.jar.JarFile jf = new java.util.jar.JarFile(code.toFile())) {
+                    var entries = jf.entries();
+                    while (entries.hasMoreElements()) {
+                        java.util.jar.JarEntry en = entries.nextElement();
+                        if ("res/langtables.txt".equalsIgnoreCase(en.getName()) && !en.isDirectory()) {
+                            return new String(jf.getInputStream(en).readAllBytes(),
+                                    java.nio.charset.StandardCharsets.UTF_8);
+                        }
+                    }
+                }
+            } else {
+                // 开发态：从 classes 目录向上找 res/（与 Resources.appDir 的向上探测同思路）
+                Path cur = code.getParent();
+                for (int i = 0; i < 5 && cur != null; i++) {
+                    Path f = cur.resolve("res").resolve("LangTables.txt");
+                    if (java.nio.file.Files.isRegularFile(f)) {
+                        return java.nio.file.Files.readString(f, java.nio.charset.StandardCharsets.UTF_8);
+                    }
+                    cur = cur.getParent();
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        // 兜底走 classpath；Class.getResourceAsStream 只定位资源，不会初始化 Theme
+        try (var in = Lang.class.getResourceAsStream("/res/LangTables.txt")) {
+            if (in != null) {
+                return new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            }
+        } catch (Throwable ignored) {
+        }
+        return "";
     }
 
     private static String unescape(String s) {
@@ -49,14 +90,12 @@ public final class Lang {
         return mode == 1 ? v[0] : v[1];
     }
 
-    /** 带参数的文案：用 %s / %d 占位，先翻译模板再填参数。 */
     public static String tf(String zh, Object... args) {
         String pattern = t(zh);
         if (args == null || args.length == 0) return pattern;
         try {
             return String.format(pattern, args);
         } catch (Exception e) {
-            // 翻译里混进了 % 之类，退回中文原文
             try {
                 return String.format(zh, args);
             } catch (Exception ignored) {
@@ -65,7 +104,7 @@ public final class Lang {
         }
     }
 
-    /** 把界面文字换成当前语言，查不到原样保留。 */
+    @SuppressWarnings({"rawtypes", "unchecked"})
     public static void localize(javafx.scene.Node node) {
         if (node == null || mode == 0) return;
         if (node instanceof javafx.scene.control.Labeled l) {
@@ -75,9 +114,24 @@ public final class Lang {
             String s = tx.getText();
             if (s != null && !s.isEmpty()) tx.setText(t(s));
         }
+        // 下拉列表的选项不是 Labeled，单独翻译，否则语言切换后仍是中文
+        if (node instanceof javafx.scene.control.ComboBox<?> combo) {
+            javafx.collections.ObservableList items = combo.getItems();
+            for (int i = 0; i < items.size(); i++) {
+                Object item = items.get(i);
+                if (item instanceof String s) {
+                    String translated = t(s);
+                    if (!translated.equals(s)) items.set(i, translated);
+                }
+            }
+        }
         if (node instanceof javafx.scene.control.TextInputControl c) {
             String hint = c.getPromptText();
             if (hint != null && !hint.isEmpty()) c.setPromptText(t(hint));
+        }
+        Object tip = node.getProperties().get("tclTooltip");
+        if (tip instanceof javafx.scene.control.Tooltip tt) {
+            tt.setText(t(tt.getText()));
         }
         if (node instanceof javafx.scene.Parent p) {
             for (javafx.scene.Node child : p.getChildrenUnmodifiable()) localize(child);
@@ -92,7 +146,16 @@ public final class Lang {
         };
     }
 
+    private static int detect() {
+        java.util.Locale locale = java.util.Locale.getDefault();
+        String lang = locale == null ? "" : locale.getLanguage().toLowerCase(java.util.Locale.ROOT);
+        if (!"zh".equals(lang)) return 1;
+        String country = locale.getCountry().toUpperCase(java.util.Locale.ROOT);
+        return "TW".equals(country) || "HK".equals(country) || "MO".equals(country) ? 2 : 0;
+    }
+
     public static void setMode(int m) {
-        mode = Math.max(0, Math.min(2, m));
+        setting = Math.max(0, Math.min(3, m));
+        mode = setting == 3 ? detect() : setting;
     }
 }

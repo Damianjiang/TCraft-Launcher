@@ -11,75 +11,90 @@ import java.time.Duration;
 import java.util.HexFormat;
 import java.util.concurrent.TimeUnit;
 
-/** 下载引擎，带重试、断点续传和 SHA-1 校验。 */
 public final class Fetch {
 
     private Fetch() {
     }
 
-    /** 单源 5 次重试。 */
     private static final int DEFAULT_RETRY = 5;
     private static final long[] BACKOFF_MS = {200, 500, 1000, 2000, 3000};
-    /** 连接建立后多久收不到字节就判定为卡死，关流重试。 */
     private static final long IDLE_TIMEOUT_MS = 20_000;
 
-    /** 下载到 target，带断点续传和校验。 */
+    // 包可见：Downloader.transferWithProgress 写同一批 .part，必须共用这把锁
+    static final java.util.concurrent.ConcurrentHashMap<String, Object> PART_LOCKS =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
     public static void file(Tasks.Task task, String url, Path target, String sha1,
                             double from, double to) throws IOException {
         Path part = target.resolveSibling(target.getFileName() + ".part");
         Files.createDirectories(target.toAbsolutePath().getParent());
 
         final String expect = sha1 == null || sha1.isEmpty() ? null : sha1.toLowerCase();
+        // 没有哈希就没法确认旧 .part 是谁写的，续传可能拼出损坏文件，直接从头下
+        if (expect == null) Files.deleteIfExists(part);
         MessageDigest digest = expect == null ? null : sha1();
 
-        long done = 0;
-        if (Files.isRegularFile(part)) {
-            done = Files.size(part);
-            // 续传时先重放已有部分，继续算摘要。
-            if (digest != null && done > 0) replay(part, digest);
+        String lockKey = part.toAbsolutePath().toString();
+        Object lock = new Object();
+        if (PART_LOCKS.putIfAbsent(lockKey, lock) != null) {
+            throw new IOException(Lang.t("该文件已在下载中：") + target.getFileName());
         }
-
         IOException last = null;
-        for (int attempt = 0; attempt <= DEFAULT_RETRY; attempt++) {
-            if (attempt > 0) sleep(BACKOFF_MS[Math.min(attempt - 1, BACKOFF_MS.length - 1)]);
-            if (task != null && task.canceled) throw new IOException("已取消");
-            try {
-                transfer(task, url, part, done, digest, from, to);
-                if (digest != null) {
-                    String actual = HexFormat.of().formatHex(digest.digest());
-                    if (!expect.equals(actual)) {
-                        // 校验失败，丢掉 .part 重下。
+        try {
+            long done = 0;
+            if (Files.isRegularFile(part)) {
+                done = Files.size(part);
+                // 续传时先重放已有部分，继续算摘要
+                if (digest != null && done > 0) replay(part, digest);
+            }
+
+            for (int attempt = 0; attempt <= DEFAULT_RETRY; attempt++) {
+                if (attempt > 0) sleep(BACKOFF_MS[Math.min(attempt - 1, BACKOFF_MS.length - 1)]);
+                if (task != null && task.canceled) throw new IOException("已取消");
+                try {
+                    transfer(task, url, part, done, digest, from, to);
+                    if (digest != null) {
+                        String actual = HexFormat.of().formatHex(digest.digest());
+                        if (!expect.equals(actual)) {
+                            // 校验失败，丢掉 .part 重下
+                            Files.deleteIfExists(part);
+                            digest = sha1();
+                            done = 0;
+                            last = new IOException("文件校验失败（SHA-1 不匹配）");
+                            continue;
+                        }
+                    }
+                } catch (IOException e) {
+                    // 取消直接退出，不走重试退避
+                    if (task != null && task.canceled) throw e;
+                    last = e;
+                    if (e instanceof Http.StatusException se && se.code == 416) {
                         Files.deleteIfExists(part);
-                        digest = sha1();
+                        if (digest != null) digest.reset();
                         done = 0;
-                        last = new IOException("文件校验失败（SHA-1 不匹配）");
                         continue;
                     }
-                }
-                Files.move(part, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                return;
-            } catch (IOException e) {
-                // 取消直接退出，不走重试退避。
-                if (task != null && task.canceled) throw e;
-                last = e;
-                // 416 表示 Range 越界，丢掉重下。
-                if (e.getMessage() != null && e.getMessage().contains("416")) {
-                    Files.deleteIfExists(part);
-                    if (digest != null) digest.reset();
-                    done = 0;
+                    try {
+                        done = Files.isRegularFile(part) ? Files.size(part) : 0;
+                    } catch (Exception ignored) {
+                        done = 0;
+                    }
                     continue;
                 }
+                // 网络重试到此为止；目标被占用不是网络问题，重下多少遍都还是失败
                 try {
-                    done = Files.isRegularFile(part) ? Files.size(part) : 0;
-                } catch (Exception ignored) {
-                    done = 0;
+                    Files.move(part, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                } catch (java.nio.file.FileSystemException e) {
+                    throw new IOException(Lang.t("文件被占用，请关闭正在运行的游戏后重试：") + target.getFileName(), e);
                 }
+                return;
             }
+        } finally {
+            PART_LOCKS.remove(lockKey, lock);
         }
-        throw last != null ? last : new IOException("下载失败：" + url);
+        throw last != null ? last : new IOException(Lang.t("下载失败：") + url);
     }
 
-    /** 单次传输，从 .part 的 done 处继续。 */
     private static void transfer(Tasks.Task task, String url, Path part, long done,
                                  MessageDigest digest, double from, double to) throws IOException {
         Http.Body body = done > 0 ? Http.open(url, Duration.ofSeconds(60), done)
@@ -89,7 +104,6 @@ public final class Fetch {
         try (InputStream in = body.in) {
             boolean append = done > 0 && body.status == 206;
             if (done > 0 && !append) {
-                // 服务器不支持 Range，只能从头写。
                 done = 0;
                 if (digest != null) digest.reset();
             }
@@ -112,7 +126,7 @@ public final class Fetch {
                     out.write(buffer, 0, n);
                     if (digest != null) digest.update(buffer, 0, n);
                     written += n;
-                    if (limit > 0) Downloader.throttle(written, started, limit);
+                    if (limit > 0) Downloader.throttle(n, limit);
                     long now = System.currentTimeMillis();
                     if (task != null && now - lastTick > 400) {
                         task.speed = speed((written - lastBytes) * 1000 / Math.max(1, now - lastTick));
@@ -128,15 +142,18 @@ public final class Fetch {
             }
             // 长度对不上说明连接被掐断，交给外层重试
             if (body.length >= 0 && written != body.length) {
-                throw new IOException("下载不完整：" + written + " / " + body.length);
+                throw new IOException(Lang.t("下载不完整：") + written + " / " + body.length);
             }
         } finally {
             guard.close();
         }
     }
 
-    /** 读满一个流；idleMs 内没有新数据就关流，避免连接假死一直挂着。 */
     public static byte[] readAll(InputStream in, long idleMs) throws IOException {
+        return readAll(in, idleMs, Long.MAX_VALUE);
+    }
+
+    public static byte[] readAll(InputStream in, long idleMs, long maxBytes) throws IOException {
         IdleGuard guard = new IdleGuard(in, idleMs);
         guard.start();
         try {
@@ -145,7 +162,9 @@ public final class Fetch {
             int n;
             while ((n = in.read(buffer)) >= 0) {
                 guard.touch();
-                out.write(buffer, 0, n);
+                int take = (int) Math.min(n, maxBytes - out.size());
+                if (take > 0) out.write(buffer, 0, take);
+                if (out.size() >= maxBytes) break;
             }
             return out.toByteArray();
         } finally {
@@ -153,7 +172,6 @@ public final class Fetch {
         }
     }
 
-    /** 盯着读流的心跳，超时就 close，让阻塞的 read 抛异常。共用一个守护线程。 */
     private static final java.util.concurrent.ScheduledExecutorService WATCHDOG =
             java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
                 Thread t = new Thread(r, "TCL-Fetch-Idle");

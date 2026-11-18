@@ -6,8 +6,6 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
-import javafx.scene.input.Clipboard;
-import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -25,18 +23,12 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 
-/** 统一错误反馈：UI 线程弹窗，后台线程只写日志。 */
 public final class Errors {
 
-    /** 反馈档位。 */
     public enum Behavior {
-        /** 只写日志不弹窗，后台线程异常走这儿。 */
         NONE,
-        /** 只弹一次「错误」窗，游戏启动失败这类。 */
         ALERT,
-        /** 弹错误窗并询问是否反馈。 */
         ALERT_FEEDBACK,
-        /** 严重错误：问完反馈就关启动器。 */
         ALERT_CRASH
     }
 
@@ -50,7 +42,6 @@ public final class Errors {
     private static volatile long lastShownAt;
     private static volatile String lastKey;
 
-    /** 警告遮罩色，统一取 Theme.warnMask。 */
     private static final Color WARN_MASK = Theme.warnMask;
 
     private static final class Report {
@@ -72,12 +63,10 @@ public final class Errors {
         }
     }
 
-    /** 主窗口建好后注册，用来承载模态层。 */
     public static void attach(MainWindow w) {
         window = w;
     }
 
-    /** 默认档，出错并询问是否反馈。 */
     public static void error(String brief, Throwable ex) {
         error(brief, ex, Behavior.ALERT_FEEDBACK);
     }
@@ -92,20 +81,18 @@ public final class Errors {
         enqueue(new Report("错误", head, detail, behavior, true, false));
     }
 
-    /** 只弹错误窗，不询问反馈。 */
     public static void alert(String brief, Throwable ex) {
         error(brief, ex, Behavior.ALERT);
     }
 
-    /** 联机模块专用，标题带「联机出错：」。 */
     public static void panic(String brief, Throwable ex) {
         String head = briefText(brief, ex);
         String detail = detailText(brief, ex);
-        enqueue(new Report("联机出错：" + (brief == null ? "" : brief), head, detail,
+        // 标题是拼接串，localize 查不到，两段分别查表
+        enqueue(new Report(Lang.t("联机出错：") + (brief == null ? "" : Lang.t(brief)), head, detail,
                 Behavior.ALERT, true, false));
     }
 
-    /** 轻微错误只弹个提示，不打断用户。 */
     public static void hint(String brief, Throwable ex) {
         logOnly(brief, ex);
         String msg = ex == null ? "" : briefOf(ex);
@@ -114,19 +101,17 @@ public final class Errors {
         onFx(() -> w.toast(brief == null ? "出错了" : brief, msg.isEmpty() ? "未知错误" : msg, 2));
     }
 
-    /** 未捕获异常入口，UI 线程弹窗，后台线程只记日志。 */
     public static void uncaught(Thread thread, Throwable ex, boolean fxThread) {
-        String brief = (fxThread ? "界面线程未捕获异常" : "后台线程未捕获异常")
+        // brief 带着 @线程名，整串查不到表，先译前缀再拼
+        String brief = Lang.t(fxThread ? "界面线程未捕获异常" : "后台线程未捕获异常")
                 + (thread == null ? "" : " @" + thread.getName());
         if (!fxThread) {
             logOnly(brief, ex);
             return;
         }
-        // 标记已处理，不退出
         error(brief, ex, Behavior.ALERT_FEEDBACK);
     }
 
-    /** 弹窗被外部关闭时推进队列。 */
     public static void onModalDismissed() {
         if (internalClose || !showing) return;
         showing = false;
@@ -134,7 +119,7 @@ public final class Errors {
     }
 
     private static void enqueue(Report r) {
-        // 2 秒内同一错误不重复弹。
+        // 2 秒内同一错误不重复弹
         String key = r.title + "|" + r.headline + "|" + r.detail;
         long now = System.currentTimeMillis();
         log(r.title, r.headline, r.detail);
@@ -175,14 +160,12 @@ public final class Errors {
             wait.setOnFinished(e -> drain());
             wait.play();
         } catch (Throwable ignored) {
-            // 图形环境关了，剩下的只记日志
             synchronized (QUEUE) {
                 QUEUE.clear();
             }
         }
     }
 
-    /** 关旧弹窗、执行动作、推进队列。 */
     private static void finish(Runnable after) {
         MainWindow w = window;
         if (w != null) {
@@ -226,7 +209,6 @@ public final class Errors {
             VBox.setMargin(head, new Insets(14, 7, 8, 7));
             card.getChildren().add(head);
 
-            // 正文放滚动容器，长堆栈直接滚。
             Label detail = new Label(r.detail);
             detail.setWrapText(true);
             detail.setFont(Font.font("Monospaced", 11));
@@ -288,7 +270,6 @@ public final class Errors {
         return card;
     }
 
-    /** 按钮用：导出并提示，弹窗不关，用户还能继续点「反馈」。 */
     private static void exportAndToast(Report r) {
         Path file = exportReport(r);
         MainWindow w = window;
@@ -296,12 +277,12 @@ public final class Errors {
         if (file == null) {
             onFx(() -> w.toast("导出失败", "无法写入错误报告，请改用「设置 → 日志」导出。", 3));
         } else {
+            // 文件名是动态串，后缀单独查表，整串 localize 查不到
             onFx(() -> w.toast("错误报告已导出",
-                    file.getFileName() + " · 请把文件发到 TCL 交流群（1131373915）", 2));
+                    file.getFileName() + Lang.t(" · 请把文件发到 TCL 交流群（1131373915）"), 2));
         }
     }
 
-    /** 把报错、诊断信息和最近的启动器日志写成一个文件，再打开所在文件夹。 */
     private static Path exportReport(Report r) {
         Path file = null;
         try {
@@ -323,12 +304,10 @@ public final class Errors {
         return file;
     }
 
-    /** 导出文件的正文：报错 + 诊断 + 最近 200 行日志。 */
     private static String exportText(Report r) {
         return exportText(r.title, r.headline, r.detail);
     }
 
-    /** 同上，方便单独验证。 */
     static String exportText(String title, String headline, String detail) {
         StringBuilder sb = new StringBuilder();
         sb.append("TCraft Launcher ").append(Build.VERSION)
@@ -340,7 +319,9 @@ public final class Errors {
         }
         sb.append("\n===== 诊断信息 =====\n").append(systemInfo()).append('\n');
         try {
-            List<String> logs = Data.get().log;
+            // 迭代器是快照，先收集成临时列表再截尾；直接按索引 get 会和 clear() 竞态越界
+            List<String> logs = new ArrayList<>();
+            for (String line : Data.get().log) logs.add(line);
             int from = Math.max(0, logs.size() - 200);
             sb.append("\n===== 最近日志（最后 ").append(logs.size() - from).append(" 行）=====\n");
             for (int i = from; i < logs.size(); i++) sb.append(logs.get(i)).append('\n');
@@ -349,7 +330,6 @@ public final class Errors {
         return sanitize(sb.toString());
     }
 
-    /** 复制完整报错、写诊断日志，再弹「反馈」窗。 */
     private static void doFeedback(Report r) {
         feedbackInfo();
         Path file = exportReport(r);
@@ -359,7 +339,6 @@ public final class Errors {
         enqueue(new Report("反馈", text, "", Behavior.ALERT, true, true));
     }
 
-    /** 系统诊断信息，复制和日志共用。 */
     private static String systemInfo() {
         StringBuilder sb = new StringBuilder("诊断信息：\n");
         try {
@@ -378,7 +357,6 @@ public final class Errors {
         return sb.toString();
     }
 
-    /** 把系统诊断信息写进日志，不弹窗。 */
     private static void feedbackInfo() {
         try {
             Data.get().log(systemInfo());
@@ -386,29 +364,16 @@ public final class Errors {
         }
     }
 
-    private static void copy(String text) {
-        try {
-            onFx(() -> {
-                try {
-                    ClipboardContent content = new ClipboardContent();
-                    content.putString(sanitize(text));
-                    Clipboard.getSystemClipboard().setContent(content);
-                } catch (Throwable ignored) {
-                }
-            });
-        } catch (Throwable ignored) {
-        }
-    }
-
-    /** 主窗口还没加载时降级成系统原生对话框。 */    private static void fallback(Report r) {
+         private static void fallback(Report r) {
         try {
             javax.swing.SwingUtilities.invokeLater(() -> {
                 try {
+                    // Swing 降级弹窗不经 localize，各段分别查表
                     String text = r.headline + "\n\n"
                             + (r.detail.length() > 1600 ? r.detail.substring(0, 1600) + "…" : r.detail)
-                            + "\n\n请不要发送截图。点「导出日志」保存错误报告，再把文件发到 TCL 交流群（1131373915）。";
-                    Object[] options = {"导出日志", "关闭"};
-                    int res = javax.swing.JOptionPane.showOptionDialog(null, text, r.title,
+                            + Lang.t("\n\n请不要发送截图。点「导出日志」保存错误报告，再把文件发到 TCL 交流群（1131373915）。");
+                    Object[] options = {Lang.t("导出日志"), Lang.t("关闭")};
+                    int res = javax.swing.JOptionPane.showOptionDialog(null, text, Lang.t(r.title),
                             javax.swing.JOptionPane.DEFAULT_OPTION, javax.swing.JOptionPane.ERROR_MESSAGE,
                             null, options, options[0]);
                     if (res == 0) {
@@ -439,9 +404,8 @@ public final class Errors {
         }
     }
 
-    /** 把内层异常串成一行。 */
     public static String briefOf(Throwable ex) {
-        if (ex == null) return "无可用错误信息！";
+        if (ex == null) return Lang.t("无可用错误信息！");
         List<String> lines = new ArrayList<>();
         for (Throwable cur = ex; cur != null && lines.size() < 8; cur = cur.getCause()) {
             String m = cur.getMessage();
@@ -454,7 +418,6 @@ public final class Errors {
         return reason == null ? joined : reason + "（" + lines.get(lines.size() - 1) + "）";
     }
 
-    /** 白话原因加完整堆栈。 */
     public static String detailOf(Throwable ex) {
         if (ex == null) return "无可用错误信息！";
         StringBuilder sb = new StringBuilder();
@@ -475,20 +438,19 @@ public final class Errors {
         return reason + "\n\n详细错误信息：\n" + detail;
     }
 
-    /** 常见错误原因分析，按 Java 异常类型映射。 */
     private static String commonReason(Throwable ex) {
         List<Throwable> chain = new ArrayList<>();
         for (Throwable c = ex; c != null && chain.size() < 8; c = c.getCause()) chain.add(c);
         for (Throwable c : chain) {
             String cls = c.getClass().getName();
-            if (c instanceof OutOfMemoryError) return "系统的运行内存不足。请在关闭一部分不需要的程序后再试。";
+            if (c instanceof OutOfMemoryError) return Lang.t("系统的运行内存不足。请在关闭一部分不需要的程序后再试。");
             if (c instanceof ExceptionInInitializerError || c instanceof NoClassDefFoundError
                     || c instanceof UnsupportedClassVersionError || c instanceof NoSuchMethodError
                     || cls.endsWith("TypeInitializationException"))
-                return "运行环境存在问题，可能是 Java 版本过旧或程序文件不完整。请尝试重新安装最新 Java 与完整版启动器后再试。";
+                return Lang.t("运行环境存在问题，可能是 Java 版本过旧或程序文件不完整。请尝试重新安装最新 Java 与完整版启动器后再试。");
             if (c instanceof SecurityException || c instanceof java.nio.file.AccessDeniedException
                     || cls.contains("UnauthorizedAccess"))
-                return "程序权限不足。请尝试右键程序，选择以管理员身份运行，或将文件移动到其他文件夹。";
+                return Lang.t("程序权限不足。请尝试右键程序，选择以管理员身份运行，或将文件移动到其他文件夹。");
         }
         for (Throwable c : chain) {
             if (c instanceof java.net.SocketTimeoutException || c instanceof java.net.UnknownHostException
@@ -496,23 +458,24 @@ public final class Errors {
                     || c instanceof java.util.concurrent.TimeoutException
                     || (c instanceof java.io.IOException && c.getMessage() != null
                     && (c.getMessage().contains("timed out") || c.getMessage().contains("connect"))))
-                return "你的网络环境不佳，请稍后再试，或使用 VPN 改善网络环境。";
+                return Lang.t("你的网络环境不佳，请稍后再试，或使用 VPN 改善网络环境。");
         }
         return null;
     }
 
     private static String briefText(String brief, Throwable ex) {
-        String b = brief == null ? "发生错误" : brief;
+        // headline 是拼接串，localize 永远查不到表：brief 与分隔符在此分别翻译，
+        // 异常消息原文保留（英文堆栈/服务器消息不译）
+        String b = brief == null ? Lang.t("发生错误") : Lang.t(brief);
         String m = briefOf(ex);
-        return sanitize(b + "：" + m);
+        return sanitize(b + Lang.t("：") + m);
     }
 
     private static String detailText(String brief, Throwable ex) {
-        String b = brief == null ? "" : brief + "：";
+        String b = brief == null ? "" : Lang.t(brief) + Lang.t("：");
         return sanitize(b + detailOf(ex));
     }
 
-    /** 令牌和本机用户名不能进日志或剪贴板。 */
     static String sanitize(String s) {
         if (s == null || s.isEmpty()) return "";
         String out = Redact.apply(s);
@@ -535,12 +498,26 @@ public final class Errors {
             Files.createDirectories(dir);
             String entry = sanitize("[" + LocalDateTime.now() + "] " + title + " — " + headline
                     + "\n" + detail + "\n\n");
-            Files.writeString(dir.resolve("errors.log"), entry, StandardCharsets.UTF_8,
+            Path errorsLog = dir.resolve("errors.log");
+            Path crashLog = dir.resolve("crash.txt");
+            // 超 4MB 滚动成 .1，不设上限会把磁盘写满
+            rotate(errorsLog);
+            rotate(crashLog);
+            Files.writeString(errorsLog, entry, StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-            // crash.txt 单独留一份堆栈。
-            Files.writeString(dir.resolve("crash.txt"),
+            Files.writeString(crashLog,
                     sanitize("[" + LocalDateTime.now() + "] " + title + " — " + headline + "\n" + detail + "\n"),
                     StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void rotate(Path file) {
+        try {
+            if (Files.isRegularFile(file) && Files.size(file) > 4L * 1024 * 1024) {
+                Files.move(file, file.resolveSibling(file.getFileName() + ".1"),
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
         } catch (Throwable ignored) {
         }
     }

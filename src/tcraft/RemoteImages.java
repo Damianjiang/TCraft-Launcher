@@ -15,32 +15,35 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
-/** 远程图标加载：内存缓存、磁盘缓存、失败分级。 */
 public final class RemoteImages {
 
     private RemoteImages() {
     }
 
-    /** 内存缓存，key 是 url 加解码尺寸。 */
     private static final Map<String, Image> CACHE = new ConcurrentHashMap<>();
-    /** 失败记录，永久失败填 Long.MAX_VALUE。 */
+    private static final Map<String, Long> ACCESSED = new ConcurrentHashMap<>();
     private static final Map<String, Long> FAILED = new ConcurrentHashMap<>();
-    /** 正在加载的 key 对应的等待回调。 */
     private static final Map<String, List<Consumer<Image>>> WAITERS = new ConcurrentHashMap<>();
 
     private static volatile Path diskDir;
     private static volatile boolean diskChecked;
 
-    /** 临时失败的重试间隔，毫秒。 */
+    public static void resetCacheDir() {
+        diskDir = null;
+        diskChecked = false;
+    }
+
     private static final long RETRY_AFTER_MS = 30_000;
     private static final int MEMORY_LIMIT = 1200;
 
-    /** 已缓存的图，没有就 null。 */
     public static Image cached(String url, double size) {
-        return url == null ? null : CACHE.get(key(url, size));
+        if (url == null) return null;
+        String k = key(url, size);
+        Image img = CACHE.get(k);
+        if (img != null) ACCESSED.put(k, System.currentTimeMillis());
+        return img;
     }
 
-    /** URL 是否在失败冷却期。 */
     public static boolean failed(String url) {
         if (url == null) return false;
         Long until = FAILED.get(url);
@@ -53,7 +56,6 @@ public final class RemoteImages {
         return true;
     }
 
-    /** 异步取图，同一 URL 只加载一次，回调在 FX 线程。 */
     public static void load(String url, double decodeSize, Consumer<Image> callback) {
         if (url == null || url.isEmpty()) {
             fire(callback, null);
@@ -62,6 +64,7 @@ public final class RemoteImages {
         String k = key(url, decodeSize);
         Image cached = CACHE.get(k);
         if (cached != null) {
+            ACCESSED.put(k, System.currentTimeMillis());
             fire(callback, cached);
             return;
         }
@@ -69,28 +72,41 @@ public final class RemoteImages {
             fire(callback, null);
             return;
         }
-        List<Consumer<Image>> waiters = WAITERS.computeIfAbsent(k, x -> new CopyOnWriteArrayList<>());
-        waiters.add(callback);
-        if (waiters.size() > 1) return; // 已有加载在跑
+        // compute 保证"加入列表"和"是否第一个"对完成回调原子，否则回调会进孤儿列表再也不被调
+        List<Consumer<Image>> waiters = WAITERS.compute(k, (kk, list) -> {
+            if (list == null) list = new CopyOnWriteArrayList<>();
+            list.add(callback);
+            return list;
+        });
+        if (waiters.size() > 1) return;
 
         final int px = decodePx(decodeSize);
         CompletableFuture
                 .supplyAsync(() -> readDisk(url), Http.pool())
-                .thenCompose(bytes -> {
-                    if (bytes != null && bytes.length > 0) {
-                        return CompletableFuture.completedFuture(bytes);
+                .thenCompose(disk -> {
+                    if (disk != null && disk.length > 0) {
+                        return CompletableFuture.completedFuture(Map.entry(disk, Boolean.TRUE));
                     }
                     return Http.getBytesAsync(url).thenApply(downloaded -> {
                         writeDisk(url, downloaded);
-                        return downloaded;
+                        return Map.entry(downloaded, Boolean.FALSE);
                     });
                 })
-                .whenComplete((bytes, err) -> {
+                .whenComplete((entry, err) -> {
+                    byte[] bytes = entry == null ? null : entry.getKey();
+                    boolean fromDisk = entry != null && entry.getValue();
                     Image img = null;
                     if (err == null && bytes != null && bytes.length > 0) {
                         img = decode(bytes, px);
                     }
                     if (img == null) {
+                        if (fromDisk) {
+                            // 磁盘缓存里的坏图不会自己恢复，删掉下轮回源重下
+                            try {
+                                Files.deleteIfExists(fileOf(url));
+                            } catch (Exception ignored) {
+                            }
+                        }
                         // 4xx 永久失败，其余冷却 30 秒
                         long until = Http.isPermanentFailure(err) || bytes == null && err == null
                                 ? Long.MAX_VALUE : System.currentTimeMillis() + RETRY_AFTER_MS;
@@ -98,6 +114,7 @@ public final class RemoteImages {
                     } else {
                         if (CACHE.size() > MEMORY_LIMIT) trimCache();
                         CACHE.put(k, img);
+                        ACCESSED.put(k, System.currentTimeMillis());
                     }
                     if (FAILED.size() > 2000) trimFailed();
                     final Image result = img;
@@ -113,7 +130,7 @@ public final class RemoteImages {
         Path d = diskDir;
         if (d != null) return d;
         try {
-            d = Data.get().baseDir().resolve("cache").resolve("images");
+            d = Data.get().cacheDir().resolve("images");
             Files.createDirectories(d);
         } catch (Exception e) {
             d = null;
@@ -138,17 +155,19 @@ public final class RemoteImages {
         }
     }
 
-    /** 超过上限时只淘汰四分之一，避免一次性清空导致界面集中重下。 */
     private static void trimCache() {
         int target = MEMORY_LIMIT * 3 / 4;
-        java.util.Iterator<String> it = CACHE.keySet().iterator();
-        while (CACHE.size() > target && it.hasNext()) {
-            it.next();
-            it.remove();
+        if (CACHE.size() <= target) return;
+        // 并发 map 的迭代序与访问序无关，按最近访问时间从旧到新淘汰
+        List<String> keys = new java.util.ArrayList<>(CACHE.keySet());
+        keys.sort(java.util.Comparator.comparingLong(k -> ACCESSED.getOrDefault(k, 0L)));
+        for (String k : keys) {
+            if (CACHE.size() <= target) break;
+            CACHE.remove(k);
+            ACCESSED.remove(k);
         }
     }
 
-    /** 清掉过期的失败记录，永久失败保留。 */
     private static void trimFailed() {
         long now = System.currentTimeMillis();
         FAILED.entrySet().removeIf(e -> e.getValue() != Long.MAX_VALUE && e.getValue() <= now);
@@ -179,27 +198,35 @@ public final class RemoteImages {
         }
     }
 
-    /** 超过 3000 张就删最旧的，后台跑。 */
+    // 磁盘缓存一律按内容 SHA-1 命名，40 位十六进制之外的东西不归这里管
+    private static final java.util.regex.Pattern SHA1_NAME = java.util.regex.Pattern.compile("[0-9a-f]{40}");
+
     private static void prune(Path d) {
         if (d == null) return;
         try {
             Http.pool().execute(() -> {
-                try (Stream<Path> s = Files.list(d)) {
-                    List<Path> files = s.filter(Files::isRegularFile)
-                            .sorted((a, b) -> {
-                                try {
-                                    return Long.compare(Files.getLastModifiedTime(a).toMillis(),
-                                            Files.getLastModifiedTime(b).toMillis());
-                                } catch (Exception e) {
-                                    return 0;
-                                }
-                            })
-                            .toList();
-                    int over = files.size() - 3000;
-                    for (int i = 0; i < over; i++) {
-                        try {
-                            Files.deleteIfExists(files.get(i));
-                        } catch (Exception ignored) {
+                try {
+                    // 缓存根没有标记文件就不是本启动器建立的目录，一个文件都不能删
+                    if (!Data.hasCacheMarker(d.getParent())) return;
+                    try (Stream<Path> s = Files.list(d)) {
+                        List<Path> files = s.filter(Files::isRegularFile)
+                                .filter(p -> p.getFileName() != null
+                                        && SHA1_NAME.matcher(p.getFileName().toString()).matches())
+                                .sorted((a, b) -> {
+                                    try {
+                                        return Long.compare(Files.getLastModifiedTime(a).toMillis(),
+                                                Files.getLastModifiedTime(b).toMillis());
+                                    } catch (Exception e) {
+                                        return 0;
+                                    }
+                                })
+                                .toList();
+                        int over = files.size() - 3000;
+                        for (int i = 0; i < over; i++) {
+                            try {
+                                Files.deleteIfExists(files.get(i));
+                            } catch (Exception ignored) {
+                            }
                         }
                     }
                 } catch (Exception ignored) {

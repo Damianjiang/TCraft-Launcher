@@ -24,10 +24,8 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
-/** 全局主题、图标、字体和动画工具。 */
 public final class Theme {
 
-    // 色阶由 setAccent 按 HSL 派生，下面只是云溪蓝初始值
     public static Color accent = Color.web("#1370f3");
     public static Color accentDark = Color.web("#0b5bcb");
     public static Color accentLight = Color.web("#4890f5");
@@ -37,29 +35,20 @@ public final class Theme {
     public static Color titleBar = Color.web("#4890f5");
 
     public static Color text = Color.web("#343d4a");
-    // 0 全透明到 100 全不透明，只缩放卡片、列表、输入框的 alpha
     public static double componentOpacity = 0.5;
-    // 卡片底色 alpha = 245 * factor
     public static Color cardBg = Color.web("#ffffff", 245 * 0.5 / 255);
     public static Color sidebarBg = Color.web("#ffffff", 0.945);
-    /** 弹窗底色，始终不透明。 */
     public static final Color dialogBg = Color.web("#fbfbfb");
-    // 弹窗遮罩：普通纯黑约 35%，警告暗红约 55%
     public static final Color modalMask = Color.web("#000000", 90 / 255.0);
     public static final Color warnMask = Color.color(80 / 255.0, 0, 0, 140 / 255.0);
-    // 输入框底色 alpha = 245 * factor + 25
     public static Color fieldBg = Color.web("#ffffff", Math.min(1, (245 * 0.5 + 25) / 255));
-    // 列表悬停底色，alpha 随组件透明度缩放
     public static Color listHoverBg = Color.web("#e0eafd", 190 * 0.5 / 255);
-    // alpha 仅 1/255，药丸控件的常态底
     public static Color semiTransparent = Color.web("#eaf2fe", 1 / 255.0);
-    // 显式给 alpha，避免 8 位 hex 按 RRGGBBAA 解析
+    // 显式给 alpha，8 位 hex 会被当 RRGGBBAA 解析
     public static Color halfWhite = Color.color(1, 1, 1, 0x55 / 255.0);
     public static Color white = Color.WHITE;
-    // 按钮和输入框的悬停底色
     public static Color brush7 = Color.web("#e0eafd");
     public static Color redBack = Color.color(251 / 255.0, 221 / 255.0, 221 / 255.0, 0x80 / 255.0);
-    // 深色半透明填充，悬停略亮
     public static Color darkBtnBg = Color.color(25 / 255.0, 25 / 255.0, 30 / 255.0, 214 / 255.0);
     public static Color darkBtnHover = Color.color(52 / 255.0, 52 / 255.0, 58 / 255.0, 226 / 255.0);
 
@@ -81,18 +70,16 @@ public final class Theme {
             "云溪蓝", "竹露青", "松涧绿", "杏阳黄", "檀木棕", "墨夜黑", "桃霞粉", "星雾紫",
             "暮霞金", "熔岩橙", "赤焰红", "海盐蓝", "七曜彩", "曜光彩", "自定义", "青柠绿",
             "薄荷绿", "靛夜蓝", "葡萄紫", "雾霭蓝", "玫瑰金",
-            // 只能末尾追加，UiThemePreset 存的是下标
-            "深海青", "苔藓绿", "橄榄金", "落霞橙", "豆沙红", "藕荷紫", "墨绿", "石板灰", "柠檬黄", "月白蓝"
+            "深海青", "苔藓绿", "橄榄金", "落霞橙", "豆沙红", "藕荷紫", "墨松绿", "石板灰", "柠檬黄", "月白蓝"
     };
     public static final String[] THEME_COLORS = {
             "#1370f3", "#3b8f7a", "#2f7a43", "#d6a01e", "#87592e", "#30343e", "#e2749a", "#7357c8",
             "#c98a2b", "#e8621d", "#d23329", "#3f9cc7", "#e05a8a", "#7a54d6", "#1370f3", "#86bf2a",
             "#2fbf92", "#24408f", "#8b3fc0", "#5b7a94", "#d99a8a",
-            // 下标 21~30 用低饱和灰调，太艳会糊在白色界面上
             "#0e6b7a", "#5d7a3a", "#8a7b2f", "#d97a45", "#a85757", "#a273b8", "#2b5f52", "#55606e", "#c9b52a", "#6f8fb8"
     };
 
-    // 每累计启动 99 次按 HIDDEN_THEMES 顺序解锁一个，UiThemeUnlocked 存已解锁 id
+    // 每 99 次启动按 HIDDEN_THEMES 顺序解锁，UiThemeUnlocked 记录已解锁 id
     public static final int[] HIDDEN_THEMES = {
             6,
             7,
@@ -101,16 +88,17 @@ public final class Theme {
             26
     };
 
-    /** 解锁一个隐藏主题需要的累计启动次数。 */
     public static final int UNLOCK_EVERY_LAUNCHES = 99;
 
-    public static Image wallpaper;
+    public static volatile Image wallpaper;
     public static Font baseFont;
+
+    // 壁纸就绪（已赋值、可渲染）后在 FX 线程回调，MainWindow 用来刷背景与主题色
+    public static volatile Runnable onWallpaperReady;
 
     private Theme() {
     }
 
-    /** 用户数据目录（皮肤、图标、日志）。 */
     public static Path root() {
         return Resources.home();
     }
@@ -127,7 +115,6 @@ public final class Theme {
         return skinDir().resolve(fileName);
     }
 
-    /** jar 内资源索引：小写相对路径 -> 实际路径。 */
     private static java.util.Map<String, String> resourceIndex;
 
     private static synchronized java.util.Map<String, String> resourceIndex() {
@@ -143,7 +130,8 @@ public final class Theme {
                         map.put(name.toLowerCase(java.util.Locale.ROOT), name);
                     }
                 }
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                Data.get().log("资源索引构建失败（jar）：" + e.getMessage());
             }
         } else {
             Path dir = Resources.appDir().resolve("res");
@@ -152,7 +140,8 @@ public final class Theme {
                     String rel = "res/" + dir.relativize(p).toString().replace('\\', '/');
                     map.put(rel.toLowerCase(java.util.Locale.ROOT), rel);
                 });
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                Data.get().log("资源索引构建失败（res 目录）：" + e.getMessage());
             }
         }
         resourceIndex = map;
@@ -187,7 +176,6 @@ public final class Theme {
         }
     }
 
-    /** 用户皮肤/图标优先，其次才是 jar 内置图片。 */
     private static Path userImage(String name) {
         if (name == null || name.isEmpty()) return null;
         if (name.startsWith("Skins/")) {
@@ -202,7 +190,6 @@ public final class Theme {
         return Files.isRegularFile(skin) ? skin : null;
     }
 
-    /** 打开图片流，先查用户目录再查 jar。 */
     public static java.io.InputStream imageStream(String name) throws IOException {
         Path user = userImage(name);
         if (user != null) return Files.newInputStream(user);
@@ -217,38 +204,163 @@ public final class Theme {
             }
         } catch (Exception ignored) {
         }
+        loadUserFonts();
         resetWallpaper();
     }
 
-    public static void resetWallpaper() {
-        wallpaper = loadImage("wallpaper.jpg");
-        if (wallpaper == null) wallpaper = loadImage("TCraft.webp");
+    public static Path fontDir() {
+        return root().resolve("Fonts");
     }
 
-    /** 从 TCL/Pictures 随机挑一张背景图。 */
+    private static final java.util.List<String> USER_FONTS = new java.util.ArrayList<>();
+
+    public static java.util.List<String> userFonts() {
+        return java.util.Collections.unmodifiableList(USER_FONTS);
+    }
+
+    public static synchronized void loadUserFonts() {
+        USER_FONTS.clear();
+        try {
+            Path dir = fontDir();
+            if (!Files.isDirectory(dir)) return;
+            try (var stream = Files.list(dir)) {
+                for (Path p : stream.filter(Files::isRegularFile).toList()) {
+                    String name = p.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
+                    if (!name.endsWith(".ttf") && !name.endsWith(".otf") && !name.endsWith(".ttc")) continue;
+                    try (java.io.InputStream in = Files.newInputStream(p)) {
+                        Font f = Font.loadFont(in, 13);
+                        if (f != null && !USER_FONTS.contains(f.getFamily())) USER_FONTS.add(f.getFamily());
+                    } catch (Exception ignored) {
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        fontFamily = null;
+        FONT_CACHE.clear();
+    }
+
+    private static String fontFamily;
+    private static final java.util.Map<String, Font> FONT_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+
+    public static String fontFamily() {
+        if (fontFamily != null) return fontFamily;
+        String custom = "";
+        try {
+            custom = Data.get().get("UiCustomFont", "");
+        } catch (Throwable ignored) {
+        }
+        java.util.List<String> families;
+        try {
+            families = Font.getFamilies();
+        } catch (Throwable t) {
+            families = java.util.List.of();
+        }
+        if (!custom.isBlank() && (USER_FONTS.contains(custom) || families.contains(custom))) {
+            fontFamily = custom;
+            return fontFamily;
+        }
+        String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
+        String[] candidates;
+        if (os.contains("mac")) {
+            candidates = new String[]{"PingFang SC", "Hiragino Sans GB", "Heiti SC", "Helvetica Neue", "Arial"};
+        } else if (os.contains("win")) {
+            candidates = new String[]{"Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", "Arial"};
+        } else {
+            candidates = new String[]{"Noto Sans CJK SC", "Noto Sans CJK", "Source Han Sans CN",
+                    "Source Han Sans SC", "WenQuanYi Micro Hei", "DejaVu Sans", "SansSerif"};
+        }
+        for (String c : candidates) {
+            if (families.contains(c) || USER_FONTS.contains(c)) {
+                fontFamily = c;
+                return fontFamily;
+            }
+        }
+        fontFamily = baseFont != null ? baseFont.getFamily()
+                : Font.getDefault() != null ? Font.getDefault().getFamily() : "SansSerif";
+        return fontFamily;
+    }
+
+    private static final java.util.concurrent.atomic.AtomicInteger wallpaperGen =
+            new java.util.concurrent.atomic.AtomicInteger();
+
+    public static void resetWallpaper() {
+        // 整屏壁纸同步解码会把 FX 线程卡住，挪后台，完成后回 FX 赋值
+        final int gen = wallpaperGen.incrementAndGet();
+        Threads.start("TCL-Wallpaper", () -> {
+            Image img = loadImage("wallpaper.jpg");
+            if (img == null) img = loadImage("TCraft.webp");
+            final Image loaded = img;
+            javafx.application.Platform.runLater(() -> {
+                if (wallpaperGen.get() != gen) return;
+                wallpaper = loaded;
+                if (onWallpaperReady != null) onWallpaperReady.run();
+            });
+        });
+    }
+
+    public static boolean isWallpaperImage(Path file) {
+        if (file == null) return false;
+        String n = file.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
+        return n.endsWith(".png") || n.endsWith(".jpg") || n.endsWith(".jpeg") || n.endsWith(".gif");
+    }
+
     public static boolean loadCustomWallpaper(Path dir) {
         try {
             if (dir == null || !Files.isDirectory(dir)) return false;
             List<Path> images = new ArrayList<>();
             try (var stream = Files.list(dir)) {
-                stream.filter(Files::isRegularFile).filter(p -> {
-                    String n = p.getFileName().toString().toLowerCase();
-                    return n.endsWith(".png") || n.endsWith(".jpg") || n.endsWith(".jpeg") || n.endsWith(".gif");
-                }).forEach(images::add);
+                stream.filter(Files::isRegularFile).filter(Theme::isWallpaperImage).forEach(images::add);
             }
             if (images.isEmpty()) return false;
             Path pick = images.get((int) (Math.random() * images.size()));
-            Image img = new Image(pick.toUri().toString(), false);
+            // 壁纸是整屏大图，同步解码会把 FX 线程卡住，交给后台解码
+            Image img = new Image(pick.toUri().toString(), true);
             if (img.isError()) return false;
-            wallpaper = img;
+            final int gen = wallpaperGen.incrementAndGet();
+            final Image loaded = img;
+            img.errorProperty().addListener((o, was, now) -> {
+                if (Boolean.TRUE.equals(now) && wallpaper == loaded) {
+                    javafx.application.Platform.runLater(Theme::resetWallpaper);
+                }
+            });
+            javafx.application.Platform.runLater(() -> {
+                if (wallpaperGen.get() != gen) return;
+                wallpaper = loaded;
+                if (onWallpaperReady != null) onWallpaperReady.run();
+            });
             return true;
         } catch (Exception e) {
             return false;
         }
     }
 
-    /** 图片缓存以资源名或文件路径做键。 */
-    private static final java.util.Map<String, Image> IMAGE_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+    // 按字节预算的 LRU，整屏壁纸一张就几十 MB，按条数清表太粗暴
+    private static final java.util.Map<String, Image> IMAGE_CACHE =
+            java.util.Collections.synchronizedMap(new java.util.LinkedHashMap<>(64, 0.75f, true));
+    private static final long IMAGE_CACHE_BUDGET = 256L * 1024 * 1024;
+    private static long imageCacheBytes;
+
+    private static long imageBytes(Image img) {
+        double w = img.getWidth(), h = img.getHeight();
+        return w > 0 && h > 0 ? (long) (w * h * 4) : 0;
+    }
+
+    private static void cacheImage(String key, Image img) {
+        synchronized (IMAGE_CACHE) {
+            Image old = IMAGE_CACHE.put(key, img);
+            if (old != null) imageCacheBytes -= imageBytes(old);
+            imageCacheBytes += imageBytes(img);
+            var it = IMAGE_CACHE.entrySet().iterator();
+            // 字节预算为主；解码失败的图宽高是 0 计不了字节，留个条数兜底
+            while ((imageCacheBytes > IMAGE_CACHE_BUDGET || IMAGE_CACHE.size() > 512)
+                    && IMAGE_CACHE.size() > 1 && it.hasNext()) {
+                var e = it.next();
+                imageCacheBytes -= imageBytes(e.getValue());
+                it.remove();
+            }
+        }
+    }
 
     public static Image loadImage(String name) {
         if (name == null || name.isEmpty()) return null;
@@ -267,8 +379,7 @@ public final class Theme {
                 if (in == null) return null;
                 Image img = new Image(in, 0, 0, true, false);
                 if (img.isError()) return null;
-                if (IMAGE_CACHE.size() > 512) IMAGE_CACHE.clear();
-                IMAGE_CACHE.put(key, img);
+                cacheImage(key, img);
                 return img;
             }
         } catch (Exception e) {
@@ -281,35 +392,42 @@ public final class Theme {
             String key = p.toAbsolutePath() + "|" + Files.getLastModifiedTime(p).toMillis() + "|" + Files.size(p);
             Image cached = IMAGE_CACHE.get(key);
             if (cached != null) return cached;
-            if (IMAGE_CACHE.size() > 512) IMAGE_CACHE.clear();
             Image img = new Image(p.toUri().toString(), false);
-            IMAGE_CACHE.put(key, img);
+            cacheImage(key, img);
             return img;
         } catch (Exception e) {
             return new Image(p.toUri().toString(), false);
         }
     }
 
-        public static Font font(double size) {
-        return Font.font("Microsoft YaHei UI", size);
+    public static Font font(double size) {
+        return cachedFont(FontWeight.NORMAL, size);
     }
 
     public static Font font(double size, boolean bold) {
-        return Font.font("Microsoft YaHei UI", bold ? FontWeight.BOLD : FontWeight.NORMAL, size);
+        return cachedFont(bold ? FontWeight.BOLD : FontWeight.NORMAL, size);
     }
 
     public static Font font(double size, FontWeight weight) {
-        return Font.font("Microsoft YaHei UI", weight, size);
+        return cachedFont(weight, size);
     }
 
-    /** 按组件透明度重算半透明表面色。 */
+    private static Font cachedFont(FontWeight weight, double size) {
+        String key = fontFamily() + '|' + weight.getWeight() + '|' + size;
+        Font f = FONT_CACHE.get(key);
+        if (f != null) return f;
+        f = Font.font(fontFamily(), weight, size);
+        if (FONT_CACHE.size() > 256) FONT_CACHE.clear();
+        FONT_CACHE.put(key, f);
+        return f;
+    }
+
     public static void applyComponentOpacity() {
         int v = Data.get().getInt("UiComponentOpacity", 50);
         v = Math.max(0, Math.min(100, v));
         componentOpacity = v / 100.0;
         cardBg = Color.web("#ffffff", Math.min(1, 245 * componentOpacity / 255));
         fieldBg = Color.web("#ffffff", Math.min(1, (245 * componentOpacity + 25) / 255));
-        // 列表悬停 alpha = 190 * factor，色相跟主题走
         listHoverBg = Color.color(brush7.getRed(), brush7.getGreen(), brush7.getBlue(),
                 Math.min(1, 190 * componentOpacity / 255));
     }
@@ -319,11 +437,9 @@ public final class Theme {
         if (index >= 0 && index < THEME_COLORS.length) {
             Color c = Color.web(THEME_COLORS[index]);
             if (index == 12) {
-                // 七曜彩每次色相加 7，饱和 85
                 double hue = (accent.getHue() + 7) % 360;
                 c = Color.hsb(hue, 0.85, c.getBrightness());
             } else if (index == 13) {
-                // 曜光彩随机色相，饱和 55 到 100
                 java.util.Random r = new java.util.Random();
                 c = Color.hsb(r.nextInt(360), 0.55 + r.nextDouble() * 0.45, c.getBrightness());
             }
@@ -331,7 +447,31 @@ public final class Theme {
         }
     }
 
-    /** 不在 HIDDEN_THEMES 里的都是公开主题。 */
+    // 把当前 accent 固化为自定义主题参数，供关掉"跟随壁纸"时保留取到的颜色
+    public static void saveCurrentAsCustom(Data d) {
+        Color c = accent;
+        double hue = c.getHue();
+        double max = Math.max(c.getRed(), Math.max(c.getGreen(), c.getBlue()));
+        double min = Math.min(c.getRed(), Math.min(c.getGreen(), c.getBlue()));
+        double light = (max + min) / 2;
+        double sat = max <= min ? 0 : (max - min) / (1 - Math.abs(2 * light - 1));
+        d.set("UiLauncherHue", (int) Math.round(hue));
+        d.set("UiLauncherSat", (int) Math.round(clamp01(sat) * 100));
+        d.set("UiLauncherLight", (int) Math.round(light * 100));
+        d.set("UiLauncherDelta", 20);
+        d.save();
+    }
+
+    public static void applyCustomTheme() {
+        Data d = Data.get();
+        double hue = d.getInt("UiLauncherHue", 210);
+        double sat = d.getInt("UiLauncherSat", 72);
+        double light = d.getInt("UiLauncherLight", 55);
+        double delta = d.getInt("UiLauncherDelta", 20);
+        setAccent(hsl(hue, sat, light), false);
+        titleBar = hsl(hue + delta, sat, Math.max(14, light - 22));
+    }
+
     public static boolean isHiddenTheme(int id) {
         for (int h : HIDDEN_THEMES) {
             if (h == id) return true;
@@ -339,7 +479,6 @@ public final class Theme {
         return false;
     }
 
-    /** 已解锁的隐藏主题 id，按 HIDDEN_THEMES 顺序返回。 */
     public static java.util.List<Integer> unlockedHiddenIds() {
         String raw = Data.get().get("UiThemeUnlocked", "");
         java.util.List<Integer> out = new java.util.ArrayList<>();
@@ -355,19 +494,16 @@ public final class Theme {
         return out;
     }
 
-    /** 公开主题恒可选，隐藏主题看解锁记录。 */
     public static boolean isThemeUnlocked(int id) {
         if (!isHiddenTheme(id)) return true;
         return unlockedHiddenIds().contains(id);
     }
 
-    /** 按累计启动次数算出应解锁的隐藏主题数量。 */
     public static int earnedUnlockCount(int launches) {
         if (launches < 0) return 0;
         return Math.min(HIDDEN_THEMES.length, launches / UNLOCK_EVERY_LAUNCHES);
     }
 
-    /** 补齐应解锁但未写入配置的隐藏主题，返回新解锁的名字。 */
     public static java.util.List<String> applyLaunchUnlocks(int launches) {
         java.util.List<Integer> have = unlockedHiddenIds();
         int target = earnedUnlockCount(launches);
@@ -386,11 +522,10 @@ public final class Theme {
         }
         Data d = Data.get();
         d.set("UiThemeUnlocked", sb.toString());
-        d.save(); // 立即落盘
+        d.save();
         return newly;
     }
 
-    /** 距离下一个隐藏主题还差几次启动，全解锁返回 0。 */
     public static int launchesToNextUnlock(int launches) {
         java.util.List<Integer> have = unlockedHiddenIds();
         if (have.size() >= HIDDEN_THEMES.length) return 0;
@@ -398,13 +533,11 @@ public final class Theme {
         return Math.max(0, next - Math.max(0, launches));
     }
 
-    /** 下一个待解锁的隐藏主题名，全解锁返回空串。 */
     public static String nextHiddenThemeName() {
         int n = unlockedHiddenIds().size();
         return n >= HIDDEN_THEMES.length ? "" : THEME_NAMES[HIDDEN_THEMES[n]];
     }
 
-    /** HSL 转 RGB，S/L 用 0~100 百分比。 */
     public static Color hsl(double h, double sPercent, double lPercent) {
         double s = Math.max(0, Math.min(100, sPercent)) / 100;
         double l = Math.max(0, Math.min(100, lPercent)) / 100;
@@ -433,7 +566,6 @@ public final class Theme {
         return Math.max(0, Math.min(1, v));
     }
 
-    /** 按主题色重算整套色阶，悬停和浅色表面也要跟着变。 */
     public static void setAccent(Color base, boolean deriveTitle) {
         double hue = base.getHue();
         double max = Math.max(base.getRed(), Math.max(base.getGreen(), base.getBlue()));
@@ -447,54 +579,71 @@ public final class Theme {
         accentLight = hsl(hue, satP, baseP + 10);
         accentPale = hsl(hue, satP, baseP + 25);
         accentPale2 = hsl(hue, satP, baseP + 36);
-        brush7 = hsl(hue, satP, baseP + 40);  // 按钮和输入框悬停底
+        brush7 = hsl(hue, satP, baseP + 40);
         accentPale3 = hsl(hue, satP, baseP + 42);
         semiTransparent = Color.color(accentPale3.getRed(), accentPale3.getGreen(), accentPale3.getBlue(), 1 / 255.0);
         blueHintBg = brush7;
         titleBar = deriveTitle
                 ? Color.hsb(hue, Math.min(0.85, base.getSaturation() * 0.82), Math.max(0.22, base.getBrightness() * 0.66))
                 : accentLight;
-        applyComponentOpacity(); // 表面色跟着新色相重算
+        applyComponentOpacity();
         refreshCss();
     }
 
     private static URL cssUrl;
     private static Runnable cssReload;
+    private static long cssGen;
 
     private static String hex(Color c) {
         return c.toString().replace("0x", "#");
     }
 
-    /** 主题色变化后重生成样式表；场景挂上后每次换色都会同步。 */
     private static void refreshCss() {
-        if (cssUrl == null && cssReload == null) return; // 场景还没建，建场景时按当前色生成
+        if (cssUrl == null && cssReload == null) return;
         regenerateCss();
         if (cssReload != null) cssReload.run();
     }
 
     private static synchronized URL regenerateCss() {
         try {
-            // 把 CSS 里的蓝色占位符换成当前主题色
             String css = resText("style.css");
             if (css.isEmpty()) return cssUrl;
             css = css.replace("#4890f5", hex(accentLight))
                     .replace("#1370f3", hex(accent))
                     .replace("#eaf2fe", hex(accentPale3));
-            Path out = Paths.get(System.getProperty("java.io.tmpdir"), "tcraft-theme.css");
+            // 文件名带代次：StyleManager 按 URL 缓存样式表，同路径换内容不会重解析
+            Path out = Paths.get(System.getProperty("java.io.tmpdir"),
+                    "tcraft-theme-" + Long.toHexString(System.currentTimeMillis()) + "-" + cssGen++ + ".css");
             Files.writeString(out, css, StandardCharsets.UTF_8);
             cssUrl = out.toUri().toURL();
+            sweepThemeCss(out);
         } catch (Exception e) {
             cssUrl = resUrl("style.css");
         }
         return cssUrl;
     }
 
-    /** 场景注册回调：主题色变化时把新样式表挂回去。 */
+    // 临时目录只留当前代，旧文件在下次生成时删掉（可能还被旧场景引用，不能提前删）
+    private static void sweepThemeCss(Path keep) {
+        try (var stream = Files.list(Paths.get(System.getProperty("java.io.tmpdir")))) {
+            stream.filter(p -> {
+                String n = p.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
+                return n.startsWith("tcraft-theme-") && n.endsWith(".css");
+            }).forEach(p -> {
+                if (p.equals(keep)) return;
+                try {
+                    Files.deleteIfExists(p);
+                } catch (Exception ignored) {
+                }
+            });
+        } catch (Exception ignored) {
+        }
+    }
+
     public static void onCssReload(Runnable r) {
         cssReload = r;
     }
 
-    /** 从背景图提取主色调。 */
     public static Color extractAccent(Image image) {
         if (image == null) return Color.web("#1370f3");
         PixelReader pr = image.getPixelReader();
@@ -519,12 +668,39 @@ public final class Theme {
         for (int i = 0; i < weights.length; i++) if (best < 0 || weights[i] > weights[best]) best = i;
         if (best < 0 || weights[best] <= 0) return Color.web("#1370f3");
         Color avg = Color.color(rs[best] / weights[best], gs[best] / weights[best], bs[best] / weights[best]);
-        // 保持色相，收窄亮度和饱和度
         return Color.hsb(avg.getHue(), Math.max(0.42, Math.min(0.78, avg.getSaturation() * 0.9)), 0.62);
     }
 
+    // 启动早期同步取壁纸主色，避免主窗口首帧用默认蓝再跳成目标色
+    public static void applyWallpaperThemeSync() {
+        Image img = loadImage("wallpaper.jpg");
+        if (img == null) img = loadImage("TCraft.webp");
+        if (img == null) return;
+        setAccent(extractAccent(img), true);
+    }
+
     public static void applyWallpaperTheme() {
-        setAccent(extractAccent(wallpaper), true);
+        Image img = wallpaper;
+        if (img == null) return;
+        // 取色是上万次像素扫描，放后台；壁纸还在异步解码时 pixelReader 拿不到，等加载完再算
+        if (img.isBackgroundLoading() && img.getProgress() < 1) {
+            img.widthProperty().addListener(new javafx.beans.value.ChangeListener<Number>() {
+                @Override
+                public void changed(javafx.beans.value.ObservableValue<? extends Number> o, Number a, Number b) {
+                    img.widthProperty().removeListener(this);
+                    if (b.doubleValue() > 0) extractAccentInBackground(img);
+                }
+            });
+            return;
+        }
+        extractAccentInBackground(img);
+    }
+
+    private static void extractAccentInBackground(Image img) {
+        Threads.start("TCL-Accent", () -> {
+            Color c = extractAccent(img);
+            javafx.application.Platform.runLater(() -> setAccent(c, true));
+        });
     }
 
     private static final java.util.Map<String, String> SVG_CACHE = new java.util.HashMap<>();
@@ -555,7 +731,6 @@ public final class Theme {
             for (String[] seg : elems(svg, "path")) {
                 String d = attr(seg[0], "d");
                 if (d == null) continue;
-                // 带 fill 属性的按实心渲染（TCl 参考图标），lucide 全是描边
                 String fill = attr(seg[0], "fill");
                 if (fill != null && !fill.equals("none")) {
                     group.getChildren().add(fillPath(d, color));
@@ -593,13 +768,11 @@ public final class Theme {
                 group.getChildren().add(poly);
             }
         } else {
-            // 缺图标时画圆点占位
             Circle c = new Circle(12, 12, 8);
             styleShape(c, color);
             group.getChildren().add(c);
         }
-        // viewBox 支持 24 以外的底（TCl 参考图标是 1024 底的填充路径）
-        // 图标缺失时 svg 为 null，跳过解析，否则 UI 线程 NPE
+        // viewBox 支持 24 以外的底（TCl 参考图标是 1024 底的填充路径）；svg 为 null 时按默认 24 缩放
         double vbx = 24;
         if (svg != null) {
             int rootStart = svg.indexOf("<svg");
@@ -646,7 +819,6 @@ public final class Theme {
         return p;
     }
 
-    /** 实心图标路径；WPF 参考实现默认 EvenOdd 挖空，JavaFX 默认 NonZero 出不来镂空。 */
     private static SVGPath fillPath(String d, Color color) {
         SVGPath p = new SVGPath();
         p.setContent(d);
@@ -733,7 +905,6 @@ public final class Theme {
         return regenerateCss();
     }
 
-    /** 几何居中助手。 */
     private static final class StackPaneAlign {
         static void center(Node node) {
             if (node instanceof Region) {

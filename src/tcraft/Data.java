@@ -14,22 +14,18 @@ import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 
-/** 账户、实例、文件夹、版本表和设置的持久化。 */
 public final class Data {
 
     public static class Account {
         public String name;
         public String uuid;
-        public String skin; // 头像用的皮肤图文件名
+        public String skin;
         public boolean online;
         public String accessToken = "";
         public String clientToken = "";
-        public String userType = ""; // msa / legacy / nide / ""
-        /** 第三方登录源：nide 是服务器码，legacy 是地址。 */
+        public String userType = "";
         public String server = "";
-        /** 微软长期令牌，用来在 Minecraft 令牌过期后自动续期。 */
         public String refreshToken = "";
-        /** Minecraft 令牌过期时间（毫秒），0 表示还不知道。 */
         public long expiresAt = 0;
 
         public Account(String name, String uuid, String skin, boolean online) {
@@ -43,14 +39,14 @@ public final class Data {
     public static class Instance {
         public String name;
         public String version;
-        public String loader;  // 原版 / Forge / Fabric / NeoForge / OptiFine
+        public String loader;
         public String loaderVersion;
         public String description;
-        public String icon;  // Images 下的文件名
+        public String icon;
         public long lastPlayed;
+        public long addedAt;
         public boolean favorite;
         public String folder;
-        /** 版本隔离：0 跟随全局设置，1 强制隔离，2 不隔离。 */
         public int isolation;
 
         public Instance(String name, String version, String loader, String loaderVersion,
@@ -68,20 +64,29 @@ public final class Data {
             this.description = description;
             this.icon = icon;
             this.lastPlayed = lastPlayed;
+            this.addedAt = System.currentTimeMillis();
             this.favorite = favorite;
             this.folder = folder;
             this.isolation = isolation;
         }
 
         public String subtitle() {
-            if (description != null && !description.isEmpty()) return description;
+            if (description != null && !description.isEmpty()) return renderedSummary(description);
             StringBuilder sb = new StringBuilder();
-            sb.append("正式版 ").append(version);
+            sb.append(Lang.t("正式版 ")).append(version);
             if (loader != null && !loader.isEmpty() && !"原版".equals(loader)) {
-                sb.append("，").append(loader);
+                sb.append(Lang.t("，")).append(loader);
                 if (loaderVersion != null) sb.append(" ").append(loaderVersion);
             }
             return sb.toString();
+        }
+
+        // 安装时写进 description 的摘要持久化为中文，显示层按模式重拼（键与 Downloader 写入端一字不差）
+        private String renderedSummary(String raw) {
+            java.util.regex.Matcher m = java.util.regex.Pattern
+                    .compile("^(正式版|预览版|愚人节版|远古版) (\\S+)，已安装 (.+)$").matcher(raw);
+            if (!m.matches()) return raw;
+            return Lang.t(m.group(1)) + " " + m.group(2) + Lang.t("，已安装 ") + m.group(3);
         }
     }
 
@@ -126,7 +131,6 @@ public final class Data {
         }
     }
 
-    /** 收藏的社区资源。 */
     public static class Favorite {
         public String type = "mod";
         public String slug = "";
@@ -134,9 +138,7 @@ public final class Data {
         public String desc = "";
         public String icon = "";
         public String website = "";
-        /** 来源平台：modrinth / curseforge。 */
         public String platform = "";
-        /** 平台项目 ID，CurseForge 要数字。 */
         public String projectId = "";
 
         public static Favorite of(String type, String slug, String name, String desc, String icon, String website) {
@@ -174,12 +176,10 @@ public final class Data {
         }
     }
 
-        /** Mojang 清单里标成 release 的愚人节版本。 */
     private static final java.util.Set<String> SPECIAL_IDS = java.util.Set.of(
             "20w14infinite", "20w14∞", "2.0", "15w14a", "23w13a_or_b", "22w13oneblockatatime",
             "24w14potato", "25w14craftmine", "1.rv-pre1", "3d shareware v1.34", "26w14a");
 
-    /** 愚人节版本的宣传语。 */
     private static String foolName(String id) {
         String name = id.toLowerCase(java.util.Locale.ROOT);
         if (name.startsWith("2.0")) return "2013 | 这个秘密计划了两年的更新将游戏推向了一个新高度！";
@@ -196,20 +196,17 @@ public final class Data {
         return "";
     }
 
-    /** 版本归类：release / snapshot / old / special。 */
     private static String classifyVersion(String id, String type, String releaseTimeIso) {
         String lower = id.toLowerCase(java.util.Locale.ROOT);
         switch (type) {
             case "release":
                 return "release";
             case "snapshot":
-                // Mojang 标错：1.x 旧快照算正式版
                 if (lower.startsWith("1.") && !lower.contains("combat") && !lower.contains("rc")
                         && !lower.contains("experimental") && !lower.contains("pre")) {
                     return "release";
                 }
                 if (SPECIAL_IDS.contains(lower)) return "special";
-                // 4 月 1 日发的快照算愚人节版
                 try {
                     java.time.LocalDateTime t = java.time.LocalDateTime.parse(releaseTimeIso,
                             java.time.format.DateTimeFormatter.ISO_DATE_TIME).plusHours(2);
@@ -226,46 +223,61 @@ public final class Data {
 
     public static final Data INSTANCE = new Data();
 
-    public final List<Account> accounts = new ArrayList<>();
+    public final List<Account> accounts = new java.util.concurrent.CopyOnWriteArrayList<>();
     public final List<Instance> instances = new java.util.concurrent.CopyOnWriteArrayList<>();
-    public final List<FolderItem> folders = new ArrayList<>();
+    public final List<FolderItem> folders = new java.util.concurrent.CopyOnWriteArrayList<>();
     public final List<McVersion> versions = new java.util.concurrent.CopyOnWriteArrayList<>();
-    public final List<Favorite> favorites = new ArrayList<>();
+    public final List<Favorite> favorites = new java.util.concurrent.CopyOnWriteArrayList<>();
     public int selectedAccount = 0;
     public int selectedInstance = 0;
     public String gameDir;
-    public String javaPath = "";
+    // 后台扫描线程会补写，跨线程可见性靠 volatile
+    public volatile String javaPath = "";
     public String downloadCategory = "原版游戏";
     public String otherSection = "about";
     public String setupSection = "launch";
     public String instanceSection = "overview";
-    public final List<String> log = new java.util.concurrent.CopyOnWriteArrayList<>();
-    /** 启动过程日志，调试模式下显示。 */
-    public final List<String> launchLog = new java.util.concurrent.CopyOnWriteArrayList<>();
-    /** 上次拉版本清单的时间。 */
+    public final List<String> log = new LogRing(500);
+    public final LogRing launchLog = new LogRing(500);
     private volatile long lastVersionRefresh;
+    private boolean versionRefreshRunning;
+    private final java.util.List<Runnable> versionWaiters = new java.util.concurrent.CopyOnWriteArrayList<>();
 
-    /** 记一条带时间戳的启动日志。 */
     public void launchLog(String line) {
         String stamped = Redact.apply("[" + LocalDateTime.now().toLocalTime().withNano(0) + "] " + line);
         launchLog.add(stamped);
-        if (launchLog.size() > 500) launchLog.remove(0);
         log(line);
     }
 
     private final Properties props = new Properties();
     private final Path configPath;
 
+    // 上次写配置崩溃会留下 .tmp，里面是明文 token，不能过夜
+    private void cleanupConfigTmp() {
+        String name = configPath.getFileName().toString();
+        for (String suffix : new String[]{".tmp", ".import.tmp"}) {
+            try {
+                Files.deleteIfExists(configPath.resolveSibling(name + suffix));
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
     private Data() {
         Path home = Resources.home();
         configPath = home.resolve("config.properties");
         gameDir = detectGameDir();
-        // 启动不灌内置版本，等官方清单。
         load();
+        cleanupConfigTmp();
         pruneInstances();
         if (instances.isEmpty()) seedInstances();
         if (folders.isEmpty()) folders.add(new FolderItem("当前文件夹", gameDir));
-        if (javaPath == null || javaPath.isEmpty()) javaPath = detectJava();
+        if (javaPath == null || javaPath.isEmpty()) {
+            // 构造期不起进程逐盘探测（首启能卡几十秒），先取缓存扫描结果，
+            // 没有就留给 App 的 TCL-Java-Scan 后台补齐
+            javaPath = cachedJavaPath();
+            if (javaPath.isEmpty()) startJavaScanFill();
+        }
         // exe 外壳选定的 Java 优先级最高
         String forcedJava = System.getProperty("tcraft.java", "");
         if (!forcedJava.isEmpty() && usableJava(forcedJava)) {
@@ -287,10 +299,8 @@ public final class Data {
         applyProxy();
     }
 
-    /** 暂时找不到版本文件的实例，只在本次会话隐藏。 */
     private final java.util.List<Instance> orphanInstances = new java.util.concurrent.CopyOnWriteArrayList<>();
 
-    /** 实例跟着磁盘状态走，读不到时不清元数据。 */
     private void pruneInstances() {
         if (instances.isEmpty()) return;
         List<Instance> keep = new ArrayList<>();
@@ -322,13 +332,66 @@ public final class Data {
         return INSTANCE;
     }
 
-    /** 数据目录，config.properties 在这儿。 */
     public Path baseDir() {
         return configPath.getParent();
     }
 
+    public static final String CACHE_MARKER = ".tcl-cache";
+
+    public Path cacheDir() {
+        String custom = get("SystemSystemCache", "");
+        if (custom != null && !custom.isBlank()) {
+            try {
+                Path p = Paths.get(custom.trim()).toAbsolutePath().normalize();
+                Path base = baseDir().toAbsolutePath().normalize();
+                Path game = Paths.get(gameDir).toAbsolutePath().normalize();
+                // 缓存根不能等于/包含/落在配置或游戏目录里，双向都挡，否则清理会误删
+                if (p.getNameCount() > 1 && !p.startsWith(base) && !p.startsWith(game)
+                        && !base.startsWith(p) && !game.startsWith(p)
+                        && !p.equals(base) && !p.equals(game)) {
+                    Files.createDirectories(p);
+                    // 已有内容但没标记的目录可能是用户自己的，不能替它认领
+                    ensureCacheMarker(p, false);
+                    return p;
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        Path d = baseDir().resolve("cache");
+        try {
+            Files.createDirectories(d);
+            ensureCacheMarker(d, true);
+        } catch (Exception ignored) {
+        }
+        return d;
+    }
+
+    private static void ensureCacheMarker(Path d, boolean always) {
+        try {
+            Path marker = d.resolve(CACHE_MARKER);
+            if (Files.isRegularFile(marker)) return;
+            if (!always) {
+                try (var s = Files.list(d)) {
+                    if (s.findAny().isPresent()) return;
+                }
+            }
+            Files.writeString(marker, "TCraft Launcher cache root", StandardCharsets.UTF_8);
+        } catch (Exception ignored) {
+        }
+    }
+
+    // 破坏性清理（prune / 清空缓存目录）前必须确认标记存在
+    public static boolean hasCacheMarker(Path cacheRoot) {
+        if (cacheRoot == null) return false;
+        try {
+            return Files.isRegularFile(cacheRoot.resolve(CACHE_MARKER));
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private String detectGameDir() {
-        String os = System.getProperty("os.name", "").toLowerCase();
+        String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
         if (os.contains("mac")) {
             return Paths.get(System.getProperty("user.home"), "Library", "Application Support", "minecraft").toString();
         }
@@ -347,20 +410,25 @@ public final class Data {
         return Paths.get(System.getProperty("user.home"), ".minecraft").toString();
     }
 
-    /** 一个可用的 Java 运行时。 */
     public record JavaRuntime(String path, int major, String folder) {
     }
 
     private volatile List<JavaRuntime> javaScanCache;
+    private final Object javaScanLock = new Object();
     private volatile long javaScanAt;
 
-    /** 清掉扫描缓存，下次重新读磁盘。 */
     public void invalidateJavaScan() {
-        javaScanCache = null;
-        javaScanAt = 0;
+        synchronized (javaScanLock) {
+            javaScanCache = null;
+            javaScanAt = 0;
+        }
     }
 
-    /** 选中版本最高的 17+ Java，没有 17+ 就用最高版本。 */
+    // 缓存里有结果时设置页可以直接渲染，不用等后台扫完
+    public boolean hasJavaScanCache() {
+        return javaScanCache != null && System.currentTimeMillis() - javaScanAt < 300_000;
+    }
+
     public String detectJava() {
         List<JavaRuntime> list = scanJavaRuntimes();
         for (JavaRuntime r : list) {
@@ -369,7 +437,37 @@ public final class Data {
         return list.isEmpty() ? "" : list.get(0).path;
     }
 
-    /** 路径存在且能读到版本号才算可用。 */
+    // 只读扫描缓存，绝不起进程
+    private String cachedJavaPath() {
+        List<JavaRuntime> cached = javaScanCache;
+        if (cached == null || cached.isEmpty()) return "";
+        for (JavaRuntime r : cached) {
+            if (r.major >= 17) return r.path;
+        }
+        return cached.get(0).path;
+    }
+
+    // 后台扫完 javaPath 还是空就填最优的；扫结果进缓存，设置页直接用
+    private void startJavaScanFill() {
+        Thread t = new Thread(() -> {
+            try {
+                List<JavaRuntime> list = scanJavaRuntimes();
+                if ((javaPath == null || javaPath.isEmpty()) && !list.isEmpty()) {
+                    for (JavaRuntime r : list) {
+                        if (r.major >= 17) {
+                            javaPath = r.path;
+                            return;
+                        }
+                    }
+                    javaPath = list.get(0).path;
+                }
+            } catch (Exception ignored) {
+            }
+        }, "TCL-Java-Fill");
+        t.setDaemon(true);
+        t.start();
+    }
+
     public static boolean usableJava(String path) {
         if (path == null || path.isBlank()) return false;
         try {
@@ -379,7 +477,6 @@ public final class Data {
         }
     }
 
-    /** 设置游戏用 Java，并同步给 exe 外壳。 */
     public void setJavaRuntime(String path, int major) {
         javaPath = path;
         set("java.path", path);
@@ -387,7 +484,6 @@ public final class Data {
         if (major >= 17) writeLauncherCfg(path);
     }
 
-    /** 写 .tcl\launcher.cfg，下次由外壳直接启动。 */
     private void writeLauncherCfg(String path) {
         try {
             Files.createDirectories(configPath.getParent());
@@ -396,36 +492,97 @@ public final class Data {
         }
     }
 
-    /** 扫描本机 Java，按版本降序；60 秒内复用结果。 */
     public List<JavaRuntime> scanJavaRuntimes() {
         long now = System.currentTimeMillis();
         List<JavaRuntime> cached = javaScanCache;
-        if (cached != null && now - javaScanAt < 60_000) return cached;
-        java.util.LinkedHashMap<String, JavaRuntime> found = new java.util.LinkedHashMap<>();
-        for (String raw : javaCandidates()) {
-            if (raw == null || raw.isBlank()) continue;
-            try {
-                Path exe = Paths.get(raw).toAbsolutePath().normalize();
-                if (!Files.isRegularFile(exe)) continue;
-                Path home = exe.getParent() == null ? null : exe.getParent().getParent();
-                // 同一个 Java 的 javaw / java 只保留一个
-                String key = (home == null ? exe.toString() : home.toString()).toLowerCase(java.util.Locale.ROOT);
-                if (found.containsKey(key)) continue;
-                int major = javaMajor(exe.toString());
-                if (major <= 0) continue;
-                String folder = home == null || home.getFileName() == null ? "" : home.getFileName().toString();
-                found.put(key, new JavaRuntime(exe.toString(), major, folder));
+        if (cached != null && now - javaScanAt < 300_000) return cached;
+        synchronized (javaScanLock) {
+            now = System.currentTimeMillis();
+            cached = javaScanCache;
+            if (cached != null && now - javaScanAt < 300_000) return cached;
+            List<JavaRuntime> list = probeAll(javaCandidates());
+            javaScanCache = list;
+            javaScanAt = now;
+            return list;
+        }
+    }
+
+    // 设置页「搜索目录」用，找到的会并入扫描缓存
+    public List<JavaRuntime> scanJavaIn(Path dir, int maxDepth) {
+        List<String> candidates = new ArrayList<>();
+        if (dir != null && Files.isDirectory(dir)) {
+            try (var walk = Files.walk(dir, Math.max(1, maxDepth))) {
+                walk.filter(p -> {
+                    String n = p.getFileName() == null ? "" : p.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
+                    return n.equals("java.exe") || n.equals("java");
+                }).filter(Files::isRegularFile).limit(200).forEach(p -> candidates.add(p.toString()));
             } catch (Exception ignored) {
             }
         }
+        List<JavaRuntime> found = probeAll(candidates);
+        if (!found.isEmpty()) {
+            synchronized (javaScanLock) {
+                java.util.LinkedHashMap<String, JavaRuntime> merged = new java.util.LinkedHashMap<>();
+                if (javaScanCache != null) {
+                    for (JavaRuntime rt : javaScanCache) merged.put(rt.path().toLowerCase(java.util.Locale.ROOT), rt);
+                }
+                for (JavaRuntime rt : found) merged.put(rt.path().toLowerCase(java.util.Locale.ROOT), rt);
+                List<JavaRuntime> list = new ArrayList<>(merged.values());
+                list.sort((a, b) -> Integer.compare(b.major(), a.major()));
+                javaScanCache = list;
+                javaScanAt = System.currentTimeMillis();
+            }
+        }
+        return found;
+    }
+
+    // 每个候选都要起进程读版本，串行在差机器上要几十秒
+    private static List<JavaRuntime> probeAll(List<String> candidates) {
+        java.util.LinkedHashMap<String, JavaRuntime> found = new java.util.LinkedHashMap<>();
+        List<String> unique = new ArrayList<>();
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (String raw : candidates) {
+            if (raw == null || raw.isBlank()) continue;
+            if (!seen.add(raw.toLowerCase(java.util.Locale.ROOT))) continue;
+            unique.add(raw);
+        }
+        if (unique.isEmpty()) return new ArrayList<>();
+
+        int threads = Math.max(1, Math.min(6, unique.size()));
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(threads, r -> {
+            Thread t = new Thread(r, "TCL-JavaProbe");
+            t.setDaemon(true);
+            return t;
+        });
+        List<java.util.concurrent.Future<JavaRuntime>> futures = new ArrayList<>();
+        for (String raw : unique) {
+            futures.add(pool.submit(() -> {
+                Path exe = Paths.get(raw).toAbsolutePath().normalize();
+                if (!Files.isRegularFile(exe)) return null;
+                int major = javaMajor(exe.toString());
+                if (major <= 0) return null;
+                Path home = exe.getParent() == null ? null : exe.getParent().getParent();
+                String folder = home == null || home.getFileName() == null ? "" : home.getFileName().toString();
+                return new JavaRuntime(exe.toString(), major, folder);
+            }));
+        }
+        for (java.util.concurrent.Future<JavaRuntime> f : futures) {
+            try {
+                JavaRuntime rt = f.get(30, java.util.concurrent.TimeUnit.SECONDS);
+                if (rt == null) continue;
+                Path home = Paths.get(rt.path()).getParent();
+                home = home == null ? null : home.getParent();
+                String key = (home == null ? rt.path() : home.toString()).toLowerCase(java.util.Locale.ROOT);
+                found.putIfAbsent(key, rt);
+            } catch (Exception ignored) {
+            }
+        }
+        pool.shutdownNow();
         List<JavaRuntime> list = new ArrayList<>(found.values());
-        list.sort((a, b) -> Integer.compare(b.major, a.major));
-        javaScanCache = list;
-        javaScanAt = now;
+        list.sort((a, b) -> Integer.compare(b.major(), a.major()));
         return list;
     }
 
-    /** 收集可能的 java 可执行文件，Windows 额外查注册表。 */
     private List<String> javaCandidates() {
         String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
         boolean win = os.contains("win");
@@ -434,18 +591,25 @@ public final class Data {
 
         addJavaExes(out, System.getProperty("java.home"), win, mac);
         addJavaExes(out, System.getenv("JAVA_HOME"), win, mac);
+        // 启动器自己下载的 Java（含 macOS 的 Contents/Home 布局）
+        try {
+            addJavaRoot(out, Resources.home().resolve("java").resolve(JavaInstaller.platformKey()), win, mac);
+        } catch (Throwable ignored) {
+        }
 
         if (win) {
             for (String env : new String[]{"ProgramFiles", "ProgramFiles(x86)", "ProgramW6432"}) {
                 String base = System.getenv(env);
                 if (base == null || base.isBlank()) continue;
                 for (String vendor : new String[]{"Java", "Microsoft", "Eclipse Adoptium", "Eclipse Foundation",
-                        "BellSoft", "Zulu", "Amazon Corretto", "Semeru", "GraalVM", "JetBrains"}) {
+                        "AdoptOpenJDK", "BellSoft", "Zulu", "Amazon Corretto", "Semeru", "GraalVM",
+                        "JetBrains", "RedHat", "SapMachine", "ojdkbuild", "Dragonwell", "Kona"}) {
                     addJavaRoot(out, Paths.get(base, vendor), win, mac);
                 }
             }
             String local = System.getenv("LOCALAPPDATA");
             String programData = System.getenv("ProgramData");
+            String appData = System.getenv("APPDATA");
             if (local != null && !local.isBlank()) {
                 addJavaRoot(out, Paths.get(local, "Programs", "Eclipse Adoptium"), win, mac);
                 addJavaRoot(out, Paths.get(local, "Programs", "Microsoft"), win, mac);
@@ -456,10 +620,23 @@ public final class Data {
                 addJavaRoot(out, Paths.get(programData, "Oracle", "Java"), win, mac);
                 addJavaRoot(out, Paths.get(programData, "chocolatey", "lib"), win, mac);
             }
+            if (appData != null && !appData.isBlank()) {
+                // 官方启动器自己下载的运行时
+                addJavaRoot(out, Paths.get(appData, ".minecraft", "runtime"), win, mac);
+            }
             String user = System.getProperty("user.home");
             if (user != null) {
                 addJavaRoot(out, Paths.get(user, ".jdks"), win, mac);
+                addJavaRoot(out, Paths.get(user, ".gradle", "jdks"), win, mac);
                 addJavaRoot(out, Paths.get(user, "scoop", "apps"), win, mac);
+            }
+            // 其它盘根目录下的常见开发目录
+            for (char drive = 'C'; drive <= 'Z'; drive++) {
+                Path root = Paths.get(drive + ":\\");
+                if (!Files.isDirectory(root)) continue;
+                for (String name : new String[]{"Java", "jdk", "JDK", "dev", "tools"}) {
+                    addJavaRoot(out, root.resolve(name), win, mac);
+                }
             }
         } else if (mac) {
             for (String root : new String[]{"/Library/Java/JavaVirtualMachines", "/opt/homebrew/opt", "/usr/local/opt"}) {
@@ -492,7 +669,6 @@ public final class Data {
         }
     }
 
-    /** PATH 里的项本身就是 bin 目录。 */
     private static void addJavaBinDir(List<String> out, String dir, boolean win) {
         String lower = dir.toLowerCase(java.util.Locale.ROOT);
         if (win && (lower.contains("\\windowsapps") || lower.contains("/windowsapps"))) return;
@@ -508,7 +684,7 @@ public final class Data {
 
     private static void addJavaExes(List<String> out, Path home, boolean win, boolean mac) {
         if (home == null) return;
-        // WindowsApps 里是应用商店的占位别名，运行会弹商店
+        // WindowsApps 是商店占位别名，运行会弹商店
         String lower = home.toString().toLowerCase(java.util.Locale.ROOT);
         if (win && (lower.contains("\\windowsapps") || lower.contains("/windowsapps"))) return;
         String exe = win ? "javaw.exe" : "java";
@@ -524,7 +700,6 @@ public final class Data {
         }
     }
 
-    /** 安装根目录最多向下找两层，覆盖 jdk-17 与 scoop 这类布局。 */
     private static void addJavaRoot(List<String> out, Path root, boolean win, boolean mac) {
         if (root == null || !Files.isDirectory(root)) return;
         addJavaExes(out, root, win, mac);
@@ -543,14 +718,20 @@ public final class Data {
     }
 
     public static String offlineUuid(String name) {
-        // 必须用 UTF-8，和 HMCL、原版离线模式算出来的一致；用平台默认编码中文名会对不上
+        // 必须 UTF-8，与 HMCL、原版离线 UUID 一致
         return UUID.nameUUIDFromBytes(("OfflinePlayer:" + name).getBytes(StandardCharsets.UTF_8)).toString();
     }
 
-    /** 读 Java 主版本号，先看 release 文件。 */
     public static int javaMajor(String javaExe) {
         try {
             Path exe = Paths.get(javaExe);
+            // javaw 没有控制台，-version 不会输出，探测统一换成同目录的 java.exe
+            String name = exe.getFileName() == null ? ""
+                    : exe.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
+            if (name.equals("javaw.exe") && exe.getParent() != null) {
+                Path console = exe.getParent().resolve("java.exe");
+                if (Files.isRegularFile(console)) exe = console;
+            }
             Path home = exe.getParent() != null ? exe.getParent().getParent() : null;
             if (home != null) {
                 Path release = home.resolve("release");
@@ -563,8 +744,8 @@ public final class Data {
                     }
                 }
             }
-            Process p = new ProcessBuilder(javaExe, "-version").redirectErrorStream(true).start();
-            // 卡死的 Java 不能拖住启动，最多等 5 秒
+            Process p = new ProcessBuilder(exe.toString(), "-version").redirectErrorStream(true).start();
+            // 卡死的 Java 最多等 5 秒
             if (!p.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)) {
                 p.destroyForcibly();
                 return 0;
@@ -592,14 +773,12 @@ public final class Data {
         }
     }
 
-    /** 版本清单是否来自离线兜底。 */
     private volatile boolean fallbackVersions = false;
 
     public boolean isFallbackVersions() {
         return fallbackVersions;
     }
 
-    /** 离线兜底版本表，官方清单失败时才用。 */
     private synchronized void seedBuiltinVersions() {
         versions.clear();
         String mark = "离线兜底数据 · 官方清单不可用";
@@ -614,7 +793,7 @@ public final class Data {
         addVersion("1.21.4-pre1", "snapshot", "2024/11/28 18:40", mark);
         addVersion("1.6.4", "old", "2013/09/19 08:00", mark);
         addVersion("b1.7.3", "old", "2011/07/08 08:00", mark);
-        addVersion("20w14∞", "special", "2020/04/01 20:00", "愚人节版 · " + mark);
+        addVersion("20w14∞", "special", "2020/04/01 20:00", Lang.t("愚人节版 · ") + Lang.t(mark));
         versions.sort((a, b) -> b.time.compareTo(a.time));
         fallbackVersions = true;
     }
@@ -672,18 +851,25 @@ public final class Data {
         return out;
     }
 
-    /** 拉 Mojang 官方版本列表，失败保留兜底。 */
     public void refreshVersions() {
         refreshVersions(false, null);
     }
 
-    /** 刷新版本清单，完成后在 FX 线程回调。 */
     public void refreshVersions(boolean force, Runnable onDone) {
-        // 5 分钟内不重复拉
-        if (!force && System.currentTimeMillis() - lastVersionRefresh < 5 * 60 * 1000L && !versions.isEmpty()) {
-            return;
+        final long now = System.currentTimeMillis();
+        synchronized (this) {
+            if (!force && now - lastVersionRefresh < 5 * 60 * 1000L && !versions.isEmpty()) {
+                if (onDone != null) runOnFx(onDone);
+                return;
+            }
+            if (versionRefreshRunning) {
+                if (onDone != null) versionWaiters.add(onDone);
+                return;
+            }
+            versionRefreshRunning = true;
+            if (onDone != null) versionWaiters.add(onDone);
         }
-        new Thread(() -> {
+        Threads.start("TCL-Manifest", () -> {
             try {
                 lastVersionRefresh = System.currentTimeMillis();
                 // 下载版本策略：0 镜像优先 / 1 官方优先并回退 / 2 只用官方
@@ -723,12 +909,17 @@ public final class Data {
                 log("获取官方版本列表失败，改用标注过的离线兜底数据：" + e.getMessage());
                 seedBuiltinVersions();
             } finally {
-                if (onDone != null) runOnFx(onDone);
+                List<Runnable> waiters;
+                synchronized (this) {
+                    versionRefreshRunning = false;
+                    waiters = new ArrayList<>(versionWaiters);
+                    versionWaiters.clear();
+                }
+                for (Runnable r : waiters) runOnFx(r);
             }
-        }, "TCL-Manifest").start();
+        });
     }
 
-    /** 在 FX 线程执行回调，没有图形环境就直接跑。 */
     private static void runOnFx(Runnable r) {
         try {
             if (javafx.application.Platform.isFxApplicationThread()) r.run();
@@ -766,13 +957,19 @@ public final class Data {
         return Boolean.parseBoolean(props.getProperty(key, String.valueOf(def)));
     }
 
+    public boolean crashAnalysisEnabled() {
+        if (props.getProperty("LaunchCrashAnalysis") != null) {
+            return getBool("LaunchCrashAnalysis", true);
+        }
+        return !getBool("LaunchAdvanceDisableCrashAnalysis", false);
+    }
+
     public String get(String key, String def) {
         return props.getProperty(key, def);
     }
 
     private long lastSaveTick;
 
-    /** 只改内存不落盘，截图自检用。 */
     void setRuntime(String key, String value) {
         props.setProperty(key, value);
     }
@@ -786,8 +983,45 @@ public final class Data {
         }
     }
 
+    public String instanceKey(String key) {
+        Instance ins = instance();
+        if (ins == null) return key;
+        String id = ins.folder == null || ins.folder.isEmpty() ? ins.name : ins.folder;
+        return "Instance." + id + "." + key;
+    }
+
+    public int getInstanceInt(String key, int def) {
+        String v = props.getProperty(instanceKey(key));
+        if (v != null) {
+            try {
+                return Integer.parseInt(v);
+            } catch (Exception ignored) {
+            }
+        }
+        return getInt("Instance" + key, def);
+    }
+
+    public boolean getInstanceBool(String key, boolean def) {
+        String v = props.getProperty(instanceKey(key));
+        if (v != null) return Boolean.parseBoolean(v);
+        return getBool("Instance" + key, def);
+    }
+
+    public String getInstance(String key, String def) {
+        String v = props.getProperty(instanceKey(key));
+        if (v != null) return v;
+        String legacy = props.getProperty("Instance" + key);
+        return legacy != null ? legacy : def;
+    }
+
+    public void setInstance(String key, Object value) {
+        set(instanceKey(key), value);
+    }
+
     public void load() {
         try {
+            // 先清掉旧键，importConfig 换文件后残留键会把导入变成叠加
+            props.clear();
             if (!Files.exists(configPath)) {
                 props.setProperty("UiThemePreset", "-1");
                 props.setProperty("UiAutoThemeFromBackground", "true");
@@ -809,7 +1043,6 @@ public final class Data {
             try (InputStream in = Files.newInputStream(configPath)) {
                 props.load(in);
             }
-            // 旧可见性 0 保持 1 最小化 2 隐藏，新语义 5 保持 4 最小化 3 隐藏并恢复
             if (!getBool("LaunchVisibilityMigrated", false)) {
                 int old = getInt("LaunchVisibility", -1);
                 if (old >= 0 && old <= 2) {
@@ -821,14 +1054,12 @@ public final class Data {
                 }
                 props.setProperty("LaunchVisibilityMigrated", "true");
             }
-            // 旧进程优先级 0 中 1 高 2 低，新语义 0 高 1 中 2 低
             if (!getBool("LaunchPriorityMigrated", false)) {
                 int old = getInt("LaunchPriority", -1);
                 if (old == 0) props.setProperty("LaunchPriority", "1");
                 else if (old == 1) props.setProperty("LaunchPriority", "0");
                 props.setProperty("LaunchPriorityMigrated", "true");
             }
-            // 旧版本隔离 0 全隔离 1 不隔离 2 仅 Mod，新语义 4 0 3
             if (!getBool("LaunchIsolationMigrated", false)) {
                 int old = getInt("LaunchIsolation", -1);
                 if (old == 0) props.setProperty("LaunchIsolation", "4");
@@ -872,6 +1103,9 @@ public final class Data {
                     Instance ins = new Instance(p[0], p[1], p[2], p[3], p[4], p[5],
                             parseLong(p[6]), Boolean.parseBoolean(p[7]), p[8]);
                     if (p.length >= 10) ins.isolation = (int) parseLong(p[9]);
+                    // 旧格式没有 addedAt 段，回退 lastPlayed；空段/非法值同理
+                    long added = p.length >= 11 ? parseLong(p[10]) : 0;
+                    ins.addedAt = added > 0 ? added : ins.lastPlayed;
                     instances.add(ins);
                 }
             }
@@ -896,7 +1130,6 @@ public final class Data {
                 if (f != null && !f.isEmpty()) favorites.add(Favorite.decode(f));
             }
         } catch (Exception e) {
-            // 配置坏了就取默认值继续，只写日志不弹窗。
             Errors.error("配置加载异常，部分数据使用默认值", e, Errors.Behavior.NONE);
         }
     }
@@ -909,7 +1142,6 @@ public final class Data {
         }
     }
 
-    /** 1.3.14 及更早的「隔离」是整棵目录装进 TCL/instances，本身已经独立，不再套一层。 */
     private void migrateLegacyIsolation() {
         for (Instance ins : instances) {
             if (ins.isolation != 0 || ins.folder == null || ins.folder.isEmpty()) continue;
@@ -918,53 +1150,82 @@ public final class Data {
         }
     }
 
-    /** 下载线程和界面线程都会调，串行化避免写坏配置文件。 */
+    private final Object saveWriteLock = new Object();
+
     public synchronized void save() {
+        byte[] payload;
         try {
-            Files.createDirectories(configPath.getParent());
-            props.setProperty("account.count", String.valueOf(accounts.size()));
-            for (int i = 0; i < accounts.size(); i++) {
-                Account a = accounts.get(i);
-                props.setProperty("account." + i, a.name + "|" + a.uuid + "|" + a.skin + "|" + a.online
-                        + "|" + a.accessToken + "|" + a.userType + "|" + a.clientToken
+            // 先取快照，FX 线程可能正在增删这些列表
+            List<Account> accountSnap = new ArrayList<>(accounts);
+            List<Instance> instanceSnap = new ArrayList<>(instances);
+            List<Instance> orphanSnap = new ArrayList<>(orphanInstances);
+            List<FolderItem> folderSnap = new ArrayList<>(folders);
+            List<Favorite> favoriteSnap = new ArrayList<>(favorites);
+            int selectedAccountSnap = selectedAccount;
+            int selectedInstanceSnap = selectedInstance;
+            String gameDirSnap = gameDir;
+            String javaPathSnap = javaPath;
+
+            props.setProperty("account.count", String.valueOf(accountSnap.size()));
+            for (int i = 0; i < accountSnap.size(); i++) {
+                Account a = accountSnap.get(i);
+                props.setProperty("account." + i, Favorite.esc(a.name) + "|" + a.uuid + "|"
+                        + Favorite.esc(a.skin) + "|" + a.online
+                        + "|" + a.accessToken + "|" + Favorite.esc(a.userType) + "|" + a.clientToken
                         + "|" + a.server.replace("|", " ")
                         + "|" + (a.refreshToken == null ? "" : a.refreshToken.replace("|", " "))
                         + "|" + a.expiresAt);
             }
-            props.setProperty("account.selected", String.valueOf(selectedAccount));
-            // 隐藏实例追加到末尾写回，索引不变
-            List<Instance> persisted = new ArrayList<>(instances);
-            persisted.addAll(orphanInstances);
+            props.setProperty("account.selected", String.valueOf(selectedAccountSnap));
+            List<Instance> persisted = new ArrayList<>(instanceSnap);
+            persisted.addAll(orphanSnap);
             props.setProperty("instance.count", String.valueOf(persisted.size()));
             for (int i = 0; i < persisted.size(); i++) {
                 Instance ins = persisted.get(i);
                 props.setProperty("instance." + i, ins.name + "|" + ins.version + "|" + ins.loader + "|"
                         + ins.loaderVersion + "|" + ins.description + "|" + ins.icon + "|" + ins.lastPlayed + "|"
-                        + ins.favorite + "|" + ins.folder + "|" + ins.isolation);
+                        + ins.favorite + "|" + ins.folder + "|" + ins.isolation + "|" + ins.addedAt);
             }
-            props.setProperty("instance.selected", String.valueOf(selectedInstance));
-            props.setProperty("folder.current", gameDir);
-            props.setProperty("folder.count", String.valueOf(folders.size()));
-            for (int i = 0; i < folders.size(); i++) {
-                props.setProperty("folder." + i, folders.get(i).name + "|" + folders.get(i).path);
+            props.setProperty("instance.selected", String.valueOf(selectedInstanceSnap));
+            props.setProperty("folder.current", gameDirSnap == null ? "" : gameDirSnap);
+            props.setProperty("folder.count", String.valueOf(folderSnap.size()));
+            for (int i = 0; i < folderSnap.size(); i++) {
+                props.setProperty("folder." + i, folderSnap.get(i).name + "|" + folderSnap.get(i).path);
             }
-            props.setProperty("java.path", javaPath);
-            props.setProperty("favorite.count", String.valueOf(favorites.size()));
-            for (int i = 0; i < favorites.size(); i++) props.setProperty("favorite." + i, favorites.get(i).encode());
-            props.setProperty("SystemLanguage", String.valueOf(Lang.mode));
-            // 先写临时文件再原子替换，避免写一半时崩溃把配置清空
-            Path tmp = configPath.resolveSibling(configPath.getFileName() + ".tmp");
-            try (OutputStream out = Files.newOutputStream(tmp,
-                    java.nio.file.StandardOpenOption.CREATE,
-                    java.nio.file.StandardOpenOption.TRUNCATE_EXISTING,
-                    java.nio.file.StandardOpenOption.WRITE)) {
-                props.store(out, "TCraft Launcher JavaFX");
+            props.setProperty("java.path", javaPathSnap == null ? "" : javaPathSnap);
+            props.setProperty("favorite.count", String.valueOf(favoriteSnap.size()));
+            for (int i = 0; i < favoriteSnap.size(); i++) {
+                props.setProperty("favorite." + i, favoriteSnap.get(i).encode());
             }
-            try {
-                Files.move(tmp, configPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING,
-                        java.nio.file.StandardCopyOption.ATOMIC_MOVE);
-            } catch (java.nio.file.AtomicMoveNotSupportedException e) {
-                Files.move(tmp, configPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            props.setProperty("SystemLanguage", String.valueOf(Lang.setting));
+            java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
+            props.store(buf, "TCraft Launcher JavaFX");
+            payload = buf.toByteArray();
+        } catch (IOException e) {
+            Errors.error("保存配置失败（账户、实例与设置可能不会被保留）", e);
+            return;
+        } catch (RuntimeException e) {
+            // 列表在遍历中被并发改动等情况：记日志而不是把异常抛给调用方
+            Errors.error("保存配置时发生异常（本次改动可能未写入）", e);
+            return;
+        }
+        // 磁盘 IO 不占数据监视器；saveWriteLock 只保证写 .tmp 与替换的原子性
+        try {
+            synchronized (saveWriteLock) {
+                Files.createDirectories(configPath.getParent());
+                Path tmp = configPath.resolveSibling(configPath.getFileName() + ".tmp");
+                try (OutputStream out = Files.newOutputStream(tmp,
+                        java.nio.file.StandardOpenOption.CREATE,
+                        java.nio.file.StandardOpenOption.TRUNCATE_EXISTING,
+                        java.nio.file.StandardOpenOption.WRITE)) {
+                    out.write(payload);
+                }
+                try {
+                    Files.move(tmp, configPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                            java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+                } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                    Files.move(tmp, configPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                }
             }
             restrictPermissions(configPath);
         } catch (IOException e) {
@@ -972,21 +1233,44 @@ public final class Data {
         }
     }
 
-    /** 配置文件里有令牌，POSIX 下只给当前用户读写。 */
     private static void restrictPermissions(Path file) {
         try {
             Files.setPosixFilePermissions(file, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
+            return;
         } catch (Exception ignored) {
-            // Windows 走用户目录默认 ACL
+            // 没有 POSIX 权限概念的平台（Windows）走下面的 ACL
+        }
+        try {
+            // 配置里有明文 token，Windows 上把 ACL 收紧到只剩文件所有者
+            java.nio.file.attribute.AclFileAttributeView acl =
+                    Files.getFileAttributeView(file, java.nio.file.attribute.AclFileAttributeView.class);
+            if (acl == null) return;
+            java.nio.file.attribute.AclEntry entry = java.nio.file.attribute.AclEntry.newBuilder()
+                    .setType(java.nio.file.attribute.AclEntryType.ALLOW)
+                    .setPrincipal(acl.getOwner())
+                    .setPermissions(
+                            java.nio.file.attribute.AclEntryPermission.READ_DATA,
+                            java.nio.file.attribute.AclEntryPermission.WRITE_DATA,
+                            java.nio.file.attribute.AclEntryPermission.APPEND_DATA,
+                            java.nio.file.attribute.AclEntryPermission.READ_NAMED_ATTRS,
+                            java.nio.file.attribute.AclEntryPermission.WRITE_NAMED_ATTRS,
+                            java.nio.file.attribute.AclEntryPermission.READ_ATTRIBUTES,
+                            java.nio.file.attribute.AclEntryPermission.WRITE_ATTRIBUTES,
+                            java.nio.file.attribute.AclEntryPermission.DELETE,
+                            java.nio.file.attribute.AclEntryPermission.READ_ACL,
+                            java.nio.file.attribute.AclEntryPermission.WRITE_ACL,
+                            java.nio.file.attribute.AclEntryPermission.SYNCHRONIZE)
+                    .build();
+            acl.setAcl(java.util.List.of(entry));
+        } catch (Exception ignored) {
         }
     }
 
-    /** 把设置里的代理应用到 JVM 网络栈。 */
     public void applyProxy() {
         try {
             applyProxyProps();
         } finally {
-            // 改代理后重建 HttpClient，老连接还是旧配置。
+            // 改代理后重建 HttpClient，老连接还是旧配置
             if (INSTANCE != null) Http.rebuild();
         }
     }
@@ -1042,7 +1326,6 @@ public final class Data {
         }
     }
 
-    /** 网络页显示的代理状态。 */
     public String describeProxy() {
         int mode = Math.max(0, Math.min(3, getInt("SystemHttpProxyType", 1)));
         String prefix = Lang.t("当前：");
@@ -1061,22 +1344,78 @@ public final class Data {
             Files.copy(configPath, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             return true;
         } catch (Exception e) {
+            log("导出配置失败：" + e);
             return false;
         }
     }
 
     public boolean importConfig(Path source) {
         try {
+            Properties incoming = new Properties();
+            try (InputStream in = Files.newInputStream(source)) {
+                incoming.load(in);
+            }
+            // 配置可能来自别人：能触发命令执行、指向可执行文件或改下载/代理链路的键都不接受
+            List<String> dropped = new ArrayList<>();
+            for (String key : new ArrayList<>(incoming.stringPropertyNames())) {
+                if (isImportBlockedKey(key)) {
+                    incoming.remove(key);
+                    dropped.add(key);
+                }
+            }
+            // 连 account/instance/folder/theme 这些键都没有的基本不是配置文件，拒掉
+            if (!incoming.containsKey("account.count") && !incoming.containsKey("instance.count")
+                    && !incoming.containsKey("folder.count") && !incoming.containsKey("UiThemePreset")) {
+                log("导入配置失败：文件不包含启动器配置项");
+                return false;
+            }
             Files.createDirectories(configPath.getParent());
-            Files.copy(source, configPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            Path tmp = configPath.resolveSibling(configPath.getFileName() + ".import.tmp");
+            try (OutputStream out = Files.newOutputStream(tmp,
+                    java.nio.file.StandardOpenOption.CREATE,
+                    java.nio.file.StandardOpenOption.TRUNCATE_EXISTING,
+                    java.nio.file.StandardOpenOption.WRITE)) {
+                incoming.store(out, "TCraft Launcher JavaFX");
+            }
+            try {
+                Files.move(tmp, configPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                        java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+            } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                Files.move(tmp, configPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+            restrictPermissions(configPath);
             load();
+            if (!dropped.isEmpty()) {
+                log("导入配置时已忽略 " + dropped.size() + " 项敏感设置：" + String.join("、", dropped));
+            }
             return true;
         } catch (Exception e) {
+            log("导入配置失败：" + e);
             return false;
         }
     }
 
-    /** 日志先入队，由后台线程批量落盘，游戏输出多时不会卡 UI。 */
+    // 导入黑名单：命令、可执行路径、下载源与代理不能由外部文件决定
+    static boolean isImportBlockedKey(String key) {
+        if (key == null || key.isEmpty()) return false;
+        String k = key.toLowerCase(java.util.Locale.ROOT);
+        // 启动前/后命令会直接交给 cmd.exe / sh -c 执行
+        if (k.contains("command")) return true;
+        // 指向任意可执行文件的路径
+        if (k.equals("java.path")) return true;
+        // getInstance("Java") 的 legacy 键与实例级变体都会成为游戏 JVM 的 java.executable
+        if (k.equals("instancejava") || (k.startsWith("instance.") && k.endsWith(".java"))) return true;
+        // classpath 头部是 JVM 最先加载的 jar，等于任意代码执行
+        if (k.equals("launchadvanceclasspathhead")) return true;
+        // 缓存根重定向配合清理功能可以删任意目录
+        if (k.equals("systemsystemcache")) return true;
+        // 下载源与代理可以把后续所有下载导向第三方
+        if (k.equals("systembmclroot")) return true;
+        if (k.startsWith("systemproxy")) return true;
+        // -javaagent / -agentpath 之类的参数同样是任意代码执行入口
+        return k.endsWith("jvmargs") || k.endsWith("gameargs");
+    }
+
     private final java.util.concurrent.BlockingQueue<String> logQueue =
             new java.util.concurrent.LinkedBlockingQueue<>(5000);
     private volatile Thread logWriter;
@@ -1084,7 +1423,6 @@ public final class Data {
     public void log(String line) {
         String stamped = Redact.apply("[" + LocalDateTime.now().toLocalTime().withNano(0) + "] " + line);
         log.add(stamped);
-        if (log.size() > 500) log.remove(0);
         if (getBool("SystemDebugMode", false)) System.out.println("[TCL] " + stamped);
         startLogWriter();
         if (!logQueue.offer(stamped)) {
@@ -1116,10 +1454,14 @@ public final class Data {
                     batch.append(System.lineSeparator()).append(next);
                 }
                 Files.createDirectories(file.getParent());
-                // 单份日志超过 4MB 就滚动，避免长期运行把磁盘写满
+                // 单份日志超 4MB 就滚到 launcher.log.1，免得磁盘被写满
                 if (Files.isRegularFile(file) && Files.size(file) > 4L * 1024 * 1024) {
-                    Files.move(file, file.resolveSibling("launcher.log.1"),
-                            java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    try {
+                        Files.move(file, file.resolveSibling("launcher.log.1"),
+                                java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    } catch (Exception e) {
+                        // 文件被占用滚不动就放弃本轮滚动，这批日志直接追加，下一轮再滚
+                    }
                 }
                 Files.writeString(file, batch + System.lineSeparator(), StandardCharsets.UTF_8,
                         java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);

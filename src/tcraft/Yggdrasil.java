@@ -11,10 +11,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** 外置登录：Yggdrasil 协议，配合 authlib-injector 使用。 */
 public final class Yggdrasil {
 
-    /** 认证服务器。apiRoot 末尾一定带斜杠。 */
     public static final class Server {
         public final String apiRoot;
         public final String name;
@@ -29,7 +27,6 @@ public final class Yggdrasil {
         }
     }
 
-    /** 游戏角色。id 可能是 32 位无连字符，也可能是带连字符的 UUID。 */
     public static final class Profile {
         public final String id;
         public final String name;
@@ -40,7 +37,6 @@ public final class Yggdrasil {
         }
     }
 
-    /** 登录或刷新的结果。 */
     public static final class Session {
         public String accessToken = "";
         public String clientToken = "";
@@ -48,7 +44,6 @@ public final class Yggdrasil {
         public final List<Profile> available = new ArrayList<>();
     }
 
-    /** 服务器拒绝，message 可以直接显示给用户。 */
     public static final class AuthException extends Exception {
         private static final long serialVersionUID = 1L;
         public final int status;
@@ -62,7 +57,6 @@ public final class Yggdrasil {
     private Yggdrasil() {
     }
 
-    /** 解析服务器根地址与 API 根路径，优先采用响应头给出的真实地址。 */
     public static Server locate(String input) throws IOException, AuthException {
         String url = input == null ? "" : input.trim();
         if (url.isEmpty()) throw new AuthException(0, "请填写认证服务器地址");
@@ -70,7 +64,7 @@ public final class Yggdrasil {
         try {
             URI.create(url);
         } catch (IllegalArgumentException e) {
-            throw new AuthException(0, "认证服务器地址格式不正确：" + url);
+            throw new AuthException(0, Lang.t("认证服务器地址格式不正确：") + url);
         }
 
         HttpResponse<String> resp = request("GET", url, null);
@@ -88,14 +82,13 @@ public final class Yggdrasil {
         Map<String, Object> root = parseObject(resp.body(), resp.statusCode());
         boolean looksServer = root.containsKey("meta") || root.containsKey("skinDomains")
                 || root.containsKey("signaturePublickey");
-        if (!looksServer) throw new AuthException(resp.statusCode(), "这不是 Yggdrasil API 地址：" + url);
+        if (!looksServer) throw new AuthException(resp.statusCode(), Lang.t("这不是 Yggdrasil API 地址：") + url);
 
         String name = Json.str(Json.obj(root.get("meta")), "serverName", "");
         if (!url.endsWith("/")) url += "/";
         return new Server(url, name);
     }
 
-    /** 用户名密码登录。clientToken 为空就生成一个。 */
     public static Session authenticate(Server server, String username, String password, String clientToken)
             throws IOException, AuthException {
         requireSecure(server);
@@ -109,9 +102,9 @@ public final class Yggdrasil {
         return send(server, "authserver/authenticate", body, token);
     }
 
-    /** 用 accessToken 换新 token。选中角色时带上 selectedProfile。 */
     public static Session refresh(Server server, String accessToken, String clientToken, Profile select)
             throws IOException, AuthException {
+        requireSecure(server);
         StringBuilder body = new StringBuilder("{\"accessToken\":")
                 .append(Json.quote(accessToken == null ? "" : accessToken))
                 .append(",\"clientToken\":").append(Json.quote(clientToken == null ? "" : clientToken))
@@ -124,16 +117,17 @@ public final class Yggdrasil {
         return send(server, "authserver/refresh", body.toString(), clientToken);
     }
 
-    /** token 还有效吗。网络异常会抛 IOException，交给调用方提示。 */
-    public static boolean validate(Server server, String accessToken, String clientToken) throws IOException {
+    public static boolean validate(Server server, String accessToken, String clientToken)
+            throws IOException, AuthException {
         if (accessToken == null || accessToken.isEmpty()) return false;
+        // validate 同样会带上 accessToken，明文 HTTP 等于把令牌交给中间人
+        requireSecure(server);
         String body = "{\"accessToken\":" + Json.quote(accessToken)
                 + ",\"clientToken\":" + Json.quote(clientToken == null ? "" : clientToken) + "}";
         HttpResponse<String> resp = request("POST", server.apiRoot + "authserver/validate", body);
         return resp.statusCode() == 200 || resp.statusCode() == 204;
     }
 
-    /** 启动前确保 token 可用：失效则刷新，并把新 clientToken 写回账户。 */
     public static void ensureFresh(Data.Account account) throws IOException, AuthException {
         if (account == null || account.server == null || account.server.isEmpty()) return;
         Server server = new Server(account.server.endsWith("/") ? account.server : account.server + "/", "");
@@ -154,6 +148,7 @@ public final class Yggdrasil {
 
     private static Session send(Server server, String path, String body, String clientToken)
             throws IOException, AuthException {
+        requireSecure(server);
         HttpResponse<String> resp = request("POST", server.apiRoot + path, body);
         Map<String, Object> m = parseObject(resp.body(), resp.statusCode());
         String error = Json.str(m, "error", "");
@@ -179,22 +174,23 @@ public final class Yggdrasil {
         return new Profile(Json.str(m, "id", ""), Json.str(m, "name", ""));
     }
 
-    /** 密码只能发给 HTTPS 或本机地址，避免明文传输。 */
     private static void requireSecure(Server server) throws AuthException {
         try {
             URI uri = URI.create(server.apiRoot);
             if ("https".equalsIgnoreCase(uri.getScheme())) return;
-            String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase();
-            if ("localhost".equals(host) || "127.0.0.1".equals(host) || "::1".equals(host)) return;
+            String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(java.util.Locale.ROOT);
+            // IPv6 字面量会连方括号一起返回，[::1] 要先剥壳再比
+            if (host.startsWith("[") && host.endsWith("]")) host = host.substring(1, host.length() - 1);
+            if ("localhost".equals(host) || "127.0.0.1".equals(host)
+                    || "::1".equals(host) || "0:0:0:0:0:0:0:1".equals(host)) return;
         } catch (Exception ignored) {
         }
         throw new AuthException(0, Lang.t("认证服务器不是 HTTPS 地址，密码会明文传输，请改用 https:// 开头的地址"));
     }
 
-    /** 把服务器的英文错误翻成一句能看懂的话。 */
     private static String friendly(String error, String remote, int status) {
         String text = remote == null ? "" : remote.trim();
-        String low = text.toLowerCase();
+        String low = text.toLowerCase(java.util.Locale.ROOT);
         if (low.contains("invalid credentials") || low.contains("invalid username or password")) {
             return "用户名或密码错误";
         }
@@ -204,7 +200,7 @@ public final class Yggdrasil {
         if (!text.isEmpty()) return text;
         if (status == 401 || status == 403) return "用户名或密码错误，或登录已过期";
         if ("ForbiddenOperationException".equals(error)) return "服务器拒绝了这次登录，请检查账号状态";
-        return "认证服务器返回 HTTP " + status;
+        return Lang.t("认证服务器返回 HTTP ") + status;
     }
 
     private static HttpResponse<String> request(String method, String url, String body) throws IOException {
@@ -227,7 +223,6 @@ public final class Yggdrasil {
         }
     }
 
-    /** 跟随一次 301/302/307/308，http 地址写到 https 时用得上。 */
     private static HttpResponse<String> followRedirect(HttpResponse<String> resp, String url) throws IOException {
         int code = resp.statusCode();
         if (code != 301 && code != 302 && code != 307 && code != 308) return resp;

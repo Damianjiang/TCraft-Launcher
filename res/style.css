@@ -1,7 +1,7 @@
 .root {
     -fx-font-family: "Microsoft YaHei UI";
     -fx-font-smoothing-type: gray;
-    /* 去掉 JavaFX 默认的蓝色焦点框（WPF 版没有这个描边） */
+    /* 去掉 JavaFX 默认蓝色焦点框（WPF 无此描边） */
     -fx-focus-color: transparent;
     -fx-faint-focus-color: transparent;
 }
@@ -17,8 +17,7 @@
 .scroll-pane:focused {
     -fx-background-color: transparent;
 }
-/* 对照 MyScrollBar.vb：宽 8，静止 ColorBrush4@0.5、悬停 ColorBrush3@0.9、捕获 ColorBrush4@1.0；
-   thumb 圆角 3、内缩 2，无箭头按钮，轨道透明（DelayedUi.xaml MyThumb/ScrollBar 模板） */
+/* 对照 MyScrollBar.vb：宽 8，thumb 圆角 3、内缩 2，无箭头，轨道透明 */
 .scroll-bar:vertical, .scroll-bar:horizontal {
     -fx-background-color: transparent;
 }
@@ -41,6 +40,10 @@
 .scroll-bar .thumb:hover {
     -fx-background-color: #1370f3;
     -fx-opacity: 0.9;
+}
+.scroll-bar .thumb:pressed {
+    -fx-background-color: #4890f5;
+    -fx-opacity: 1;
 }
 .scroll-bar .increment-button, .scroll-bar .decrement-button {
     -fx-pref-height: 0;
@@ -75,8 +78,7 @@
 .text-area {
     -fx-background-color: transparent;
     -fx-border-color: transparent;
-    /* 显式指定正文颜色：只清背景不给颜色时，TextArea 会按主题推导出白色，
-       在这套浅色卡片上就是"整页日志看不见字"（owner 反馈的日志页白字）。 */
+    /* 只清背景不给颜色时，TextArea 会推导出白色，浅色卡片上日志不可见 */
     -fx-text-fill: #343d4a;
 }
 

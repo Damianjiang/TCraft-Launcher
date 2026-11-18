@@ -10,7 +10,7 @@
 启动\n可以管理多个版本实例。支持正版、离线和国内区登录，能设置皮肤与披风。会根据版本自动匹配合适的 Java 与内存，也能手动指定。启动失败时会记录日志并做崩溃分析，帮你定位是哪个 Mod 出了问题。	Launch\nManage multiple version instances. Supports premium, offline and Unified Pass (China) logins, and lets you set skin and cape. It auto-matches the right Java and memory for each version, or you can specify them manually. If a launch fails, it logs the error and runs crash analysis to help you find which Mod broke.	啟動\n可以管理多個版本實例。支援正版、離線和國內區登入，能設定皮膚與披風。會根據版本自動匹配合適的 Java 與記憶體，也能手動指定。啟動失敗時會記錄日誌並做崩潰分析，幫你定位是哪個 Mod 出了問題。	
 联机\n基于 EasyTier 的 P2P 联机，不用公网 IP 也能开房间。可以创建房间、把单人存档分享给朋友，也可以输入收到的邀请码加入。还带服务器列表与在线状态查询。	Multiplayer\nP2P multiplayer over EasyTier, so you can host without a public IP. Create a room to share a single-player save with friends, or join via an invite code. Includes a server list with online status checks.	聯機\n基於 EasyTier 的 P2P 聯機，不用公眾 IP 也能開房間。可以建立房間、把單人存檔分享給朋友，也可以輸入收到的邀請碼加入。還帶伺服器清單與線上狀態查詢。	
 版本管理\n每个实例可以单独管理 Mod、查看 Jar-in-Jar 内嵌依赖、管理存档与数据包、看游戏截图，还能把整个整合包导出给别人装。	Version Management\nEach instance manages its own Mods, shows Jar-in-Jar embedded dependencies, manages saves and datapacks, lists screenshots, and can export the whole modpack for others to install.	版本管理\n每個實例可以單獨管理 Mod、查看 Jar-in-Jar 內嵌依賴、管理存檔與資料包、看遊戲截圖，還能把整個整合包導出給別人裝。	
-实用工具\n联机大厅、网络测速、环境检测、日志查看与导出，以及今日人品等小工具，都在「更多」里。	Utilities\nThe multiplayer lobby, network speed test, environment check, log viewing and export, plus daily-luck and other small tools, are all under More.	實用工具\n聯機大廳、網路測速、環境檢測、日誌檢視與匯出，以及今日人品等小工具，都在「更多」裡。	
+实用工具\n清理垃圾与今日人品等小工具，都在「更多」里。	Utilities\nJunk cleanup and Daily Luck are under More.	實用工具\n清理垃圾與今日人品等小工具，都在「更多」裡。	
 设置\n分启动、联机、Java、个性化、系统几类，覆盖下载目录、内存分配、代理、界面主题与语言。界面语言支持简体中文、English、繁體中文、文言文，也可以自动跟随系统语言。	Settings\nOrganized into Launch, Multiplayer, Java, Personalization and System, covering download folder, memory allocation, proxy, UI theme and language. The UI language supports Simplified Chinese, English, Traditional Chinese and Classical Chinese, or auto-follows the system language.	設定\n分啟動、聯機、Java、個性化、系統幾類，涵蓋下載目錄、記憶體分配、代理、介面主題與語言。介面語言支援簡體中文、English、繁體中文、文言文，也可以自動跟隨系統語言。	
 确认网络通畅，并且用的是国际区账号。国内区账号请改用登录页里的「国内区」方式。	Confirm the network is stable and that you're using an international account. For a China-region account, use the Unified Pass option on the login page instead.	確認網路通暢，並且用的是國際區帳號。國內區帳號請改用登入頁裡的「國內區」方式。	
 上面这些都没解决的话，可以进 TCL 官方 QQ 群求助：\n\n  群号：1131373915\n\n入群后请说明你的系统（Windows 版本、Java 版本、Minecraft 版本）以及具体遇到了什么问题。	If none of the above helped, join the official TCL QQ group for help:\n\n  Group: 1131373915\n\nAfter joining, state your system (Windows version, Java version, Minecraft version) and exactly what went wrong.	上面這些都沒解決的話，可以進 TCL 官方 QQ 群求助：\n\n  群号：1131373915\n\n入群後請說明你的系統（Windows 版本、Java 版本、Minecraft 版本）以及具體遇到了什麼問題。	
@@ -73,7 +73,7 @@ PNG 图片	PNG image	PNG 圖片
 保存头像失败：	Failed to save avatar: 	儲存頭像失敗：	
 成就图片已保存！	Achievement image saved!	成就圖片已儲存！	
 打开下载文件夹失败	Failed to open download folder	開啟下載資料夾失敗	
-大凶之日，宜躺平、宜频繁存档，出门前多存几份档。Orz	Very bad luck — stay put, save often, and keep multiple backups. Orz	大凶之日，宜躺平、宜頻繁存檔，出門前多存幾份檔。Orz	
+大凶之日，宜躺平、宜频繁存档，出门前多存几份档。	Very bad luck — stay put, save often, and keep multiple backups.	大凶之日，宜躺平、宜頻繁存檔，出門前多存幾份檔。	
 获取成就图片失败	Failed to fetch achievement image	獲取成就圖片失敗	
 获取成就图片失败，请检查物品 ID 是否正确。	Failed to fetch achievement image. Check the item ID.	獲取成就圖片失敗，請檢查物品 ID 是否正確。	
 获取皮肤太过频繁，请 5 分钟后再试！	Fetching skins too frequently. Try again in 5 minutes!	獲取皮膚太過頻繁，請 5 分鐘後再試！	
@@ -588,20 +588,20 @@ Bangumi 番剧主页（作者：wzyaeu）	Bangumi Anime Homepage (by wzyaeu)	Ban
 分……	 points…	分……	
 评价：	Rating: 	評價：	
 我知道了	Got it	我知道了	
-满分！天选之子非你莫属，欧气拉满、掉啥爆啥！(๑•̀ㅂ•́)و✧	Perfect score! You're the one born under the star — luck maxed, everything drops!	滿分！天選之子非你莫屬，歐氣拉滿、掉啥爆啥！(๑•̀ㅂ•́)و✧	
-鸿运当头，连挖都是稀有货，今天掉块钻石都不奇怪！(≧▽≦)	Lucky streak — even a random dig yields rarities; a diamond today wouldn't be weird!	鴻運當頭，連挖都是稀有貨，今天掉塊鑽石都不奇怪！(≧▽≦)	
-运气爆棚，下界见龙蛋、刷怪塔爆满，冲就完事了！(•̀ᴗ•́)و	Ludicrous luck — dragon eggs in the Nether, spawner farms packed; just go for it!	運氣爆棚，下界見龍蛋、刷怪塔爆滿，衝就完事了！(•̀ᴗ•́)و	
-运势不错，今天是个好日子，正常肝基本不会亏。٩(ˊᗜˋ*)۶	Decent day — a normal grind should pay off fine.	運勢不錯，今天是個好日子，正常肝基本不會虧。٩(ˊᗜˋ*)۶	
-平平淡淡，掉率回到平均线，稳住就好、别指望逆天。(•̀_•́)	Just average — drop rates back to normal; stay steady, don't expect miracles.	平平淡淡，掉率回到平均線，穩住就好、別指望逆天。(•̀_•́)	
-运气偏背，抽卡、开盲盒先缓缓，动手前深呼吸。(；´д｀)	A bit unlucky — hold off on gacha and blind boxes; breathe before you act.	運氣偏背，抽卡、開盲盒先緩緩，動手前深呼吸。(；´д｀)	
-今天掉的全是沙子和煤炭，背到连刷怪塔都在坑你……(╯°□°)╯	Everything you get today is sand and coal — unlucky even to your spawner farms…	今天掉的全是沙子和煤炭，背到連刷怪塔都在坑你……(╯°□°)╯	
+满分！天选之子非你莫属，欧气拉满，掉啥爆啥！	Perfect score! You are the one born under the star — luck maxed, everything drops!	滿分！天選之子非你莫屬，歐氣拉滿，掉啥爆啥！	
+鸿运当头，连挖都是稀有货，今天掉块钻石都不奇怪！	Lucky streak — even a random dig yields rarities; a diamond today would not be weird!	鴻運當頭，連挖都是稀有貨，今天掉塊鑽石都不奇怪！	
+运气爆棚，下界见龙蛋、刷怪塔爆满，冲就完事了！	Ludicrous luck — dragon eggs in the Nether, spawner farms packed; just go for it!	運氣爆棚，下界見龍蛋、刷怪塔爆滿，衝就完事了！	
+运势不错，今天是个好日子，正常肝基本不会亏。	Decent day — a normal grind should pay off fine.	運勢不錯，今天是個好日子，正常肝基本不會虧。	
+平平淡淡，掉率回到平均线，稳住就好，别指望逆天。	Just average — drop rates back to normal; stay steady, do not expect miracles.	平平淡淡，掉率回到平均線，穩住就好，別指望逆天。	
+运气偏背，抽卡、开盲盒先缓缓，动手前深呼吸。	A bit unlucky — hold off on gacha and blind boxes; breathe before you act.	運氣偏背，抽卡、開盲盒先緩緩，動手前深呼吸。	
+今天掉的全是沙子和煤炭，背到连刷怪塔都在坑你。	Everything you get today is sand and coal — unlucky even to your spawner farms.	今天掉的全是沙子和煤炭，背到連刷怪塔都在坑你。	
 小游戏	Mini-games	小遊戲	
 Cleanroom（仅支持 1.12.2，点击下载安装器）	Cleanroom (1.12.2 only, click to download the installer)	Cleanroom（僅支援 1.12.2，點按下載安裝器）	
 复制识别码	Copy Auth Code	複製識別碼	
 该版本不是由整合包安装的，或原始整合包文件已被删除。整合包清单需要版本目录下的「原始整合包.zip / .mrpack」。	This version was not installed from a modpack, or the original modpack file was deleted. The modpack manifest requires an "original pack.zip / .mrpack" in the version directory.	該版本不是由整合包安裝的，或原始整合包檔案已被刪除。整合包清單需要版本目錄下的「原始整合包.zip / .mrpack」。	
 原版改良	Improved Vanilla	原版改良	
 缓存文件夹	Cache Folder	快取資料夾	
-联机大厅、网络测速、环境检测、日志查看与导出，以及今日人品等小工具，都在「更多」里。	Multiplayer lobby, network speed test, environment check, log viewing & export, and tools like "Daily Luck" are all under More.	聯機大廳、網路測速、環境檢測、日誌檢視與匯出，以及今日人品等小工具，都在「更多」裡。	
+清理垃圾与今日人品等小工具，都在「更多」里。	Junk cleanup and Daily Luck are under More.	清理垃圾與今日人品等小工具，都在「更多」裡。	
 选择 Mod	Select Mod	選擇 Mod	
 含模型	Includes models	含模型	
 资源清单	Resource Manifest	資源清單	
@@ -691,7 +691,7 @@ TCL 能做什么	What Can TCL Do	TCL 能為你做什麼
 支持原版、Forge、NeoForge、Fabric、LiteLoader、Cleanroom、OptiFine，以及 Mod、整合包、资源包、光影、数据包、世界的下载。可以把本地文件导入进来，也可以把下载的资源存到收藏夹里下次再取。下载走多线程，并支持对下载节点做测速，挑最快的一条来下。	Downloads vanilla, Forge, NeoForge, Fabric, LiteLoader, Cleanroom and OptiFine, plus Mods, modpacks, resource packs, shaders, datapacks and worlds. Import local files, or save downloaded resources to favorites for later. Downloads are multithreaded with node speed-testing to pick the fastest.	支援原版、Forge、NeoForge、Fabric、LiteLoader、Cleanroom、OptiFine，以及 Mod、整合包、資源包、光影、資料包、世界的下載。可以匯入本機檔案，也可以把下載的資源存到收藏夾裡下次再取。下載走多執行緒，並支援對下載節點做測速，挑最快的一條來下。	
 杂志主页（作者：CreeperIsASpy）	Magazine Homepage (by CreeperIsASpy)	雜誌主頁（作者：CreeperIsASpy）	
 每日游戏推荐（作者：llsgllsg）	Daily Game Recommendations (by llsgllsg)	每日遊戲推薦（作者：llsgllsg）	
-蒸汽朋克	Steampunk	蒸汽朋克	
+蒸汽朋克	Steampunk	蒸汽龐克	
 默认（游戏自带渲染器）	Default (game built-in renderer)	預設（遊戲自帶渲染器）	
 圆石	Cobblestone	圓石	
 服务器 ID（必填）	Server ID (required)	伺服器 ID（必填）	
@@ -905,7 +905,7 @@ TCL 的下载、皮肤等缓存文件的存储位置。\n不推荐路径中带�
 禁止在 Mod 管理页面更新 Mod。	Disallow updating Mods on the Mod management page.	禁止在 Mod 管理頁面更新 Mod。	
 仅隐藏本选项卡，设置的禁用内容依然有效。\n可以在保留个性化设置页面的情况下避免隐藏设置被修改。	Only hides this tab; the disabled settings still apply.\nKeeps the personalization settings page while preventing hidden settings from being changed.	僅隱藏本選項卡，設定的禁用內容依然有效。\n可以在保留個人化設定頁面的情況下避免隱藏設定被修改。	
 隐藏版本设置中的版本修改功能。	Hide the version-editing feature in the version settings.	隱藏版本設定中的版本修改功能。	
-背景视频	Background Video	背景視頻	
+背景视频	Background Video	背景影片	
 刷新背景视频	Refresh Background Video	重新整理背景視頻	
 清空背景视频	Clear Background Video	清空背景視頻	
 静音（仅作为背景画面）	Mute (use as a background picture only)	靜音（僅作為背景畫面）	
@@ -2141,7 +2141,7 @@ ZGC / 分代 ZGC 内存占用更高但回收时不卡顿；G1GC 占用更低但�
 已清理	Cleaned up	已清理	
 ，其中	, of which	，其中	
 打开缓存目录失败：	Failed to open cache folder: 	開啟快取資料夾失敗：	
-搜索页面、实例与设置（Ctrl+K）	Search pages, instances and settings (Ctrl+K)	搜索頁面、實例與設置（Ctrl+K）	
+搜索页面、实例与设置（Ctrl+K）	Search pages, instances and settings (Ctrl+K)	搜尋頁面、實例與設置（Ctrl+K）	
 没有匹配的结果	No matches	沒有匹配的結果	
 安装整合包	Install modpack	安裝整合包	
 是否安装此整合包？安装后会作为一个新实例出现在实例列表中。	Install this modpack? It will appear in the instance list as a new instance.	是否安裝此整合包？安裝後會作爲一個新實例出現在實例列表中。	
@@ -2156,8 +2156,8 @@ ZGC / 分代 ZGC 内存占用更高但回收时不卡顿；G1GC 占用更低但�
 清除已完成	Clear finished	清除已完成	
 诊断	Diagnostics	診斷	
 查看游戏日志、崩溃报告与启动器日志，定位启动失败的原因。	View game logs, crash reports and launcher logs to find out why a launch failed.	查看遊戲日誌、崩潰報告與啓動器日誌，定位啓動失敗的原因。	
-搜索日志	Search logs	搜索日誌	
-信息	Info	信息	
+搜索日志	Search logs	搜尋日誌	
+信息	Info	資訊	
 调试	Debug	調試	
 导出…	Export…	導出…	
 崩溃分析…	Crash analysis…	崩潰分析…	
@@ -2179,7 +2179,7 @@ ZGC / 分代 ZGC 内存占用更高但回收时不卡顿；G1GC 占用更低但�
 拖动平移 · 滚轮缩放	Drag to pan · scroll to zoom	拖動平移 · 滾輪縮放	
 直接编辑这个实例的 options.txt：和游戏内「选项」等价，请在游戏关闭时修改。	Edit this instance's options.txt directly — equivalent to the in-game "Options" screen. Modify while the game is closed.	直接編輯這個實例的 options.txt：和遊戲內「選項」等價，請在遊戲關閉時修改。	
 操作	Actions	操作	
-保存修改	Save changes	保存修改	
+保存修改	Save changes	儲存變更	
 重新载入	Reload	重新載入	
 存为预设	Save as preset	存爲預設	
 载入预设	Load preset	載入預設	
@@ -2187,10 +2187,10 @@ ZGC / 分代 ZGC 内存占用更高但回收时不卡顿；G1GC 占用更低但�
 占用空间：计算中…	Disk usage: calculating…	佔用空間：計算中…	
 查看历史与快照	View history & snapshots	查看歷史與快照	
 结束游戏	End game	結束遊戲	
-搜索资源包	Search resource packs	搜索資源包	
+搜索资源包	Search resource packs	搜尋資源包	
 导入 .zip	Import .zip	導入 .zip	
-搜索世界名称或文件夹名	Search world or folder name	搜索世界名稱或文件夾名	
-世界信息	World info	世界信息	
+搜索世界名称或文件夹名	Search world or folder name	搜尋世界名稱或文件夾名	
+世界信息	World info	世界資訊	
 点缩略图可看大图，大图里能前后翻、复制、在文件夹中显示或删除。	Click a thumbnail to view it full-size; from there you can browse, copy, reveal in folder or delete.	點縮略圖可看大圖，大圖裏能前後翻、複製、在文件夾中顯示或刪除。	
 上一张	Previous	上一張	
 下一张	Next	下一張	
@@ -2199,7 +2199,7 @@ ZGC / 分代 ZGC 内存占用更高但回收时不卡顿；G1GC 占用更低但�
 实例改装	Mod loaders	實例改裝	
 为该实例追加 Forge / NeoForge / Fabric 等加载器。点击后跳转到安装页，并自动预选此实例对应的原版版本。	Add Forge / NeoForge / Fabric and more to this instance. Opens the install page with this instance's vanilla version preselected.	爲該實例追加 Forge / NeoForge / Fabric 等加載器。點擊後跳轉到安裝頁，並自動預選此實例對應的原版版本。	
 安装加载器	Install loader	安裝加載器	
-搜索光影包	Search shader packs	搜索光影包	
+搜索光影包	Search shader packs	搜尋光影包	
 正版皮肤与披风	Premium skin & cape	正版皮膚與披風	
 这里是当前正版账户的皮肤预览。修改后会自动刷新头像与标题栏徽章。	Preview of the current premium account's skin. Changes refresh the avatar and title-bar badge automatically.	這裏是當前正版賬戶的皮膚預覽。修改後會自動刷新頭像與標題欄徽章。	
 兑换 CDKEY	Redeem CDKEY	兌換 CDKEY	
@@ -2220,7 +2220,7 @@ https://github.com/Damianjiang/TCraft-Launcher\n欢迎提交 Issue 与 Pull Requ
 管理可用的 Java 运行时，并设置优先级。	Manage available Java runtimes and their priority.	管理可用的 Java 運行時，並設置優先級。	
 下载 Java…	Download Java…	下載 Java…	
 版本、窗口、内存与高级启动选项。	Versions, window, memory and advanced launch options.	版本、窗口、內存與高級啓動選項。	
-搜索设置	Search settings	搜索設置	
+搜索设置	Search settings	搜尋設置	
 没有找到相关设置	No matching settings	沒有找到相關設置	
 P2P 联机连接与节点下载选项。	P2P connection and node download options.	P2P 聯機連接與節點下載選項。	
 查看、导出与清理运行日志。	View, export and clean up run logs.	查看、導出與清理運行日誌。	
@@ -2228,7 +2228,7 @@ P2P 联机连接与节点下载选项。	P2P connection and node download option
 全部级别	All levels	全部級別	
 警告及错误	Warnings & errors	警告及錯誤	
 仅错误	Errors only	僅錯誤	
-搜索日志内容	Search log content	搜索日誌內容	
+搜索日志内容	Search log content	搜尋日誌內容	
 自动滚动	Auto scroll	自動滾動	
 实时监听 Log1.txt…	Watching Log1.txt…	實時監聽 Log1.txt…	
 社区与启动器维护。	Community and launcher maintenance.	社區與啓動器維護。	
@@ -2332,8 +2332,8 @@ Mojang 官方	Mojang official	Mojang 官方
 旁观	Spectator	旁觀	
 未知	Unknown	未知	
 主世界	Overworld	主世界	
-下界	The Nether	下界	
-末地	The End	末地	
+下界	The Nether	地獄	
+末地	The End	終界	
 找不到所选的图片文件。	The selected image file cannot be found.	找不到所選的圖片文件。	
 该文件不是有效的 PNG 图片，请选择 .png 格式的图标。	That file is not a valid PNG — pick a .png icon.	該文件不是有效的 PNG 圖片，請選擇 .png 格式的圖標。	
 无法读取该 PNG 的尺寸，文件可能已损坏。	Cannot read the PNG size; the file may be corrupt.	無法讀取該 PNG 的尺寸，文件可能已損壞。	
@@ -2347,16 +2347,16 @@ Mojang 官方	Mojang official	Mojang 官方
 已	Done 	已	
 切换为列表视图	Switch to list view	切換爲列表視圖	
 切换为网格视图	Switch to grid view	切換爲網格視圖	
-重命名合集	Rename collection	重命名合集	
+重命名合集	Rename collection	重新命名合集	
 所有实例上的这个标签会一起改。	This tag changes on every instance that has it.	所有實例上的這個標籤會一起改。	
-合集已重命名。	Collection renamed.	合集已重命名。	
+合集已重命名。	Collection renamed.	合集已重新命名。	
 确定要删除合集「	Delete collection "	確定要刪除合集「	
 」吗？	"?	」嗎？	
 只会删掉这个标签，实例本身与其文件不受影响。	Only the tag is removed; instances and their files are untouched.	只會刪掉這個標籤，實例本身與其文件不受影響。	
 删除合集	Delete collection	刪除合集	
 合集已删除。	Collection deleted.	合集已刪除。	
 没有匹配的实例	No matching instances	沒有匹配的實例	
-换个关键词试试，或者清空右上角的搜索框。	Try another keyword, or clear the search box at the top right.	換個關鍵詞試試，或者清空右上角的搜索框。	
+换个关键词试试，或者清空右上角的搜索框。	Try another keyword, or clear the search box at the top right.	換個關鍵詞試試，或者清空右上角的搜尋框。	
 刚刚游玩	Just now	剛剛遊玩	
 分钟前	 minutes ago	分鐘前	
 小时前	 hours ago	小時前	
@@ -2366,7 +2366,7 @@ Mojang 官方	Mojang official	Mojang 官方
 该实例无法被识别	This instance cannot be recognized	該實例無法被識別	
 实例设置	Instance settings	實例設置	
 更多操作	More actions	更多操作	
-新建合集	New collection	新建合集	
+新建合集	New collection	新增合集	
 合集只是标签，不会移动实例文件。	A collection is just a tag; instance files are not moved.	合集只是標籤，不會移動實例文件。	
 已加入合集	Added to collection	已加入合集	
 颜色标签	Color tag	顏色標籤	
@@ -2405,7 +2405,7 @@ Mojang 官方	Mojang official	Mojang 官方
 没有可导出的日志。	No logs to export.	沒有可導出的日誌。	
 导出日志	Export logs	導出日誌	
 日志文件	Log files	日誌文件	
-文本文件	Text files	文本文件	
+文本文件	Text files	文字檔案	
 日志已导出（已脱敏）。	Logs exported (sanitized).	日誌已導出（已脫敏）。	
 导出失败：	Export failed: 	導出失敗：	
 请先加载一份日志。	Load a log first.	請先加載一份日誌。	
@@ -2527,7 +2527,7 @@ options.txt 存在，但没有包含可编辑的常用选项。可以在游戏�
 无法定位这个实例的 resourcepacks 文件夹，请检查版本隔离设置。	Cannot locate this instance's resourcepacks folder; check version isolation.	無法定位這個實例的 resourcepacks 文件夾，請檢查版本隔離設置。	
 资源包列表已刷新。	Resource pack list refreshed.	資源包列表已刷新。	
 这个实例还没有资源包。把 .zip 拖进来或放到 resourcepacks 文件夹。	No resource packs yet. Drop a .zip in, or place it into the resourcepacks folder.	這個實例還沒有資源包。把 .zip 拖進來或放到 resourcepacks 文件夾。	
-没有匹配当前搜索的资源包。	No resource packs match the search.	沒有匹配當前搜索的資源包。	
+没有匹配当前搜索的资源包。	No resource packs match the search.	沒有匹配當前搜尋的資源包。	
 资源包（	Resource packs (	資源包（	
 已启用：	Enabled: 	已啓用：	
 已停用：	Disabled: 	已停用：	
@@ -2544,14 +2544,14 @@ options.txt 存在，但没有包含可编辑的常用选项。可以在游戏�
 已成功更新	Updated 	已成功更新	
 个文件！	 files!	個檔案！	
 文件夹不存在！	Folder does not exist!	文件夾不存在！	
-文件不存在！	File does not exist!	文件不存在！	
+文件不存在！	File does not exist!	檔案不存在！	
 确定要删除资源包「	Delete resource pack "	確定要刪除資源包「	
 删除后会被移入回收站，可以自行恢复。	It goes to the Recycle Bin and can be restored.	刪除後會被移入回收站，可以自行恢復。	
 删除资源包	Delete resource pack	刪除資源包	
 已删除：	Deleted: 	已刪除：	
 删除失败：	Deletion failed: 	刪除失敗：	
 个资源包。	 resource pack(s).	個資源包。	
-没有匹配当前搜索的存档。	No saves match the current search.	沒有匹配當前搜索的存檔。	
+没有匹配当前搜索的存档。	No saves match the current search.	沒有匹配當前搜尋的存檔。	
 复制这个世界	Copy this world	複製這個世界	
 导出为 .zip	Export as .zip	導出爲 .zip	
 世界已复制为：	World copied as: 	世界已複製爲：	
@@ -2574,7 +2574,7 @@ options.txt 存在，但没有包含可编辑的常用选项。可以在游戏�
 这个文件夹里没有 level.dat，可能不是有效的存档。	No level.dat in this folder — probably not a valid save.	這個文件夾裏沒有 level.dat，可能不是有效的存檔。	
 读取世界信息失败，level.dat 可能已损坏。	Failed to read world info; level.dat may be corrupt.	讀取世界信息失敗，level.dat 可能已損壞。	
 打开世界信息失败：	Failed to open world info: 	打開世界信息失敗：	
-基本信息	Basics	基本信息	
+基本信息	Basics	基本資訊	
 世界名	World name	世界名	
 种子	Seed	種子	
 出生点	Spawn point	出生點	
@@ -2593,7 +2593,7 @@ options.txt 存在，但没有包含可编辑的常用选项。可以在游戏�
 锁定难度（游戏内无法再更改）	Lock difficulty (cannot be changed in-game)	鎖定難度（遊戲內無法再更改）	
 修改会直接写回 level.dat，原文件会保留一份 level.dat.bak。	Changes are written back to level.dat; the original is kept as level.dat.bak.	修改會直接寫回 level.dat，原文件會保留一份 level.dat.bak。	
 玩家数据	Player data	玩家數據	
-血量	Health	血量	
+血量	Health	生命值	
 饥饿	Hunger	飢餓	
 （饱和度	(saturation 	（飽和度	
 经验等级	XP level	經驗等級	
@@ -2604,7 +2604,7 @@ options.txt 存在，但没有包含可编辑的常用选项。可以在游戏�
 上次死亡点	Last death position	上次死亡點	
 没有找到玩家数据（可能还没进过这个世界）。	No player data found (this world may never have been entered).	沒有找到玩家數據（可能還沒進過這個世界）。	
 世界名不能为空。	World name cannot be empty.	世界名不能爲空。	
-世界信息已保存。	World info saved.	世界信息已保存。	
+世界信息已保存。	World info saved.	世界資訊已儲存。	
 保存世界信息失败：	Failed to save world info: 	保存世界信息失敗：	
 选择世界图标	Select world icon	選擇世界圖標	
 世界图标已更新。	World icon updated.	世界圖標已更新。	
@@ -2651,12 +2651,12 @@ options.txt 存在，但没有包含可编辑的常用选项。可以在游戏�
 重新检测	Re-detect	重新檢測	
 取消当前光影	Clear current shader	取消當前光影	
 无法定位这个实例的 shaderpacks 文件夹，请检查版本隔离设置。	Cannot locate this instance's shaderpacks folder; check version isolation.	無法定位這個實例的 shaderpacks 文件夾，請檢查版本隔離設置。	
-光影包列表已刷新。	Shader pack list refreshed.	光影包列表已刷新。	
+光影包列表已刷新。	Shader pack list refreshed.	光影包清單已重新整理。	
 当前没有启用光影。	No shader is active.	當前沒有啓用光影。	
 当前光影：	Current shader: 	當前光影：	
 （重启游戏后生效）	(effective after restarting the game)	（重啓遊戲後生效）	
 还没有光影包。光影需要 Iris 或 OptiFine，装好后把 .zip 放进 shaderpacks 文件夹。	No shader packs yet. Shaders need Iris or OptiFine — install one, then drop a .zip into the shaderpacks folder.	還沒有光影包。光影需要 Iris 或 OptiFine，裝好後把 .zip 放進 shaderpacks 文件夾。	
-没有匹配当前搜索的光影包。	No shader packs match the search.	沒有匹配當前搜索的光影包。	
+没有匹配当前搜索的光影包。	No shader packs match the search.	沒有匹配當前搜尋的光影包。	
 光影包（	Shader packs (	光影包（	
 （使用中） ·	(in use) · 	（使用中） ·	
 已切换为「	Switched to "	已切換爲「	
@@ -2698,8 +2698,8 @@ options.txt 存在，但没有包含可编辑的常用选项。可以在游戏�
 卸载并删除该官方 Java	Uninstall and remove this official Java	卸載並刪除該官方 Java	
 供应商：	Vendor: 	供應商：	
 架构：	Architecture: 	架構：	
-64 位（x64）	64-bit (x64)	64 位（x64）	
-搜索初始化失败，请查看日志	Search initialization failed — see the logs	搜索初始化失敗，請查看日誌	
+64 位（x64）	64-bit (x64)	64 位元（x64）	
+搜索初始化失败，请查看日志	Search initialization failed — see the logs	搜尋初始化失敗，請查看日誌	
 行 · 实时监听中	 lines · watching live	行 · 實時監聽中	
 当前 .NET Framework 版本对 SOCKS5 支持有限，建议使用 HTTP 代理或系统代理（可用 Clash / v2rayN 的 HTTP 端口）。	.NET Framework has limited SOCKS5 support; prefer an HTTP proxy or the system proxy (e.g. the HTTP port of Clash / v2rayN).	當前 .NET Framework 版本對 SOCKS5 支持有限，建議使用 HTTP 代理或系統代理（可用 Clash / v2rayN 的 HTTP 端口）。	
 请填写代理工具的 HTTP 端口，例如 Clash 默认的 7890。	Enter your proxy tool's HTTP port, e.g. Clash's default 7890.	請填寫代理工具的 HTTP 端口，例如 Clash 默認的 7890。	
@@ -3244,7 +3244,6 @@ Java 运行时	Java runtime	Java 執行環境
 下载源已切换为 	Download source switched to 	下載來源已切換為 	
 快捷方式启动失败	Shortcut launch failed	捷徑啟動失敗	
 未找到实例「	Instance not found "	未找到實例「	
-详情页自检失败	Detail page self-check failed	詳情頁自檢失敗	
 没搜到「	Nothing found for "	沒搜到「	
 登录微软账号	Sign in with Microsoft	登入微軟帳號	
 已打开浏览器。登录完成后把地址栏整条链接粘到上面。	Browser opened. After signing in, paste the whole link from the address bar above.	已開啟瀏覽器。登入完成後把網址列整條連結貼到上面。	
@@ -3460,7 +3459,7 @@ Mixin 注入失败	Mixin injection failed	Mixin 注入失敗
 当前：SOCKS5 代理 	Current: SOCKS5 proxy 	目前：SOCKS5 代理 
 
 填充	Fill	填充	
-墨绿	Dark green	墨綠	
+墨松绿	Dark pine green	墨松綠	
 备份实例 · 	Backup instance · 	備份實例 · 	
 复制完成	Copy complete	複製完成	
 如何安装 Java？	How do I install Java?	如何安裝 Java？	
@@ -3924,3 +3923,325 @@ CurseForge 的内容没有取到（%s），当前仅显示 Modrinth 的结果。
 支持 .zip / .mrpack 整合包或游戏目录	Drop a .zip / .mrpack modpack or a game folder	支援 .zip / .mrpack 整合包或遊戲目錄
 已添加游戏目录	Game folder added	已新增遊戲目錄
 已切换游戏目录	Switched game folder	已切換遊戲目錄
+%d 分钟前	%d min ago	%d 分鐘前
+%d 小时前	%d h ago	%d 小時前
+%d 天前	%d d ago	%d 天前
+%d 个月前	%d mo ago	%d 個月前
+%d 年前	%d y ago	%d 年前
+1 分钟内	within 1 min	1 分鐘內
+Java 下载失败	Java download failed	Java 下載失敗
+Java 已安装	Java installed	Java 已安裝
+优先级已调整	Priority updated	優先級已調整
+使用高性能显卡（写入 Windows 显卡首选项）	Use high-performance GPU (writes Windows GPU preference)	使用高效能顯卡（寫入 Windows 顯卡偏好設定）
+启动前进行内存优化	Optimize memory before launch	啟動前進行記憶體最佳化
+启动时自动播放	Auto-play on startup	啟動時自動播放
+字体已切换	Font switched	字型已切換
+字体已重新加载	Fonts reloaded	字型已重新載入
+实例名称不可用	Instance name unavailable	實例名稱不可用
+已写入显卡首选项	GPU preference saved	已寫入顯卡偏好設定
+已还原	Restored	已還原
+开启后每个版本用 versions/版本号 当游戏目录，mods、saves、config 各自独立；	Each version uses versions/<version> as its game directory, with separate mods, saves and config;	開啟後每個版本用 versions/版本號 當遊戲目錄，mods、saves、config 各自獨立；
+恢复默认字体	Restore default font	恢復預設字型
+把 .ttf / .otf 字体放进 游戏目录/TCL/Fonts 后点「重新加载字体」，	Put .ttf / .otf fonts into <game>/TCL/Fonts, then click Reload Fonts,	把 .ttf / .otf 字型放進 遊戲目錄/TCL/Fonts 後點「重新載入字型」，
+接收正式版更新提示	Notify me about stable releases	接收正式版更新提示
+接收测试版更新提示	Notify me about snapshot releases	接收測試版更新提示
+整合包 .zip / .mrpack，或包含 .minecraft 的游戏目录	Modpack .zip / .mrpack, or a game directory containing .minecraft	整合包 .zip / .mrpack，或包含 .minecraft 的遊戲目錄
+显示控制台窗口（java.exe，占用一个命令行窗口）	Show console window (java.exe, uses a terminal window)	顯示主控台視窗（java.exe，佔用一個命令列視窗）
+标题栏内容居左	Title bar content aligned left	標題列內容靠左
+正在下载 Java 运行时 %d / %d	Downloading Java runtime %d / %d	正在下載 Java 執行環境 %d / %d
+游戏启动时暂停音乐	Pause music when the game starts	遊戲啟動時暫停音樂
+游戏异常退出时自动分析崩溃原因	Analyze crash reports automatically when the game exits abnormally	遊戲異常退出時自動分析崩潰原因
+游戏语言自动设为中文（仅当游戏内为英文时）	Set game language to Chinese automatically (only when it is English)	遊戲語言自動設為中文（僅當遊戲內為英文時）
+游戏退出后恢复播放	Resume playback after the game exits	遊戲退出後恢復播放
+用右侧箭头调整优先级：列表越靠前的 Java 越优先被自动选用。	Use the arrows to reorder: the Java higher in the list is picked first.	用右側箭頭調整優先級：列表越靠前的 Java 越優先被自動選用。
+用浏览器打开微软设备登录页，输入下面的代码完成微软账号登录，	Open the Microsoft device login page in a browser and enter the code below,	用瀏覽器開啟微軟裝置登入頁，輸入下面的代碼完成微軟帳號登入，
+禁用硬件加速（下次启动生效，远程桌面/老显卡可用）	Disable hardware acceleration (takes effect next launch; for remote desktop/old GPUs)	停用硬體加速（下次啟動生效，遠端桌面/舊顯卡可用）
+至少保留一个页面	Keep at least one page visible	至少保留一個頁面
+还原为默认	Restore defaults	還原為預設
+这个版本没有内置微软登录凭据，开源版去掉了正版登录。	This build has no embedded Microsoft credentials; the open-source edition removed official login.	這個版本沒有內建微軟登入憑據，開源版去掉了正版登入。
+重新加载字体	Reload fonts	重新載入字型
+准备中	Preparing	準備中
+智能	Smart	智慧
+左上	Top left	左上
+右上	Top right	右上
+左下	Bottom left	左下
+右下	Bottom right	右下
+左中	Center left	左中
+右中	Center right	右中
+上中	Top center	上中
+下中	Bottom center	下中
+标题栏 Logo	Title bar logo	標題列 Logo
+不显示	None	不顯示
+默认文字 TCL	Default text TCL	預設文字 TCL
+自定义文字	Custom text	自訂文字
+自定义图片（TCL/Logo.png）	Custom image (TCL/Logo.png)	自訂圖片（TCL/Logo.png）
+最大帧率（下次启动生效）	Max frame rate (next launch)	最大幀率（下次啟動生效）
+字体	Fonts	字型
+界面字体	UI font	介面字型
+启动页	Launch page	啟動頁
+实例页	Instances page	實例頁
+下载页	Download page	下載頁
+联机页	Multiplayer page	連線頁
+更多页	More page	更多頁
+自定义主题色	Custom accent color	自訂主題色
+标题栏色相偏移	Title bar hue shift	標題列色相偏移
+默认资源来源	Default resource source	預設資源來源
+全部来源	All sources	全部來源
+优先 CurseForge	Prefer CurseForge	優先 CurseForge
+优先 Modrinth	Prefer Modrinth	優先 Modrinth
+显示文件名	Show file name	顯示檔案名稱
+优先显示 Mod 自带名称	Prefer the mod's own name	優先顯示 Mod 自帶名稱
+下载文件名格式	Download file name format	下載檔案名稱格式
+保留原始文件名	Keep original file name	保留原始檔案名稱
+标题-版本	Title-version	標題-版本
+仅标题	Title only	僅標題
+原文-版本	Original-version	原文-版本
+标题-原文	Title-original	標題-原文
+填入物品 ID 与文字，生成 Minecraft 成就提示图片。	Enter an item ID and text to generate a Minecraft achievement toast image.	填入物品 ID 與文字，產生 Minecraft 成就提示圖片。
+图片解析失败，物品 ID 可能不正确。	Image could not be parsed; the item ID may be wrong.	圖片解析失敗，物品 ID 可能不正確。
+正在获取成就图片…	Fetching achievement image...	正在取得成就圖片…
+获取失败：%s	Failed to fetch: %s	取得失敗：%s
+请输入物品 ID	Enter an item ID	請輸入物品 ID
+预览已生成，可点击保存。	Preview ready; you can save it now.	預覽已產生，可點擊儲存。
+成就图片已保存	Achievement image saved	成就圖片已儲存
+成就图片已保存：	Achievement image saved: 	成就圖片已儲存：
+当前平台不支持自动下载	Automatic download is not supported on this platform	當前平台不支援自動下載
+把 .ttf / .otf 字体放进 游戏目录/TCL/Fonts 后点「重新加载字体」，即可在列表中选择；macOS / Linux 会自动使用系统自带的苹方 / Noto Sans CJK。	Put .ttf / .otf fonts into GameDir/TCL/Fonts, then click "Reload fonts" to pick them from the list; macOS / Linux automatically use the built-in PingFang / Noto Sans CJK.	把 .ttf / .otf 字型放進 遊戲目錄/TCL/Fonts 後點「重新載入字型」，即可在清單中選擇；macOS / Linux 會自動使用系統內建的蘋方 / Noto Sans CJK。
+下载缓存与社区图片都会放到这里；改到剩余空间更大的盘可以避免 C 盘被占满。	Download cache and community images are stored here; move it to a drive with more free space if C: is filling up.	下載快取與社群圖片都會放到這裡；改到剩餘空間更大的磁碟可以避免 C 盤被佔滿。
+请手动安装 Java，然后用「导入 Java…」添加。	Please install Java manually, then add it with "Import Java…".	請手動安裝 Java，然後用「匯入 Java…」加入。
+Java 下载已取消	Java download cancelled	Java 下載已取消
+JVM 参数已恢复为空（使用游戏默认）	JVM arguments cleared (game defaults will be used)	JVM 參數已還原為空（使用遊戲預設）
+下次启动游戏时生效	Takes effect on the next game launch	下次啟動遊戲時生效
+标题栏文字	Title bar text	標題列文字
+不能隐藏全部导航页	At least one navigation page must remain visible	不能隱藏全部導覽頁
+当前正版账户：%s。修改皮肤 / 披风后会同步刷新账户头像与标题栏徽章；皮肤文件也可另存为 PNG。	Signed-in account: %s. Changing skin or cape refreshes the avatar and title-bar badge; the skin file can also be saved as PNG.	目前正版帳戶：%s。修改外觀 / 披風後會同步重新整理帳戶頭像與標題列徽章；外觀檔案也可另存為 PNG。
+读取 options.txt 失败：%s	Failed to read options.txt: %s	讀取 options.txt 失敗：%s
+读取失败：%s	Failed to read: %s	讀取失敗：%s
+ · 作者 	 · Author 	 · 作者 
+设置-启动	Settings - Launch	設定 - 啟動
+设置-联机	Settings - Multiplayer	設定 - 聯機
+设置-个性化	Settings - Appearance	設定 - 個性化
+设置-系统	Settings - System	設定 - 系統
+至少保留一个设置分类	Keep at least one settings section	至少保留一個設定分類
+不能隐藏全部设置分类	All settings sections cannot be hidden	不能隱藏全部設定分類
+设置入口	Settings entry	設定入口
+DirectX 12（d3d12）	DirectX 12 (d3d12)	DirectX 12（d3d12）	
+Vulkan（zink）	Vulkan (zink)	Vulkan（zink）	
+渲染器组件已就绪	Renderer component ready	渲染器元件已就緒	
+渲染器组件下载失败	Failed to download renderer component	渲染器元件下載失敗	
+渲染器组件下载校验失败，请重试	Renderer component checksum verification failed, please retry	渲染器元件下載校驗失敗，請重試	
+留空则不自动进入服务器	Empty means do not auto-join a server	留空則不自動進入伺服器	
+常用工具。	Common tools.	常用工具。
+今日人品：%d 分！\n评价：%s	Daily luck: %d points!\nRating: %s	今日人品：%d 分！\n評價：%s	
+今日人品：%d 分。\n评价：%s	Daily luck: %d points.\nRating: %s	今日人品：%d 分。\n評價：%s	
+详情页自检失败	Detail page self-check failed	詳情頁自檢失敗	
+保存配置时发生异常（本次改动可能未写入）	Failed to save config; this change may not have been written	儲存設定時發生異常（本次變更可能未寫入）	
+重定向超过 5 跳：	Redirected more than 5 times: 	重新導向超過 5 跳：	
+该文件已在下载中：	File is already being downloaded: 	檔案已在下載中：	
+文件被占用，请关闭正在运行的游戏后重试：	File is in use — close the running game and retry: 	檔案被佔用，請關閉正在執行的遊戲後重試：	
+登录响应格式异常：	Unexpected login response format: 	登入回應格式異常：	
+无法确认购买状态，请检查网络后重试	Could not verify purchase status — check your network and retry	無法確認購買狀態，請檢查網路後重試	
+认证服务器地址格式不正确：	Invalid authentication server address: 	認證伺服器位址格式不正確：	
+这不是 Yggdrasil API 地址：	This is not a Yggdrasil API address: 	這不是 Yggdrasil API 位址：	
+版本 ID 含非法字符：	Version ID contains illegal characters: 	版本 ID 含非法字元：	
+版本继承链存在循环或过深：	Version inheritance chain is circular or too deep: 	版本繼承鏈存在循環或過深：	
+无法创建游戏目录：	Could not create the game folder: 	無法建立遊戲目錄：	
+ 个依赖库（重新启动一次将自动补全）：	 libraries (restart once to fetch them automatically): 	 個依賴庫（重新啟動一次將自動補全）：	
+微软登录已失效：	Microsoft login has expired: 	微軟登入已失效：	
+外置登录已失效：	Third-party login has expired: 	外置登入已失效：	
+。请在「账户」里重新登录。	. Please sign in again on the Accounts page.	。請在「帳戶」裡重新登入。	
+连接认证服务器失败：	Could not reach the authentication server: 	連線認證伺服器失敗：	
+，请检查网络或代理设置。	; check your network or proxy settings.	，請檢查網路或代理設定。	
+ 个资源文件下载失败，请检查网络后重试	 asset files failed to download; please check your network and retry	 個資源檔案下載失敗，請檢查網路後重試	
+SHA-1 不可用	SHA-1 unavailable	SHA-1 無法使用	
+下载被中断	Download interrupted	下載被中斷	
+ 安装器下载源没有提供 .sha1 校验值，出于安全考虑已中止安装：	 installer source provides no .sha1 checksum — installation aborted for security reasons: 	 安裝器下載源沒有提供 .sha1 校驗值，出於安全考慮已中止安裝：	
+ 依赖 	 dependency 	 依賴 	
+ 安装器超过 20 分钟没有结束，请检查网络或改用镜像。日志：	 installer did not finish within 20 minutes — check your network or switch mirrors. Log: 	 安裝器超過 20 分鐘沒有結束，請檢查網路或改用鏡像。日誌：	
+Fabric 加载器版本	Fabric loader version	Fabric 載入器版本	
+安装 %s 失败	Installing %s failed	安裝 %s 失敗	
+Java 8（旧版）	Java 8 (legacy)	Java 8（舊版）	
+Java 25（最新）	Java 25 (latest)	Java 25（最新）	
+当前平台不受 Mojang Java 运行时支持	Mojang Java runtimes are not available for this platform	當前平台不受 Mojang Java 執行環境支援	
+官方清单里没有 	Not in the Mojang manifest: 	官方清單裡沒有 	
+Java 运行时清单缺少下载地址	The Java runtime manifest has no download URL	Java 執行環境清單缺少下載位址	
+清单包含非法路径：	Manifest contains an illegal path: 	清單包含非法路徑：	
+Java 文件校验失败：	Java file checksum mismatch: 	Java 檔案校驗失敗：	
+安装完成但找不到 java 可执行文件	Install finished but the java executable was not found	安裝完成但找不到 java 可執行檔	
+连接 Mojang 清单…	Connecting to the Mojang manifest…	連線 Mojang 清單…	
+联机模块下载已取消	Multiplayer module download cancelled	多人連線模組下載已取消	
+当前平台（%s-%s）没有内置的联机模块校验值，出于安全考虑已取消下载	No built-in checksum for the multiplayer module on %s-%s — download cancelled for security reasons	當前平台（%s-%s）沒有內建的多人連線模組校驗值，出於安全考慮已取消下載	
+ · 请把文件发到 TCL 交流群（1131373915）	 · Please post the file in the TCL group (1131373915)	 · 請把檔案發到 TCL 交流群（1131373915）	
+\n\n请不要发送截图。点「导出日志」保存错误报告，再把文件发到 TCL 交流群（1131373915）。	\n\nPlease do not send screenshots. Click "Export log" to save the error report, then post the file in the TCL group (1131373915).	\n\n請不要傳送截圖。點「匯出日誌」儲存錯誤報告，再把檔案發到 TCL 交流群（1131373915）。	
+运行环境存在问题，可能是 Java 版本过旧或程序文件不完整。请尝试重新安装最新 Java 与完整版启动器后再试。	The runtime environment looks broken — the Java version may be too old or program files may be incomplete. Try reinstalling the latest Java and the full launcher.	執行環境存在問題，可能是 Java 版本過舊或程式檔案不完整。請嘗試重新安裝最新 Java 與完整版啟動器後再試。	
+你的网络环境不佳，请稍后再试，或使用 VPN 改善网络环境。	Your network connection is poor. Try again later, or use a VPN to improve it.	你的網路環境不佳，請稍後再試，或使用 VPN 改善網路環境。	
+TCraft Launcher 需要 Java 17 或更高版本。\n\n	TCraft Launcher requires Java 17 or later.\n\n	TCraft Launcher 需要 Java 17 或更新版本。\n\n	
+当前 Java：	Current Java: 	當前 Java：	
+请安装 64 位 Java 17 后重新运行。	Please install 64-bit Java 17 and run again.	請安裝 64 位元 Java 17 後重新執行。	
+准备 TCL 启动器中…	Preparing TCraft Launcher…	準備 TCL 啟動器中…	
+JavaFX 运行库准备失败：\n\n	Failed to prepare the JavaFX runtime:\n\n	JavaFX 執行庫準備失敗：\n\n	
+\n\n请检查网络后重试，或删除 	\n\nCheck your network and retry, or delete 	\n\n請檢查網路後重試，或刪除 	
+ 再运行。	 then run again.	 再執行。	
+找不到 JavaFX 运行时。\n\n	JavaFX runtime not found.\n\n	找不到 JavaFX 執行環境。\n\n	
+首次启动需要联网下载约 10MB 的 JavaFX 运行库。\n	The first launch downloads about 10 MB of JavaFX runtime files over the network.\n	首次啟動需要連網下載約 10MB 的 JavaFX 執行庫。\n	
+正在启动 TCL…	Starting TCL…	正在啟動 TCL…	
+TCraft Launcher 无法启动：\n\n	TCraft Launcher could not start:\n\n	TCraft Launcher 無法啟動：\n\n	
+\n\n详细堆栈已写入：\n	\n\nFull stack trace written to:\n	\n\n詳細堆疊已寫入：\n	
+\n\n请不要发送截图，点「导出错误报告」保存日志，再把文件发到 TCL 交流群（1131373915）。	\n\nPlease do not send screenshots. Click "Export error report", save the log, then post the file in the TCL group (1131373915).	\n\n請不要傳送截圖，點「匯出錯誤報告」儲存日誌，再把檔案發到 TCL 交流群（1131373915）。	
+正在检查资源是否齐全…	Checking resources…	正在檢查資源是否齊全…	
+正在准备主界面…	Preparing the main window…	正在準備主介面…	
+准备完成	Ready	準備完成	
+未找到实例「%s」	Instance not found: %s	未找到實例「%s」	
+Mod 依赖解析失败	Mod dependency resolution failed	Mod 依賴解析失敗	
+Mod 重复	Duplicate Mod	Mod 重複	
+同一个 Mod 放了多个版本，删掉多余的 jar。	The same Mod is present in several versions — delete the extra jar.	同一個 Mod 放了多個版本，刪掉多餘的 jar。	
+Mod 与游戏版本不匹配	Mod does not match the game version	Mod 與遊戲版本不匹配	
+图形环境异常	Graphics environment problem	圖形環境異常	
+关闭占用文件的程序，或以管理员身份运行启动器。	Close the program using the file, or run the launcher as administrator.	關閉佔用檔案的程式，或以系統管理員身份執行啟動器。	
+主线程异常	Main thread exception	主執行緒異常	
+主类缺失	Main class missing	主類別缺失	
+版本文件不完整，重新下载该版本。	The version files are incomplete — download this version again.	版本檔案不完整，重新下載該版本。	
+确认加载器安装完整，必要时重新下载版本。	Check that the loader is fully installed; re-download the version if needed.	確認載入器安裝完整，必要時重新下載版本。	
+检查网络或切换下载源后重试。	Check your network or switch the download source and retry.	檢查網路或切換下載源後重試。	
+网络不可用	Network unavailable	網路不可用	
+检查网络连接、代理与 DNS 设置。	Check your network connection, proxy and DNS settings.	檢查網路連線、代理與 DNS 設定。	
+检查代理设置与防火墙。	Check your proxy settings and firewall.	檢查代理設定與防火牆。	
+Mod 组合不兼容	Incompatible Mod combination	Mod 組合不相容	
+按日志列出的冲突 Mod 逐个停用排查。	Disable the conflicting Mods listed in the log one by one to narrow it down.	按日誌列出的衝突 Mod 逐個停用排查。	
+ 的版本		 的版本	
+ 项前置	 prerequisites	 項前置	
+次	 times	次	
+TCL/Videos 里没有可用视频，已切回图片背景。	No usable videos in TCL/Videos; switched back to the image background.	TCL/Videos 裡沒有可用影片，已切回圖片背景。	
+已切回图片背景，请检查格式（mp4 / m4v / mov）	Switched back to the image background. Check the format (mp4 / m4v / mov).	已切回圖片背景，請檢查格式（mp4 / m4v / mov）	
+关于、帮助、新闻与实用工具	About, Help, News and Utilities	關於、幫助、新聞與實用工具	
+该实例要求正版登录，请先切换为正版账户。	This instance requires premium login. Switch to a premium account first.	該實例要求正版登入，請先切換為正版帳戶。	
+该实例要求第三方登录，请先切换为第三方账户。	This instance requires third-party login. Switch to a third-party account first.	該實例要求第三方登入，請先切換為第三方帳戶。	
+该实例不允许离线登录，请先切换为在线账户。	This instance does not allow offline login. Switch to an online account first.	該實例不允許離線登入，請先切換為線上帳戶。	
+且长度不超过 16 个字符。确定要继续吗？	and be at most 16 characters. Continue?	且長度不超過 16 個字元。確定要繼續嗎？	
+要用正版登录，请自行构建完整版并注入自己的 client id，构建说明见 docs/构建与发布.md。	To use premium login, build the full version yourself and inject your own client id. Build instructions: docs/构建与发布.md.	要用正版登入，請自行建置完整版並注入自己的 client id，建置說明見 docs/構建與發布.md。	
+授权后启动器会自动继续。	The launcher continues automatically after you authorize.	授權後啟動器會自動繼續。	
+NBT 嵌套过深	NBT nesting too deep	NBT 巢狀過深	
+NBT 字节数组长度异常：	Invalid NBT byte array length: 	NBT 位元組陣列長度異常：	
+NBT 数组长度异常：	Invalid NBT array length: 	NBT 陣列長度異常：	
+意外的状态响应包长度：	Unexpected status response packet length: 	意外的狀態回應封包長度：	
+服务器状态解析失败：	Failed to parse server status: 	伺服器狀態解析失敗：	
+响应不是有效的 JSON	Response is not valid JSON	回應不是有效的 JSON	
+服务器状态响应格式异常	Malformed server status response	伺服器狀態回應格式異常	
+正在检查运行环境…	Checking runtime environment…	正在檢查執行環境…	
+OpenJFX 17 没有 Windows ARM64 原生包。请使用 x64 版 Java 运行启动器（Windows 会自动模拟），	OpenJFX 17 has no native Windows ARM64 package. Run the launcher with x64 Java (Windows emulates it automatically), 	OpenJFX 17 沒有 Windows ARM64 原生套件。請使用 x64 版 Java 執行啟動器（Windows 會自動模擬），	
+或把 JavaFX 17 放到 	or place JavaFX 17 in 	或把 JavaFX 17 放到 	
+OpenJFX 17 没有 32 位 Windows 原生包。请安装 64 位 Java 后重新启动启动器。	OpenJFX 17 has no native 32-bit Windows package. Install 64-bit Java and restart the launcher.	OpenJFX 17 沒有 32 位 Windows 原生套件。請安裝 64 位 Java 後重新啟動啟動器。	
+OpenJFX 17 没有 32 位 Linux 原生包。请安装 64 位 Java 后重新启动启动器。	OpenJFX 17 has no native 32-bit Linux package. Install 64-bit Java and restart the launcher.	OpenJFX 17 沒有 32 位 Linux 原生套件。請安裝 64 位 Java 後重新啟動啟動器。	
+暂不支持当前系统：	Unsupported system: 	暫不支援目前系統：	
+资源检查完成	Resource check complete	資源檢查完成	
+正在准备运行库…	Preparing runtime libraries…	正在準備執行庫…	
+正在下载 JavaFX 	Downloading JavaFX 	正在下載 JavaFX 	
+ 下载失败	 download failed	 下載失敗	
+没有 JavaFX 17 运行库：	No JavaFX 17 runtime for 	沒有 JavaFX 17 執行庫：	
+仅作用于当前实例的启动选项，每个实例各自保存。	Launch options for this instance only; each instance keeps its own.	僅作用於當前實例的啟動選項，每個實例各自儲存。	
+自动选择（按版本要求）	Auto (per version requirements)	自動選擇（按版本要求）	
+跟随全局设置（%s）	Follow global (%s)	跟隨全域設定（%s）	
+已跟随全局 Java	Now following the global Java	已跟隨全域 Java	
+已使用自动 Java	Now using auto-selected Java	已使用自動 Java	
+已指定实例 Java	Now using the instance-specific Java	已指定實例 Java	
+按版本要求选择	Selected per version requirements	按版本要求選擇	
+崩溃报告 · %s	Crash report · %s	崩潰報告 · %s	
+共 %d 行，显示 %d 行	%d lines in total, showing %d	共 %d 行，顯示 %d 行	
+删除预设 · %s	Delete preset · %s	刪除預設 · %s	
+删除%s失败	Failed to delete the %s	刪除%s失敗	
+移入回收站失败（系统回收站不可用或权限不足），文件未删除。	Failed to move to the Recycle Bin (unavailable or access denied); the file was not deleted.	移入資源回收筒失敗（系統資源回收筒不可用或權限不足），檔案未刪除。	
+%s 未被 Modrinth 收录。	%s is not on Modrinth.	%s 未被 Modrinth 收錄。	
+%s 有新版本：%s\n新文件：%s\n\n新版本 Mod 可能不兼容旧存档或者其他 Mod，这可能导致游戏崩溃，甚至永久损坏存档。\n如果你在游玩整合包，请千万不要自行更新 Mod。更新前请先备份存档。\n\n是否更新？旧文件将移入回收站。	%s has a new version: %s\nNew file: %s\n\nThe new Mod version may be incompatible with old saves or other Mods, which can crash the game or even permanently damage saves.\nIf you are playing a modpack, never update Mods on your own. Back up your saves before updating.\n\nUpdate anyway? The old file will be moved to the Recycle Bin.	%s 有新版本：%s\n新檔案：%s\n\n新版本 Mod 可能與舊存檔或其他 Mod 不相容，這可能導致遊戲崩潰，甚至永久損壞存檔。\n如果你在玩整合包，請千萬不要自行更新 Mod。更新前請先備份存檔。\n\n是否更新？舊檔案將移入資源回收筒。	
+\n\n注意，这两个文件的内容并不相同。请手动删除或重命名其中一个后再试。	\n\nNote that the two files are not identical. Delete or rename one of them manually, then try again.	\n\n注意，這兩個檔案的內容並不相同。請手動刪除或重命名其中一個後再試。	
+存档名不合法	Invalid save name	存檔名不合法	
+目标路径超出了存档目录。	The target path escapes the saves folder.	目標路徑超出了存檔目錄。	
+名称不能以点或空格结尾。	The name cannot end with a dot or a space.	名稱不能以點或空格結尾。	
+这是系统保留名称。	This name is reserved by the system.	這是系統保留名稱。	
+不安全的下载地址	Insecure download URL	不安全的下載地址	
+这个文件的下载地址是 http 明文链接，下载内容可能被中途篡改。\n\n仍要继续下载吗？	This file is served over plain-text http, so its content could be tampered with in transit.\n\nDownload anyway?	這個檔案的下載地址是 http 明文連結，下載內容可能被中途篡改。\n\n仍要繼續下載嗎？	
+这个文件的下载地址不是 https，下载内容可能被中途篡改。\n\n仍要继续下载吗？	This file's download URL is not https, so its content could be tampered with in transit.\n\nDownload anyway?	這個檔案的下載地址不是 https，下載內容可能被中途篡改。\n\n仍要繼續下載嗎？	
+联网获取部分文件信息失败（%s），是否继续导出？\n\n若继续，无法获取信息的文件将被直接打包。由于二次分发可能违反使用协议，请尽量不要公开发布导出的整合包！	Failed to fetch info for some files online (%s). Continue exporting?\n\nIf you continue, files whose info could not be fetched will be packed as-is. Redistribution may violate their terms of use — avoid publishing the exported modpack publicly!	連網取得部分檔案資訊失敗（%s），是否繼續導出？\n\n若繼續，無法取得資訊的檔案將被直接打包。由於二次分發可能違反使用協議，請盡量不要公開發布導出的整合包！	
+配置文件会改动本机内容	The config file changes local behavior	設定檔會改動本機內容	
+\n这些设置来自外部文件，确认按此配置导出吗？	\nThese settings come from an external file. Export with this configuration?	\n這些設定來自外部檔案，確認按此配置導出嗎？	
+· 导出位置被固定为：	· Export location is fixed to: 	· 導出位置被固定為：	
+· 会打包本地文件：	· Local file that will be packed: 	· 會打包本地檔案：	
+· 以及另外 %d 个本地路径\n	· and %d more local paths\n	· 以及另外 %d 個本地路徑\n	
+支持 mp4 / m4v / mov（H.264）。mkv、avi、wmv、webm 等 JavaFX 无法解码，需要先转成 mp4；多个视频循环播放。建议使用 720p 以内的素材，分辨率越高 CPU 占用越大。	Supports mp4 / m4v / mov (H.264). mkv, avi, wmv, webm etc. cannot be decoded by JavaFX and must be converted to mp4 first; multiple videos play in a loop. Use 720p-or-lower clips — the higher the resolution, the higher the CPU usage.	支援 mp4 / m4v / mov（H.264）。mkv、avi、wmv、webm 等 JavaFX 無法解碼，需要先轉成 mp4；多個影片循環播放。建議使用 720p 以內的素材，解析度越高 CPU 佔用越大。	
+跟随系统默认（%s）	Follow system default (%s)	跟隨系統預設（%s）	
+跟随系统默认	Follow system default	跟隨系統預設	
+共 %d 个自定义字体	%d custom fonts in total	共 %d 個自訂字型	
+背景（视频 %d 个）	Background (%d videos)	背景（影片 %d 個）	
+背景（图片 %d 张）	Background (%d images)	背景（圖片 %d 張）	
+启动器失去焦点时暂停（省 CPU）	Pause when the launcher loses focus (saves CPU)	啟動器失去焦點時暫停（節省 CPU）	
+留空使用默认	Leave empty for the default	留空使用預設	
+跟随系统	Follow system	跟隨系統	
+将导入 %s 中的配置，同名设置会被文件内容覆盖。\n\n出于安全考虑，导入时不会应用启动前命令、Java 路径、下载源、代理，以及 JVM / 游戏附加参数，这些只能在本机手动设置。\n\n确认导入吗？	Configuration will be imported from %s; settings with the same names will be overwritten by the file.\n\nFor safety, importing does not apply pre-launch commands, Java paths, download sources or proxy, nor JVM / game argument overrides — those can only be set manually on this machine.\n\nImport now?	將匯入 %s 中的配置，同名設定會被檔案內容覆蓋。\n\n出於安全考慮，匯入時不會應用啟動前命令、Java 路徑、下載源、代理，以及 JVM / 遊戲附加參數，這些只能在本機手動設定。\n\n確認匯入嗎？	
+配置已重新加载，敏感项已忽略	Configuration reloaded; sensitive items were skipped	配置已重新載入，敏感項已忽略	
+搜索目录…	Search folder…	搜尋目錄…	
+正在扫描本机的 Java…	Scanning this PC for Java…	正在掃描本機的 Java…	
+首选 	Preferred: 	首選 	
+下载 Java 运行时	Download a Java runtime	下載 Java 執行環境	
+找不到语言表	Language table not found	找不到語言表	
+请选择 bin 目录下的 %s	Please choose %s inside the bin folder	請選擇 bin 目錄下的 %s	
+选择要搜索 Java 的文件夹	Choose a folder to search for Java	選擇要搜尋 Java 的資料夾	
+没有找到 Java	No Java found	沒有找到 Java	
+换个目录再试，或直接选择 bin\java.exe	Try another folder, or pick bin\java.exe directly	換個目錄再試，或直接選擇 bin\java.exe	
+找到 %d 个 Java	Found %d Java installations	找到 %d 個 Java	
+读取失败：%s（当前显示内存日志）	Read failed: %s (showing the in-memory log)	讀取失敗：%s（目前顯示記憶體日誌）	
+\n\n不会删除游戏存档与已安装版本。是否继续？	\n\nGame saves and installed versions will not be deleted. Continue?	\n\n不會刪除遊戲存檔與已安裝版本。是否繼續？	
+发现 %d 个无用文件，共 %s	Found %d junk files, totaling %s	發現 %d 個無用檔案，共 %s	
+代理参数无效：%s	Invalid proxy settings: %s	代理參數無效：%s	
+正在加载第 %d 页…	Loading page %d…	正在載入第 %d 頁…	
+请求超时	Request timed out	請求逾時	
+找不到启动器程序（TCraftLauncher.exe / TCraftLauncher.sh），请确认使用的是完整版程序。	Launcher executable not found (TCraftLauncher.exe / TCraftLauncher.sh); make sure you are running the full package.	找不到啟動器程式（TCraftLauncher.exe / TCraftLauncher.sh），請確認使用的是完整版程式。	
+将一个已有的 Minecraft 文件夹添加到列表，也可以直接把文件夹拖进窗口	Add an existing Minecraft folder to the list, or drag the folder straight into the window	將一個已有的 Minecraft 資料夾新增到清單，也可以直接把資料夾拖進視窗	
+支持 .zip / .mrpack，可直接拖入窗口	Supports .zip / .mrpack; drag it straight into the window	支援 .zip / .mrpack，可直接拖入視窗	
+预读整合包失败	Failed to pre-read the modpack	預讀整合包失敗	
+读取整合包时出错：%s	Error while reading the modpack: %s	讀取整合包時出錯：%s	
+整合包读取失败	Failed to read the modpack	整合包讀取失敗	
+无法从该压缩包中识别出整合包清单。\n当前支持 Modrinth (.mrpack)、CurseForge (.zip)、MultiMC、HMCL 与 MCBBS 格式。	No modpack manifest could be identified in this archive.\nSupported formats: Modrinth (.mrpack), CurseForge (.zip), MultiMC, HMCL and MCBBS.	無法從該壓縮包中識別出整合包清單。\n目前支援 Modrinth (.mrpack)、CurseForge (.zip)、MultiMC、HMCL 與 MCBBS 格式。	
+\n无法完成安装。	\nThe installation cannot be completed.	\n無法完成安裝。	
+\n\n是否开始安装？	\n\nStart installation now?	\n\n是否開始安裝？	
+版本扫描失败：%s	Version scan failed: %s	版本掃描失敗：%s	
+联机码内容不是合法 JSON：%s	The link code is not valid JSON: %s	聯機碼內容不是合法 JSON：%s	
+联机码 Base64 解码失败：%s	Failed to Base64-decode the link code: %s	聯機碼 Base64 解碼失敗：%s	
+格式损坏	Malformed	格式損壞	
+ · 当前账户	 · current account	 · 目前帳戶	
+无法识别整合包格式（压缩包里没有清单文件）	Unrecognized modpack format (no manifest file in the archive)	無法識別整合包格式（壓縮包裡沒有清單檔案）	
+压缩包损坏或读取失败：%s	The archive is corrupt or could not be read: %s	壓縮包損壞或讀取失敗：%s	
+ 整合包 · MC 	 modpack · MC 	 整合包 · MC 	
+整合包内容已解压，但游戏版本安装失败：%s	Modpack content was extracted, but the game version failed to install: %s	整合包內容已解壓，但遊戲版本安裝失敗：%s	
+游戏版本安装失败	Game version install failed	遊戲版本安裝失敗	
+整合包内容已就绪，游戏版本未装完	Modpack content is ready, but the game version is not fully installed	整合包內容已就緒，遊戲版本未裝完	
+整合包安装完成	Modpack installed	整合包安裝完成	
+项目分类获取失败（id=%s）：%s	Failed to fetch project categories (id=%s): %s	專案分類取得失敗（id=%s）：%s	
+整合包清单文件过大：%s（%d 字节）	The modpack manifest is too large: %s (%d bytes)	整合包清單檔案過大：%s（%d 位元組）	
+整合包清单 JSON 损坏：%s，%s	The modpack manifest JSON is corrupt: %s, %s	整合包清單 JSON 損壞：%s，%s	
+格式不合法	Invalid format	格式不合法	
+整合包清单 JSON 无法解析：%s，%s	The modpack manifest JSON could not be parsed: %s, %s	整合包清單 JSON 無法解析：%s，%s	
+整合包的覆盖目录超出了解压目录，请向整合包作者反馈此问题！	The modpack's overrides directory escapes the extraction directory — please report this to the modpack author!	整合包的覆蓋目錄超出了解壓目錄，請向整合包作者回饋此問題！	
+退出程序	Exit	結束程式	
+，	, 	，	
+隐藏主题 %d/%d · 每累计启动 %d 次解锁一个，再启动 %d 次解锁「%s」	Hidden themes %d/%d · unlock one every %d launches; %d more launches unlock "%s"	隱藏主題 %d/%d · 每累計啟動 %d 次解鎖一個，再啟動 %d 次解鎖「%s」	
+Java 17（1.18+）	Java 17 (1.18+)	Java 17（1.18+）	
+Java 21（1.20.5+）	Java 21 (1.20.5+)	Java 21（1.20.5+）	
+请检查网络后重试，或删除 	Please check your network and retry, or delete 	請檢查網路後重試，或刪除 	
+%s 有新版本：%s\n新文件：%s\n\n新版本 Mod 可能不兼容旧存档或者其他 Mod，这可能导致游戏崩溃，甚至永久损坏存档。\n如果你在游玩整合包，请千万不要自行更新 Mod。更新前请先备份存档。\n\n是否更新？旧文件将移入回收站。\t%s has a new version: %s\nNew file: %s\n\nA newer Mod version may be incompatible with old saves or other Mods, which can crash the game or even permanently corrupt saves.\nIf you are playing a modpack, never update Mods on your own. Back up your saves before updating.\n\nUpdate now? Old files will be moved to the recycle bin.\t%s 有新版本：%s\n新檔案：%s\n\n新版 Mod 可能與舊存檔或其他 Mod 不相容，可能導致遊戲崩潰，甚至永久損壞存檔。\n如果你在遊玩整合包，請千萬不要自行更新 Mod。更新前請先備份存檔。\n\n是否更新？舊檔案將移入回收站。\t
+联网获取部分文件信息失败（%s），是否继续导出？\n\n若继续，无法获取信息的文件将被直接打包。由于二次分发可能违反使用协议，请尽量不要公开发布导出的整合包！\tFetching info for some files online failed (%s). Continue export?\n\nIf you continue, files whose info could not be fetched will be packed as-is. Redistribution may violate the terms of use, so avoid publishing the exported modpack publicly!\t線上取得部分檔案資訊失敗（%s），是否繼續匯出？\n\n若繼續，無法取得資訊的檔案將被直接打包。二次分發可能違反使用協議，請盡量不要公開發布匯出的整合包！\t
+将导入 %s 中的配置，同名设置会被文件内容覆盖。\n\n出于安全考虑，导入时不会应用启动前命令、Java 路径、下载源、代理，以及 JVM / 游戏附加参数，这些只能在本机手动设置。\n\n确认导入吗？\tConfig from %s will be imported; entries with the same name will be overwritten by the file contents.\n\nFor security, pre-launch commands, Java paths, download sources, proxies and JVM / game arguments are not imported and must be set locally.\n\nImport now?\t將匯入 %s 中的設定，同名設定會被檔案內容覆蓋。\n\n出於安全考慮，匯入時不會套用啟動前命令、Java 路徑、下載來源、代理，以及 JVM / 遊戲附加參數，這些只能在本機手動設定。\n\n確認匯入嗎？\t
+
+共 %d 首	%d tracks	共 %d 首	
+已清空背景音乐	Background music cleared	已清空背景音樂	
+删除了 %d 个文件	Deleted %d files	刪除了 %d 個檔案	
+
+字体预览 The quick brown fox 中文 123	Font preview The quick brown fox 中文 123	字型預覽 The quick brown fox 中文 123	
+字体已安装	Font installed	字型已安裝	
+安装字体失败	Failed to install font	安裝字型失敗	
+选择标题栏图片	Choose title bar image	選擇標題列圖片	
+标题栏图片已更换	Title bar image changed	標題列圖片已更換	
+更换图片失败	Failed to change image	更換圖片失敗	
+已清空标题栏图片	Title bar image cleared	已清空標題列圖片	
+
+背景图片（%d 张）	Background images (%d)	背景圖片（%d 張）	
+背景视频（%d 个）	Background videos (%d)	背景視頻（%d 個）	
+TCL/Videos 里没有可用视频，请放入 mp4/m4v/mov。	No usable video in TCL/Videos. Put mp4/m4v/mov files there.	TCL/Videos 中沒有可用視頻，請放入 mp4/m4v/mov。	

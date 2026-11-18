@@ -2,7 +2,6 @@ package tcraft;
 
 import javafx.scene.Node;
 
-/** 版本选择页，点击即选中并返回首页。 */
 public class PageVersionSelect implements Page {
 
     private final MainWindow win;

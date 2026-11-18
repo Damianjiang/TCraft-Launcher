@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** GitHub Releases 更新检查：Atom → API → releases 页面。 */
 public final class Updates {
 
     public static final String RELEASES_URL =
@@ -38,33 +37,28 @@ public final class Updates {
     private static final String API_URL =
             "https://api.github.com/repos/Damianjiang/TCraft-Launcher/releases/latest";
 
-    /** 正在检查时禁止重复发起。 */
     private static volatile boolean checking;
 
     private Updates() {
     }
 
-    /** 启动后自动检查，受设置项 CheckUpdateOnStartup 控制。 */
     public static void checkOnStartup(MainWindow win) {
-        if (App.SNAPSHOT_MODE || App.PERF_MODE) return;
         if (!Data.get().getBool("CheckUpdateOnStartup", true)) return;
+        if (!Data.get().getBool("ToolUpdateRelease", true)
+                && !Data.get().getBool("ToolUpdateSnapshot", false)) return;
         PauseTransition delay = new PauseTransition(Duration.seconds(3));
         delay.setOnFinished(e -> check(win, false));
         delay.play();
     }
 
-    /** 每次检查的代号，晚到的旧结果直接丢掉，避免抢走新检查的收尾。 */
     private static final java.util.concurrent.atomic.AtomicLong GENERATION =
             new java.util.concurrent.atomic.AtomicLong();
 
-    /** 后台线程写结果，FX 线程轮询读取。 */
     private static volatile Release pendingRelease;
     private static volatile Exception pendingError;
     private static volatile long pendingGen;
-    /** 轮询器要存字段，局部变量会被回收。 */
     private static Timeline poller;
 
-    /** 只用来做超时兜底，单线程，不占资源。 */
     private static final java.util.concurrent.ScheduledExecutorService TIMEOUT =
             java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
                 Thread t = new Thread(r, "TCL-Update-Timeout");
@@ -72,15 +66,12 @@ public final class Updates {
                 return t;
             });
 
-    /** manual=true 时无论结果都会给反馈；自动检查只在有新版本时弹窗。 */
     public static void check(MainWindow win, boolean manual) {
         check(win, manual, null);
     }
 
-    /** hint 不为空时，把结果同时写到这行说明文字上，免得用户错过弹窗。 */
     public static void check(MainWindow win, boolean manual, Label hint) {
         if (!manual && !windowAlive(win)) return;
-        // 自动检查不打断进行中的检查；手动点击永远优先，直接作废上一次
         if (checking && !manual) return;
         long generation = GENERATION.incrementAndGet();
         checking = true;
@@ -109,7 +100,7 @@ public final class Updates {
         thread.setDaemon(true);
         thread.start();
 
-        // 超时只在后台打标记，不碰界面；已有结果或已收尾就别再覆盖
+        // 超时只在后台打标记，不碰界面
         TIMEOUT.schedule(() -> {
             if (generation != GENERATION.get() || !checking) return;
             if (pendingGen == generation) return;
@@ -125,7 +116,6 @@ public final class Updates {
         poller.play();
     }
 
-    /** FX 线程轮询：结果到了就收尾。 */
     private static void poll(long generation, MainWindow win, boolean manual, Label hint) {
         if (generation != GENERATION.get()) {
             stopPoller();
@@ -140,7 +130,6 @@ public final class Updates {
         pendingGen = 0;
         checking = false;
         try {
-            if (App.SNAPSHOT_MODE || App.PERF_MODE) return;
             if (!windowAlive(win)) return;
             if (release == null) {
                 String why = reason(error);
@@ -172,7 +161,6 @@ public final class Updates {
         }
     }
 
-    /** 检查失败：说明原因，并留一个手动打开下载页的入口。 */
     private static void showFailure(MainWindow win, String message) {
         VBox card = Dialogs.msgCard("无法检查更新");
         card.setPrefWidth(440);
@@ -197,17 +185,16 @@ public final class Updates {
         win.showModal(card, true);
     }
 
-    /** 把常见网络错误翻成一句能看懂的话。 */
     private static String reason(Exception e) {
         String msg = e == null || e.getMessage() == null ? "" : e.getMessage();
-        String low = msg.toLowerCase();
+        String low = msg.toLowerCase(java.util.Locale.ROOT);
         if (msg.contains("PKIX") || low.contains("certificate")) {
-            return "证书校验失败，可能是代理或网络工具拦截了 GitHub，关掉代理再试。";
+            return Lang.t("证书校验失败，可能是代理或网络工具拦截了 GitHub，关掉代理再试。");
         }
         if (msg.contains("超时") || low.contains("timed out") || low.contains("timeout")) {
-            return "连接 GitHub 超时，请检查网络后再试。";
+            return Lang.t("连接 GitHub 超时，请检查网络后再试。");
         }
-        return "GitHub 可能连接不稳定，你可以使用瓦特工具箱等工具开个加速或来个 VPN。";
+        return Lang.t("GitHub 可能连接不稳定，你可以使用瓦特工具箱等工具开个加速或来个 VPN。");
     }
 
     private static boolean windowAlive(MainWindow win) {
@@ -221,9 +208,13 @@ public final class Updates {
             if (manual) showFailure(win, "GitHub 没有返回可用的版本号。");
             return;
         }
-        // 开发版/无法解析的版本号：直接展示最新版信息，方便本地构建也能验证
         if (!isComparable(current)) {
-            showUpdate(win, release);
+            // 自动检查遇到不可比版本号（dev 构建等）只记日志，弹窗留给手动检查
+            if (manual) {
+                showUpdate(win, release);
+            } else {
+                Data.get().log("当前版本号 \"" + current + "\" 无法比较，跳过自动更新提示");
+            }
             return;
         }
         int compared = compare(latest, current);
@@ -239,7 +230,6 @@ public final class Updates {
         showUpdate(win, release);
     }
 
-    /** 有更新时的弹窗：版本号、更新日志、前往下载。 */
     private static void showUpdate(MainWindow win, Release release) {
         VBox card = Dialogs.msgCard("发现更新");
         card.setPrefWidth(520);
@@ -258,7 +248,8 @@ public final class Updates {
         logContent.setPadding(new Insets(7, 9, 7, 9));
         logContent.setBackground(Ui.fill(Theme.fieldBg, 6));
         logContent.setBorder(Ui.border(Theme.gray6, 6, 1));
-        ScrollPane logScroll = Ui.scroll(logContent);
+        // 小框滚轮放慢对齐 WPF MyMsgText 的 DeltaMult=0.7（0.7×全局 3.0）
+        ScrollPane logScroll = Ui.scroll(logContent, 2.1);
         logScroll.setPrefViewportHeight(190);
         logScroll.setMinHeight(110);
         logScroll.setMaxHeight(220);
@@ -281,7 +272,6 @@ public final class Updates {
         win.showModal(card, true);
     }
 
-    /** 依次尝试 Atom、API、Releases 页面。 */
     private static Release fetchLatest() throws Exception {
         Exception atomError = null;
         try {
@@ -303,12 +293,10 @@ public final class Updates {
         }
     }
 
-    /** releases.atom 带完整更新日志，且不受 API 限流影响。 */
     private static Release fetchAtom() throws Exception {
         return parseAtom(fetch(ATOM_URL, "application/atom+xml,application/xml,text/xml"));
     }
 
-    /** 解析 Atom 文本，单独抽出来方便自检。 */
     static Release parseAtom(String xml) throws Exception {
         if (xml != null && !xml.isEmpty() && xml.charAt(0) == '\uFEFF') {
             xml = xml.substring(1); // 有的源带 BOM，String 解析会报 prolog 错误
@@ -321,8 +309,41 @@ public final class Updates {
         Document doc = factory.newDocumentBuilder().parse(new InputSource(new StringReader(xml)));
         NodeList entries = doc.getElementsByTagName("entry");
         if (entries.getLength() == 0) throw new IOException("Atom 中没有 release");
-        Element entry = (Element) entries.item(0);
+        Element entry = null;
+        for (int i = 0; i < entries.getLength(); i++) {
+            Element candidate = (Element) entries.item(i);
+            String tag = tagOf(candidate);
+            if (tag.isEmpty()) continue;
+            if (tagAllowed(tag)) {
+                entry = candidate;
+                break;
+            }
+        }
+        // 没有符合开关的条目就报真实原因，不再拿首个条目兜底绕过测试版开关
+        if (entry == null) {
+            throw new IOException("GitHub Releases 中没有符合测试版开关设置的版本");
+        }
 
+        String tag = tagOf(entry);
+        if (tag.isEmpty()) throw new IOException("Atom 中没有 tag");
+
+        String html = textOf(entry, "content");
+        return new Release(tag, htmlToText(html));
+    }
+
+    private static boolean tagAllowed(String tag) {
+        boolean snapshot = isSnapshotTag(tag);
+        return snapshot ? Data.get().getBool("ToolUpdateSnapshot", false)
+                : Data.get().getBool("ToolUpdateRelease", true);
+    }
+
+    private static boolean isSnapshotTag(String tag) {
+        String t = tag.toLowerCase(java.util.Locale.ROOT);
+        return t.contains("snapshot") || t.contains("beta") || t.contains("alpha")
+                || t.contains("rc") || t.contains("dev");
+    }
+
+    private static String tagOf(Element entry) {
         String tag = null;
         NodeList links = entry.getElementsByTagName("link");
         for (int i = 0; i < links.getLength(); i++) {
@@ -333,32 +354,35 @@ public final class Updates {
             if (tag != null && !tag.isEmpty()) break;
         }
         if (tag == null || tag.isEmpty()) tag = textOf(entry, "title").trim();
-        if (tag.isEmpty()) throw new IOException("Atom 中没有 tag");
-
-        String html = textOf(entry, "content");
-        return new Release(tag, htmlToText(html));
+        return tag == null ? "" : tag;
     }
 
-    /** GitHub API 兜底，更新日志是 Markdown 原文。 */
     @SuppressWarnings("unchecked")
     private static Release fetchApi() throws Exception {
         String json = fetch(API_URL, "application/vnd.github+json");
         Map<String, Object> obj = Json.obj(Json.parse(json));
         String tag = Json.str(obj, "tag_name", "").trim();
         if (tag.isEmpty()) throw new IOException("API 中没有 tag");
+        // latest 接口只给一个 tag，不满足开关就跳过该源，让 fetchPage 接着找
+        if (!tagAllowed(tag)) {
+            throw new IOException("API 返回的 " + tag + " 不在当前测试版开关允许范围内");
+        }
         String body = Json.str(obj, "body", "");
         return new Release(tag, body == null ? "" : body.trim());
     }
 
-    /** 最后直接抓 releases 页面里的 tag 链接，更新日志留空。 */
     private static Release fetchPage() throws Exception {
         String html = fetch(RELEASES_URL, "text/html");
         Matcher matcher = Pattern.compile("/releases/tag/([^\"'/?#]+)").matcher(html);
-        if (!matcher.find()) throw new IOException("releases 页面中没有 tag");
-        String raw = matcher.group(1);
-        String tag = URLDecoder.decode(raw, StandardCharsets.UTF_8);
-        if (tag.isEmpty()) throw new IOException("releases 页面中没有 tag");
-        return new Release(tag, "");
+        boolean any = false;
+        while (matcher.find()) {
+            String tag = URLDecoder.decode(matcher.group(1), StandardCharsets.UTF_8);
+            if (tag.isEmpty()) continue;
+            any = true;
+            if (tagAllowed(tag)) return new Release(tag, "");
+        }
+        if (!any) throw new IOException("releases 页面中没有 tag");
+        throw new IOException("releases 页面只有测试版，且设置未允许提示测试版");
     }
 
     private static String fetch(String url, String accept) throws IOException {
@@ -412,7 +436,6 @@ public final class Updates {
         return URLDecoder.decode(tag, StandardCharsets.UTF_8);
     }
 
-    /** Atom 里的更新日志是 HTML，转成可读纯文本。 */
     private static String htmlToText(String html) {
         if (html == null || html.isEmpty()) return "";
         String s = html;
@@ -433,7 +456,6 @@ public final class Updates {
         return s;
     }
 
-    /** 去掉 tag 前缀的 v，仅用于展示。 */
     private static String clean(String version) {
         String value = normalize(version);
         return value.isEmpty() ? String.valueOf(version) : value;
@@ -446,13 +468,11 @@ public final class Updates {
         return value.trim();
     }
 
-    /** 是否是可比较的数字版本号（dev、空串、纯文字都不算）。 */
     private static boolean isComparable(String version) {
         String value = normalize(version);
         return value.matches("\\d+(\\.\\d+)*([._+-].*)?");
     }
 
-    /** 逐段比较数字版本，返回 latest 相对 current 的大小。 */
     private static int compare(String latest, String current) {
         String[] left = normalize(latest).split("[._+\\-\\s]+");
         String[] right = normalize(current).split("[._+\\-\\s]+");

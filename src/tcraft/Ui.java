@@ -28,9 +28,7 @@ import javafx.scene.text.FontWeight;
 import javafx.util.Duration;
 
 import java.util.List;
-import java.util.function.Consumer;
 
-/** 自绘控件集合，统一外观和动画。 */
 public final class Ui {
 
     public static final int BTN_NORMAL = 0;
@@ -42,7 +40,7 @@ public final class Ui {
     private Ui() {
     }
 
-    // SPLINE 控制点必须在 [0,1]，越界类初始化就崩，编译期发现不了。
+    // SPLINE 控制点须在 [0,1]，越界会崩在类初始化
     public static Interpolator fluentOut(final double p) {
         return new Interpolator() {
             @Override
@@ -130,22 +128,24 @@ public final class Ui {
         private final Label titleLabel;
         private final Node chevron;
         private final DropShadow glow = new DropShadow(5, 0, 0, Color.web("#343d4a", 0.07));
+        private Timeline glowOn;
+        private Timeline glowOff;
         private boolean collapsed;
         private boolean collapsible;
         private double expandedHeight = -1;
+        private Timeline toggleAnim;
         private Runnable lazyContent;
         private boolean lazyBuilt;
 
         public Card(String title) {
-            // Ui.card(null) 会走无标题卡片，title 先归一成 "" 防 NPE。
+            // title 归一成 ""，card(null) 走无标题卡片
             if (title == null) title = "";
-            // 毛玻璃底：竖向渐变 + 1px 高光边，圆角 14。
             setBackground(glassFill(14));
             setBorder(glassBorder(14));
             setEffect(glow);
             setAlignment(Pos.TOP_LEFT);
             setMaxWidth(Double.MAX_VALUE);
-            // 不设 clip，clip 会把 DropShadow 一起裁掉。
+            // 不设 clip，clip 会把 DropShadow 一起裁掉
 
             VBox root = new VBox();
             root.setMaxWidth(Double.MAX_VALUE);
@@ -163,11 +163,9 @@ public final class Ui {
             content.setMaxWidth(Double.MAX_VALUE);
             content.setPadding(new Insets(0, 15, 14, 15));
             root.getChildren().addAll(header, content);
-            // 无标题卡片隐藏标题行，省下 22px 空白。
             if (title.isEmpty()) {
                 header.setVisible(false);
                 header.setManaged(false);
-                // 标题行不占位，内容自己留顶部内边距
                 content.setPadding(new Insets(14, 15, 14, 15));
             }
             getChildren().add(root);
@@ -190,7 +188,7 @@ public final class Ui {
                 });
             }
 
-            // 悬停点亮阴影，DropShadow 没有 opacity，用 color alpha 插值。
+            // 悬停阴影用 color alpha 插值，DropShadow 无 opacity
             addEventHandler(javafx.scene.input.MouseEvent.MOUSE_ENTERED, e -> {
                 animateGlow(true);
                 titleLabel.setTextFill(Theme.accentDark);
@@ -201,7 +199,6 @@ public final class Ui {
             });
         }
 
-        /** 大卡片直接落终态，避免逐帧重糊。 */
         private void animateGlow(boolean hover) {
             double radius = hover ? 11 : 5;
             Color color = hover ? Color.web(Theme.accent.toString(), 0.16)
@@ -211,17 +208,21 @@ public final class Ui {
                 glow.setColor(color);
                 return;
             }
-            Timeline anim = new Timeline(new KeyFrame(Duration.millis(hover ? 160 : 220),
-                    new KeyValue(glow.radiusProperty(), radius, EASE_OUT_FLUENT),
-                    new KeyValue(glow.colorProperty(), color, EASE_OUT_FLUENT)));
-            anim.play();
+            Timeline anim = hover ? glowOn : glowOff;
+            if (anim == null) {
+                anim = new Timeline(new KeyFrame(Duration.millis(hover ? 150 : 200),
+                        new KeyValue(glow.radiusProperty(), radius, EASE_OUT_FLUENT),
+                        new KeyValue(glow.colorProperty(), color, EASE_OUT_FLUENT)));
+                if (hover) glowOn = anim;
+                else glowOff = anim;
+            }
+            anim.playFromStart();
         }
 
         public void add(Node... nodes) {
             content.getChildren().addAll(nodes);
         }
 
-        /** 懒加载内容，首次展开才构建。 */
         public void setLazyContent(Runnable builder) {
             this.lazyContent = builder;
         }
@@ -251,15 +252,20 @@ public final class Ui {
         public void setCollapsed(boolean value) {
             setCollapsible(true);
             if (collapsed == value) return;
+            stopToggleAnimation();
             collapsed = value;
+            content.setOpacity(1);
+            content.setTranslateY(0);
             if (value) {
-                expandedHeight = content.getHeight() > 0 ? content.getHeight() : content.prefHeight(getWidth() - 30);
+                expandedHeight = content.getHeight() > 0 ? content.getHeight() : -1;
                 content.setVisible(false);
                 content.setManaged(false);
+                content.setMaxHeight(Region.USE_COMPUTED_SIZE);
             } else {
                 ensureContent();
                 content.setVisible(true);
                 content.setManaged(true);
+                content.setMaxHeight(Region.USE_COMPUTED_SIZE);
             }
             updateChevron();
         }
@@ -268,52 +274,93 @@ public final class Ui {
             if (!collapsible) return;
             ensureContent();
             boolean collapse = !collapsed;
-            // 展开时每帧都在改高度，辉光阴影逐帧重糊一整张卡片是卡顿大头；
-            // 动画期间先摘掉阴影，再把内容子树缓存成贴图，结束后还原。
+            stopToggleAnimation();
             setEffect(null);
-            content.setCache(true);
-            content.setCacheHint(CacheHint.SPEED);
             if (collapse) {
                 expandedHeight = Math.max(20, content.getHeight());
                 content.setVisible(true);
                 content.setManaged(true);
+                content.setOpacity(1);
+                content.setTranslateY(0);
+                int ms = aniMs(180);
+                if (ms <= 0) {
+                    content.setVisible(false);
+                    content.setManaged(false);
+                    content.setMaxHeight(Region.USE_COMPUTED_SIZE);
+                    animationCleanup();
+                    collapsed = true;
+                    updateChevron();
+                    return;
+                }
+                boolean useCache = expandedHeight <= 300;
+                content.setCache(useCache);
+                content.setCacheHint(useCache ? CacheHint.SPEED : CacheHint.DEFAULT);
                 Timeline t = new Timeline(
                         new KeyFrame(Duration.ZERO, new KeyValue(content.maxHeightProperty(), expandedHeight)),
-                        new KeyFrame(Duration.millis(180), new KeyValue(content.maxHeightProperty(), 0,
+                        new KeyFrame(Duration.millis(ms), new KeyValue(content.maxHeightProperty(), 0,
                                 Interpolator.EASE_IN)));
                 t.setOnFinished(e -> {
+                    if (toggleAnim != t) return;
+                    toggleAnim = null;
                     content.setVisible(false);
                     content.setManaged(false);
                     content.setMaxHeight(Region.USE_COMPUTED_SIZE);
                     animationCleanup();
                 });
+                toggleAnim = t;
                 t.play();
             } else {
                 content.setVisible(true);
                 content.setManaged(true);
                 content.setMaxHeight(Region.USE_COMPUTED_SIZE);
+                content.setOpacity(1);
+                content.setTranslateY(0);
                 applyCss();
                 content.applyCss();
                 double target = Math.max(20, content.prefHeight(Math.max(100, getWidth() - 30)));
+                int ms = aniMs(target > 300 ? 180 : 240);
+                if (ms <= 0) {
+                    content.setMaxHeight(Region.USE_COMPUTED_SIZE);
+                    animationCleanup();
+                    collapsed = false;
+                    updateChevron();
+                    return;
+                }
+                boolean useCache = target <= 300;
+                content.setCache(useCache);
+                content.setCacheHint(useCache ? CacheHint.SPEED : CacheHint.DEFAULT);
                 content.setMaxHeight(0);
                 Timeline t = new Timeline(
                         new KeyFrame(Duration.ZERO, new KeyValue(content.maxHeightProperty(), 0)),
-                        new KeyFrame(Duration.millis(240), new KeyValue(content.maxHeightProperty(),
+                        new KeyFrame(Duration.millis(ms), new KeyValue(content.maxHeightProperty(),
                                 target, Interpolator.EASE_OUT)));
                 t.setOnFinished(e -> {
+                    if (toggleAnim != t) return;
+                    toggleAnim = null;
                     content.setMaxHeight(Region.USE_COMPUTED_SIZE);
                     animationCleanup();
                 });
+                toggleAnim = t;
                 t.play();
             }
             collapsed = collapse;
             updateChevron();
         }
 
-        /** 高度动画结束：恢复辉光，撤掉子树缓存。 */
+        private void stopToggleAnimation() {
+            if (toggleAnim != null) {
+                toggleAnim.stop();
+                toggleAnim = null;
+            }
+            content.setCache(false);
+            setEffect(glow);
+        }
+
         private void animationCleanup() {
             setEffect(glow);
             content.setCache(false);
+            content.setOpacity(1);
+            content.setTranslateY(0);
         }
 
         private void updateChevron() {
@@ -350,9 +397,7 @@ public final class Ui {
         pane.setMinHeight(34);
         pane.setCursor(Cursor.HAND);
         pane.setAlignment(Pos.CENTER);
-        // 按钮阴影：模糊 9、深度 2、不透明度 0.22
         pane.setEffect(Theme.shadow(9, 2, 0.22, Color.BLACK));
-        // 文字色跟描边同色，悬停时一起变。
         final Color baseBg;
         final Color baseBorder;
         final Color hoverBg;
@@ -360,7 +405,6 @@ public final class Ui {
         final Color textColor;
         final Color hoverText;
         switch (type) {
-            // Theme：实心主题底 + 白字，无边框
             case BTN_THEME -> {
                 baseBg = Theme.accentDark;
                 baseBorder = Color.TRANSPARENT;
@@ -369,7 +413,6 @@ public final class Ui {
                 textColor = Color.WHITE;
                 hoverText = Color.WHITE;
             }
-            // Red：半透明白底 + 深红描边
             case BTN_RED -> {
                 baseBg = Theme.halfWhite;
                 baseBorder = Theme.redDark;
@@ -378,7 +421,6 @@ public final class Ui {
                 textColor = Theme.redDark;
                 hoverText = Theme.red;
             }
-            // Dark：深色半透明底 + 白字白描边
             case BTN_DARK -> {
                 baseBg = Theme.darkBtnBg;
                 baseBorder = Color.WHITE;
@@ -387,7 +429,6 @@ public final class Ui {
                 textColor = Color.WHITE;
                 hoverText = Color.WHITE;
             }
-            // Highlight：半透明白底 + 主题色描边
             case BTN_HIGHLIGHT -> {
                 baseBg = Theme.halfWhite;
                 baseBorder = Theme.accentDark;
@@ -396,7 +437,6 @@ public final class Ui {
                 textColor = Theme.accentDark;
                 hoverText = Theme.accent;
             }
-            // Normal：半透明白底 + 文字色描边
             default -> {
                 baseBg = Theme.halfWhite;
                 baseBorder = Theme.text;
@@ -409,7 +449,6 @@ public final class Ui {
         lab.setTextFill(textColor);
         pane.setBackground(fill(baseBg, 8));
         pane.setBorder(type == BTN_THEME ? null : border(baseBorder, 8, 1));
-        // 进 100ms，出 200ms；Theme 两向都 100ms
         int inMs = 100;
         int outMs = type == BTN_THEME ? 100 : 200;
         pane.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_ENTERED, e -> {
@@ -426,11 +465,9 @@ public final class Ui {
         });
         pane.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_PRESSED, e -> scale(pane, 0.96));
         pane.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_RELEASED, e -> scale(pane, 1));
-        // 禁用态：Theme 文字变淡，Dark 描边调灰，其余走 gray4
         pane.disabledProperty().addListener((o, was, now) -> {
             if (now) {
                 if (type == BTN_THEME) {
-                    // 保持主题色底，别淡到看不清版本号
                     animateBg(pane, Theme.accentDark, Theme.accentDark, 1);
                     lab.setTextFill(Theme.accentPale);
                 } else if (type == BTN_DARK) {
@@ -459,7 +496,16 @@ public final class Ui {
         animateBg(region, from, to, ms, null);
     }
 
-    /** ease 为 null 时线性。 */
+    // 同一节点同一槽位的动画先停旧的再播新的，快速 hover 终态才不会被上一段拽回去
+    static void startExclusive(Node owner, Object slot, javafx.animation.Animation t) {
+        Object old = owner.getProperties().put(slot, t);
+        if (old instanceof javafx.animation.Animation running) running.stop();
+        t.setOnFinished(e -> {
+            if (owner.getProperties().get(slot) == t) owner.getProperties().remove(slot);
+        });
+        t.play();
+    }
+
     public static void animateBg(Region region, Color from, Color to, int ms, Interpolator ease) {
         javafx.animation.Transition t = new javafx.animation.Transition() {
             {
@@ -473,7 +519,7 @@ public final class Ui {
                 region.setBackground(fill(c, corner(region.getBackground())));
             }
         };
-        t.play();
+        startExclusive(region, "uiBgAnim", t);
     }
 
     private static double corner(Background bg) {
@@ -498,7 +544,7 @@ public final class Ui {
                 region.setBorder(border(c, r, 1));
             }
         };
-        t.play();
+        startExclusive(region, "uiBorderAnim", t);
     }
 
     public static void scale(Node node, double target) {
@@ -509,33 +555,45 @@ public final class Ui {
         st.play();
     }
 
-    /** 菜单卡片的一行，separator() 是分隔线。 */
     public static final class MenuRow {
         final String title;
         final String icon;
         final Runnable action;
         final boolean sep;
+        final boolean keepOpen;
 
-        private MenuRow(String title, String icon, Runnable action, boolean sep) {
+        private MenuRow(String title, String icon, Runnable action, boolean sep, boolean keepOpen) {
             this.title = title;
             this.icon = icon;
             this.action = action;
             this.sep = sep;
+            this.keepOpen = keepOpen;
         }
 
         public static MenuRow of(String title, String icon, Runnable action) {
-            return new MenuRow(title, icon, action, false);
+            return new MenuRow(title, icon, action, false, false);
+        }
+
+        /** 二级菜单入口：点它不关卡片，而是在同一张卡片里换内容（对齐 WPF 的二级卡片） */
+        public static MenuRow submenu(String title, String icon, Runnable action) {
+            return new MenuRow(title, icon, action, false, true);
         }
 
         public static MenuRow separator() {
-            return new MenuRow(null, null, null, true);
+            return new MenuRow(null, null, null, true, false);
         }
     }
 
-    /** 自绘菜单卡片：圆角 10，行高 34。 */
-    public static javafx.stage.Popup menuCard(javafx.scene.Node anchor, MenuRow... rows) {
-        VBox card = menuCardShell(210);
+    /** 当前打开的菜单卡片；二级菜单靠它拿到同一张卡片 */
+    private static javafx.stage.Popup activeMenu;
 
+    public static javafx.stage.Popup activeMenu() {
+        return activeMenu;
+    }
+
+    /** 只构建菜单行（不含卡片外壳），二级菜单原地换内容时复用 */
+    public static VBox menuRows(MenuRow... rows) {
+        VBox box = new VBox(0);
         for (MenuRow row : rows) {
             if (row.sep) {
                 Region sep = new Region();
@@ -543,21 +601,25 @@ public final class Ui {
                 sep.setMaxHeight(1);
                 sep.setBackground(fill(Theme.gray6, 0));
                 VBox.setMargin(sep, new Insets(5, 8, 5, 8));
-                card.getChildren().add(sep);
+                box.getChildren().add(sep);
                 continue;
             }
             ListItem item = new ListItem(Theme.icon(row.icon, 16, Theme.text), row.title, null, 34);
             item.setOnMouseClicked(e -> {
-                closeMenuCard((javafx.stage.Popup) card.getProperties().get("popup"));
+                if (!row.keepOpen) closeMenuCard(activeMenu);
                 if (row.action != null) row.action.run();
             });
-            card.getChildren().add(item);
+            box.getChildren().add(item);
         }
+        return box;
+    }
 
+    public static javafx.stage.Popup menuCard(javafx.scene.Node anchor, MenuRow... rows) {
+        VBox card = menuCardShell(210);
+        card.getChildren().addAll(menuRows(rows).getChildren());
         return showMenuCard(anchor, card);
     }
 
-    /** 自定义内容的菜单卡片，外壳和动画同 menuCard。 */
     public static javafx.stage.Popup menuCardNode(javafx.scene.Node anchor,
                                                   javafx.scene.Node content, double width) {
         VBox card = menuCardShell(width);
@@ -565,46 +627,325 @@ public final class Ui {
         return showMenuCard(anchor, card);
     }
 
-    /** 菜单卡片外壳：圆角 10、内边距 8。 */
+    /** 卡片给投影留的白边，和 WPF 版 MenuCard.ShadowPad 一致 */
+    private static final double MENU_SHADOW_PAD = 14;
+
     private static VBox menuCardShell(double width) {
         VBox card = new VBox(0);
         card.setPadding(new Insets(8));
-        // 只设下限，锁死宽度会让文字溢出卡片。
+        // 只设下限，实际宽度在 showMenuCard 里按内容量出来后回填
         card.setMinWidth(width);
-        card.setBackground(fill(Theme.cardBg, 10));
+        card.setBackground(fill(popupBg(), 10));
+        card.setBorder(border(Color.color(Theme.text.getRed(), Theme.text.getGreen(), Theme.text.getBlue(), 0.10), 10, 1));
         card.setEffect(Theme.shadow(18, 3, 0.35, Theme.text));
         return card;
     }
 
-    /** 放进弹层：量出真实宽度后右对齐锚点，再展开。 */
+    public static Color popupBg() {
+        int pct = Data.get().getInt("UiMenuOpacity", 100);
+        pct = Math.max(0, Math.min(100, pct));
+        Color base = Theme.cardBg;
+        // WPF 的卡片底色是 #f5ffffff（96% 白）；组件半透明调低时不能再跟着一起透，
+        // 否则弹层叠在壁纸上等于没有底板，字看不清。这里给个 0.85 的底
+        double alpha = Math.max(base.getOpacity(), 0.85) * pct / 100.0;
+        if (pct > 0) alpha = Math.max(alpha, 0.30);
+        return Color.color(base.getRed(), base.getGreen(), base.getBlue(), alpha);
+    }
+
+    /**
+     * 菜单可用区域：优先用主窗口范围（菜单不能超出窗口），窗口取不到时退回所在屏幕。
+     * 两者取交集，保证既不出窗也不出屏。
+     */
+    private static javafx.geometry.Rectangle2D menuArea(javafx.stage.Window owner,
+                                                       javafx.geometry.Rectangle2D screen) {
+        if (owner instanceof javafx.stage.Stage) {
+            javafx.stage.Stage st = (javafx.stage.Stage) owner;
+            double x = st.getX(), y = st.getY(), w = st.getWidth(), h = st.getHeight();
+            if (w > 100 && h > 100 && !Double.isNaN(x) && !Double.isNaN(y)) {
+                double minX = Math.max(screen.getMinX(), x);
+                double minY = Math.max(screen.getMinY(), y);
+                double maxX = Math.min(screen.getMaxX(), x + w);
+                double maxY = Math.min(screen.getMaxY(), y + h);
+                if (maxX - minX > 160 && maxY - minY > 160) {
+                    return new javafx.geometry.Rectangle2D(minX, minY, maxX - minX, maxY - minY);
+                }
+            }
+        }
+        return screen;
+    }
+
+    /**
+     * 按锚点算菜单最大高度，移植 WPF MenuCard.CalcMaxMenuHeight：
+     * 取「下方」和「上方」里更宽敞的一侧，留 16px 边距，再扣掉卡片内边距和投影留白。
+     */
+    private static double calcMaxMenuHeight(javafx.geometry.Bounds ab,
+                                            javafx.geometry.Rectangle2D area) {
+        double below = area.getMaxY() - ab.getMaxY() - 16;
+        double above = ab.getMinY() - area.getMinY() - 16;
+        double usable = Math.max(below, above);
+        if (usable < 200) usable = area.getHeight() - 32;      // 坐标异常时退化成整块区域可用
+        return Math.max(160, Math.min(usable - 48, area.getHeight() - 80));
+    }
+
     private static javafx.stage.Popup showMenuCard(javafx.scene.Node anchor, VBox card) {
         javafx.stage.Popup popup = new javafx.stage.Popup();
         popup.setAutoHide(true);
         popup.setHideOnEscape(true);
         card.getProperties().put("popup", popup);
 
-        // 宽度要等布局，先隐身，避免闪一下再跳位。
-        card.setOpacity(0);
-        card.setScaleX(0.94);
-        card.setScaleY(0.94);
-        card.setTranslateY(10);
-        popup.getContent().add(card);
-
-        // 别用 show(anchor, x, y)，锚定定位会顶掉后面的 setX/setY。
         javafx.geometry.Bounds ab = anchor.localToScreen(anchor.getBoundsInLocal());
+        if (ab == null) ab = new javafx.geometry.BoundingBox(0, 0, 0, 0);
+        javafx.geometry.Rectangle2D screen = screenOf(ab);
         javafx.stage.Window owner = anchor.getScene() == null ? null : anchor.getScene().getWindow();
-        double w0 = card.prefWidth(-1);
-        if (w0 <= 1) w0 = 210;   // 算不出来就按最小宽度摆
-        double showX = Math.max(0, ab.getMaxX() - w0);
-        double showY = Math.max(0, ab.getMaxY() + 2);
-        if (owner != null) popup.show(owner, showX, showY);
-        else popup.show(anchor, showX, showY);
-        placeMenuCard(popup, card, anchor);
+        javafx.geometry.Rectangle2D area = menuArea(owner, screen);
+
+        MenuBox box = layoutMenu(card, ab, area);
+        box.visual.setOpacity(0);
+        box.visual.setScaleX(0.94);
+        box.visual.setScaleY(0.94);
+        box.visual.setTranslateY(10);
+        box.visual.getProperties().put("menuAnchor", anchor);
+        popup.getContent().add(box.visual);
+
+        double[] xy = placeMenu(box, ab, area);
+        if (owner != null) popup.show(owner, xy[0], xy[1]);
+        else popup.show(anchor, xy[0], xy[1]);
+
+        activeMenu = popup;
+        popup.setOnHidden(e -> {
+            if (activeMenu == popup) activeMenu = null;
+        });
+        attachThemeCss(box.visual);
+        expandIn(box.visual);
         return popup;
     }
 
-    /** 展开：130ms 淡入，220ms 缩放归位。 */
-    private static void expandIn(VBox card) {
+    /**
+     * 二级菜单：在同一张卡片里换内容（对齐 WPF 的二级卡片——PanInstanceMenu.Children.Clear() 后重建）。
+     * 不关窗、不重播入场动画，卡片风格和位置与一级菜单完全一致。
+     */
+    public static void swapMenuCard(javafx.stage.Popup popup, javafx.scene.Node content, double width) {
+        if (popup == null || !popup.isShowing() || popup.getContent().isEmpty()) return;
+        javafx.scene.Node old = popup.getContent().get(0);
+        javafx.scene.Node anchor = (javafx.scene.Node) old.getProperties().get("menuAnchor");
+        if (anchor == null) return;
+
+        VBox card = menuCardShell(width);
+        card.getChildren().add(content);
+
+        javafx.geometry.Bounds ab = anchor.localToScreen(anchor.getBoundsInLocal());
+        if (ab == null) ab = new javafx.geometry.BoundingBox(0, 0, 0, 0);
+        javafx.geometry.Rectangle2D screen = screenOf(ab);
+        javafx.stage.Window owner = anchor.getScene() == null ? null : anchor.getScene().getWindow();
+        javafx.geometry.Rectangle2D area = menuArea(owner, screen);
+
+        MenuBox box = layoutMenu(card, ab, area);
+        box.visual.setOpacity(0);
+        box.visual.getProperties().put("menuAnchor", anchor);
+
+        // Popup 显示中改宽度不生效（高度会自动跟内容走），宽度变了只能原位重开一次
+        boolean widthChanged = Math.abs(popup.getWidth() - box.vw) > 1;
+        popup.getContent().set(0, box.visual);
+        popup.setHeight(box.vh);
+        double[] xy = placeMenu(box, ab, area);
+        if (widthChanged && owner != null) {
+            popup.hide();
+            popup.show(owner, xy[0], xy[1]);
+            activeMenu = popup;
+        } else {
+            popup.setX(xy[0]);
+            popup.setY(xy[1]);
+        }
+        attachThemeCss(box.visual);
+
+        javafx.animation.Timeline in = new javafx.animation.Timeline(
+                new javafx.animation.KeyFrame(javafx.util.Duration.ZERO,
+                        new javafx.animation.KeyValue(box.visual.opacityProperty(), 0)),
+                new javafx.animation.KeyFrame(javafx.util.Duration.millis(110),
+                        new javafx.animation.KeyValue(box.visual.opacityProperty(), 1)));
+        in.play();
+    }
+
+    /** 排版结果：内容节点 + 弹窗整体尺寸（含投影留白） */
+    private static final class MenuBox {
+        javafx.scene.layout.Pane visual;
+        double w;
+        double vw;
+        double vh;
+    }
+
+    private static MenuBox layoutMenu(VBox card, javafx.geometry.Bounds ab,
+                                     javafx.geometry.Rectangle2D area) {
+        // VBox.prefWidth() 不含 minWidth，不兜底会被压成一条、文字只剩一个字；
+        // 内容自身的最小宽度也要算进来（先放开 minWidth 才能量到真实值）
+        card.setMinWidth(Region.USE_COMPUTED_SIZE);
+        double naturalMin = card.minWidth(-1);
+        double w = Math.max(210, Math.max(naturalMin, card.prefWidth(-1)));
+        w = Math.min(w, Math.max(220, area.getWidth() - 48));
+        card.setMinWidth(w);
+        card.setPrefWidth(w);
+        card.setMaxWidth(w);
+
+        double contentH = card.prefHeight(w);
+        double panelH = Math.min(contentH, calcMaxMenuHeight(ab, area));
+
+        MenuBox box = new MenuBox();
+        box.w = w;
+        box.vw = w + MENU_SHADOW_PAD * 2;
+        box.vh = panelH + MENU_SHADOW_PAD * 2;
+        // 统一走滚动壳：内容放得下时壳里不显示滚动条，外观和裸卡片一致
+        box.visual = scrollShell(card, w, panelH, contentH);
+        return box;
+    }
+
+    private static double[] placeMenu(MenuBox box, javafx.geometry.Bounds ab,
+                                      javafx.geometry.Rectangle2D area) {
+        double pad = MENU_SHADOW_PAD;
+        // 候选位置与 WPF 一致：右侧对齐/左侧对齐 × 下方/上方，取第一个能放进区域的
+        double xRight = ab.getMaxX() - box.w - pad;
+        double xLeft = ab.getMinX() - pad;
+        double yBelow = ab.getMaxY() + 2 - pad;
+        double yAbove = ab.getMinY() - box.vh - 2 + pad;
+        double[] xs = {xRight, xRight, xLeft, xLeft};
+        double[] ys = {yBelow, yAbove, yBelow, yAbove};
+        for (int i = 0; i < xs.length; i++) {
+            if (xs[i] >= area.getMinX() + 4 && xs[i] + box.vw <= area.getMaxX() - 4
+                    && ys[i] >= area.getMinY() + 4 && ys[i] + box.vh <= area.getMaxY() - 4) {
+                return new double[]{xs[i], ys[i]};
+            }
+        }
+        return new double[]{
+                Math.max(area.getMinX() + 4, Math.min(xRight, area.getMaxX() - box.vw - 4)),
+                Math.max(area.getMinY() + 4, Math.min(yBelow, area.getMaxY() - box.vh - 4))};
+    }
+
+    private static void attachThemeCss(javafx.scene.Node visual) {
+        // Popup 有独立 scene，不继承主窗样式表；手动挂主题 CSS
+        try {
+            if (visual.getScene() != null && Theme.css() != null) {
+                visual.getScene().getStylesheets().setAll(Theme.css().toExternalForm());
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    /**
+     * 菜单滚动壳：外层 Pane 就是 Popup 的内容，尺寸固定为「卡片 + 投影留白」；
+     * 里面再套一层裁剪到卡片圆角的视口，卡片在视口里上下平移，右侧是自绘滚动条。
+     * 不用 ScrollPane：它的视口会吃掉圆角背景，fitToWidth 还会把卡片压窄。
+     */
+    private static javafx.scene.layout.Pane scrollShell(VBox card, double w, double viewH, double contentH) {
+        final double pad = MENU_SHADOW_PAD;
+        final double vw = w + pad * 2;
+        final double vh = viewH + pad * 2;
+        final boolean scrollable = contentH > viewH + 0.5;
+
+        javafx.scene.layout.Pane root = new javafx.scene.layout.Pane();
+        root.setMinSize(vw, vh);
+        root.setPrefSize(vw, vh);
+        root.setMaxSize(vw, vh);
+        // 外层也裁一刀：否则子节点的溢出会把 bounds 撑大，Popup 会跟着撑到屏幕外
+        root.setClip(new Rectangle(vw, vh));
+
+        javafx.scene.layout.Pane view = new javafx.scene.layout.Pane();
+        view.setManaged(false);
+        view.resizeRelocate(pad, pad, w, viewH);
+        Rectangle clip = new Rectangle(w, viewH);
+        clip.setArcWidth(20);
+        clip.setArcHeight(20);
+        view.setClip(clip);
+
+        // 投影底板：视口会把卡片的阴影一起裁掉，所以阴影单独画一层垫在下面
+        javafx.scene.layout.Region back = new javafx.scene.layout.Region();
+        back.setManaged(false);
+        back.resizeRelocate(pad, pad, w, viewH);
+        back.setBackground(fill(popupBg(), 10));
+        back.setEffect(Theme.shadow(18, 3, 0.35, Theme.text));
+        root.getChildren().add(back);
+
+        root.getChildren().add(view);
+
+        card.setLayoutX(0);
+        card.setLayoutY(0);
+        card.setPrefHeight(contentH);
+        card.setEffect(null);          // 阴影已由底板负责，卡片再画一次会被裁出硬边
+        view.getChildren().add(card);
+
+        final double barW = 5;
+        final double barX = pad + w - barW - 4;
+        final double trackY = pad + 8;
+        final double trackH = Math.max(20, viewH - 16);
+        final double thumbH = Math.max(32, trackH * viewH / Math.max(viewH, contentH));
+        final double maxScroll = Math.max(1, contentH - viewH);
+
+        javafx.scene.layout.Region track = new javafx.scene.layout.Region();
+        track.setManaged(false);
+        track.setVisible(scrollable);
+        track.setBackground(fill(Color.color(Theme.text.getRed(), Theme.text.getGreen(),
+                Theme.text.getBlue(), 0.06), barW / 2.0));
+        track.resizeRelocate(barX, trackY, barW, trackH);
+        root.getChildren().add(track);
+
+        javafx.scene.layout.Region thumb = new javafx.scene.layout.Region();
+        thumb.setManaged(false);
+        thumb.setVisible(scrollable);
+        thumb.setCursor(Cursor.HAND);
+        thumb.setBackground(fill(Color.color(Theme.accent.getRed(), Theme.accent.getGreen(),
+                Theme.accent.getBlue(), 0.62), barW / 2.0));
+        root.getChildren().add(thumb);
+
+        final double[] off = {0};
+        Runnable apply = () -> {
+            card.setLayoutY(-off[0]);
+            double ty = trackY + (trackH - thumbH) * (off[0] / maxScroll);
+            thumb.resizeRelocate(barX, ty, barW, thumbH);
+        };
+        apply.run();
+
+        if (scrollable) {
+            root.setOnScroll(e -> {
+                if (e.getDeltaY() == 0) return;
+                off[0] = Math.max(0, Math.min(maxScroll, off[0] - e.getDeltaY()));
+                apply.run();
+                e.consume();
+            });
+
+            final double[] drag = new double[2];
+            thumb.setOnMousePressed(e -> {
+                drag[0] = e.getSceneY();
+                drag[1] = off[0];
+                e.consume();
+            });
+            thumb.setOnMouseDragged(e -> {
+                double span = Math.max(1, trackH - thumbH);
+                off[0] = Math.max(0, Math.min(maxScroll,
+                        drag[1] + (e.getSceneY() - drag[0]) / span * maxScroll));
+                apply.run();
+                e.consume();
+            });
+        }
+        return root;
+    }
+
+    private static javafx.geometry.Rectangle2D screenOf(javafx.geometry.Bounds screenBounds) {
+        if (screenBounds != null) {
+            for (javafx.stage.Screen s : javafx.stage.Screen.getScreensForRectangle(
+                    screenBounds.getMinX(), screenBounds.getMinY(),
+                    Math.max(1, screenBounds.getWidth()), Math.max(1, screenBounds.getHeight()))) {
+                return s.getVisualBounds();
+            }
+        }
+        return javafx.stage.Screen.getPrimary().getVisualBounds();
+    }
+
+    private static void expandIn(javafx.scene.Node card) {
+        if (!Data.get().getBool("UiMenuAnimation", true)) {
+            card.setOpacity(1);
+            card.setScaleX(1);
+            card.setScaleY(1);
+            card.setTranslateY(0);
+            return;
+        }
         javafx.animation.Timeline in = new javafx.animation.Timeline(
                 new javafx.animation.KeyFrame(javafx.util.Duration.ZERO,
                         new javafx.animation.KeyValue(card.opacityProperty(), 0),
@@ -620,43 +961,6 @@ public final class Ui {
         in.play();
     }
 
-    /** 布局后校正弹层位置，按实际宽度右对齐。 */
-    private static void placeMenuCard(javafx.stage.Popup popup, javafx.scene.layout.VBox card,
-                                      javafx.scene.Node anchor) {
-        // 弹层是独立窗口，要等布局完再量；延后 60ms，必要时重试。
-        attemptPlace(popup, card, anchor, 0);
-    }
-
-    private static void attemptPlace(javafx.stage.Popup popup, javafx.scene.layout.VBox card,
-                                     javafx.scene.Node anchor, int tries) {
-        javafx.animation.PauseTransition wait = new javafx.animation.PauseTransition(
-                javafx.util.Duration.millis(tries == 0 ? 60 : 40));
-        wait.setOnFinished(ev -> {
-            javafx.geometry.Bounds b = anchor.localToScreen(anchor.getBoundsInLocal());
-            if (b == null) {
-                expandIn(card);
-                return;
-            }
-            if (card.getWidth() <= 1 && tries < 4) {   // 还没量出宽度，稍后重试
-                attemptPlace(popup, card, anchor, tries + 1);
-                return;
-            }
-            // 只取布局宽度，boundsInLocal 含 18px 阴影。
-            double cw = card.getWidth();
-            if (cw <= 1) cw = card.prefWidth(-1);
-            double ch = card.getHeight() > 1 ? card.getHeight() : card.prefHeight(cw);
-            javafx.geometry.Rectangle2D vb = javafx.stage.Screen.getPrimary().getVisualBounds();
-            double x = Math.max(vb.getMinX(), b.getMaxX() - cw);  // 右边缘对齐锚点
-            double below = b.getMaxY() + 2;
-            double y = below + ch <= vb.getMaxY() ? below : b.getMinY() - ch - 2; // 下方放不下就翻上去
-            if (Math.abs(popup.getX() - x) > 1) popup.setX(x);
-            if (Math.abs(popup.getY() - y) > 1) popup.setY(Math.max(vb.getMinY(), y));
-            expandIn(card);   // 位置对好再淡入，看不到挪位
-        });
-        wait.play();
-    }
-
-    /** 收起菜单卡片：淡出并缩到 0.96 后关闭。 */
     public static void closeMenuCard(javafx.stage.Popup popup) {
         if (popup == null || !popup.isShowing()) return;
         javafx.scene.Node card = popup.getContent().isEmpty() ? null : popup.getContent().get(0);
@@ -674,6 +978,14 @@ public final class Ui {
                         new javafx.animation.KeyValue(card.scaleYProperty(), 0.96)));
         out.setOnFinished(e -> popup.hide());
         out.play();
+    }
+
+    // 列表行内按钮：点击不冒泡到整行
+    public static StackPane listAction(String icon, double size, double iconSize, String tooltip, Runnable action) {
+        StackPane pane = iconButton(icon, size, iconSize, tooltip, action);
+        pane.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED,
+                javafx.scene.input.MouseEvent::consume);
+        return pane;
     }
 
     public static StackPane iconButton(String icon, double size, double iconSize, String tooltip, Runnable action) {
@@ -697,7 +1009,6 @@ public final class Ui {
         return pane;
     }
 
-    /** 带图标的文字按钮：药丸高 27，图标 16。 */
     public static HBox iconTextButton(String icon, String text, boolean highlight, Runnable action) {
         HBox pane = new HBox(7);
         pane.setAlignment(Pos.CENTER_LEFT);
@@ -714,13 +1025,13 @@ public final class Ui {
         pane.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_ENTERED, e -> {
             if (isDisabledNode(pane)) return;
             animateBg(pane, Theme.semiTransparent, Theme.listHoverBg, aniMs(100));
-            colorTween(c -> tint(glyph, c), baseFg, Theme.accent, aniMs(100));
-            colorTween(c -> lab.setTextFill(c), baseFg, Theme.accent, aniMs(100));
+            colorTween(pane, "uiIconTint", c -> tint(glyph, c), baseFg, Theme.accent, aniMs(100));
+            colorTween(pane, "uiLabelText", c -> lab.setTextFill(c), baseFg, Theme.accent, aniMs(100));
         });
         pane.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_EXITED, e -> {
             animateBg(pane, Theme.listHoverBg, Theme.semiTransparent, aniMs(150));
-            colorTween(c -> tint(glyph, c), Theme.accent, baseFg, aniMs(150));
-            colorTween(c -> lab.setTextFill(c), Theme.accent, baseFg, aniMs(150));
+            colorTween(pane, "uiIconTint", c -> tint(glyph, c), Theme.accent, baseFg, aniMs(150));
+            colorTween(pane, "uiLabelText", c -> lab.setTextFill(c), Theme.accent, baseFg, aniMs(150));
         });
         pane.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_PRESSED,
                 e -> animateBg(pane, pane.getBackground() == null ? Theme.halfWhite : Theme.listHoverBg,
@@ -729,8 +1040,8 @@ public final class Ui {
             boolean over = pane.isHover();
             animateBg(pane, Theme.accentPale2, over ? Theme.listHoverBg : Theme.semiTransparent, aniMs(100));
             if (!over) {
-                colorTween(c -> tint(glyph, c), Theme.accent, baseFg, aniMs(150));
-                colorTween(c -> lab.setTextFill(c), Theme.accent, baseFg, aniMs(150));
+                colorTween(pane, "uiIconTint", c -> tint(glyph, c), Theme.accent, baseFg, aniMs(150));
+                colorTween(pane, "uiLabelText", c -> lab.setTextFill(c), Theme.accent, baseFg, aniMs(150));
             }
         });
         pane.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED, e -> {
@@ -749,7 +1060,6 @@ public final class Ui {
         return n.isDisabled();
     }
 
-    /** 白主题图标按钮，悬停只加白底。 */
     public static StackPane iconButtonWhite(String icon, double size, double iconSize, String tooltip, Runnable action) {
         StackPane pane = new StackPane(Theme.icon(icon, iconSize, Theme.accentPale3));
         pane.setPrefSize(size, size);
@@ -839,7 +1149,6 @@ public final class Ui {
             HBox.setHgrow(texts, Priority.ALWAYS);
             getChildren().add(texts);
             setPadding(new Insets(0, 4, 0, 1));
-            // 悬停是遮罩渐显，120ms 进、180ms 出。
             addEventHandler(javafx.scene.input.MouseEvent.MOUSE_ENTERED, e -> {
                 hover = true;
                 animateBack(hoverFill(), 120);
@@ -849,7 +1158,7 @@ public final class Ui {
                 hover = false;
                 pressed = false;
                 animateBack(Color.TRANSPARENT, 180);
-                scaleTo(1, 180); // 移出时复位缩放
+                scaleTo(1, 180);
                 refreshColor();
             });
             addEventHandler(javafx.scene.input.MouseEvent.MOUSE_PRESSED, e -> {
@@ -864,17 +1173,14 @@ public final class Ui {
             });
         }
 
-        /** 悬停底色。 */
         private Color hoverFill() {
             return Theme.listHoverBg;
         }
 
-        /** 按下底色，比悬停深一档。 */
         private Color pressFill() {
             return Theme.accentPale2;
         }
 
-        /** 背景色渐变，省掉一层透明度节点。 */
         private void animateBack(Color to, int ms) {
             Color from = currentBack;
             currentBack = to;
@@ -901,7 +1207,7 @@ public final class Ui {
                     new javafx.animation.KeyFrame(javafx.util.Duration.millis(ms),
                             new javafx.animation.KeyValue(scaleXProperty(), target, EASE_OUT_FLUENT),
                             new javafx.animation.KeyValue(scaleYProperty(), target, EASE_OUT_FLUENT)));
-            tl.play();
+            startExclusive(this, "uiListScale", tl);
         }
 
         public void setSelected(boolean value) {
@@ -913,7 +1219,6 @@ public final class Ui {
             return selected;
         }
 
-        /** 列表行右侧的操作按钮，默认悬停才显示。 */
         public void addAction(Node action) {
             actions.add(action);
             action.setOpacity(Data.get().getBool("UiListButtonsAlwaysShow", false) ? 1 : 0);
@@ -926,7 +1231,6 @@ public final class Ui {
             title.setTextFill(selected ? Theme.accent : Theme.text);
             info.setTextFill(selected ? Theme.accentLight : Theme.gray2);
             if (icon != null) tint(icon, selected ? Theme.accent : Theme.text);
-            // 底色归 animateBack，选中靠左侧竖条和文字色
             boolean always = Data.get().getBool("UiListButtonsAlwaysShow", false);
             for (Node n : actions) {
                 n.setOpacity(hover || always ? 1 : 0);
@@ -948,14 +1252,12 @@ public final class Ui {
         }
     }
 
-    /** 输入框：圆角 3，聚焦用描边强调。 */
     public static TextField field(String hint) {
         TextField tf = new TextField();
         tf.setPromptText(Lang.t(hint));
         tf.setFont(Theme.font(13));
         tf.setPrefHeight(30);
         tf.setStyle(fieldStyle(Theme.fieldBg, Theme.accentPale));
-        // 三态直接瞬变，不做颜色动画
         tf.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_ENTERED, e -> {
             if (!tf.isFocused() && tf.isEditable()) tf.setStyle(fieldStyle(Theme.brush7, Theme.accentLight));
         });
@@ -985,7 +1287,6 @@ public final class Ui {
         return c.toString().replace("0x", "#");
     }
 
-    /** 下拉框，展开时弹层有缩放动画。 */
     public static ComboBox<String> combo(String[] items, int selected) {
         ComboBox<String> cb = new ComboBox<>();
         for (String item : items) cb.getItems().add(Lang.t(item));
@@ -999,7 +1300,6 @@ public final class Ui {
         cb.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_EXITED, e -> {
             if (!cb.isShowing()) cb.setStyle(comboStyle(Theme.fieldBg, Theme.accentPale));
         });
-        // 展开时底色变亮，弹层出现后播动画
         cb.showingProperty().addListener((o, was, now) -> {
             if (now) {
                 cb.setStyle(comboStyle(Theme.brush7, Theme.accent));
@@ -1021,7 +1321,6 @@ public final class Ui {
                 + "-fx-focus-color: transparent; -fx-faint-focus-color: transparent;";
     }
 
-    /** 弹层展开：缩放归位并上浮，220ms。 */
     private static void animateComboPopup(ComboBox<?> cb) {
         if (Data.get().getInt("UiAnimSpeed", 100) <= 0 || cb.getScene() == null) return;
         javafx.stage.Window owner = cb.getScene().getWindow();
@@ -1068,12 +1367,10 @@ public final class Ui {
         return row;
     }
 
-    /** 提示条：基色乘组件透明度，配描边和深色文字。 */
     public static HBox hint(String text, int type) {
         HBox box = new HBox(10);
         box.setAlignment(Pos.CENTER_LEFT);
         box.setPadding(new Insets(9, 12, 9, 12));
-        // 底色 alpha 跟着 UiComponentOpacity 缩放
         double fa = Math.max(0, Math.min(1, Theme.componentOpacity));
         Color bg;
         Color border;
@@ -1093,7 +1390,6 @@ public final class Ui {
                 icon = "circle-minus";
             }
             default -> {
-                // 蓝色提示条也按主题色走，紫色主题里不再出现蓝色提示框
                 Color hb = Theme.blueHintBg;
                 bg = Color.color(hb.getRed(), hb.getGreen(), hb.getBlue(), fa);
                 border = Theme.accentLight;
@@ -1111,7 +1407,6 @@ public final class Ui {
         return box;
     }
 
-    /** 时长按 UiAnimSpeed 缩放，0 表示不动画。 */
     static int aniMs(int ms) {
         int speed = Data.get().getInt("UiAnimSpeed", 100);
         if (speed <= 0) return 0;
@@ -1134,7 +1429,23 @@ public final class Ui {
         return t;
     }
 
-    /** 复选框：18×18 圆角框，勾选时对勾弹出。 */
+    private static javafx.animation.Transition colorTween(Node owner, Object slot,
+                                                          javafx.beans.property.ObjectProperty<Color> prop,
+                                                          Color from, Color to, int ms) {
+        javafx.animation.Transition t = new javafx.animation.Transition() {
+            {
+                setCycleDuration(Duration.millis(Math.max(1, ms)));
+            }
+
+            @Override
+            protected void interpolate(double f) {
+                prop.set(from.interpolate(to, f));
+            }
+        };
+        startExclusive(owner, slot, t);
+        return t;
+    }
+
     public static final class Check extends HBox {
         private final Region box = new Region();
         private final javafx.scene.shape.SVGPath check = new javafx.scene.shape.SVGPath();
@@ -1147,7 +1458,7 @@ public final class Ui {
         private boolean pressed;
         private Color textColor = Theme.text;
         private Runnable onAction;
-        // 按下和松开各自起一段动画，必须停掉上一段，否则旧动画结束后会把勾拉回去
+        // 停掉上一段动画，不然旧动画会把勾拉回去
         private javafx.animation.Animation checkAnim;
         private javafx.animation.Animation boxAnim;
 
@@ -1174,15 +1485,14 @@ public final class Ui {
             getChildren().addAll(boxHolder, lab);
             lab.setMouseTransparent(true);
             this.selected = checked;
-            // 静态初值，不走动画
             checkScale.setX(checked ? 1 : 0);
             checkScale.setY(checked ? 1 : 0);
             box.setBorder(border(checked ? Theme.accentDark : Theme.text, 3, 1.1));
             check.setFill(checked ? Theme.accentDark : Theme.text);
             addEventHandler(javafx.scene.input.MouseEvent.MOUSE_ENTERED, e -> {
                 if (isDisabled()) return;
-                colorTween(c -> { textColor = c; lab.setTextFill(c); }, textColor, Theme.accent, aniMs(100));
-                colorTween(boxBorderProperty(), currentBorder(), Theme.accent, aniMs(100));
+                colorTween(this, "uiCheckText", c -> { textColor = c; lab.setTextFill(c); }, textColor, Theme.accent, aniMs(100));
+                colorTween(this, "uiCheckBorder", boxBorderProperty(), currentBorder(), Theme.accent, aniMs(100));
             });
             addEventHandler(javafx.scene.input.MouseEvent.MOUSE_EXITED, e -> {
                 if (pressed) {
@@ -1190,15 +1500,14 @@ public final class Ui {
                     releaseVisual();
                 }
                 if (isDisabled()) return;
-                colorTween(c -> { textColor = c; lab.setTextFill(c); }, textColor, Theme.text, aniMs(200));
-                colorTween(boxBorderProperty(), currentBorder(),
+                colorTween(this, "uiCheckText", c -> { textColor = c; lab.setTextFill(c); }, textColor, Theme.text, aniMs(200));
+                colorTween(this, "uiCheckBorder", boxBorderProperty(), currentBorder(),
                         !isDisabled() ? (selected ? Theme.accentDark : Theme.text) : Theme.gray5, aniMs(200));
                 box.setBackground(fill(Theme.halfWhite, 3));
             });
             addEventHandler(javafx.scene.input.MouseEvent.MOUSE_PRESSED, e -> {
                 if (isDisabled()) return;
                 pressed = true;
-                // 按下：框缩到 16.5
                 box.setBackground(fill(Theme.listHoverBg, 3));
                 animateBox(16.5 / 18.0, aniMs(1000), EASE_OUT_FLUENT_STRONG);
                 if (selected) animateCheck(0.9, aniMs(1000), EASE_OUT_FLUENT_STRONG, 0);
@@ -1224,7 +1533,6 @@ public final class Ui {
         }
 
         private javafx.beans.property.ObjectProperty<Color> boxBorderProperty() {
-            // 直接写回新 Border，1.1px、半径 3
             return new javafx.beans.property.SimpleObjectProperty<>() {
                 @Override
                 public void set(Color c) {
@@ -1235,7 +1543,6 @@ public final class Ui {
         }
 
         private void releaseVisual() {
-            // 底色回白，框和勾复位
             box.setBackground(fill(Theme.halfWhite, 3));
             animateBox(1, aniMs(400), EASE_OUT_FLUENT_STRONG);
             animateCheck(selected ? 1 : 0, aniMs(500), EASE_OUT_FLUENT_STRONG, 0);
@@ -1267,14 +1574,13 @@ public final class Ui {
         public void setSelected(boolean value) {
             if (value == selected) return;
             selected = value;
-            // 勾选 300ms 弹出，取消 135ms 收回
             if (selected) {
                 animateCheck(1, aniMs(300), EASE_OUT_BACK, aniMs(105));
-                colorTween(boxBorderProperty(), currentBorder(),
+                colorTween(this, "uiCheckBorder", boxBorderProperty(), currentBorder(),
                         isHover() && !isDisabled() ? Theme.accent : Theme.accentDark, aniMs(150));
             } else {
                 animateCheck(0, aniMs(135), fluentIn(2), 0);
-                colorTween(boxBorderProperty(), currentBorder(), Theme.text, aniMs(150));
+                colorTween(this, "uiCheckBorder", boxBorderProperty(), currentBorder(), Theme.text, aniMs(150));
             }
         }
 
@@ -1287,7 +1593,6 @@ public final class Ui {
         return new Check(text, checked);
     }
 
-    /** 单选框：18×18 圆框，选中会取消同容器的其他项。 */
     public static final class RadioBox extends HBox {
         private final javafx.scene.shape.Ellipse ring = new javafx.scene.shape.Ellipse(9, 9);
         private final javafx.scene.shape.Ellipse dot = new javafx.scene.shape.Ellipse(4.5, 4.5);
@@ -1331,18 +1636,17 @@ public final class Ui {
             this.selected = checked;
             addEventHandler(javafx.scene.input.MouseEvent.MOUSE_ENTERED, e -> {
                 if (isDisabled()) return;
-                colorTween(c -> { textColor = c; lab.setTextFill(c); }, textColor, Theme.accent, aniMs(100));
+                colorTween(this, "uiRadioText", c -> { textColor = c; lab.setTextFill(c); }, textColor, Theme.accent, aniMs(100));
                 ringColorTween(currentRing(), Theme.accent, aniMs(100));
             });
             addEventHandler(javafx.scene.input.MouseEvent.MOUSE_EXITED, e -> {
                 if (isDisabled()) return;
-                colorTween(c -> { textColor = c; lab.setTextFill(c); }, textColor, Theme.text, aniMs(200));
+                colorTween(this, "uiRadioText", c -> { textColor = c; lab.setTextFill(c); }, textColor, Theme.text, aniMs(200));
                 ringColorTween(currentRing(), selected ? Theme.accentDark : Theme.text, aniMs(200));
             });
             addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED, e -> {
                 if (isDisabled()) return;
                 if (selected) return;
-                // 取消同容器其他单选框
                 javafx.scene.Parent p = getParent();
                 if (p != null) {
                     for (Node n : p.getChildrenUnmodifiable()) {
@@ -1371,7 +1675,7 @@ public final class Ui {
                     dot.setFill(c);
                 }
             };
-            t.play();
+            startExclusive(this, "uiRadioRing", t);
         }
 
         public boolean isSelected() {
@@ -1382,7 +1686,6 @@ public final class Ui {
             if (value == selected) return;
             selected = value;
             selectedProp.set(value);
-            // 圆点弹出，描边变色
             if (selected) {
                 javafx.animation.Timeline tl = new javafx.animation.Timeline(new javafx.animation.KeyFrame(
                         Duration.millis(Math.max(1, aniMs(390))),
@@ -1409,7 +1712,6 @@ public final class Ui {
         return new RadioBox(text, checked);
     }
 
-    /** 滑动条：16 高轨道，拖动时弹数值气泡。 */
     public static final class SliderBar extends Pane {
         private final Region back = new Region();
         private final Region fore = new Region();
@@ -1434,7 +1736,7 @@ public final class Ui {
             back.setMouseTransparent(true);
             fore.setMouseTransparent(true);
             dot.setMouseTransparent(true);
-            // Pane 会把 managed 子节点按 pref 尺寸重排，滑条线和圆点必须自己定位
+            // Pane 按 pref 重排 managed 子节点，滑条需自行定位
             back.setManaged(false);
             fore.setManaged(false);
             dot.setManaged(false);
@@ -1444,11 +1746,11 @@ public final class Ui {
             applyColor(lineColor);
             layoutValue();
             addEventHandler(javafx.scene.input.MouseEvent.MOUSE_ENTERED, e -> {
-                if (!dragging) colorTween(this::applyColor, lineColor, Theme.accent, aniMs(40));
+                if (!dragging) colorTween(this, "uiSliderLine", this::applyColor, lineColor, Theme.accent, aniMs(40));
             });
             addEventHandler(javafx.scene.input.MouseEvent.MOUSE_EXITED, e -> {
                 if (!dragging && !isDisabled())
-                    colorTween(this::applyColor, lineColor, Theme.accentPale, aniMs(100));
+                    colorTween(this, "uiSliderLine", this::applyColor, lineColor, Theme.accentPale, aniMs(100));
             });
             addEventHandler(javafx.scene.input.MouseEvent.MOUSE_PRESSED, e -> {
                 if (isDisabled()) return;
@@ -1458,7 +1760,7 @@ public final class Ui {
                         new javafx.animation.KeyValue(dotScale.xProperty(), 1.3, EASE_OUT_FLUENT),
                         new javafx.animation.KeyValue(dotScale.yProperty(), 1.3, EASE_OUT_FLUENT)));
                 tl.play();
-                colorTween(this::applyColor, lineColor, Theme.accent, aniMs(40));
+                colorTween(this, "uiSliderLine", this::applyColor, lineColor, Theme.accent, aniMs(40));
                 jumpTo(e.getX());
             });
             addEventHandler(javafx.scene.input.MouseEvent.MOUSE_DRAGGED, e -> {
@@ -1472,7 +1774,7 @@ public final class Ui {
                         new javafx.animation.KeyValue(dotScale.xProperty(), 1, EASE_OUT_FLUENT),
                         new javafx.animation.KeyValue(dotScale.yProperty(), 1, EASE_OUT_FLUENT)));
                 tl.play();
-                colorTween(this::applyColor, lineColor, isHover() ? Theme.accent : Theme.accentPale, aniMs(100));
+                colorTween(this, "uiSliderLine", this::applyColor, lineColor, isHover() ? Theme.accent : Theme.accentPale, aniMs(100));
             });
             disabledProperty().addListener((o, was, now) ->
                     applyColor(now ? Theme.gray5 : (dragging || isHover() ? Theme.accent : Theme.accentPale)));
@@ -1503,7 +1805,6 @@ public final class Ui {
             if (v == value) return;
             double old = value;
             value = v;
-            // 时长按进度差算，拖动即时生效
             if (animate && getWidth() > 10) {
                 double delta = Math.abs(value / (max - min) - old / (max - min));
                 int ms = Math.max(1, (int) ((1 - Math.pow(1 - delta, 3)) * 300));
@@ -1569,10 +1870,28 @@ public final class Ui {
         return t;
     }
 
-    /** 搜索框：40 高卡片，有文字才显示清除钮。 */
+    private static javafx.animation.Transition colorTween(Node owner, Object slot,
+                                                          java.util.function.Consumer<Color> setter,
+                                                          Color from, Color to, int ms) {
+        javafx.animation.Transition t = new javafx.animation.Transition() {
+            {
+                setCycleDuration(Duration.millis(Math.max(1, ms)));
+            }
+
+            @Override
+            protected void interpolate(double f) {
+                setter.accept(from.interpolate(to, f));
+            }
+        };
+        startExclusive(owner, slot, t);
+        return t;
+    }
+
     public static final class SearchBox extends StackPane {
         public final TextField field;
         private final StackPane clearBtn;
+        private Timeline glowOn;
+        private Timeline glowOff;
 
         public SearchBox(String hint) {
             setAlignment(Pos.CENTER_LEFT);
@@ -1607,18 +1926,21 @@ public final class Ui {
             HBox content = new HBox(leftPad, magnifier, field, rightPad, clearBtn);
             content.setAlignment(Pos.CENTER_LEFT);
             getChildren().add(content);
-            // 悬停点亮阴影，同卡片
             addEventHandler(javafx.scene.input.MouseEvent.MOUSE_ENTERED, e -> {
-                Timeline anim = new Timeline(new KeyFrame(Duration.millis(160),
-                        new KeyValue(glow.radiusProperty(), 11, EASE_OUT_FLUENT),
-                        new KeyValue(glow.colorProperty(), Color.web(Theme.accent.toString(), 0.16), EASE_OUT_FLUENT)));
-                anim.play();
+                if (glowOn == null) {
+                    glowOn = new Timeline(new KeyFrame(Duration.millis(160),
+                            new KeyValue(glow.radiusProperty(), 11, EASE_OUT_FLUENT),
+                            new KeyValue(glow.colorProperty(), Color.web(Theme.accent.toString(), 0.16), EASE_OUT_FLUENT)));
+                }
+                glowOn.playFromStart();
             });
             addEventHandler(javafx.scene.input.MouseEvent.MOUSE_EXITED, e -> {
-                Timeline anim = new Timeline(new KeyFrame(Duration.millis(220),
-                        new KeyValue(glow.radiusProperty(), 5, EASE_OUT_FLUENT),
-                        new KeyValue(glow.colorProperty(), Color.web("#343d4a", 0.07), EASE_OUT_FLUENT)));
-                anim.play();
+                if (glowOff == null) {
+                    glowOff = new Timeline(new KeyFrame(Duration.millis(220),
+                            new KeyValue(glow.radiusProperty(), 5, EASE_OUT_FLUENT),
+                            new KeyValue(glow.colorProperty(), Color.web("#343d4a", 0.07), EASE_OUT_FLUENT)));
+                }
+                glowOff.playFromStart();
             });
             field.textProperty().addListener((o, a, b) -> {
                 boolean has = b != null && !b.isEmpty();
@@ -1647,6 +1969,11 @@ public final class Ui {
     }
 
     public static ScrollPane scroll(Node content) {
+        return scroll(content, SmoothScroll.DEFAULT_WHEEL_SPEED);
+    }
+
+    // wheelSpeed 每 pane 可调，弹窗小框要慢些对齐 WPF MyMsgText 的 DeltaMult=0.7
+    public static ScrollPane scroll(Node content, double wheelSpeed) {
         if (content instanceof Region region) region.setMaxWidth(Double.MAX_VALUE);
         ScrollPane sp = new ScrollPane(content);
         sp.setFitToWidth(true);
@@ -1656,26 +1983,10 @@ public final class Ui {
         sp.setPannable(false);
         sp.setMaxWidth(Double.MAX_VALUE);
         sp.setMaxHeight(Double.MAX_VALUE);
-        // min 归零，别让内容把右栏顶宽、撑出窗口。
         sp.setMinWidth(0);
         sp.setMinHeight(0);
-        // 清 viewport 白底只能用 -fx-background-color，别用 -fx-background。
         sp.setStyle("-fx-background-color: transparent; -fx-background-insets: 0; -fx-padding: 0;");
-        // viewport 皮肤生成后才存在，就绪后再清一次底
-        sp.skinProperty().addListener((o, a, b) -> {
-            Node vp = sp.lookup(".viewport");
-            if (vp != null) vp.setStyle("-fx-background-color: transparent;");
-            // 拖动时完全不透明，其余交给 style.css
-            Node thumb = sp.lookup(".scroll-bar .thumb");
-            if (thumb != null) {
-                thumb.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_PRESSED,
-                        e -> thumb.setStyle("-fx-background-color: " + web(Theme.accentLight) + "; -fx-opacity: 1;"));
-                thumb.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_RELEASED,
-                        e -> thumb.setStyle(null));
-            }
-        });
-        // 滚轮缓动，列表不再一格一格地跳
-        SmoothScroll.install(sp);
+        SmoothScroll.install(sp, wheelSpeed);
         return sp;
     }
 
@@ -1710,7 +2021,6 @@ public final class Ui {
         return box;
     }
 
-    /** 60×47 舞台上挥镐子，砸地甩出碎屑，循环。 */
     public static class Loading extends StackPane {
         private static final String PICKAXE =
                 "M 963.6 858.2 410.816 305.504 C 508.116 213.304 609.204 196.8 711.104 128.6 "
@@ -1720,7 +2030,6 @@ public final class Ui {
                         + "593.588 228.888 492.4 321.088 395.2 L 873.9 948 c 0.60001 0.59999 1.6 0.6 2.2 0 "
                         + "l 87.5 -87.5 c 0.6 -0.7 0.6 -1.6 0 -2.3 z";
 
-        /** 舞台逻辑尺寸 60×47，实际渲染时整体等比缩放。 */
         private static final double STAGE_W = 60, STAGE_H = 47;
         private final Timeline swing, debrisFly, debrisFade;
         private final javafx.scene.shape.SVGPath glyph;
@@ -1736,10 +2045,8 @@ public final class Ui {
             double stageH = Math.max(18, Math.min(STAGE_H, height - (hasText ? 24 : 2)));
             double k = stageH / STAGE_H;
 
-            // 旋转枢轴在舞台 (40,36)
             rotate = new javafx.scene.transform.Rotate(55, 40, 36);
 
-            // 镐子按高 35 缩放，左上角落在 (10,6)
             glyph = new javafx.scene.shape.SVGPath();
             glyph.setContent(PICKAXE);
             glyph.setFill(Color.TRANSPARENT);
@@ -1753,12 +2060,10 @@ public final class Ui {
             glyph.setLayoutX(10 + gw / 2 - (b.getMinX() + b.getWidth() / 2));
             glyph.setLayoutY(6 + 17.5 - (b.getMinY() + b.getHeight() / 2));
 
-            // 镐子落地的那条横线
             bar = new javafx.scene.shape.Rectangle(25, 2);
             bar.setFill(Theme.accent);
-            bar.setLayoutY(STAGE_H - 2); // 贴着舞台底边
+            bar.setLayoutY(STAGE_H - 2);
 
-            // 砸地甩出的碎屑
             javafx.scene.shape.SVGPath left = spark(-45);
             javafx.scene.shape.SVGPath right = spark(45);
             left.setLayoutX(7);
@@ -1768,7 +2073,6 @@ public final class Ui {
             left.setOpacity(0);
             right.setOpacity(0);
 
-            // rotate 只挂镐子，横条和碎屑是兄弟节点，不跟着转。
             javafx.scene.Group pickaxe = new javafx.scene.Group(glyph);
             pickaxe.getTransforms().add(rotate);
             Pane stage = new Pane(bar, left, right, pickaxe);
@@ -1776,7 +2080,6 @@ public final class Ui {
             stage.setMinSize(STAGE_W, STAGE_H);
             stage.setMaxSize(STAGE_W, STAGE_H);
             javafx.scene.Group spin = new javafx.scene.Group(stage);
-            // 整体缩放绕舞台中心，再把左上角对到控件框原点
             spin.setScaleX(k);
             spin.setScaleY(k);
             spin.setLayoutX(30 * k - 30);
@@ -1788,13 +2091,12 @@ public final class Ui {
 
             box.getChildren().add(holder);
             if (hasText) {
-                Label l = label(text, 16, Theme.text); // 文字字号 16
+                Label l = label(text, 16, Theme.text);
                 l.setAlignment(Pos.CENTER);
                 box.getChildren().add(l);
             }
             getChildren().add(box);
 
-            // 55° 定格，蓄力到 -20°，砸到 30°，抬回 55°，无缝循环。
             swing = new Timeline(
                     new KeyFrame(Duration.ZERO, new KeyValue(rotate.angleProperty(), 55)),
                     new KeyFrame(Duration.millis(250), new KeyValue(rotate.angleProperty(), 55)),
@@ -1803,7 +2105,6 @@ public final class Ui {
                     new KeyFrame(Duration.millis(2400), new KeyValue(rotate.angleProperty(), 55, EASE_OUT_FLUENT)));
             swing.setCycleCount(Timeline.INDEFINITE);
 
-            // 碎屑砸地才出现，150ms 内淡出。
             debrisFade = new Timeline(
                     new KeyFrame(Duration.ZERO, new KeyValue(left.opacityProperty(), 0),
                             new KeyValue(right.opacityProperty(), 0)),
@@ -1816,7 +2117,6 @@ public final class Ui {
                     new KeyFrame(Duration.millis(2400), new KeyValue(left.opacityProperty(), 0),
                             new KeyValue(right.opacityProperty(), 0)));
             debrisFade.setCycleCount(Timeline.INDEFINITE);
-            // 碎屑砸地后 180ms 内飞出，末尾复位
             debrisFly = new Timeline(
                     new KeyFrame(Duration.ZERO,
                             new KeyValue(left.translateXProperty(), 0), new KeyValue(left.translateYProperty(), 0),
@@ -1843,11 +2143,10 @@ public final class Ui {
             return p;
         }
 
-        /** 希望运行的状态，进场景后才真播。 */
         private boolean wantRun;
 
         {
-            // 离开场景就停表，避免被替换掉的 Loading 一直空转烧 CPU。
+            // 离开场景就停表，被换下来的 Loading 不停会一直空转烧 CPU
             sceneProperty().addListener((o, oldScene, newScene) -> applyRunState());
         }
 
@@ -1864,7 +2163,6 @@ public final class Ui {
         private void applyRunState() {
             boolean run = wantRun && getScene() != null;
             if (run) {
-                // 起播时重新取色，主题可能换过
                 glyph.setStroke(Theme.accent);
                 bar.setFill(Theme.accent);
                 if (swing.getStatus() != javafx.animation.Animation.Status.RUNNING) swing.play();
@@ -1878,7 +2176,6 @@ public final class Ui {
         }
     }
 
-    /** 52 高胶囊按钮，主题色底 + 白字。 */
     public static StackPane extraTextButton(String icon, String text, Runnable action) {
         StackPane pill = new StackPane();
         pill.setMinHeight(52);
@@ -1905,7 +2202,6 @@ public final class Ui {
         return pill;
     }
 
-    /** 页面内的镐子加载卡片。 */
     public static Node loadingCard(String text) {
         StackPane box = new StackPane();
         box.setPadding(new Insets(8, 0, 10, 0));
@@ -1930,7 +2226,6 @@ public final class Ui {
                 new CornerRadii(radius), Insets.EMPTY));
     }
 
-    /** 毛玻璃卡片的 1px 高光边，缺了就像贴纸。 */
     public static Border glassBorder(double radius) {
         return new Border(new BorderStroke(Color.web("#ffffff", 0.55), BorderStrokeStyle.SOLID,
                 new CornerRadii(radius), new BorderWidths(1)));
@@ -1945,7 +2240,6 @@ public final class Ui {
                 new BorderWidths(width)));
     }
 
-    /** 统一悬浮提示，350ms 后出现。 */
     public static void tooltip(Node node, String text) {
         Tooltip tip = new Tooltip(Lang.t(text));
         tip.setFont(Theme.font(12));
@@ -1955,8 +2249,6 @@ public final class Ui {
         tip.setHideDelay(Duration.millis(120));
         tip.setShowDuration(Duration.seconds(20));
         Tooltip.install(node, tip);
-    }
-
-                        private static void unused(Consumer<?> c) {
+        node.getProperties().put("tclTooltip", tip);
     }
 }

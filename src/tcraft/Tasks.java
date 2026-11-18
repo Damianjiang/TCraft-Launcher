@@ -3,7 +3,6 @@ package tcraft;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/** 下载、安装、启动任务中心。 */
 public final class Tasks {
 
     public enum State { RUNNING, DONE, FAILED, CANCELED }
@@ -45,35 +44,32 @@ public final class Tasks {
 
     public static final Tasks INSTANCE = new Tasks();
     public final List<Task> list = new CopyOnWriteArrayList<>();
-    private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
 
     private Tasks() {
     }
 
-    public void addListener(Runnable r) {
-        if (!listeners.contains(r)) listeners.add(r);
-    }
-
-    public void removeListener(Runnable r) {
-        listeners.remove(r);
-    }
-
-    private void fire() {
-        for (Runnable r : listeners) {
-            try {
-                r.run();
-            } catch (Exception ignored) {
-            }
-        }
-    }
-
     public void add(Task task) {
         list.add(0, task);
-        fire();
+        trim();
     }
 
     public void changed() {
-        fire();
+    }
+
+    // 失败/取消的同样算已结束；最多留 40 条，长跑不撑爆列表
+    private static final int MAX_FINISHED = 40;
+
+    private void trim() {
+        int finished = 0;
+        for (Task t : list) if (t.state != State.RUNNING) finished++;
+        int drop = finished - MAX_FINISHED;
+        if (drop <= 0) return;
+        for (int i = list.size() - 1; i >= 0 && drop > 0; i--) {
+            if (list.get(i).state != State.RUNNING) {
+                list.remove(i);
+                drop--;
+            }
+        }
     }
 
     public boolean hasActive() {
@@ -92,7 +88,6 @@ public final class Tasks {
     }
 
     public void clearFinished() {
-        list.removeIf(t -> t.state == State.DONE);
-        fire();
+        list.removeIf(t -> t.state != State.RUNNING);
     }
 }

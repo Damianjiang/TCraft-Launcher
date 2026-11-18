@@ -8,7 +8,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-/** CurseForge API 客户端，世界和地图类用它。 */
 public final class CurseForge {
 
     private static final String API = "https://api.curseforge.com/v1";
@@ -41,7 +40,6 @@ public final class CurseForge {
         return search(query, classId, limit, 0, 0);
     }
 
-    /** 带分类和偏移的搜索。 */
     public static List<Project> search(String query, int classId, int limit, int categoryId, int offset) throws IOException {
         String key = apiKey();
         if (key.isEmpty()) throw new IOException("尚未填写 CurseForge API Key");
@@ -75,7 +73,6 @@ public final class CurseForge {
         return out;
     }
 
-    /** 取项目全部文件的原始 JSON。 */
     public static List<Object> projectFiles(long id) throws IOException {
         String key = apiKey();
         if (key.isEmpty()) throw new IOException("尚未填写 CurseForge API Key");
@@ -83,7 +80,6 @@ public final class CurseForge {
         return Json.arr(root.get("data"));
     }
 
-    /** 单个项目信息，前置展示用。 */
     public static Project projectInfo(long id) throws IOException {
         String key = apiKey();
         if (key.isEmpty()) throw new IOException("尚未填写 CurseForge API Key");
@@ -106,13 +102,11 @@ public final class CurseForge {
         return p;
     }
 
-    /** 下载文件到 target。 */
     private static void downloadFile(Tasks.Task task, String url, Path target) throws IOException {
         // 走 Fetch，支持续传和重试
         Fetch.file(task, url, target, null, 0, 0.99);
     }
 
-    /** 按 fileId 批量查文件信息，整合包安装用。 */
     public static List<Object> filesByIds(List<Long> ids) throws IOException {
         String key = apiKey();
         if (key.isEmpty()) throw new IOException("尚未填写 CurseForge API Key");
@@ -127,7 +121,6 @@ public final class CurseForge {
     }
 
     private static String post(String url, String body, String key) throws IOException {
-        // 共享连接池，少握手
         return Http.post(url, body, Map.of("Accept", "application/json", "x-api-key", key));
     }
 

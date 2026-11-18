@@ -4,7 +4,7 @@ dist/
 out/
 javac.*.args
 
-# 编译中间产物：编译时会自动重新生成，不入库
+# 编译中间产物
 *.class
 *.o
 *.obj
@@ -28,7 +28,7 @@ hs_err_pid*
 .DS_Store
 Thumbs.db
 
-# 构建脚本与工具缓存：开发者自行准备，不入库
+# 本地构建脚本与工具
 build.ps1
 tools/set-icon.ps1
 tools/tcc/

@@ -87,14 +87,14 @@ TCraft Launcher（简称 **TCL**）是用 JavaFX 写的 Minecraft 启动器。�
 
 - 需要系统里有 **Java 17 或更高版本**（不捆绑 JRE）
 - 首次启动弹出 Java 选择窗口，可自动扫描或手动指定；确认后记在 `.tcl\launcher.cfg`，路径失效或版本读不出时再次提示
-- 首次启动还会按当前系统下载 JavaFX 到 **`.tcl\dependencies\<平台>\openjfx`**（约 10 MB，之后复用）
+- 首次启动还会按当前系统下载 **JavaFX 17.0.21** 到 **`.tcl\dependencies\<平台>\openjfx`**（约 10 MB，之后复用；Linux ARM64 使用官方 `linux-aarch64` 包，不再额外要求 JDK 21）
 - 内置 jar 解到 **exe 同目录的 `.tcl`**（同 HMCL 的 `./.hmcl`），不会被清理工具当临时文件删；目录写不出来时弹窗提示换位置，不改写到 `%LOCALAPPDATA%`
 - 配置、日志、皮肤与实例图标在 `.tcl` 内，首次启动从旧的 `~/.tcraft-launcher-javafx` 迁移配置
 - 联机功能首次使用会按平台自动下载 EasyTier 到 `.tcl\EasyTier`，并校验 SHA-256；使用 `--no-tun` 用户态组网，Windows / macOS / Linux 都不需要管理员权限
 
 ## 编译与运行
 
-需要 **JDK 17 或更高版本**，`lib/` 里是编译用的 JavaFX jar：
+需要 **JDK 17 或更高版本**，`lib/` 里是 JavaFX 17.0.21 的编译用 jar（只包含 base / graphics / controls / media，Runtime 也只下载这四个模块）：
 
 ```bash
 javac --release 17 --module-path lib --add-modules javafx.controls,javafx.media \
@@ -104,8 +104,8 @@ javac --release 17 --module-path lib --add-modules javafx.controls,javafx.media 
 > `--release 17` 不能省：缺了它，用 JDK 21/25 编出的 class 是 21/25 字节码，
 > JDK 17 加载会抛 `UnsupportedClassVersionError`。产物应为 major 61。
 
-打包：class 与 `res/` 打成一个 jar（`Main-Class: tcraft.Boot`），首次启动会按平台把 JavaFX
-下载到 `.tcl/dependencies`，所以仓库里不放 JavaFX 的本机库。
+打包：class 与 `res/` 打成一个 jar（`Main-Class: tcraft.Boot`），`lib/` 只用于编译，
+首次启动会按平台把 JavaFX 17.0.21 下载到 `.tcl/dependencies`，所以发布包不需要携带 JavaFX。
 
 Windows 单文件包：编译 `tools/launcher.c` → `python tools/add-icon.py` 注入图标
 （TCC 不能链接 `.rc`，直接写 PE 的 `.rsrc` 节）→ 追加 jar。

@@ -16,21 +16,17 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 
-/** 账户管理页，切换账户就地刷新。 */
 public class PageAccountManager implements Page {
 
     private final MainWindow win;
     private final Data data = Data.get();
-    /** 每行的节点引用，顺序和 data.accounts 一致。 */
     private final List<RowRef> rows = new ArrayList<>();
 
     private VBox content;
     private VBox listBox;
     private Ui.Card skinBox;
-    /** 皮肤卡当前展示的账户，null 表示没显示。 */
     private Data.Account skinCardFor;
 
-    /** 一行的可变节点引用。 */
     private static final class RowRef {
         StackPane row;
         Ui.RadioBox radio;
@@ -59,8 +55,8 @@ public class PageAccountManager implements Page {
         card.add(listBox);
         content.getChildren().add(card);
 
-        rebuildRows();   // 首屏填充，含空态
-        syncSkinCard();  // 正版账户才显示皮肤卡
+        rebuildRows();
+        syncSkinCard();
 
         StackPane holder = new StackPane(content);
         holder.setAlignment(Pos.TOP_LEFT);
@@ -74,7 +70,6 @@ public class PageAccountManager implements Page {
         return data.account() != null && data.account().online;
     }
 
-    /** 顶部：添加账户 + 刷新。 */
     private Node topBar() {
         HBox bar = new HBox(10);
         bar.setAlignment(Pos.CENTER_LEFT);
@@ -85,21 +80,18 @@ public class PageAccountManager implements Page {
         return bar;
     }
 
-    /** 静默重读账户，头像按文件时间自动失效。 */
     private void refreshManually() {
         refreshSilently();
         win.toast("已刷新", "账户列表与头像已重新读取。", 1);
     }
 
-    /** 重建列表、同步皮肤卡、刷新徽章，无动画。 */
     private void refreshSilently() {
         rebuildRows();
-        skinCardFor = null;   // 强制重建皮肤卡
+        skinCardFor = null;
         syncSkinCard();
         win.refreshAccountBadge();
     }
 
-    /** 重建列表行，空列表显示空态。 */
     private void rebuildRows() {
         if (listBox == null) return;
         rows.clear();
@@ -119,13 +111,11 @@ public class PageAccountManager implements Page {
         }
     }
 
-    /** 正版账户才显示皮肤卡。 */
     private void syncSkinCard() {
         if (content == null) return;
-        // 只有微软账户才动得了正版皮肤，第三方和离线不显示这张卡
         Data.Account current = signedIn() && "msa".equals(data.account().userType)
                 ? data.account() : null;
-        if (current == skinCardFor) return;   // 账户没变就不用重建
+        if (current == skinCardFor) return;
         if (skinBox != null) {
             content.getChildren().remove(skinBox);
             skinBox = null;
@@ -148,7 +138,6 @@ public class PageAccountManager implements Page {
         row.setMaxHeight(56);
         row.setMaxWidth(Double.MAX_VALUE);
         row.setBackground(Ui.fill(Theme.cardBg, 6));
-        // 选中态由左侧单选钮表达
         row.setBorder(Ui.border(Theme.accentPale2, 6, 1));
         row.setCursor(Cursor.HAND);
         row.setPickOnBounds(true);
@@ -192,12 +181,12 @@ public class PageAccountManager implements Page {
                         () -> openWebsite("https://www.minecraft.net/profile")));
             }
             actions.add(Ui.iconButton("refresh-cw", 28, 15, "刷新该账户的登录状态", () -> {
-                refreshSilently(); // 静默刷新，不闪整页
+                refreshSilently();
                 win.toast("已刷新。", a.name, 1);
             }));
         } else {
             actions.add(Ui.iconButton("refresh-cw", 28, 15, "刷新该账户的皮肤与头像缓存", () -> {
-                refreshSilently(); // 静默刷新，不闪整页
+                refreshSilently();
                 win.toast("已刷新。", a.name, 1);
             }));
         }
@@ -218,7 +207,6 @@ public class PageAccountManager implements Page {
         layout.getChildren().addAll(radio, faceBox, texts, buttons);
         row.getChildren().add(layout);
 
-        // 悬停底色过渡到 listHoverBg
         row.setOnMouseEntered(e -> row.setBackground(Ui.fill(Theme.listHoverBg, 6)));
         row.setOnMouseExited(e -> row.setBackground(Ui.fill(Theme.cardBg, 6)));
         row.setOnMouseClicked(e -> {
@@ -234,7 +222,6 @@ public class PageAccountManager implements Page {
     }
 
     private Ui.RadioBox radio(boolean selected) {
-        // 行首单选钮，18×18
         Ui.RadioBox rb = Ui.radioBox("", selected);
         rb.setPrefWidth(18);
         rb.setMinWidth(18);
@@ -242,7 +229,6 @@ public class PageAccountManager implements Page {
         return rb;
     }
 
-    /** 切换启动账户，只就地更新选中态。 */
     void select(int index) {
         if (index < 0 || index >= data.accounts.size()) return;
         data.selectedAccount = index;
@@ -253,18 +239,17 @@ public class PageAccountManager implements Page {
             if (r.radio != null) r.radio.setSelected(i == index);
             if (r.info != null) r.info.setText(rowInfo(i, i == index));
         }
-        syncSkinCard();  // 切到正版账户才出现皮肤卡
-        win.refreshAccountBadge(); // 标题栏徽章跟着改
+        syncSkinCard();
+        win.refreshAccountBadge();
         win.toast("已切换启动账户。", data.accounts.get(index).name, 1);
     }
 
-    /** 行里那句登录状态。 */
     private String rowInfo(int index, boolean current) {
         Data.Account a = data.accounts.get(index);
-        return loginType(a) + (current ? " · 当前账户" : "");
+        // 拼接串查不到整键，两个调用点（构建/选中刷新）都不再过 localize，逐段创建时翻译
+        return Lang.t(loginType(a)) + (current ? Lang.t(" · 当前账户") : "");
     }
 
-    /** 和标题栏徽章一致的登录类型。 */
     private static String loginType(Data.Account a) {
         if (a == null) return "离线登录";
         if ("msa".equals(a.userType)) return "正版登录";
@@ -289,12 +274,11 @@ public class PageAccountManager implements Page {
             data.accounts.remove(i);
             if (data.selectedAccount >= data.accounts.size()) data.selectedAccount = 0;
             data.save();
-            refreshSilently(); // 原地重建，不闪整页
+            refreshSilently();
             win.toast("账户已删除", a.name, 1);
         }, true);
     }
 
-    /** 正版皮肤与披风卡片。 */
     private Ui.Card skinCard() {
         Ui.Card card = Ui.card("正版皮肤与披风");
         card.setContentPadding(new Insets(10, 22, 20, 22));
@@ -309,8 +293,7 @@ public class PageAccountManager implements Page {
         preview.setBackground(Ui.fill(Theme.halfWhite, 6));
 
         VBox right = new VBox(12);
-        Label hint = Ui.wrap(Ui.label("当前正版账户：" + a.name
-                + "。修改皮肤 / 披风后会同步刷新账户头像与标题栏徽章；皮肤文件也可另存为 PNG。", 12, Theme.text), 430);
+        Label hint = Ui.wrap(Ui.label(Lang.tf("当前正版账户：%s。修改皮肤 / 披风后会同步刷新账户头像与标题栏徽章；皮肤文件也可另存为 PNG。", a.name), 12, Theme.text), 430);
         hint.setOpacity(0.6);
         hint.setLineSpacing(4);
 
@@ -322,7 +305,7 @@ public class PageAccountManager implements Page {
         });
         StackPane save = skinButton("保存皮肤文件", false, () -> saveSkinFile(a));
         StackPane refresh = skinButton("刷新皮肤", false, () -> {
-            refreshSilently(); // 头像按文件时间自动失效缓存
+            refreshSilently();
             win.toast("已刷新。", a.name, 1);
         });
         StackPane redeem = skinButton("兑换 CDKEY", false, () -> openWebsite("https://www.minecraft.net/zh-hans/redeem"));
@@ -348,9 +331,9 @@ public class PageAccountManager implements Page {
     private void saveSkinFile(Data.Account a) {
         String skinName = a.skin == null ? "Steve.png" : a.skin;
         FileChooser chooser = new FileChooser();
-        chooser.setTitle("保存皮肤文件");
+        chooser.setTitle(Lang.t("保存皮肤文件"));
         chooser.setInitialFileName(a.name + ".png");
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PNG 图片", "*.png"));
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(Lang.t("PNG 图片"), "*.png"));
         java.io.File target = chooser.showSaveDialog(win.stage);
         if (target == null) return;
         try (java.io.InputStream in = Theme.imageStream(skinName)) {

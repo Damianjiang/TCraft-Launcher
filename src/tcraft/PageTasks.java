@@ -17,7 +17,6 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** 任务管理页。 */
 public class PageTasks implements Page {
 
     private static final Pattern RUN_WITH_LOG = Pattern.compile("^运行 (.+) 安装器：(.+)$");
@@ -32,7 +31,6 @@ public class PageTasks implements Page {
     };
 
     private final MainWindow win;
-    private final Data data = Data.get();
     private VBox taskList;
     private Label progressLabel;
     private Label speedLabel;
@@ -258,7 +256,7 @@ public class PageTasks implements Page {
             stageLabel.setText(taskText(task.state == Tasks.State.FAILED && task.error != null ? task.error : task.stage));
             speedLabel.setText(task.speed == null ? "" : task.speed);
             cancel.setVisible(task.state == Tasks.State.RUNNING);
-            // 子任务状态没变就不重建节点，避免每 450ms 清空重加
+            // 子任务状态没变就不重建节点，450ms 一次清空重加太浪费
             StringBuilder sig = new StringBuilder();
             for (Tasks.SubTask sub : task.subs) sig.append(sub.state).append(':').append(sub.name).append('|');
             if (sig.toString().equals(subSig)) return;
@@ -268,7 +266,6 @@ public class PageTasks implements Page {
         }
     }
 
-    /** 任务标题/阶段/子任务在运行时写入，展示时统一补翻译。 */
     static String taskText(String s) {
         if (s == null || s.isEmpty()) return "";
         String exact = Lang.t(s);

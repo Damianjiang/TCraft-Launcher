@@ -11,12 +11,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.function.Consumer;
 
-/** 微软账户登录：设备码流程 + Xbox Live、XSTS 到 Minecraft 服务。 */
 public final class MsAuth {
 
-    /** 构建时注入的 client id，开源版为空。 */
     private static final String CLIENT_ID = Build.MICROSOFT_ID;
-    /** 16 位压缩形式走 Live Connect 旧接口，GUID 形式走 consumers v2。 */
     private static final boolean LEGACY = !CLIENT_ID.isEmpty() && !CLIENT_ID.contains("-");
     private static final String SCOPE = LEGACY
             ? "service::user.auth.xboxlive.com::MBI_SSL"
@@ -42,7 +39,6 @@ public final class MsAuth {
     private MsAuth() {
     }
 
-    /** 设备码登录第一步返回的信息。 */
     public static final class DeviceCode {
         public String deviceCode = "";
         public String userCode = "";
@@ -59,11 +55,9 @@ public final class MsAuth {
         public String name = "";
         public String skinUrl = "";
         public String capeUrl = "";
-        /** Minecraft 令牌过期时间（毫秒），0 表示没拿到。 */
         public long expiresAt = 0;
     }
 
-    /** 用户关闭登录窗口或取消流程。 */
     public static final class CancelledException extends Exception {
         private static final long serialVersionUID = 1L;
     }
@@ -72,12 +66,10 @@ public final class MsAuth {
         boolean cancelled();
     }
 
-    /** 这个构建里有没有微软登录凭据。 */
     public static boolean available() {
         return !CLIENT_ID.isEmpty();
     }
 
-    /** 请求设备码，界面拿到后展示给用户。 */
     public static DeviceCode requestDeviceCode() throws Exception {
         if (!available()) throw new Exception(Lang.t("这个版本没有内置微软登录凭据"));
         String body = "client_id=" + enc(CLIENT_ID) + "&scope=" + enc(SCOPE)
@@ -99,7 +91,6 @@ public final class MsAuth {
         return d;
     }
 
-    /** 轮询到用户完成授权，再走 Xbox 与 Minecraft 的令牌链。 */
     public static Result login(DeviceCode code, Cancel cancel, Consumer<String> stage) throws Exception {
         long deadline = System.currentTimeMillis()
                 + Math.min(code.expiresIn, 900) * 1000L;
@@ -115,14 +106,19 @@ public final class MsAuth {
                     + "&grant_type=" + enc(grant);
             Resp r = postForm(TOKEN_URL, body, 15000);
             if (r.code == 200) {
-                Map<String, Object> m = parse(r.body);
+                Map<String, Object> m;
+                try {
+                    m = parse(r.body);
+                } catch (RuntimeException e) {
+                    throw new Exception(Lang.t("登录响应格式异常：") + e.getMessage());
+                }
                 String access = Json.str(m, "access_token", "");
                 String refresh = Json.str(m, "refresh_token", "");
                 if (access.isEmpty()) throw new Exception(Lang.t("微软没有返回访问令牌"));
                 if (stage != null) stage.accept("正在验证 Xbox 账户…");
                 return authenticate(access, refresh, stage);
             }
-            Map<String, Object> err = parse(r.body);
+            Map<String, Object> err = lenientParse(r.body);
             String e = Json.str(err, "error", "");
             String desc = Json.str(err, "error_description", "");
             if ("authorization_pending".equals(e)) continue;
@@ -138,7 +134,6 @@ public final class MsAuth {
         }
     }
 
-    /** 用 refreshToken 换新的 Minecraft 令牌，令牌过期后启动前调用。 */
     public static Result refresh(String refreshToken) throws Exception {
         if (!available()) throw new Exception(Lang.t("这个版本没有内置微软登录凭据"));
         if (refreshToken == null || refreshToken.isEmpty()) {
@@ -150,18 +145,22 @@ public final class MsAuth {
                 + "&scope=" + enc(SCOPE);
         Resp r = postForm(TOKEN_URL, body, 20000);
         if (r.code != 200) {
-            Map<String, Object> m = parse(r.body);
+            Map<String, Object> m = lenientParse(r.body);
             String why = Json.str(m, "error_description", "");
             throw new Exception(Lang.tf("微软登录已过期：%s", why.isEmpty() ? Lang.t("请重新登录") : why));
         }
-        Map<String, Object> m = parse(r.body);
+        Map<String, Object> m;
+        try {
+            m = parse(r.body);
+        } catch (RuntimeException e) {
+            throw new Exception(Lang.t("登录响应格式异常：" + e.getMessage()));
+        }
         String token = Json.str(m, "access_token", "");
         if (token.isEmpty()) throw new Exception(Lang.t("微软没有返回访问令牌"));
         String next = Json.str(m, "refresh_token", refreshToken);
         return authenticate(token, next.isEmpty() ? refreshToken : next, null);
     }
 
-    /** Minecraft 令牌还有效吗。401 / 404 算失效，其他错误照常抛出。 */
     public static boolean validate(String accessToken) throws Exception {
         if (accessToken == null || accessToken.isEmpty()) return false;
         Resp r = get(MC_PROFILE_URL, accessToken, 15000);
@@ -170,7 +169,6 @@ public final class MsAuth {
         throw new Exception(Lang.tf("验证 Minecraft 令牌失败：HTTP %d", r.code));
     }
 
-    /** 微软令牌换 Minecraft 令牌，并读档案。 */
     private static Result authenticate(String msToken, String refreshToken,
                                        Consumer<String> stage) throws Exception {
         if (stage != null) stage.accept("正在验证 Xbox 账户…");
@@ -183,7 +181,12 @@ public final class MsAuth {
         if (xbl.code != 200) {
             throw new Exception(Lang.tf("Xbox Live 验证失败：%s", errorText(xbl)));
         }
-        Map<String, Object> xblMap = parse(xbl.body);
+        Map<String, Object> xblMap;
+        try {
+            xblMap = parse(xbl.body);
+        } catch (RuntimeException e) {
+            throw new Exception(Lang.t("登录响应格式异常：" + e.getMessage()));
+        }
         String xblToken = Json.str(xblMap, "Token", "");
         String uhs = displayClaim(xblMap, "uhs");
         if (xblToken.isEmpty() || uhs.isEmpty()) {
@@ -195,7 +198,7 @@ public final class MsAuth {
                 + "\"TokenType\":\"JWT\"}";
         Resp xsts = postJson(XSTS_URL, xstsBody, 15000);
         if (xsts.code != 200) {
-            Map<String, Object> m = parse(xsts.body);
+            Map<String, Object> m = lenientParse(xsts.body);
             String xerr = Json.str(m, "XErr", "");
             String why = switch (xerr) {
                 case "2148916227" -> Lang.t("该账户已被 Xbox Live 封禁");
@@ -210,7 +213,12 @@ public final class MsAuth {
                     ? Lang.tf("XSTS 授权失败：HTTP %d", xsts.code)
                     : Lang.tf("XSTS 授权失败（错误码 %s）", xerr));
         }
-        Map<String, Object> xstsMap = parse(xsts.body);
+        Map<String, Object> xstsMap;
+        try {
+            xstsMap = parse(xsts.body);
+        } catch (RuntimeException e) {
+            throw new Exception(Lang.t("登录响应格式异常：" + e.getMessage()));
+        }
         String xstsToken = Json.str(xstsMap, "Token", "");
         uhs = displayClaim(xstsMap, "uhs");
         if (xstsToken.isEmpty() || uhs.isEmpty()) throw new Exception(Lang.t("XSTS 授权失败"));
@@ -224,7 +232,12 @@ public final class MsAuth {
                     : errorText(mc);
             throw new Exception(Lang.tf("Minecraft 登录失败：%s", why));
         }
-        Map<String, Object> mcMap = parse(mc.body);
+        Map<String, Object> mcMap;
+        try {
+            mcMap = parse(mc.body);
+        } catch (RuntimeException e) {
+            throw new Exception(Lang.t("登录响应格式异常：" + e.getMessage()));
+        }
         String token = Json.str(mcMap, "access_token", "");
         if (token.isEmpty()) throw new Exception(Lang.t("Minecraft 登录失败：该账户可能未拥有游戏"));
 
@@ -247,7 +260,12 @@ public final class MsAuth {
         if (profile.code != 200) {
             throw new Exception(Lang.tf("获取 Minecraft 档案失败：%s", errorText(profile)));
         }
-        Map<String, Object> pm = parse(profile.body);
+        Map<String, Object> pm;
+        try {
+            pm = parse(profile.body);
+        } catch (RuntimeException e) {
+            throw new Exception(Lang.t("登录响应格式异常：" + e.getMessage()));
+        }
         r.uuid = formatUuid(Json.str(pm, "id", ""));
         r.name = Json.str(pm, "name", "");
         for (Object o : Json.arr(pm.get("skins"))) {
@@ -268,21 +286,21 @@ public final class MsAuth {
         return r;
     }
 
-    /** 档案 404 时区分「没买游戏」和「没有 Java 档案」。 */
     private static String missingGameMessage(String token) {
         try {
             Resp r = get(MC_LICENSE_URL, token, 15000);
+            if (r.code != 200) return Lang.t("无法确认购买状态，请检查网络后重试");
             for (Object o : Json.arr(Json.obj(Json.parse(r.body)), "items")) {
                 if ("game_minecraft".equals(Json.str(Json.obj(o), "name", ""))) {
                     return "该账户没有 Minecraft: Java Edition 档案";
                 }
             }
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            return Lang.t("无法确认购买状态，请检查网络后重试");
         }
         return "该账户还没有购买 Minecraft: Java Edition";
     }
 
-    /** 下载皮肤，返回头像能用的相对路径。 */
     public static String saveSkin(Result r) {
         if (r.skinUrl == null || r.skinUrl.isEmpty()) return "";
         try {
@@ -292,11 +310,14 @@ public final class MsAuth {
             java.nio.file.Files.write(dir.resolve(file), download(r.skinUrl));
             return "Skins/" + file;
         } catch (Exception e) {
+            try {
+                Data.get().log("保存皮肤失败：" + e);
+            } catch (Exception ignored) {
+            }
             return "";
         }
     }
 
-    /** 分段睡眠，方便窗口关闭后立刻退出轮询。 */
     private static boolean sleep(long ms, Cancel cancel) {
         long end = System.currentTimeMillis() + ms;
         while (System.currentTimeMillis() < end) {
@@ -338,16 +359,22 @@ public final class MsAuth {
 
     private static Map<String, Object> parse(String text) {
         if (text == null || text.isEmpty()) return Map.of();
+        return Json.obj(Json.parse(text));
+    }
+
+    // 解析错误响应时不挑格式，HTML 也能往下走
+    private static Map<String, Object> lenientParse(String text) {
         try {
-            return Json.obj(Json.parse(text));
-        } catch (Exception e) {
+            return parse(text);
+        } catch (RuntimeException e) {
             return Map.of();
         }
     }
 
     private static String errorText(Resp r) {
-        if (r == null) return "未知错误";
-        Map<String, Object> m = parse(r.body);
+        // 兜底值会拼进「Minecraft 登录失败：%s」，先译好再拼
+        if (r == null) return Lang.t("未知错误");
+        Map<String, Object> m = lenientParse(r.body);
         String why = Json.str(m, "error_description", "");
         if (why.isEmpty()) why = Json.str(m, "Message", "");
         if (why.isEmpty()) why = Json.str(m, "errorMessage", "");
@@ -423,7 +450,6 @@ public final class MsAuth {
         }
     }
 
-    /** 打开系统浏览器，跨平台。 */
     public static void openBrowser(String url) {
         try {
             Shell.openUrl(url);

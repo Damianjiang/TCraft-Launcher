@@ -5,8 +5,18 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** 极简 JSON 解析器，不引第三方依赖。 */
 public final class Json {
+
+    // 服务端响应不会有这个深度，超了只可能是恶意构造或解析错位
+    private static final int MAX_DEPTH = 128;
+
+    public static class MalformedException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        public MalformedException(String message) {
+            super(message);
+        }
+    }
 
     private final String s;
     private int i;
@@ -16,10 +26,13 @@ public final class Json {
     }
 
     public static Object parse(String text) {
+        if (text == null) throw new MalformedException("JSON 输入为空");
         Json p = new Json(text);
         p.ws();
-        Object o = p.value();
+        if (p.i >= p.s.length()) throw new MalformedException("JSON 输入为空");
+        Object o = p.value(0);
         p.ws();
+        if (p.i < p.s.length()) throw new MalformedException("JSON 结束后有多余字符 '" + p.s.charAt(p.i) + "'");
         return o;
     }
 
@@ -46,7 +59,6 @@ public final class Json {
         return v == null ? def : String.valueOf(v);
     }
 
-    /** 序列化成 JSON 字符串字面量。 */
     public static String quote(String s) {
         if (s == null) return "\"\"";
         StringBuilder sb = new StringBuilder("\"");
@@ -72,32 +84,33 @@ public final class Json {
         return v instanceof Boolean ? (Boolean) v : def;
     }
 
-    private Object value() {
+    private Object value(int depth) {
+        if (depth > MAX_DEPTH) throw new MalformedException("JSON 嵌套超过 " + MAX_DEPTH + " 层");
         ws(); // 先跳空白，否则空格会被当数字
-        if (i >= s.length()) return null;
+        if (i >= s.length()) throw new MalformedException("JSON 意外结束");
         char c = s.charAt(i);
         switch (c) {
             case '{':
-                return object();
+                return object(depth);
             case '[':
-                return array();
+                return array(depth);
             case '"':
                 return string();
             case 't':
-                i += 4;
+                expect("true");
                 return Boolean.TRUE;
             case 'f':
-                i += 5;
+                expect("false");
                 return Boolean.FALSE;
             case 'n':
-                i += 4;
+                expect("null");
                 return null;
             default:
                 return number();
         }
     }
 
-    private Map<String, Object> object() {
+    private Map<String, Object> object(int depth) {
         Map<String, Object> map = new LinkedHashMap<>();
         i++;
         ws();
@@ -105,22 +118,26 @@ public final class Json {
             i++;
             return map;
         }
-        while (i < s.length()) {
+        while (true) {
             ws();
+            if (peek() != '"') throw new MalformedException("JSON 对象的键必须是字符串");
             String key = string();
             ws();
-            if (peek() == ':') i++;
-            ws();
-            map.put(key, value());
+            if (peek() != ':') throw new MalformedException("JSON 对象缺少冒号");
+            i++;
+            map.put(key, value(depth + 1));
             ws();
             char c = peek();
+            if (c == '}') {
+                i++;
+                return map;
+            }
+            if (c != ',') throw new MalformedException("JSON 对象缺少逗号");
             i++;
-            if (c == '}') break;
         }
-        return map;
     }
 
-    private List<Object> array() {
+    private List<Object> array(int depth) {
         List<Object> list = new ArrayList<>();
         i++;
         ws();
@@ -128,25 +145,31 @@ public final class Json {
             i++;
             return list;
         }
-        while (i < s.length()) {
-            list.add(value());
+        while (true) {
+            if (i >= s.length()) throw new MalformedException("JSON 数组提前结束");
+            list.add(value(depth + 1));
             ws();
             char c = peek();
+            if (c == ']') {
+                i++;
+                return list;
+            }
+            if (c != ',') throw new MalformedException("JSON 数组缺少逗号");
             i++;
-            if (c == ']') break;
         }
-        return list;
     }
 
     private String string() {
+        if (peek() != '"') throw new MalformedException("JSON 字符串应以引号开始");
+        i++;
         StringBuilder sb = new StringBuilder();
-        if (peek() == '"') i++;
-        while (i < s.length()) {
+        while (true) {
+            if (i >= s.length()) throw new MalformedException("JSON 字符串未闭合");
             char c = s.charAt(i++);
             if (c == '"') break;
             if (c == '\\') {
-                // 畸形 JSON 不能抛越界异常
-                if (i >= s.length()) break;
+                // 转义符后面没内容了，按未闭合处理，不能越界
+                if (i >= s.length()) throw new MalformedException("JSON 字符串未闭合");
                 char e = s.charAt(i++);
                 switch (e) {
                     case 'n' -> sb.append('\n');
@@ -180,9 +203,16 @@ public final class Json {
         try {
             if (n.contains(".") || n.contains("e") || n.contains("E")) return Double.parseDouble(n);
             return Long.parseLong(n);
-        } catch (Exception e) {
-            return 0L;
+        } catch (NumberFormatException e) {
+            throw new MalformedException(n.isEmpty()
+                    ? "JSON 意外字符 '" + s.charAt(start) + "'"
+                    : "JSON 数字格式错误：" + n);
         }
+    }
+
+    private void expect(String word) {
+        if (!s.startsWith(word, i)) throw new MalformedException("JSON 字面量不是 " + word);
+        i += word.length();
     }
 
     private void ws() {

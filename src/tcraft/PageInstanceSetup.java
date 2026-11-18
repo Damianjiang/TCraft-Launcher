@@ -27,21 +27,18 @@ import java.util.concurrent.CountDownLatch;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-/** 版本设置页：概览、日志、选项、文件管理和导出。 */
 public class PageInstanceSetup implements Page {
 
     private final MainWindow win;
     private final Data data = Data.get();
     private VBox leftList;
 
-    /** 实例根目录：隔离时是 versions/&lt;版本&gt;，否则是所在游戏目录。 */
     private java.nio.file.Path instanceRoot() {
         Data.Instance ins = data.instance();
         if (ins == null) return java.nio.file.Paths.get(data.gameDir);
         return Isolation.run(ins);
     }
 
-    /** 基础游戏目录：libraries、assets 与 versions 所在位置。 */
     private java.nio.file.Path baseRoot() {
         Data.Instance ins = data.instance();
         return ins == null ? java.nio.file.Paths.get(data.gameDir) : Isolation.base(ins);
@@ -116,7 +113,7 @@ public class PageInstanceSetup implements Page {
         item.setOnMouseClicked(e -> {
             if (key.equals(data.instanceSection)) return;
             data.instanceSection = key;
-            win.refreshRight();
+            win.refreshRight(true);
         });
         if ("settings".equals(key)) {
             StackPane reset = Ui.iconButton("rotate-ccw", 22, 13, "初始化本页设置", this::resetSettings);
@@ -143,10 +140,28 @@ public class PageInstanceSetup implements Page {
             ins.isolation = Isolation.FOLLOW;
             data.save();
         }
-        data.set("InstanceRam", 4096);
-        data.set("InstanceJvmArgs", "");
-        data.set("InstanceWindowTitle", "");
-        win.refreshRight();
+        data.setInstance("Ram", 4096);
+        data.setInstance("RamType", 0);
+        data.setInstance("RamInitial", 0);
+        data.setInstance("JvmArgs", "");
+        data.setInstance("GameArgs", "");
+        data.setInstance("WindowTitle", "");
+        data.setInstance("Info", "");
+        data.setInstance("ServerEnter", "");
+        data.setInstance("LoginRequire", 0);
+        data.setInstance("Java", "");
+        data.setInstance("Renderer", -1);
+        data.setInstance("PreCommand", "");
+        data.setInstance("PreCommandWait", true);
+        data.setInstance("Console", false);
+        data.setInstance("DisableModUpdate", false);
+        data.setInstance("GC", -1);
+        data.setInstance("ClasspathHead", "");
+        data.setInstance("WindowType", -1);
+        data.setInstance("WindowWidth", "854");
+        data.setInstance("WindowHeight", "480");
+        data.save();
+        win.openSetup("settings");
         win.toast("已重置", "版本设置已恢复默认", 1);
     }
 
@@ -292,7 +307,7 @@ public class PageInstanceSetup implements Page {
     private static final long DIAG_MAX_BYTES = 8L * 1024 * 1024;
     private final java.util.List<String> diagSourceNames = new ArrayList<>();
     private final java.util.List<Path> diagSourcePaths = new ArrayList<>();
-    private final java.util.List<String[]> diagAll = new ArrayList<>();   // {text, level}
+    private final java.util.List<String[]> diagAll = new ArrayList<>();
     private final java.util.List<String[]> diagDisplay = new ArrayList<>();
     private ComboBox<String> diagSourceCombo;
     private Label diagStatus;
@@ -303,6 +318,7 @@ public class PageInstanceSetup implements Page {
     private Ui.Check diagChkInfo;
     private Ui.Check diagChkDebug;
     private TextField diagSearch;
+    private int diagLoadGen;
 
     private void buildDiagnostics(VBox page) {
         header(page, "诊断", "查看游戏日志、崩溃报告与启动器日志，定位启动失败的原因。");
@@ -310,7 +326,6 @@ public class PageInstanceSetup implements Page {
         diagDisplay.clear();
         diagSourceNames.clear();
         diagSourcePaths.clear();
-        // 来源：latest.log、最近 12 份崩溃报告、启动器日志
         Path latest = instanceRoot().resolve("logs").resolve("latest.log");
         if (Files.isRegularFile(latest)) diagAddSource("游戏最新日志（latest.log）", latest);
         Path crashDir = instanceRoot().resolve("crash-reports");
@@ -319,7 +334,8 @@ public class PageInstanceSetup implements Page {
                 st.filter(Files::isRegularFile)
                         .sorted(java.util.Comparator.comparingLong((Path p) -> p.toFile().lastModified()).reversed())
                         .limit(12)
-                        .forEach(p -> diagAddSource("崩溃报告 · " + p.getFileName(), p));
+                        // 下拉项是拼接串，localize 只翻译整项文本，须创建时翻译
+                        .forEach(p -> diagAddSource(Lang.tf("崩溃报告 · %s", p.getFileName()), p));
             } catch (Exception ignored) {
             }
         }
@@ -350,7 +366,11 @@ public class PageInstanceSetup implements Page {
         HBox searchRow = new HBox(10);
         searchRow.setAlignment(Pos.CENTER_LEFT);
         diagSearch = Ui.field("搜索日志关键字");
-        diagSearch.textProperty().addListener((o, a, b) -> diagApplyFilter());
+        // 每键全量重建 ListView 太重，200ms 防抖
+        javafx.animation.PauseTransition diagSearchDebounce =
+                new javafx.animation.PauseTransition(javafx.util.Duration.millis(200));
+        diagSearchDebounce.setOnFinished(e -> diagApplyFilter());
+        diagSearch.textProperty().addListener((o, a, b) -> diagSearchDebounce.playFromStart());
         HBox.setHgrow(diagSearch, Priority.ALWAYS);
         searchRow.getChildren().addAll(diagSearch,
                 Ui.button("复制", Ui.BTN_NORMAL, this::diagCopy),
@@ -405,41 +425,43 @@ public class PageInstanceSetup implements Page {
         diagSourcePaths.add(path);
     }
 
-    /** 读当前来源，尾部 8MB、最多 4000 行。 */
     private void diagLoadCurrent(VBox page) {
         diagAll.clear();
         diagDisplay.clear();
         int index = diagSourceCombo == null ? -1 : diagSourceCombo.getSelectionModel().getSelectedIndex();
         if (index < 0 || index >= diagSourcePaths.size()) {
-            diagStatus.setText("没有可用的日志来源。");
+            // runLater/异步回调后 localize 不再经过，状态文本创建处翻译
+            diagStatus.setText(Lang.t("没有可用的日志来源。"));
             diagPath.setText("");
             diagApplyFilter();
             return;
         }
         Path target = diagSourcePaths.get(index);
         diagPath.setText(target.toString());
-        diagStatus.setText("正在读取…");
+        diagStatus.setText(Lang.t("正在读取…"));
+        // 代次计数：快速切换来源时，旧结果不许盖掉新日志
+        final int gen = ++diagLoadGen;
         Thread t = new Thread(() -> {
             java.util.List<String[]> result = new ArrayList<>();
             String failed = null;
             try {
                 if (Files.isRegularFile(target)) {
-                    long length = Files.size(target);
-                    java.io.RandomAccessFile raf = new java.io.RandomAccessFile(target.toFile(), "r");
-                    if (length > DIAG_MAX_BYTES) raf.seek(length - DIAG_MAX_BYTES);
-                    java.util.List<String> raw = new ArrayList<>();
-                    String line;
-                    try (java.io.BufferedReader reader = new java.io.BufferedReader(
-                            new java.io.InputStreamReader(new java.io.FileInputStream(raf.getFD()), StandardCharsets.UTF_8))) {
-                        while ((line = reader.readLine()) != null) {
-                            raw.add(line);
-                            if (raw.size() > DIAG_MAX_LINES * 2) raw.subList(0, raw.size() - DIAG_MAX_LINES).clear();
+                    try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(target.toFile(), "r")) {
+                        long length = Files.size(target);
+                        if (length > DIAG_MAX_BYTES) raf.seek(length - DIAG_MAX_BYTES);
+                        java.util.List<String> raw = new ArrayList<>();
+                        String line;
+                        try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                                new java.io.InputStreamReader(new java.io.FileInputStream(raf.getFD()), StandardCharsets.UTF_8))) {
+                            while ((line = reader.readLine()) != null) {
+                                raw.add(line);
+                                if (raw.size() > DIAG_MAX_LINES * 2) raw.subList(0, raw.size() - DIAG_MAX_LINES).clear();
+                            }
                         }
-                    }
-                    raf.close();
-                    int start = Math.max(0, raw.size() - DIAG_MAX_LINES);
-                    for (int i = start; i < raw.size(); i++) {
-                        result.add(new String[]{raw.get(i), String.valueOf(diagLevel(raw.get(i)))});
+                        int start = Math.max(0, raw.size() - DIAG_MAX_LINES);
+                        for (int i = start; i < raw.size(); i++) {
+                            result.add(new String[]{raw.get(i), String.valueOf(diagLevel(raw.get(i)))});
+                        }
                     }
                 }
             } catch (Exception e) {
@@ -448,9 +470,10 @@ public class PageInstanceSetup implements Page {
             java.util.List<String[]> fResult = result;
             String fFailed = failed;
             javafx.application.Platform.runLater(() -> {
+                if (gen != diagLoadGen) return;
                 diagAll.clear();
                 for (String[] l : fResult) diagAll.add(l);
-                if (fFailed != null) diagStatus.setText("读取失败：" + fFailed);
+                if (fFailed != null) diagStatus.setText(Lang.t("读取失败：") + fFailed);
                 diagApplyFilter();
                 if (fFailed == null && diagList != null) diagList.scrollTo(diagDisplay.size() - 1);
             });
@@ -468,7 +491,6 @@ public class PageInstanceSetup implements Page {
         return 2;
     }
 
-    /** 级别筛选 + 关键字过滤。 */
     private void diagApplyFilter() {
         if (diagList == null) return;
         diagDisplay.clear();
@@ -484,8 +506,9 @@ public class PageInstanceSetup implements Page {
         }
         diagList.getItems().setAll(diagDisplay);
         boolean empty = diagDisplay.isEmpty();
-        diagStatus.setText(diagAll.isEmpty() ? "这个来源还没有内容。"
-                : (empty ? "没有匹配当前筛选的日志。" : "共 " + diagAll.size() + " 行，显示 " + diagDisplay.size() + " 行"));
+        diagStatus.setText(diagAll.isEmpty() ? Lang.t("这个来源还没有内容。")
+                : (empty ? Lang.t("没有匹配当前筛选的日志。")
+                : Lang.tf("共 %d 行，显示 %d 行", diagAll.size(), diagDisplay.size())));
     }
 
     private void diagCopy() {
@@ -507,11 +530,11 @@ public class PageInstanceSetup implements Page {
             return;
         }
         javafx.stage.FileChooser chooser = new javafx.stage.FileChooser();
-        chooser.setTitle("导出日志");
+        chooser.setTitle(Lang.t("导出日志"));
         String stamp = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
         chooser.setInitialFileName("diagnostics-" + stamp + ".log");
-        chooser.getExtensionFilters().add(new javafx.stage.FileChooser.ExtensionFilter("日志文件", "*.log"));
-        chooser.getExtensionFilters().add(new javafx.stage.FileChooser.ExtensionFilter("文本文件", "*.txt"));
+        chooser.getExtensionFilters().add(new javafx.stage.FileChooser.ExtensionFilter(Lang.t("日志文件"), "*.log"));
+        chooser.getExtensionFilters().add(new javafx.stage.FileChooser.ExtensionFilter(Lang.t("文本文件"), "*.txt"));
         java.io.File file = chooser.showSaveDialog(win.stage);
         if (file == null) return;
         try {
@@ -525,7 +548,6 @@ public class PageInstanceSetup implements Page {
         }
     }
 
-    /** 脱敏，替换路径、用户目录和 UUID。 */
     private String diagDesensitize(String line) {
         try {
             Data.Instance ins = data.instance();
@@ -538,67 +560,21 @@ public class PageInstanceSetup implements Page {
         return line;
     }
 
-    /** 按关键字规则分析崩溃原因，不联网。 */
     private void diagAnalyze() {
         if (diagAll.isEmpty()) {
             win.toast("请先加载一份日志。", "", 3);
             return;
         }
-        String[][] rules = {
-                {"OutOfMemoryError", "内存不足", "把最大内存调高（设置 › 启动 › 内存），并检查是否安装了过多大型 Mod。"},
-                {"Java heap space", "内存不足", "把最大内存调高，或减少同时加载的 Mod / 光影。"},
-                {"UnsupportedClassVersionError", "Java 版本不匹配", "这个版本需要更高版本的 Java；到 设置 › Java 重新选择运行时。"},
-                {"requires Java", "Java 版本不匹配", "按崩溃提示的版本要求更换 Java。"},
-                {"Missing or unsupported mandatory dependencies", "缺少前置 Mod", "按日志列出的 modid 补齐前置 Mod，或换用兼容版本。"},
-                {"Mod resolution failed", "Mod 依赖解析失败", "检查缺失依赖、重复 Mod 与版本冲突。"},
-                {"Duplicate mods", "Mod 重复", "同一个 Mod 放了多个版本，删掉多余的 jar。"},
-                {"Mixin apply failed", "Mixin 注入失败", "常见于 Mod 与游戏版本不匹配，逐一停用最近添加的 Mod。"},
-                {"MixinApplyError", "Mixin 注入失败", "常见于 Mod 与游戏版本不匹配，逐一停用最近添加的 Mod。"},
-                {"java.lang.ClassNotFoundException", "缺少类 / 依赖", "确认 Forge / Fabric 等加载器安装完整，必要时修复游戏文件。"},
-                {"NoSuchMethodError", "Mod 与游戏版本不匹配", "把 Mod 换成对应游戏版本的版本。"},
-                {"GLFW error", "图形环境异常", "更新显卡驱动；笔记本切换到独显运行。"},
-                {"Pixel format not accelerated", "显卡驱动不支持 OpenGL", "安装厂商驱动，不要用系统自带的基础驱动。"},
-                {"Failed to create window", "无法创建游戏窗口", "检查显卡驱动与远程桌面 / 虚拟机环境。"},
-                {"AccessDeniedException", "文件被占用或无权限", "关闭占用文件的程序，或以管理员身份运行启动器。"},
-                {"The game crashed whilst", "游戏崩溃", "结合下方错误行定位；也可以在「日志」里换崩溃报告查看完整堆栈。"},
-                {"Exception in thread \"main\"", "主线程异常", "查看紧随其后的 Caused by 行。"},
-        };
-        StringBuilder hits = new StringBuilder();
-        StringBuilder evidence = new StringBuilder();
-        int hitCount = 0;
-        for (String[] rule : rules) {
-            String found = null;
-            for (String[] item : diagAll) {
-                if (item[0].toLowerCase().contains(rule[0].toLowerCase())) {
-                    found = item[0].trim();
-                    break;
-                }
-            }
-            if (found != null) {
-                hitCount++;
-                hits.append("· ").append(rule[1]).append("：").append(rule[2]).append(System.lineSeparator());
-                evidence.append("    ").append(found).append(System.lineSeparator());
-            }
-        }
-        String text;
-        if (hitCount == 0) {
-            StringBuilder fallback = new StringBuilder();
-            int count = 0;
-            for (String[] item : diagAll) {
-                if (item[1].equals("0")) {
-                    fallback.append("    ").append(item[0].trim()).append(System.lineSeparator());
-                    if (++count >= 6) break;
-                }
-            }
-            text = "没有匹配到已知的崩溃特征。" + System.lineSeparator() + System.lineSeparator()
-                    + (count > 0 ? "最近的错误行：" + System.lineSeparator() + fallback
-                    : "这份日志里也没有错误级别的行。");
-        } else {
-            text = "可能的原因与建议：" + System.lineSeparator() + hits
-                    + System.lineSeparator() + "证据（日志原文）：" + System.lineSeparator() + evidence;
-        }
+        java.util.List<String> lines = new java.util.ArrayList<>();
+        for (String[] item : diagAll) lines.add(item[0]);
+        showCrashReport(CrashAnalyzer.analyze(lines));
+    }
+
+    static void showCrashReport(MainWindow win, CrashAnalyzer.Result result) {
+        String text = CrashAnalyzer.describe(result);
+        boolean bad = result != null && result.found();
         VBox card = Dialogs.msgCard("崩溃分析");
-        Label body = Ui.label(text, 13, hitCount > 0 ? Theme.redDark : Theme.text);
+        Label body = Ui.label(text, 13, bad ? Theme.redDark : Theme.text);
         body.setWrapText(true);
         VBox.setMargin(body, new Insets(13, 0, 17, 0));
         card.getChildren().add(body);
@@ -609,9 +585,12 @@ public class PageInstanceSetup implements Page {
         win.showModal(card);
     }
 
+    private void showCrashReport(CrashAnalyzer.Result result) {
+        showCrashReport(win, result);
+    }
+
     private static final String[] OPT_GROUPS = {"画面", "声音", "操作", "聊天与语言"};
 
-    /** 列依次是键、标题、分组、控件类型、最小、最大、百分比、选项。 */
     private static final Object[][] OPT_DEFS = {
             {"renderDistance", "渲染距离", "画面", 1, 2, 32, false, null},
             {"simulationDistance", "模拟距离", "画面", 1, 5, 32, false, null},
@@ -639,7 +618,6 @@ public class PageInstanceSetup implements Page {
                     new String[]{"zh_cn", "zh_tw", "en_us", "ja_jp", "ko_kr", "ru_ru", "de_de", "fr_fr", "es_es"}},
     };
 
-    /** options.txt 键值，保持顺序，未知键原样保留。 */
     private final java.util.LinkedHashMap<String, String> optionValues = new java.util.LinkedHashMap<>();
     private boolean optionDirty = false;
 
@@ -661,7 +639,7 @@ public class PageInstanceSetup implements Page {
             }
         } catch (Exception e) {
             Ui.Card notice = addCard(page, "读取失败");
-            notice.add(Ui.label("读取 options.txt 失败：" + e.getMessage(), 13, Theme.gray2));
+            notice.add(Ui.label(Lang.tf("读取 options.txt 失败：%s", e.getMessage()), 13, Theme.gray2));
             return;
         }
 
@@ -699,7 +677,6 @@ public class PageInstanceSetup implements Page {
         page.getChildren().add(actions);
     }
 
-    /** 标题、控件和当前值一行。 */
     private HBox buildOptionRow(Object[] def) {
         String key = (String) def[0];
         String title = (String) def[1];
@@ -756,7 +733,6 @@ public class PageInstanceSetup implements Page {
         return row;
     }
 
-    /** options.txt 原始值转滑块整数。 */
     private static int toSlider(int min, int max, boolean percent, String raw) {
         double num;
         try {
@@ -768,7 +744,6 @@ public class PageInstanceSetup implements Page {
         return Math.max(0, Math.min(max - min, (int) Math.round(scaled) - min));
     }
 
-    /** 滑块整数转 options.txt 值，percent 用 0.0### 格式。 */
     private static String fromSlider(int min, boolean percent, int sliderValue) {
         int actual = sliderValue + min;
         if (percent) return String.format(java.util.Locale.ROOT, "%.4f", actual / 100.0).replaceAll("0+$", "").replaceAll("\\.$", "");
@@ -780,7 +755,6 @@ public class PageInstanceSetup implements Page {
         return percent ? v + "%" : String.valueOf(v);
     }
 
-    /** 写回 options.txt，保持顺序和未知键，UTF-8 无 BOM。 */
     private void saveOptions(Path options) {
         if (!Files.isRegularFile(options)) {
             win.toast("没有可保存的 options.txt。", "", 3);
@@ -803,7 +777,6 @@ public class PageInstanceSetup implements Page {
         }
     }
 
-    /** 选项预设目录，JSON 格式。 */
     private Path optionPresetDir() {
         Path dir = Resources.home().resolve("option-presets");
         try {
@@ -813,7 +786,6 @@ public class PageInstanceSetup implements Page {
         return dir;
     }
 
-    /** 存预设，只存本页认识的键。 */
     private void saveOptionPreset() {
         Dialogs.input(win, "存为选项预设", "保存当前这张表里的全部选项，之后可以一键套用到其他实例。", "", name -> {
             if (name == null || name.trim().isEmpty()) return;
@@ -842,7 +814,6 @@ public class PageInstanceSetup implements Page {
         });
     }
 
-    /** 套用或删除预设。 */
     private void applyOptionPreset() {
         java.util.List<Path> presets = new ArrayList<>();
         try (java.util.stream.Stream<Path> st = Files.list(optionPresetDir())) {
@@ -874,15 +845,16 @@ public class PageInstanceSetup implements Page {
                     optionDirty = true;
                     win.closeModal();
                     win.openSetup("options");
-                    win.toast("已套用预设「" + preset.getFileName().toString().replace(".json", "") + "」",
-                            "共 " + applied + " 项。记得点「保存修改」写入 options.txt。", 1);
+                    // toast 只对整串查表，拼接串须按片段在创建处翻译；「项。…」键不带前导空格
+                    win.toast(Lang.t("已套用预设「") + preset.getFileName().toString().replace(".json", "") + "」",
+                            Lang.t("共 ") + applied + Lang.t("项。记得点「保存修改」写入 options.txt。"), 1);
                 } catch (Exception ex) {
                     win.toast("套用预设失败", ex.getMessage(), 3);
                 }
             });
             rows.getChildren().add(applyRow);
             Ui.ListItem deleteRow = new Ui.ListItem(Theme.icon("trash-2", 15, Theme.red),
-                    "删除预设 · " + preset.getFileName().toString().replace(".json", ""), null, 40);
+                    Lang.tf("删除预设 · %s", preset.getFileName().toString().replace(".json", "")), null, 40);
             deleteRow.setOnMouseClicked(e -> {
                 try {
                     Files.deleteIfExists(preset);
@@ -930,9 +902,9 @@ public class PageInstanceSetup implements Page {
     }
 
     private void buildSettings(VBox page) {
-        header(page, "版本设置", "仅作用于当前实例的启动选项。");
-        Ui.Card basic = addCard(page, "基础设置");
+        header(page, "版本设置", "仅作用于当前实例的启动选项，每个实例各自保存。");
         Data.Instance current = data.instance();
+        Ui.Card basic = addCard(page, "基础设置");
         Label isolationHint = Ui.label(current == null ? "" : Isolation.describe(current), 11.5, Theme.gray3);
         isolationHint.setWrapText(true);
         isolationHint.setMaxWidth(430);
@@ -948,34 +920,208 @@ public class PageInstanceSetup implements Page {
         });
         basic.add(Ui.settingRow("版本隔离", isolation));
         basic.add(isolationHint);
+
         TextField title = Ui.field("默认");
-        title.setText(data.get("InstanceWindowTitle", ""));
-        title.textProperty().addListener((o, a, b) -> data.set("InstanceWindowTitle", b));
+        title.setText(data.getInstance("WindowTitle", ""));
+        title.textProperty().addListener((o, a, b) -> data.setInstance("WindowTitle", b));
         basic.add(Ui.settingRow("游戏窗口标题", title));
-        Ui.SliderBar memory = Ui.sliderBar(1024, 16384, data.getInt("InstanceRam", 4096));
-        memory.setPrefWidth(260);
-        Label memVal = Ui.label(data.getInt("InstanceRam", 4096) + " MB", 12, Theme.text);
-        memory.setOnChanged(b -> {
+
+        TextField info = Ui.field("TCL");
+        info.setText(data.getInstance("Info", ""));
+        info.textProperty().addListener((o, a, b) -> data.setInstance("Info", b));
+        basic.add(Ui.settingRow("自定义信息", info));
+
+        TextField serverEnter = Ui.field("留空则不自动进入服务器");
+        serverEnter.setText(data.getInstance("ServerEnter", ""));
+        serverEnter.textProperty().addListener((o, a, b) -> data.setInstance("ServerEnter", b));
+        basic.add(Ui.settingRow("自动进入服务器", serverEnter));
+
+        ComboBox<String> loginRequire = Ui.combo(new String[]{"不要求", "必须正版登录", "必须第三方登录",
+                        "不允许离线登录"},
+                Math.max(0, Math.min(3, data.getInstanceInt("LoginRequire", 0))));
+        loginRequire.setPrefWidth(240);
+        loginRequire.setOnAction(e -> data.setInstance("LoginRequire",
+                loginRequire.getSelectionModel().getSelectedIndex()));
+        basic.add(Ui.settingRow("登录要求", loginRequire));
+
+        // 内存：自动 / 自定义，每个实例独立
+        int ramType = data.getInstanceInt("RamType", 0);
+        Ui.RadioBox autoRam = Ui.radioBox("自动配置", ramType == 0);
+        Ui.RadioBox customRam = Ui.radioBox("自定义", ramType == 1);
+        HBox ramRadios = new HBox(20, autoRam, customRam);
+        int ram = data.getInstanceInt("Ram", 4096);
+        Ui.SliderBar ramBar = Ui.sliderBar(512, physicalRamMb(), ram);
+        ramBar.setPrefWidth(250);
+        Label ramVal = Ui.label(ramType == 0 ? "自动" : ram + " MB", 12, Theme.text);
+        ramBar.setOnChanged(b -> {
             int v = (int) (Math.round(b / 512.0) * 512);
-            memVal.setText(v + " MB");
-            data.set("InstanceRam", v);
+            ramVal.setText(v + " MB");
+            data.setInstance("Ram", v);
         });
-        HBox memBox = new HBox(10, memory, memVal);
-        memBox.setAlignment(Pos.CENTER_LEFT);
-        basic.add(Ui.settingRow("内存分配", memBox));
+        HBox ramBox = new HBox(10, ramBar, ramVal);
+        ramBox.setAlignment(Pos.CENTER_LEFT);
+        basic.add(ramRadios);
+        basic.add(Ui.settingRow("内存分配", ramBox));
+        Runnable syncRam = () -> {
+            boolean on = customRam.isSelected();
+            ramBar.setDisable(!on);
+            ramVal.setOpacity(on ? 1 : 0.55);
+            int v = (int) (Math.round(ramBar.getValue() / 512.0) * 512);
+            ramVal.setText(on ? v + " MB" : "自动");
+        };
+        syncRam.run();
+        autoRam.setOnAction(() -> {
+            customRam.setSelected(false);
+            data.setInstance("RamType", 0);
+            syncRam.run();
+        });
+        customRam.setOnAction(() -> {
+            autoRam.setSelected(false);
+            data.setInstance("RamType", 1);
+            syncRam.run();
+        });
+        Ui.Check ramOptimize = Ui.checkBox("启动前进行内存优化", false);
+        ramOptimize.setSelected(data.getInstanceBool("OptimizeRam", true));
+        ramOptimize.setOnAction(() -> data.setInstance("OptimizeRam", ramOptimize.isSelected()));
+        basic.add(ramOptimize);
+
+        int initialRam = data.getInstanceInt("RamInitial", data.getInt("LaunchRamInitial", 0));
+        if (initialRam > ram) initialRam = 0;
+        Ui.SliderBar initialBar = Ui.sliderBar(0, Math.max(512, ram), Math.min(Math.max(512, ram), initialRam));
+        initialBar.setPrefWidth(250);
+        Label initialVal = Ui.label(initialRam <= 0 ? "自动" : initialRam + " MB", 12, Theme.text);
+        initialBar.setOnChanged(b -> {
+            int v = (int) (Math.round(b / 512.0) * 512);
+            initialVal.setText(v <= 0 ? "自动" : v + " MB");
+            data.setInstance("RamInitial", v);
+        });
+        HBox initialBox = new HBox(10, initialBar, initialVal);
+        initialBox.setAlignment(Pos.CENTER_LEFT);
+        basic.add(Ui.settingRow("初始内存", initialBox));
+
+        int winType = data.getInstanceInt("WindowType", -1);
+        ComboBox<String> winCombo = Ui.combo(new String[]{"跟随全局设置", "全屏", "默认", "自定义尺寸", "最大化"},
+                Math.max(0, Math.min(4, winType + 1)));
+        winCombo.setPrefWidth(240);
+        TextField winW = Ui.field("854");
+        TextField winH = Ui.field("480");
+        winW.setPrefWidth(70);
+        winH.setPrefWidth(70);
+        winW.setText(data.getInstance("WindowWidth", "854"));
+        winH.setText(data.getInstance("WindowHeight", "480"));
+        HBox sizeRow = new HBox(6, winW, Ui.label(" × ", 15, Theme.text), winH);
+        sizeRow.setAlignment(Pos.CENTER_LEFT);
+        Runnable syncSize = () -> {
+            boolean show = winCombo.getSelectionModel().getSelectedIndex() == 3;
+            sizeRow.setVisible(show);
+            sizeRow.setManaged(show);
+        };
+        syncSize.run();
+        winCombo.setOnAction(e -> {
+            int idx = winCombo.getSelectionModel().getSelectedIndex();
+            data.setInstance("WindowType", idx - 1);
+            syncSize.run();
+        });
+        winW.textProperty().addListener((o, a, b) -> data.setInstance("WindowWidth", b));
+        winH.textProperty().addListener((o, a, b) -> data.setInstance("WindowHeight", b));
+        basic.add(Ui.settingRow("窗口大小", winCombo));
+        basic.add(sizeRow);
 
         Ui.Card java = addCard(page, "Java 与高级");
-        ComboBox<String> javaCombo = Ui.combo(new String[]{javaName(), "跟随全局设置"}, 0);
-        javaCombo.setPrefWidth(300);
+        // 每个实例可以指定 Java；没缓存时不在这里起进程探测，先占位再后台扫
+        java.util.List<Data.JavaRuntime> runtimes;
+        if (data.hasJavaScanCache()) {
+            runtimes = data.scanJavaRuntimes();
+        } else {
+            runtimes = new ArrayList<>();
+            Threads.start("TCL-JavaScan", () -> {
+                data.scanJavaRuntimes();
+                javafx.application.Platform.runLater(() -> {
+                    if (win.currentKey == null || !win.currentKey.equals("instanceSetup")) return;
+                    if (!"settings".equals(data.instanceSection)) return;
+                    win.refreshRight();
+                });
+            });
+        }
+        java.util.List<String> javaOpts = new ArrayList<>();
+        java.util.List<String> javaPaths = new ArrayList<>();
+        // 下拉项是拼接串，localize 只查整串，创建时翻译
+        String followLabel = Lang.tf("跟随全局设置（%s）", data.javaPath.isEmpty() ? Lang.t("未找到 Java")
+                : Paths.get(data.javaPath).getFileName());
+        javaOpts.add(followLabel);
+        javaPaths.add("");
+        javaOpts.add("自动选择（按版本要求）");
+        javaPaths.add("@auto");
+        String insJava = data.getInstance("Java", "");
+        int javaSel = 0;
+        if ("@auto".equals(insJava)) javaSel = 1;
+        for (Data.JavaRuntime rt : runtimes) {
+            javaOpts.add("Java " + rt.major() + " · " + rt.path());
+            javaPaths.add(rt.path());
+            if (rt.path().equals(insJava)) javaSel = javaOpts.size() - 1;
+        }
+        ComboBox<String> javaCombo = Ui.combo(javaOpts.toArray(new String[0]), javaSel);
+        javaCombo.setPrefWidth(340);
+        javaCombo.setOnAction(e -> {
+            int i = javaCombo.getSelectionModel().getSelectedIndex();
+            if (i < 0 || i >= javaPaths.size()) return;
+            data.setInstance("Java", javaPaths.get(i));
+            String toastTitle = i == 0 ? "已跟随全局 Java" : i == 1 ? "已使用自动 Java" : "已指定实例 Java";
+            String detail = i == 0 ? data.javaPath : i == 1 ? "按版本要求选择" : javaPaths.get(i);
+            win.toast(toastTitle, detail, 1);
+        });
         java.add(Ui.settingRow("Java 运行时", javaCombo));
-        TextField args = Ui.field("留空则使用全局设置");
-        args.setText(data.get("InstanceJvmArgs", ""));
-        args.textProperty().addListener((o, a, b) -> data.set("InstanceJvmArgs", b));
-        java.add(Ui.settingRow("JVM 参数", args));
-        Ui.Check console = Ui.checkBox("显示控制台窗口", false);
-        console.setSelected(data.getBool("InstanceConsole", false));
-        console.setOnAction(() -> data.set("InstanceConsole", console.isSelected()));
+
+        if (Shell.windows()) {
+            ComboBox<String> renderer = Ui.combo(new String[]{"跟随全局设置", "默认（游戏自带渲染器）",
+                    "软件渲染（llvmpipe）", "DirectX 12（d3d12）", "Vulkan（zink）"},
+                    Math.max(0, Math.min(4, data.getInstanceInt("Renderer", -1) + 1)));
+            renderer.setPrefWidth(260);
+            renderer.setOnAction(e -> data.setInstance("Renderer",
+                    renderer.getSelectionModel().getSelectedIndex() - 1));
+            java.add(Ui.settingRow("渲染器", renderer));
+        }
+
+        TextField jvm = Ui.field("留空则使用全局设置");
+        jvm.setText(data.getInstance("JvmArgs", ""));
+        jvm.textProperty().addListener((o, a, b) -> data.setInstance("JvmArgs", b));
+        java.add(Ui.settingRow("JVM 参数", jvm));
+
+        TextField gameArgs = Ui.field("留空则使用全局设置");
+        gameArgs.setText(data.getInstance("GameArgs", ""));
+        gameArgs.textProperty().addListener((o, a, b) -> data.setInstance("GameArgs", b));
+        java.add(Ui.settingRow("游戏参数", gameArgs));
+
+        TextField pre = Ui.field("留空则不执行");
+        pre.setText(data.getInstance("PreCommand", ""));
+        pre.textProperty().addListener((o, a, b) -> data.setInstance("PreCommand", b));
+        java.add(Ui.settingRow("启动前执行命令", pre));
+        Ui.Check preWait = Ui.checkBox("等待命令执行完成后再继续启动", false);
+        preWait.setSelected(data.getInstanceBool("PreCommandWait", true));
+        preWait.setOnAction(() -> data.setInstance("PreCommandWait", preWait.isSelected()));
+        java.add(preWait);
+
+        ComboBox<String> gc = Ui.combo(new String[]{"跟随全局设置", "尽量使用 ZGC", "尽量使用分代 ZGC",
+                "标准 G1GC", "不指定（可自定义）", "调优 G1GC"},
+                Math.max(0, Math.min(5, data.getInstanceInt("GC", -1) + 1)));
+        gc.setPrefWidth(240);
+        gc.setOnAction(e -> data.setInstance("GC", gc.getSelectionModel().getSelectedIndex() - 1));
+        java.add(Ui.settingRow("内存管理", gc));
+
+        TextField classpathHead = Ui.field("留空则使用全局设置");
+        classpathHead.setText(data.getInstance("ClasspathHead", ""));
+        classpathHead.textProperty().addListener((o, a, b) -> data.setInstance("ClasspathHead", b));
+        java.add(Ui.settingRow("类路径头部", classpathHead));
+
+        Ui.Check console = Ui.checkBox("显示控制台窗口（java.exe，占用一个命令行窗口）", false);
+        console.setSelected(data.getInstanceBool("Console", false));
+        console.setOnAction(() -> data.setInstance("Console", console.isSelected()));
         java.add(console);
+
+        Ui.Check disableModUpdate = Ui.checkBox("禁止更新 Mod", false);
+        disableModUpdate.setSelected(data.getInstanceBool("DisableModUpdate", false));
+        disableModUpdate.setOnAction(() -> data.setInstance("DisableModUpdate", disableModUpdate.isSelected()));
+        java.add(disableModUpdate);
 
         HBox actions = new HBox(10);
         actions.getChildren().addAll(
@@ -984,13 +1130,19 @@ public class PageInstanceSetup implements Page {
         page.getChildren().add(actions);
     }
 
-    private String javaName() {
-        return data.javaPath.isEmpty() ? "未找到 Java" : Paths.get(data.javaPath).getFileName().toString();
+    private static long physicalRamMb() {
+        try {
+            com.sun.management.OperatingSystemMXBean os =
+                    (com.sun.management.OperatingSystemMXBean) java.lang.management.ManagementFactory.getOperatingSystemMXBean();
+            long total = os.getTotalMemorySize() / (1024 * 1024);
+            return total > 0 ? total : 4096;
+        } catch (Throwable t) {
+            return 4096;
+        }
     }
 
     private void buildMods(VBox page) {
         Path modsDir = instanceRoot().resolve("mods");
-        // 识别 .jar、.zip、.litemod，.disabled 为禁用
         List<Path> mods = listModFiles(modsDir);
         long enabledCount = mods.stream().filter(p -> !isDisabledPack(p)).count();
         header(page, "Mod 管理", Lang.tf("共 %d 个，已启用 %d 个。", mods.size(), enabledCount));
@@ -1016,7 +1168,6 @@ public class PageInstanceSetup implements Page {
         if (mods.isEmpty()) {
             card.add(Ui.label("这个实例的 mods 文件夹是空的。\n点击「安装 Mod」选择文件，或把 .jar 放入 mods 文件夹后点击刷新。", 12.5, Theme.gray2));
         } else {
-            // 筛选：0 全部，1 启用，2 禁用
             String[] filter = {"0"};
             HBox filterRow = new HBox(6);
             Runnable[] renderRef = new Runnable[1];
@@ -1049,37 +1200,105 @@ public class PageInstanceSetup implements Page {
         }
     }
 
-    /** Mod 行操作按钮。 */
     private Node modRow(Path modsDir, Path mod) {
         String name = mod.getFileName().toString();
         boolean disabled = isDisabledPack(mod);
-        String display = disabled ? name.substring(0, name.length() - ".disabled".length()) : name;
+        String fileDisplay = disabled ? name.substring(0, name.length() - ".disabled".length()) : name;
+        boolean wantLocalName = Data.get().getInt("ToolModLocalNameStyle", 0) == 1;
+        String cacheKey = mod.toAbsolutePath().toString();
+        String cached = wantLocalName ? MOD_NAME_CACHE.get(cacheKey) : null;
+        String display = cached != null && !cached.isBlank() ? cached.trim() : fileDisplay;
         Node icon = Theme.icon(disabled ? "link-2-off" : "puzzle", 16, disabled ? Theme.gray4 : Theme.accent);
-        Ui.ListItem item = new Ui.ListItem(icon, display, disabled ? "已禁用 · " + sizeOf(mod) : sizeOf(mod), 40);
-        StackPane info = Ui.iconButton("info", 26, 15, "详情", () -> modDetail(mod, display, disabled));
-        info.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED, javafx.scene.input.MouseEvent::consume);
-        StackPane open = Ui.iconButton("folder-open", 26, 15, "打开文件位置", () -> openFolder(mod.getParent().toString()));
-        open.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED, javafx.scene.input.MouseEvent::consume);
-        StackPane toggle = Ui.iconButton("power", 26, 15, disabled ? "启用" : "禁用", () -> toggleMod(mod, disabled));
-        toggle.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED, javafx.scene.input.MouseEvent::consume);
-        StackPane update = Ui.iconButton("git-pull-request-arrow", 26, 15, "检查更新", () -> checkModUpdate(mod, display));
-        update.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED, javafx.scene.input.MouseEvent::consume);
-        StackPane delete = Ui.iconButton("trash-2", 26, 15, "删除", () -> deleteFile(mod, "Mod"));
-        delete.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED, javafx.scene.input.MouseEvent::consume);
+        Ui.ListItem item = new Ui.ListItem(icon, display,
+                (disabled ? "已禁用 · " : "") + (display.equals(fileDisplay) ? "" : fileDisplay + " · ") + sizeOf(mod), 40);
+        if (wantLocalName && cached == null) {
+            // 名字放后台读：100+ Mod 逐个 new ZipFile 在主线程上会卡好几秒，
+            // 池子固定 2 线程，几百个 Mod 不能一次起几百条线程
+            MOD_NAME_POOL.execute(() -> {
+                String local = readLocalModName(mod);
+                if (local == null || local.isBlank()) return;
+                cacheModName(cacheKey, local.trim());
+                javafx.application.Platform.runLater(() -> {
+                    item.title.setText(local.trim());
+                    item.info.setText((disabled ? "已禁用 · " : "") + fileDisplay + " · " + sizeOf(mod));
+                });
+            });
+        }
+        StackPane info = Ui.listAction("info", 26, 15, "详情", () -> modDetail(mod, item.title.getText(), disabled));
+        StackPane open = Ui.listAction("folder-open", 26, 15, "打开文件位置", () -> openFolder(mod.getParent().toString()));
+        StackPane toggle = Ui.listAction("power", 26, 15, disabled ? "启用" : "禁用", () -> toggleMod(mod, disabled));
+        StackPane update = Ui.listAction("git-pull-request-arrow", 26, 15, "检查更新", () -> checkModUpdate(mod, item.title.getText()));
+        StackPane delete = Ui.listAction("trash-2", 26, 15, "删除", () -> deleteFile(mod, "Mod"));
         item.addAction(info);
         item.addAction(open);
         item.addAction(toggle);
-        item.addAction(update);
+        if (!data.getInstanceBool("DisableModUpdate", false)
+                && !data.getBool("UiHiddenFunctionModUpdate", false)) item.addAction(update);
         item.addAction(delete);
-        item.setOnMouseClicked(e -> modDetail(mod, display, disabled)); // 点整行看详情
+        item.setOnMouseClicked(e -> modDetail(mod, item.title.getText(), disabled));
         return item;
     }
 
-    /** 复制到 mods，文件名去掉 .disabled。 */
+    // 只解析 Mod 内的名称，不碰缓存；读盘操作，别在 FX 线程调
+    private static String readLocalModName(Path mod) {
+        String found = "";
+        try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(mod.toFile())) {
+            java.util.zip.ZipEntry fabric = zip.getEntry("fabric.mod.json");
+            if (fabric != null) {
+                String text = new String(zip.getInputStream(fabric).readAllBytes(),
+                        java.nio.charset.StandardCharsets.UTF_8);
+                java.util.regex.Matcher m = java.util.regex.Pattern.compile(
+                        "\"name\"\\s*:\\s*\"([^\"]+)\"").matcher(text);
+                if (m.find()) found = m.group(1);
+            }
+            if (found.isEmpty()) {
+                java.util.zip.ZipEntry forge = zip.getEntry("META-INF/mods.toml");
+                if (forge == null) forge = zip.getEntry("META-INF/neoforge.mods.toml");
+                if (forge != null) {
+                    String text = new String(zip.getInputStream(forge).readAllBytes(),
+                            java.nio.charset.StandardCharsets.UTF_8);
+                    java.util.regex.Matcher m = java.util.regex.Pattern.compile(
+                            "(?m)^\\s*displayName\\s*=\\s*\"([^\"]+)\"").matcher(text);
+                    if (m.find()) found = m.group(1);
+                }
+            }
+            if (found.isEmpty()) {
+                java.util.zip.ZipEntry old = zip.getEntry("mcmod.info");
+                if (old != null) {
+                    String text = new String(zip.getInputStream(old).readAllBytes(),
+                            java.nio.charset.StandardCharsets.UTF_8);
+                    java.util.regex.Matcher m = java.util.regex.Pattern.compile(
+                            "\"name\"\\s*:\\s*\"([^\"]+)\"").matcher(text);
+                    if (m.find()) found = m.group(1);
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return found;
+    }
+
+    private static final java.util.Map<String, String> MOD_NAME_CACHE =
+            new java.util.concurrent.ConcurrentHashMap<>();
+    private static final int MOD_NAME_CACHE_LIMIT = 2000;
+
+    // 读包名固定 2 线程：够快，又不会几百个 Mod 一次起几百条线程
+    private static final java.util.concurrent.ExecutorService MOD_NAME_POOL =
+            java.util.concurrent.Executors.newFixedThreadPool(2, r -> {
+                Thread t = new Thread(r, "TCL-Mod-Name");
+                t.setDaemon(true);
+                return t;
+            });
+
+    // 缓存上限固定，来回切换多个大型整合包也不会无限增长
+    private static void cacheModName(String key, String name) {
+        if (MOD_NAME_CACHE.size() >= MOD_NAME_CACHE_LIMIT) MOD_NAME_CACHE.clear();
+        MOD_NAME_CACHE.put(key, name);
+    }
+
     private void installMods(Path modsDir) {
         FileChooser chooser = new FileChooser();
-        chooser.setTitle("选择要安装的 Mod");
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Mod 文件",
+        chooser.setTitle(Lang.t("选择要安装的 Mod"));
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(Lang.t("Mod 文件"),
                 "*.jar", "*.litemod", "*.zip", "*.disabled"));
         List<File> files = chooser.showOpenMultipleDialog(win.stage);
         if (files == null || files.isEmpty()) return;
@@ -1101,7 +1320,6 @@ public class PageInstanceSetup implements Page {
         }
     }
 
-    /** 重命名 .disabled，重名时提示冲突。 */
     private void toggleMod(Path mod, boolean disabled) {
         try {
             String name = mod.getFileName().toString();
@@ -1122,7 +1340,6 @@ public class PageInstanceSetup implements Page {
         }
     }
 
-    /** 读 mcmod.info 或 fabric.mod.json 展示详情。 */
     private void modDetail(Path mod, String display, boolean disabled) {
         String[] meta = null;
         try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(mod.toFile())) {
@@ -1156,20 +1373,19 @@ public class PageInstanceSetup implements Page {
         card.setEffect(Theme.shadow(22, 4, 0.32, Theme.text));
         card.getChildren().add(Ui.bold(meta != null && !meta[0].isEmpty() ? meta[0] : display, 16, Theme.text));
         VBox rows = new VBox(5);
-        if (meta != null && !meta[1].isEmpty()) rows.getChildren().add(Ui.label("版本：" + meta[1], 12.5, Theme.gray1));
+        if (meta != null && !meta[1].isEmpty()) rows.getChildren().add(Ui.label(Lang.t("版本：") + meta[1], 12.5, Theme.gray1));
         if (meta != null && !meta[2].isEmpty()) {
             Label desc = Ui.label(meta[2], 12, Theme.gray2);
             desc.setWrapText(true);
             rows.getChildren().add(desc);
         }
-        rows.getChildren().add(Ui.label("文件：" + mod.getFileName(), 12, Theme.gray2));
+        rows.getChildren().add(Ui.label(Lang.t("文件：") + mod.getFileName(), 12, Theme.gray2));
         rows.getChildren().add(Ui.label(Lang.tf("大小：%s · 修改于 %s", sizeOf(mod), time), 12, Theme.gray2));
-        rows.getChildren().add(Ui.label("状态：" + (disabled ? "已禁用" : "已启用"), 12, Theme.gray2));
+        rows.getChildren().add(Ui.label(Lang.t("状态：") + Lang.t(disabled ? "已禁用" : "已启用"), 12, Theme.gray2));
         card.getChildren().addAll(rows, Ui.button("关闭", Ui.BTN_NORMAL, win::closeModal));
         win.showModal(card);
     }
 
-    /** 确认后移入回收站。 */
     private void deleteFile(Path file, String kind) {
         Dialogs.confirm(win, Lang.tf("删除%s", Lang.t(kind)), Lang.tf("确定要删除 %s 吗？文件将移入回收站。", file.getFileName()), () -> {
             // 回收站要等 PowerShell 进程，不能放 FX 线程
@@ -1180,8 +1396,8 @@ public class PageInstanceSetup implements Page {
                         win.toast("已删除", file.getFileName().toString(), 1);
                         win.refreshRight();
                     } else {
-                        Errors.error("删除" + kind + "失败",
-                                new Exception("系统回收站操作失败：" + file));
+                        Dialogs.message(win, Lang.tf("删除%s失败", Lang.t(kind)),
+                                "移入回收站失败（系统回收站不可用或权限不足），文件未删除。", true, "知道了");
                     }
                 });
             }, "TCL-Recycle");
@@ -1190,16 +1406,15 @@ public class PageInstanceSetup implements Page {
         }, true);
     }
 
-    /** 按 SHA-1 查 Modrinth，再取项目最新版本比较。 */
     private void checkModUpdate(Path mod, String display) {
         win.toast("正在检查更新", display, 0);
-        new Thread(() -> {
+        Threads.start("TCL-ModUpdate-Check", () -> {
             try {
                 String localHash = GameLauncher.sha1Of(mod);
                 String[] cur = Modrinth.checkUpdateBySha1(localHash);
                 if (cur == null) {
                     javafx.application.Platform.runLater(() ->
-                            win.toast("未发现更新", display + " 未被 Modrinth 收录（或网络失败）。", 0));
+                            win.toast("未发现更新", Lang.tf("%s 未被 Modrinth 收录。", display), 0));
                     return;
                 }
                 List<Object> versions = Modrinth.projectVersions(cur[0]);
@@ -1214,21 +1429,20 @@ public class PageInstanceSetup implements Page {
                             win.toast("已是最新版本", display + " · " + cur[1], 1));
                     return;
                 }
+                // 四段拼接整串查不到表，合并成单个完整键在创建处格式化
                 javafx.application.Platform.runLater(() -> Dialogs.confirm(win, "发现更新",
-                        display + " 有新版本：" + latest.title(false)
-                                + "\n新文件：" + latest.fileName
-                                + "\n\n新版本 Mod 可能不兼容旧存档或者其他 Mod，这可能导致游戏崩溃，甚至永久损坏存档。"
+                        Lang.tf("%s 有新版本：%s\n新文件：%s\n\n新版本 Mod 可能不兼容旧存档或者其他 Mod，这可能导致游戏崩溃，甚至永久损坏存档。"
                                 + "\n如果你在游玩整合包，请千万不要自行更新 Mod。更新前请先备份存档。"
                                 + "\n\n是否更新？旧文件将移入回收站。",
+                        display, latest.title(false), latest.fileName),
                         () -> applyModUpdate(mod, latest, display), true));
             } catch (Exception e) {
                 javafx.application.Platform.runLater(() ->
                         win.toast("检查更新失败", e.getMessage() == null ? "网络错误" : e.getMessage(), 3));
             }
-        }, "TCL-ModUpdate-Check").start();
+        });
     }
 
-    /** 下载新文件，旧文件移入回收站。 */
     private void applyModUpdate(Path oldMod, ResourceVersion latest, String display) {
         Path modsDir = oldMod.getParent();
         String fileName = latest.fileName.replace("~", "-");
@@ -1264,7 +1478,7 @@ public class PageInstanceSetup implements Page {
                     win.refreshRight();
                 });
             } catch (Exception e) {
-                // 失败时还原备份，别让 Mod 消失
+                // 失败时还原备份，Mod 不能就这么丢了
                 if (backup[0] != null && !Files.exists(oldMod)) {
                     try {
                         Files.move(backup[0], oldMod, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
@@ -1286,7 +1500,6 @@ public class PageInstanceSetup implements Page {
         Path root = instanceRoot();
         Path dir = root.resolve(folder);
         boolean isShader = folder.equals("shaderpacks");
-        // 文件和文件夹都算，.disabled 表示禁用
         List<Path> packs = listPacks(dir);
         long enabledCount = packs.stream().filter(p -> !isDisabledPack(p)).count();
         header(page, label, Lang.tf("共 %d 个，已启用 %d 个。", packs.size(), enabledCount));
@@ -1329,25 +1542,26 @@ public class PageInstanceSetup implements Page {
                 String info = disabled ? "已禁用" : isFolderPack ? "文件夹包" : sizeOf(pack);
                 Ui.ListItem item = new Ui.ListItem(Theme.icon(disabled ? "link-2-off" : isFolderPack ? "folder" : "image", 16,
                         disabled ? Theme.gray4 : Theme.accent), display, info, 40);
-                StackPane toggle = Ui.iconButton("power", 26, 15, disabled ? "启用" : "禁用",
+                StackPane toggle = Ui.listAction("power", 26, 15, disabled ? "启用" : "禁用",
                         () -> togglePack(pack, disabled, folder));
-                toggle.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED, javafx.scene.input.MouseEvent::consume);
                 item.addAction(toggle);
                 if (isShader && !disabled) {
-                    StackPane use = Ui.iconButton("circle-check", 26, 15, "设为当前使用", () -> {
-                        writeOption(root, "shaderPack", display);
-                        win.toast("已设为当前光影包", display, 1);
-                        win.refreshRight();
+                    StackPane use = Ui.listAction("circle-check", 26, 15, "设为当前使用", () -> {
+                        // 写 options.txt 挪后台
+                        Threads.start("TCL-ShaderUse", () -> {
+                            writeOption(root, "shaderPack", display);
+                            javafx.application.Platform.runLater(() -> {
+                                win.toast("已设为当前光影包", display, 1);
+                                win.refreshRight();
+                            });
+                        });
                     });
-                    use.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED, javafx.scene.input.MouseEvent::consume);
                     item.addAction(use);
                 }
-                StackPane open = Ui.iconButton("folder-open", 26, 15, "打开文件位置", () -> openFolder(dir.toString()));
-                open.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED, javafx.scene.input.MouseEvent::consume);
+                StackPane open = Ui.listAction("folder-open", 26, 15, "打开文件位置", () -> openFolder(dir.toString()));
                 item.addAction(open);
                 if (!isFolderPack) {
-                    StackPane delete = Ui.iconButton("trash-2", 26, 15, "删除", () -> deleteFile(pack, label));
-                    delete.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED, javafx.scene.input.MouseEvent::consume);
+                    StackPane delete = Ui.listAction("trash-2", 26, 15, "删除", () -> deleteFile(pack, label));
                     item.addAction(delete);
                 }
                 card.add(item);
@@ -1355,7 +1569,6 @@ public class PageInstanceSetup implements Page {
         }
     }
 
-    /** 文件和文件夹都算，.disabled 为禁用。 */
     private List<Path> listPacks(Path dir) {
         List<Path> out = new ArrayList<>();
         try {
@@ -1373,7 +1586,6 @@ public class PageInstanceSetup implements Page {
         return out;
     }
 
-    /** .jar、.zip、.litemod，.disabled 为禁用。 */
     private List<Path> listModFiles(Path dir) {
         List<Path> out = new ArrayList<>();
         try {
@@ -1395,7 +1607,6 @@ public class PageInstanceSetup implements Page {
         return p.getFileName().toString().toLowerCase().endsWith(".disabled");
     }
 
-    /** 当前使用的光影包，去掉引号，off 视为空。 */
     private String currentShader(Path root) {
         String raw = readOption(root, "shaderPack").trim();
         if (raw.startsWith("\"") && raw.endsWith("\"") && raw.length() >= 2) {
@@ -1404,7 +1615,6 @@ public class PageInstanceSetup implements Page {
         return raw.equalsIgnoreCase("off") ? "" : raw;
     }
 
-    /** mods 里有没有 Iris / Oculus / OptiFine。 */
     private boolean hasShaderLoader() {
         Path mods = instanceRoot().resolve("mods");
         try {
@@ -1423,7 +1633,6 @@ public class PageInstanceSetup implements Page {
         return false;
     }
 
-    /** 读 options.txt 单个键。 */
     private String readOption(Path root, String key) {
         Path options = root.resolve("options.txt");
         if (!Files.isRegularFile(options)) return "";
@@ -1437,7 +1646,6 @@ public class PageInstanceSetup implements Page {
         return "";
     }
 
-    /** 写单个键，其他行不动。 */
     private void writeOption(Path root, String key, String value) {
         Path options = root.resolve("options.txt");
         try {
@@ -1457,11 +1665,10 @@ public class PageInstanceSetup implements Page {
             if (!replaced) out.add(key + ":" + value);
             Files.write(options, out, StandardCharsets.UTF_8);
         } catch (Exception e) {
-            win.toast("写入 options.txt 失败", e.getMessage(), 3);
+            javafx.application.Platform.runLater(() -> win.toast("写入 options.txt 失败", e.getMessage(), 3));
         }
     }
 
-    /** 把启用的资源包同步到 options.txt，兼容 1.12 旧格式。 */
     private void syncResourcePacks(Path root) {
         try {
             List<Path> packs = listPacks(root.resolve("resourcepacks"));
@@ -1492,7 +1699,23 @@ public class PageInstanceSetup implements Page {
     private void renameSave(Path save) {
         Dialogs.input(win, "重命名存档", "", save.getFileName().toString(), name -> {
             if (name == null || name.equals(save.getFileName().toString())) return;
-            Path target = save.resolveSibling(name);
+            String error = saveNameError(name);
+            if (error != null) {
+                win.toast("存档名不合法", error, 3);
+                return;
+            }
+            Path target;
+            try {
+                target = save.resolveSibling(name.trim()).toAbsolutePath().normalize();
+                // normalize 后必须还落在 saves 目录里，绝对路径和 .. 一律拒绝
+                if (!target.startsWith(save.getParent().toAbsolutePath().normalize())) {
+                    win.toast("重命名失败", "目标路径超出了存档目录。", 3);
+                    return;
+                }
+            } catch (Exception ex) {
+                win.toast("存档名不合法", ex.getMessage(), 3);
+                return;
+            }
             if (Files.exists(target)) {
                 win.toast("已存在同名存档", name, 2);
                 return;
@@ -1507,19 +1730,32 @@ public class PageInstanceSetup implements Page {
         });
     }
 
-    /** 导出存档为 zip。 */
+    private static String saveNameError(String name) {
+        String value = name == null ? "" : name.trim();
+        if (value.isEmpty()) return "名称不能为空。";
+        if (value.length() > 64) return "名称不能超过 64 个字符。";
+        if (value.equals(".") || value.equals("..")) return "名称不合法。";
+        for (char c : "\\/:*?\"<>|".toCharArray()) {
+            if (value.indexOf(c) >= 0) return Lang.tf("名称不能包含字符：%s", c);
+        }
+        if (value.endsWith(".") || value.endsWith(" ")) return "名称不能以点或空格结尾。";
+        String upper = value.toUpperCase(java.util.Locale.ROOT);
+        if (upper.matches("CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9]")) return "这是系统保留名称。";
+        return null;
+    }
+
     private void exportSave(Path save) {
         FileChooser chooser = new FileChooser();
-        chooser.setTitle("导出存档");
+        chooser.setTitle(Lang.t("导出存档"));
         chooser.setInitialFileName(save.getFileName() + ".zip");
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Zip 压缩包", "*.zip"));
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(Lang.t("Zip 压缩包"), "*.zip"));
         File file = chooser.showSaveDialog(win.stage);
         if (file == null) return;
         Tasks.Task task = new Tasks.Task("导出存档 · " + save.getFileName());
         task.subs.add(new Tasks.SubTask("写入压缩包"));
         Tasks.INSTANCE.add(task);
         win.toast("开始导出", save.getFileName().toString(), 0);
-        new Thread(() -> {
+        Threads.start("TCL-SaveExport", () -> {
             try (ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(file))) {
                 List<Path> files = new ArrayList<>();
                 try (var stream = Files.walk(save)) {
@@ -1549,21 +1785,31 @@ public class PageInstanceSetup implements Page {
             } finally {
                 Tasks.INSTANCE.changed();
             }
-        }, "TCL-SaveExport").start();
+        });
     }
 
-    /** 确认后删除存档。 */
     private void deleteSave(Path save) {
         Dialogs.confirm(win, "删除存档", Lang.tf("确定要删除存档 %s 吗？\n该世界将永久丢失，无法恢复。", save.getFileName()), () -> {
-            try (var stream = Files.walk(save)) {
-                for (Path p : stream.sorted(java.util.Comparator.reverseOrder()).toList()) {
-                    Files.deleteIfExists(p);
+            // 大存档几万个文件，递归删除放后台
+            Threads.start("TCL-SaveDelete", () -> {
+                String error = null;
+                try (var stream = Files.walk(save)) {
+                    for (Path p : stream.sorted(java.util.Comparator.reverseOrder()).toList()) {
+                        Files.deleteIfExists(p);
+                    }
+                } catch (Exception ex) {
+                    error = ex.getMessage();
                 }
-                win.toast("已删除存档", save.getFileName().toString(), 1);
-                win.refreshRight();
-            } catch (Exception e) {
-                win.toast("删除失败", e.getMessage(), 3);
-            }
+                final String fError = error;
+                javafx.application.Platform.runLater(() -> {
+                    if (fError != null) {
+                        win.toast("删除失败", fError, 3);
+                    } else {
+                        win.toast("已删除存档", save.getFileName().toString(), 1);
+                        win.refreshRight();
+                    }
+                });
+            });
         }, true);
     }
 
@@ -1584,23 +1830,33 @@ public class PageInstanceSetup implements Page {
         return out;
     }
 
-    /** 重命名 .disabled，资源包再同步 options.txt。 */
     private void togglePack(Path file, boolean disabled, String folder) {
-        try {
-            String name = file.getFileName().toString();
-            Path target = disabled ? file.resolveSibling(name.substring(0, name.length() - ".disabled".length()))
-                    : file.resolveSibling(name + ".disabled");
-            if (Files.exists(target)) {
-                win.toast("目标路径已存在文件", target.getFileName().toString(), 2);
-                return;
-            }
-            Files.move(file, target);
-            if ("resourcepacks".equals(folder)) syncResourcePacks(instanceRoot());
-            win.toast(disabled ? "已启用" : "已禁用", target.getFileName().toString(), 1);
-            win.refreshRight();
-        } catch (Exception e) {
-            win.toast("操作失败", e.getMessage(), 3);
+        String name = file.getFileName().toString();
+        Path target = disabled ? file.resolveSibling(name.substring(0, name.length() - ".disabled".length()))
+                : file.resolveSibling(name + ".disabled");
+        if (Files.exists(target)) {
+            win.toast("目标路径已存在文件", target.getFileName().toString(), 2);
+            return;
         }
+        // 挪文件 + 重写 options.txt 一起放后台，完成后回 FX 刷新
+        Threads.start("TCL-PackToggle", () -> {
+            String error = null;
+            try {
+                Files.move(file, target);
+                if ("resourcepacks".equals(folder)) syncResourcePacks(instanceRoot());
+            } catch (Exception ex) {
+                error = ex.getMessage();
+            }
+            final String fError = error;
+            javafx.application.Platform.runLater(() -> {
+                if (fError != null) {
+                    win.toast("操作失败", fError, 3);
+                    return;
+                }
+                win.toast(disabled ? "已启用" : "已禁用", target.getFileName().toString(), 1);
+                win.refreshRight();
+            });
+        });
     }
 
     private String sizeOf(Path p) {
@@ -1652,15 +1908,11 @@ public class PageInstanceSetup implements Page {
                 }
                 String fTime = time;
                 Ui.ListItem item = new Ui.ListItem(Theme.icon("map", 16, Theme.text), save.getFileName().toString(), "最后修改 " + time, 40);
-                // 打开、重命名、导出、删除，点条目打开文件夹
-                StackPane open = Ui.iconButton("folder-open", 26, 15, "打开存档文件夹", () -> openFolder(save.toString()));
-                open.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED, javafx.scene.input.MouseEvent::consume);
-                StackPane rename = Ui.iconButton("pencil", 26, 15, "重命名存档", () -> renameSave(save));
-                rename.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED, javafx.scene.input.MouseEvent::consume);
-                StackPane export = Ui.iconButton("upload", 26, 15, "导出为 .zip", () -> exportSave(save));
-                export.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED, javafx.scene.input.MouseEvent::consume);
-                StackPane delete = Ui.iconButton("trash-2", 26, 15, "删除存档", () -> deleteSave(save));
-                delete.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED, javafx.scene.input.MouseEvent::consume);
+                // 四项操作：打开、重命名、导出、删除
+                StackPane open = Ui.listAction("folder-open", 26, 15, "打开存档文件夹", () -> openFolder(save.toString()));
+                StackPane rename = Ui.listAction("pencil", 26, 15, "重命名存档", () -> renameSave(save));
+                StackPane export = Ui.listAction("upload", 26, 15, "导出为 .zip", () -> exportSave(save));
+                StackPane delete = Ui.listAction("trash-2", 26, 15, "删除存档", () -> deleteSave(save));
                 item.addAction(open);
                 item.addAction(rename);
                 item.addAction(export);
@@ -1700,7 +1952,7 @@ public class PageInstanceSetup implements Page {
             VBox box = new VBox(5);
             box.setPrefWidth(180);
             try {
-                ImageView iv = new ImageView(new javafx.scene.image.Image(shot.toUri().toString(), 170, 96, false, true, true));
+                ImageView iv = new ImageView(cachedScreenshot(shot));
                 iv.setFitWidth(170);
                 iv.setFitHeight(96);
                 Rectangle clip = new Rectangle(170, 96);
@@ -1717,10 +1969,8 @@ public class PageInstanceSetup implements Page {
             StackPane rowBtns = new StackPane();
             HBox btns = new HBox(6);
             btns.setAlignment(Pos.CENTER);
-            StackPane open = Ui.iconButton("folder-open", 24, 14, "打开图片", () -> openFolder(shot.toString()));
-            open.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED, javafx.scene.input.MouseEvent::consume);
-            StackPane del = Ui.iconButton("trash-2", 24, 14, "删除截图", () -> deleteFile(shot, "截图"));
-            del.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED, javafx.scene.input.MouseEvent::consume);
+            StackPane open = Ui.listAction("folder-open", 24, 14, "打开图片", () -> openFolder(shot.toString()));
+            StackPane del = Ui.listAction("trash-2", 24, 14, "删除截图", () -> deleteFile(shot, "截图"));
             btns.getChildren().addAll(open, del);
             rowBtns.getChildren().add(btns);
             box.getChildren().add(rowBtns);
@@ -1731,6 +1981,30 @@ public class PageInstanceSetup implements Page {
         }
         Ui.Card card = addCard(page, "截图列表");
         card.add(flow);
+    }
+
+    private static final java.util.LinkedHashMap<String, javafx.scene.image.Image> SCREENSHOT_CACHE =
+            new java.util.LinkedHashMap<>(32, 0.75f, true);
+    private static final int SCREENSHOT_CACHE_LIMIT = 60;
+
+    private static javafx.scene.image.Image cachedScreenshot(Path p) {
+        try {
+            String key = p.toAbsolutePath() + "|" + Files.getLastModifiedTime(p).toMillis();
+            synchronized (SCREENSHOT_CACHE) {
+                javafx.scene.image.Image hit = SCREENSHOT_CACHE.get(key);
+                if (hit != null) return hit;
+            }
+            javafx.scene.image.Image img = new javafx.scene.image.Image(p.toUri().toString(), 170, 96, false, true, true);
+            synchronized (SCREENSHOT_CACHE) {
+                while (SCREENSHOT_CACHE.size() >= SCREENSHOT_CACHE_LIMIT) {
+                    SCREENSHOT_CACHE.remove(SCREENSHOT_CACHE.keySet().iterator().next());
+                }
+                SCREENSHOT_CACHE.put(key, img);
+            }
+            return img;
+        } catch (Exception e) {
+            return new javafx.scene.image.Image(p.toUri().toString(), 170, 96, false, true, true);
+        }
     }
 
     private final java.util.List<Servers.Entry> serverList = new ArrayList<>();
@@ -1766,7 +2040,6 @@ public class PageInstanceSetup implements Page {
         pingAll();
     }
 
-    /** 服务器卡片。 */
     private Ui.Card serverCard(Servers.Entry entry) {
         Ui.Card card = Ui.card(null);
         card.setMaxWidth(Double.MAX_VALUE);
@@ -1814,7 +2087,6 @@ public class PageInstanceSetup implements Page {
         return card;
     }
 
-    /** 服务器更多操作。 */
     private void serverMoreMenu(Servers.Entry entry, Runnable refresh) {
         VBox card = Dialogs.msgCard("服务器操作");
         VBox rows = new VBox(2);
@@ -1902,7 +2174,6 @@ public class PageInstanceSetup implements Page {
         refresh.run();
     }
 
-    /** 启动并直连（--server [port]）。 */
     private void launchToServer(Servers.Entry entry) {
         if (entry.ip == null || entry.ip.trim().isEmpty()) {
             win.toast("这个服务器没有填写地址。", "", 3);
@@ -1913,13 +2184,20 @@ public class PageInstanceSetup implements Page {
 
     private void pingSingle(Servers.Entry entry, Label status) {
         status.setText("查询中……");
-        new Thread(() -> {
+        Threads.start("TCL-Ping-One", () -> {
             Servers.PingResult r = Servers.ping(entry.ip, 3000);
             javafx.application.Platform.runLater(() -> applyPing(status, r));
-        }, "TCL-Ping-One").start();
+        });
     }
 
-    /** 并发查询服务器状态。 */
+    // 固定 8 线程：parallelStream 会挤占公共 ForkJoinPool，limit(64) 还会丢掉多余条目
+    private static final java.util.concurrent.ExecutorService PING_POOL =
+            java.util.concurrent.Executors.newFixedThreadPool(8, r -> {
+                Thread t = new Thread(r, "TCL-Ping");
+                t.setDaemon(true);
+                return t;
+            });
+
     private void pingAll() {
         if (pingLock) return;
         pingLock = true;
@@ -1931,19 +2209,27 @@ public class PageInstanceSetup implements Page {
         }
         Thread t = new Thread(() -> {
             try {
-                statuses.parallelStream().limit(64).forEach(label -> {
-                    Servers.Entry entry = (Servers.Entry) label.getProperties().get("entry");
-                    try {
-                        Servers.PingResult r = Servers.ping(entry.ip, 3000);
-                        javafx.application.Platform.runLater(() -> applyPing(label, r));
-                    } catch (Exception e) {
-                        javafx.application.Platform.runLater(() -> {
-                            label.setText("离线（查询异常）");
-                            label.setTextFill(Theme.gray3);
-                            label.setOpacity(0.8);
-                        });
-                    }
-                });
+                java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(statuses.size());
+                for (Label label : statuses) {
+                    PING_POOL.execute(() -> {
+                        try {
+                            Servers.Entry entry = (Servers.Entry) label.getProperties().get("entry");
+                            Servers.PingResult r = Servers.ping(entry.ip, 3000);
+                            javafx.application.Platform.runLater(() -> applyPing(label, r));
+                        } catch (Exception e) {
+                            javafx.application.Platform.runLater(() -> {
+                                label.setText("离线（查询异常）");
+                                label.setTextFill(Theme.gray3);
+                                label.setOpacity(0.8);
+                            });
+                        } finally {
+                            done.countDown();
+                        }
+                    });
+                }
+                done.await();
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
             } finally {
                 javafx.application.Platform.runLater(() -> pingLock = false);
             }
@@ -1966,7 +2252,6 @@ public class PageInstanceSetup implements Page {
         }
     }
 
-    /** base64 服务器图标解码。 */
     private javafx.scene.image.Image decodeIcon(String icon) {
         if (icon == null || icon.isEmpty()) return null;
         try {
@@ -2020,7 +2305,6 @@ public class PageInstanceSetup implements Page {
 
     private void buildCompManifest(VBox page) {
         header(page, "整合包清单", "显示实例目录中整合包的组件清单，绿色表示文件已存在。");
-        // 优先 原始整合包，其次任意 .mrpack
         Path packPath = null;
         for (String candidate : new String[]{"原始整合包.mrpack", "原始整合包.zip"}) {
             Path p = instanceRoot().resolve(candidate);
@@ -2042,29 +2326,41 @@ public class PageInstanceSetup implements Page {
             card.add(Ui.button("打开实例文件夹", Ui.BTN_NORMAL, () -> openFolder(instanceRoot().toString())));
             return;
         }
-        try (java.util.zip.ZipInputStream zip = new java.util.zip.ZipInputStream(Files.newInputStream(packPath))) {
+        // 流式扫整个 mrpack 可能有几百 MB，放后台，扫完回 FX 渲染
+        final Path scanPack = packPath;
+        Threads.start("TCL-CompScan", () -> {
             java.util.Map<String, byte[]> entries = new java.util.LinkedHashMap<>();
-            java.util.zip.ZipEntry e;
-            while ((e = zip.getNextEntry()) != null) {
-                if (e.isDirectory()) continue;
-                // 只读清单，overrides 跳过
-                if (e.getName().equals("modrinth.index.json") || e.getName().equals("manifest.json")) {
-                    entries.put(e.getName(), zip.readAllBytes());
+            String error = null;
+            try (java.util.zip.ZipInputStream zip = new java.util.zip.ZipInputStream(Files.newInputStream(scanPack))) {
+                java.util.zip.ZipEntry e;
+                while ((e = zip.getNextEntry()) != null) {
+                    if (e.isDirectory()) continue;
+                    if (e.getName().equals("modrinth.index.json") || e.getName().equals("manifest.json")) {
+                        entries.put(e.getName(), zip.readAllBytes());
+                    }
+                    if (entries.size() == 2) break;
                 }
-                if (entries.size() == 2) break;
+            } catch (Exception ex) {
+                error = ex.getMessage();
             }
-            if (packPath.getFileName().toString().toLowerCase().endsWith(".mrpack")) {
-                buildCompManifestModrinth(page, packPath, entries.get("modrinth.index.json"));
-            } else {
-                buildCompManifestCurseForge(page, packPath, entries.get("manifest.json"));
-            }
-        } catch (Exception ex) {
-            Ui.Card card = addCard(page, "读取失败");
-            card.add(Ui.label("读取失败：" + ex.getMessage(), 13, Theme.gray2));
-        }
+            final byte[] modrinthBytes = entries.get("modrinth.index.json");
+            final byte[] curseBytes = entries.get("manifest.json");
+            final String fError = error;
+            javafx.application.Platform.runLater(() -> {
+                if (fError != null) {
+                    Ui.Card card = addCard(page, "读取失败");
+                    card.add(Ui.label(Lang.tf("读取失败：%s", fError), 13, Theme.gray2));
+                    return;
+                }
+                if (scanPack.getFileName().toString().toLowerCase().endsWith(".mrpack")) {
+                    buildCompManifestModrinth(page, scanPack, modrinthBytes);
+                } else {
+                    buildCompManifestCurseForge(page, scanPack, curseBytes);
+                }
+            });
+        });
     }
 
-    /** Modrinth 清单视图。 */
     private void buildCompManifestModrinth(VBox page, Path packPath, byte[] indexBytes) {
         if (indexBytes == null) {
             Ui.Card card = addCard(page, "提示");
@@ -2081,7 +2377,7 @@ public class PageInstanceSetup implements Page {
             if (!k.equals("minecraft")) loader.append(" ").append(k).append(" ").append(Json.str(deps, k, ""));
         }
         Ui.Card head = addCard(page, name);
-        head.add(Ui.label("Modrinth 整合包 · 版本 " + versionId + " · Minecraft " + mc + loader, 13, Theme.gray2));
+        head.add(Ui.label(Lang.t("Modrinth 整合包 · 版本 ") + versionId + " · Minecraft " + mc + loader, 13, Theme.gray2));
         List<Object> files = Json.arr(json.get("files"));
         Ui.Card list = addCard(page, Lang.tf("共 %d 个文件，颜色深表示已存在：", files.size()));
         for (Object o : files) {
@@ -2095,7 +2391,6 @@ public class PageInstanceSetup implements Page {
         }
     }
 
-    /** CurseForge 清单视图。 */
     private void buildCompManifestCurseForge(VBox page, Path packPath, byte[] manifestBytes) {
         if (manifestBytes == null) {
             Ui.Card card = addCard(page, "提示");
@@ -2106,8 +2401,8 @@ public class PageInstanceSetup implements Page {
         String name = Json.str(json, "name", packPath.getFileName().toString());
         java.util.Map<String, Object> mc = Json.obj(json.get("minecraft"));
         Ui.Card head = addCard(page, name);
-        head.add(Ui.label("CurseForge 整合包 · 版本 " + Json.str(json, "version", "")
-                + " · 作者 " + Json.str(json, "author", "")
+        head.add(Ui.label(Lang.t("CurseForge 整合包 · 版本 ") + Json.str(json, "version", "")
+                + Lang.t(" · 作者 ") + Json.str(json, "author", "")
                 + " · Minecraft " + Json.str(mc, "version", ""), 13, Theme.gray2));
         List<Object> files = Json.arr(json.get("files"));
         Ui.Card list = addCard(page, Lang.tf("共 %d 个文件（CurseForge 仅记录项目与文件 ID）：", files.size()));
@@ -2118,7 +2413,6 @@ public class PageInstanceSetup implements Page {
         }
     }
 
-    /** 清单文件行，缺失时可下载。 */
     private void compManifestRow(Ui.Card list, String relativePath, long size, String url) {
         Path root = instanceRoot().toAbsolutePath().normalize();
         Path target = root.resolve(relativePath.replace('/', java.io.File.separatorChar)).normalize();
@@ -2147,13 +2441,28 @@ public class PageInstanceSetup implements Page {
         list.add(row);
     }
 
-    /** 下载缺失文件到实例目录。 */
     private void compManifestDownload(String url, Path target) {
+        compManifestDownload(url, target, false);
+    }
+
+    private void compManifestDownload(String url, Path target, boolean confirmed) {
+        if (!confirmed) {
+            String lower = url.toLowerCase(java.util.Locale.ROOT);
+            if (!lower.startsWith("https://")) {
+                Dialogs.confirm(win, "不安全的下载地址",
+                        // 两个完整句各自成键，三元选整句再翻译，避免半句拼接查不到表
+                        Lang.t(lower.startsWith("http://")
+                                ? "这个文件的下载地址是 http 明文链接，下载内容可能被中途篡改。\n\n仍要继续下载吗？"
+                                : "这个文件的下载地址不是 https，下载内容可能被中途篡改。\n\n仍要继续下载吗？"),
+                        () -> compManifestDownload(url, target, true));
+                return;
+            }
+        }
         Tasks.Task task = new Tasks.Task("下载整合包资源 " + target.getFileName());
         task.subs.add(new Tasks.SubTask("下载文件"));
         Tasks.INSTANCE.add(task);
         win.toast("开始下载", target.getFileName().toString(), 0);
-        new Thread(() -> {
+        Threads.start("TCL-CompDownload", () -> {
             try {
                 Files.createDirectories(target.getParent());
                 Downloader.downloadFileTo(p -> task.progress = p, url, target, target.getFileName().toString());
@@ -2168,7 +2477,7 @@ public class PageInstanceSetup implements Page {
                 javafx.application.Platform.runLater(() ->
                         win.toast("下载失败：" + target.getFileName(), e.getMessage(), 3));
             }
-        }, "TCL-CompDownload").start();
+        });
     }
 
     private ComboBox<String> jijCombo;
@@ -2222,7 +2531,6 @@ public class PageInstanceSetup implements Page {
         }
     }
 
-    /** 后台读 META-INF/jars 下的内嵌 jar。 */
     private void jijLoadJars() {
         jijList.getChildren().clear();
         jijExportAll.setVisible(false);
@@ -2232,8 +2540,8 @@ public class PageInstanceSetup implements Page {
         }
         Path modPath = jijCurrentMod;
         jijTip.setText("正在读取…");
-        new Thread(() -> {
-            List<String[]> jars = new ArrayList<>(); // {entryName, size, nestedName, nestedVersion}
+        Threads.start("TCL-JarInJar", () -> {
+            List<String[]> jars = new ArrayList<>();
             String error = null;
             try (java.util.zip.ZipInputStream zip = new java.util.zip.ZipInputStream(Files.newInputStream(modPath))) {
                 java.util.zip.ZipEntry e;
@@ -2249,10 +2557,9 @@ public class PageInstanceSetup implements Page {
             List<String[]> fJars = jars;
             String fError = error;
             javafx.application.Platform.runLater(() -> jijApplyJars(modPath, fError, fJars));
-        }, "TCL-JarInJar").start();
+        });
     }
 
-    /** 读内嵌 jar 的名称和版本。 */
     private static String[] jijReadNestedInfo(byte[] nestedJar) {
         try (java.util.zip.ZipInputStream nested = new java.util.zip.ZipInputStream(
                 new java.io.ByteArrayInputStream(nestedJar))) {
@@ -2270,8 +2577,9 @@ public class PageInstanceSetup implements Page {
         return new String[]{"", ""};
     }
 
-    /** 按读到的结果建卡片。 */
     private void jijApplyJars(Path modPath, String error, List<String[]> jars) {
+        // 入口比对：已经切到别的 Mod 时，旧读取结果直接丢掉
+        if (modPath != jijCurrentMod) return;
         if (error != null) {
             jijTip.setText("读取失败：" + error);
             return;
@@ -2311,54 +2619,81 @@ public class PageInstanceSetup implements Page {
         jijExportAll.setVisible(true);
     }
 
-    /** 导出单个内嵌 jar。 */
     private void jijExportEntry(Path modPath, String entryName) {
-        try {
-            Path folder = jijExportFolder(modPath);
-            try (java.util.zip.ZipInputStream zip = new java.util.zip.ZipInputStream(Files.newInputStream(modPath))) {
-                java.util.zip.ZipEntry e;
-                boolean found = false;
-                while ((e = zip.getNextEntry()) != null) {
-                    if (!e.getName().equals(entryName)) continue;
-                    found = true;
-                    Path target = folder.resolve(entryName.substring(entryName.lastIndexOf('/') + 1));
-                    Files.copy(zip, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                    break;
+        // 全量扫 zip 挪后台，扫完回 FX 提示
+        Threads.start("TCL-JiJ-Export", () -> {
+            String error = null;
+            Path folder = null;
+            boolean found = false;
+            try {
+                folder = jijExportFolder(modPath);
+                try (java.util.zip.ZipInputStream zip = new java.util.zip.ZipInputStream(Files.newInputStream(modPath))) {
+                    java.util.zip.ZipEntry e;
+                    while ((e = zip.getNextEntry()) != null) {
+                        if (!e.getName().equals(entryName)) continue;
+                        found = true;
+                        Path target = folder.resolve(entryName.substring(entryName.lastIndexOf('/') + 1));
+                        Files.copy(zip, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                        break;
+                    }
                 }
-                if (!found) {
+            } catch (Exception ex) {
+                error = ex.getMessage();
+            }
+            final Path fFolder = folder;
+            final boolean fFound = found;
+            final String fError = error;
+            javafx.application.Platform.runLater(() -> {
+                if (fError != null) {
+                    win.toast("导出内嵌依赖失败", fError, 3);
+                    return;
+                }
+                if (!fFound) {
                     win.toast("导出失败：条目已不存在。", "", 3);
                     return;
                 }
-            }
-            win.toast("已导出：" + entryName.substring(entryName.lastIndexOf('/') + 1), "", 1);
-            openFolder(folder.toString());
-        } catch (Exception ex) {
-            win.toast("导出内嵌依赖失败", ex.getMessage(), 3);
-        }
+                win.toast("已导出：" + entryName.substring(entryName.lastIndexOf('/') + 1), "", 1);
+                openFolder(fFolder.toString());
+            });
+        });
     }
 
     private void jijExportAll() {
         if (jijCurrentMod == null) return;
-        try {
-            Path folder = jijExportFolder(jijCurrentMod);
+        final Path modPath = jijCurrentMod;
+        // 全量扫 zip 挪后台，扫完回 FX 提示
+        Threads.start("TCL-JiJ-ExportAll", () -> {
+            String error = null;
+            Path folder = null;
             int count = 0;
-            try (java.util.zip.ZipInputStream zip = new java.util.zip.ZipInputStream(Files.newInputStream(jijCurrentMod))) {
-                java.util.zip.ZipEntry e;
-                while ((e = zip.getNextEntry()) != null) {
-                    if (!e.getName().startsWith("META-INF/jars/") || !e.getName().endsWith(".jar")) continue;
-                    Files.copy(zip, folder.resolve(e.getName().substring(e.getName().lastIndexOf('/') + 1)),
-                            java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                    count++;
+            try {
+                folder = jijExportFolder(modPath);
+                try (java.util.zip.ZipInputStream zip = new java.util.zip.ZipInputStream(Files.newInputStream(modPath))) {
+                    java.util.zip.ZipEntry e;
+                    while ((e = zip.getNextEntry()) != null) {
+                        if (!e.getName().startsWith("META-INF/jars/") || !e.getName().endsWith(".jar")) continue;
+                        Files.copy(zip, folder.resolve(e.getName().substring(e.getName().lastIndexOf('/') + 1)),
+                                java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                        count++;
+                    }
                 }
+            } catch (Exception ex) {
+                error = ex.getMessage();
             }
-            win.toast("已导出 " + count + " 个内嵌依赖！", "", 1);
-            openFolder(folder.toString());
-        } catch (Exception ex) {
-            win.toast("导出全部内嵌依赖失败", ex.getMessage(), 3);
-        }
+            final Path fFolder = folder;
+            final int fCount = count;
+            final String fError = error;
+            javafx.application.Platform.runLater(() -> {
+                if (fError != null) {
+                    win.toast("导出全部内嵌依赖失败", fError, 3);
+                    return;
+                }
+                win.toast("已导出 " + fCount + " 个内嵌依赖！", "", 1);
+                openFolder(fFolder.toString());
+            });
+        });
     }
 
-    /** 导出目录 mods/JiJ导出/{mod 名}。 */
     private Path jijExportFolder(Path modPath) throws Exception {
         Path folder = modPath.getParent().resolve("JiJ导出")
                 .resolve(modPath.getFileName().toString().replaceAll("\\.jar$", ""));
@@ -2366,7 +2701,6 @@ public class PageInstanceSetup implements Page {
         return folder;
     }
 
-    /** 复制实例文件夹。 */
     private void copyInstance() {
         Data.Instance ins = data.instance();
         if (ins == null) return;
@@ -2391,7 +2725,7 @@ public class PageInstanceSetup implements Page {
         task.subs.add(new Tasks.SubTask("复制文件"));
         Tasks.INSTANCE.add(task);
         win.toast("正在复制实例", name, 0);
-        new Thread(() -> {
+        Threads.start("TCL-InstanceCopy", () -> {
             try {
                 Files.createDirectories(newFolder);
                 try (var stream = Files.walk(srcRoot)) {
@@ -2414,6 +2748,7 @@ public class PageInstanceSetup implements Page {
                     Data.Instance copy = new Data.Instance(copyName, copyName, ins.loader, ins.loaderVersion,
                             ins.description, ins.icon, System.currentTimeMillis(), false, base.toString(),
                             isolated ? Isolation.ON : Isolation.OFF);
+                    copy.addedAt = System.currentTimeMillis();
                     data.instances.add(copy);
                     data.selectedInstance = data.instances.size() - 1;
                     data.save();
@@ -2430,10 +2765,9 @@ public class PageInstanceSetup implements Page {
                 Tasks.INSTANCE.changed();
                 javafx.application.Platform.runLater(() -> win.toast("复制失败", task.stage, 3));
             }
-        }, "TCL-InstanceCopy").start();
+        });
     }
 
-    /** 导出选项，rules 为空时按 showRules 判显隐。 */
     private record ExportOption(String key, String title, String rules, String showRules,
                                 boolean defaultChecked, boolean requireModLoader, boolean requireOptiFine,
                                 boolean hidden) {
@@ -2458,11 +2792,9 @@ public class PageInstanceSetup implements Page {
             new ExportOption("shaderpacks", "光影包", null, "shaderpacks/", true, false, false, false),
     };
 
-    /** 兜底排除规则。 */
     private static final String[] EXPORT_EXCLUDES = {"!*.log", "!*.dat_old", "!*.BakaCoreInfo", "!hmclversion.cfg", "!log4j2.xml"};
 
     private final java.util.Map<String, Boolean> exportChecked = new java.util.LinkedHashMap<>();
-    /** 从配置导入的名称、版本和路径。 */
     private String exportConfiguredName = "";
     private String exportConfiguredVersion = "";
     private String exportConfiguredPackPath = null;
@@ -2480,7 +2812,7 @@ public class PageInstanceSetup implements Page {
         TextField name = Ui.field("");
         name.setPromptText(ins.name);
         name.setMaxWidth(280);
-        name.setText(exportConfiguredName); // 配置导入的名称
+        name.setText(exportConfiguredName);
         TextField version = Ui.field("");
         version.setPromptText("1.0.0");
         version.setMaxWidth(280);
@@ -2490,7 +2822,6 @@ public class PageInstanceSetup implements Page {
         Ui.Card meta = addCard(page, "整合包信息");
         meta.add(Ui.settingRow("名称", name), Ui.settingRow("版本号", version));
 
-        // 存档、资源包、光影包的具体项
         exportSubOptions.clear();
         addExportSubOption("saves", "存档", true);
         addExportSubOption("resourcepacks", "资源包", true);
@@ -2524,7 +2855,7 @@ public class PageInstanceSetup implements Page {
             options.add(cb);
         }
         for (ExportOption sub : exportSubOptions) {
-            Ui.Check cb = Ui.checkBox("存档 · " + sub.title(), true);
+            Ui.Check cb = Ui.checkBox(Lang.t("存档 · ") + sub.title(), true);
             exportChecked.put(sub.key(), true);
             cb.setOnAction(() -> exportChecked.put(sub.key(), cb.isSelected()));
             options.add(cb);
@@ -2562,7 +2893,6 @@ public class PageInstanceSetup implements Page {
         page.getChildren().add(actions);
     }
 
-    /** 枚举 zip、rar 和子文件夹。 */
     private void addExportSubOption(String folder, String label, boolean acceptFolder) {
         Path dir = instanceRoot().resolve(folder);
         if (!Files.isDirectory(dir)) return;
@@ -2592,7 +2922,6 @@ public class PageInstanceSetup implements Page {
         return ins.version.toLowerCase().contains("optifine");
     }
 
-    /** 通配符转正则。 */
     private static String globToRegex(String pattern) {
         StringBuilder sb = new StringBuilder();
         for (char c : pattern.toCharArray()) {
@@ -2610,7 +2939,6 @@ public class PageInstanceSetup implements Page {
         return s.replace("*", "[*]").replace("?", "[?]");
     }
 
-    /** 规则匹配，! 开头反选，后行覆盖前行。 */
     private static boolean matchesRules(java.util.List<String> rules, String relativePath) {
         boolean keep = false;
         String lower = relativePath.toLowerCase();
@@ -2624,7 +2952,6 @@ public class PageInstanceSetup implements Page {
         return keep;
     }
 
-    /** 选位置、复制文件、查 hash、写 index、打包。 */
     private void startExport(TextField nameField, TextField versionField) {
         startExport(nameField, versionField, exportRulesOverride != null ? exportRulesOverride : null, false);
     }
@@ -2642,12 +2969,6 @@ public class PageInstanceSetup implements Page {
                 ? "1.0.0" : versionField.getText().trim();
         Path game = instanceRoot();
 
-        // 配置覆盖优先，否则合并勾选项和排除段
-        if (exportRulesOverride != null) {
-            java.util.List<String> override = new ArrayList<>(exportRulesOverride);
-            startExport(nameField, versionField, override, false);
-            return;
-        }
         java.util.List<String> rules = new ArrayList<>();
         rules.add("");
         rules.add("# 修改下方的规则以控制需要导出的内容。");
@@ -2670,12 +2991,12 @@ public class PageInstanceSetup implements Page {
             rules.add("");
         }
         for (String ex : EXPORT_EXCLUDES) rules.add(ex);
+        // 覆盖配置从参数进来（2 参重载负责取字段值），这里判断字段会无限递归
         if (ruleOverride != null) {
             rules = new ArrayList<>(ruleOverride);
         }
         final java.util.List<String> effRules = rules;
 
-        // 配置有 PackPath 就直接用，无效再弹窗
         java.io.File target = null;
         boolean bypassConfiguredPath = startExportBypass;
         if (!bypassConfiguredPath && exportConfiguredPackPath != null
@@ -2694,12 +3015,12 @@ public class PageInstanceSetup implements Page {
         }
         if (target == null) {
             FileChooser chooser = new FileChooser();
-            chooser.setTitle("选择导出位置");
+            chooser.setTitle(Lang.t("选择导出位置"));
             chooser.setInitialFileName(packName + " " + packVersion);
             if (exportModrinth) {
-                chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Modrinth 整合包文件", "*.mrpack"));
+                chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(Lang.t("Modrinth 整合包文件"), "*.mrpack"));
             }
-            chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("压缩文件", "*.zip"));
+            chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(Lang.t("压缩文件"), "*.zip"));
             target = chooser.showSaveDialog(win.stage);
             if (target == null) return;
         }
@@ -2714,7 +3035,7 @@ public class PageInstanceSetup implements Page {
         final String fPackName = packName;
         final String fPackVersion = packVersion;
         final java.io.File fTarget = target;
-        new Thread(() -> {
+        Threads.start("TCL-Export", () -> {
             try {
                 Path cache = Files.createTempDirectory("tcl-export-");
                 Path overrides = cache.resolve("modpack").resolve("overrides");
@@ -2791,15 +3112,22 @@ public class PageInstanceSetup implements Page {
                         CountDownLatch latch = new CountDownLatch(1);
                         javafx.application.Platform.runLater(() -> {
                             Dialogs.confirm(win, "部分文件信息获取失败",
-                                    "联网获取部分文件信息失败（" + fe.getMessage() + "），是否继续导出？\n\n"
+                                    Lang.tf("联网获取部分文件信息失败（%s），是否继续导出？\n\n"
                                             + "若继续，无法获取信息的文件将被直接打包。由于二次分发可能违反使用协议，请尽量不要公开发布导出的整合包！",
+                                            fe.getMessage()),
                                     () -> {
                                         proceed[0] = true;
                                         latch.countDown();
                                     });
-                            latch.countDown(); // 关掉弹窗也继续
                         });
-                        latch.await();
+                        boolean confirmed;
+                        try {
+                            confirmed = latch.await(5, java.util.concurrent.TimeUnit.MINUTES);
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            confirmed = false;
+                        }
+                        if (!confirmed) javafx.application.Platform.runLater(win::closeModal);
                         if (!proceed[0]) throw new Exception("导出已取消");
                     }
                 }
@@ -2825,7 +3153,7 @@ public class PageInstanceSetup implements Page {
                                 .append("},\"env\":{\"client\":\"required\",\"server\":\"required\"},\"downloads\":[")
                                 .append(Json.quote(e.getValue()))
                                 .append("],\"fileSize\":").append(Files.size(file)).append("}");
-                        Files.deleteIfExists(file); // 命中的文件不打包进 overrides
+                        Files.deleteIfExists(file);
                     }
                     filesJson.append("]");
                     StringBuilder deps = new StringBuilder("{\"minecraft\":").append(Json.quote(vanillaName(ins)));
@@ -2844,13 +3172,11 @@ public class PageInstanceSetup implements Page {
                             .append("}").toString();
                     Files.writeString(cache.resolve("modpack").resolve("modrinth.index.json"), index, StandardCharsets.UTF_8);
                 } else {
-                    // 普通 zip 附一份规则说明
                     StringBuilder conf = new StringBuilder();
                     for (String r : effRules) conf.append(r).append(System.lineSeparator());
                     Files.writeString(cache.resolve("modpack").resolve("TCraft-Export-Config.txt"), conf.toString(), StandardCharsets.UTF_8);
                 }
 
-                // 压到目标文件
                 task.threads = 1;
                 try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(fTarget.toPath()))) {
                     try (var walk = Files.walk(cache.resolve("modpack"))) {
@@ -2881,10 +3207,9 @@ public class PageInstanceSetup implements Page {
                 javafx.application.Platform.runLater(() ->
                         win.toast("导出失败", task.error, 3));
             }
-        }, "TCL-Export").start();
+        });
     }
 
-    /** 剥掉加载器后缀得到原版版本名。 */
     private static String vanillaName(Data.Instance ins) {
         String v = ins.version;
         for (String sfx : new String[]{"-forge", "-fabric", "-neoforge", "-quilt"}) {
@@ -2894,7 +3219,6 @@ public class PageInstanceSetup implements Page {
         return v;
     }
 
-    /** 从版本串截加载器版本，如 1.20.1-forge-47.2.0 取 47.2.0。 */
     private static String loaderVersion(Data.Instance ins) {
         String v = ins.version;
         for (String sfx : new String[]{"-forge-", "-fabric-", "-neoforge-", "-quilt-"}) {
@@ -2938,10 +3262,10 @@ public class PageInstanceSetup implements Page {
         }
         String stamp = java.time.LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
         FileChooser chooser = new FileChooser();
-        chooser.setTitle("备份实例");
+        chooser.setTitle(Lang.t("备份实例"));
         chooser.setInitialDirectory(backups.toFile());
         chooser.setInitialFileName(ins.name + "-" + stamp + ".zip");
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Zip 压缩包", "*.zip"));
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(Lang.t("Zip 压缩包"), "*.zip"));
         File file = chooser.showSaveDialog(win.stage);
         if (file == null) return;
         win.toast("开始备份", file.getName(), 0);
@@ -2952,7 +3276,7 @@ public class PageInstanceSetup implements Page {
         Tasks.Task task = new Tasks.Task(title);
         task.subs.add(new Tasks.SubTask("写入压缩包"));
         Tasks.INSTANCE.add(task);
-        new Thread(() -> {
+        Threads.start("TCL-Backup", () -> {
             try {
                 Path game = instanceRoot();
                 List<Path> files = new ArrayList<>();
@@ -2988,28 +3312,24 @@ public class PageInstanceSetup implements Page {
             } finally {
                 Tasks.INSTANCE.changed();
             }
-        }, "TCL-Backup").start();
+        });
     }
 
     private void openFolder(String path) {
         Shell.openFolder(path);
     }
 
-    /** 配置导入的规则覆盖，非 null 时替代勾选规则。 */
     private java.util.List<String> exportRulesOverride = null;
-    /** 配置导入的追加内容，/ 结尾表示文件夹。 */
     private java.util.List<String> exportExtraFiles = null;
     private boolean exportIncludeLauncher = false;
     private boolean exportIncludeLauncherCustom = false;
-    /** 资源文件直接打包，不联网查托管。 */
     private boolean exportDontCheckHosted = false;
 
-    /** 保存导出配置，段之间用 ===== 分隔。 */
     private void exportExportConfig() {
         javafx.stage.FileChooser chooser = new javafx.stage.FileChooser();
-        chooser.setTitle("选择文件位置");
+        chooser.setTitle(Lang.t("选择文件位置"));
         chooser.setInitialFileName("export_config.txt");
-        chooser.getExtensionFilters().add(new javafx.stage.FileChooser.ExtensionFilter("整合包导出配置", "*.txt"));
+        chooser.getExtensionFilters().add(new javafx.stage.FileChooser.ExtensionFilter(Lang.t("整合包导出配置"), "*.txt"));
         java.io.File file = chooser.showSaveDialog(win.stage);
         if (file == null) return;
         try {
@@ -3056,12 +3376,11 @@ public class PageInstanceSetup implements Page {
         }
     }
 
-    /** 读导出配置，规则段会覆盖勾选。 */
     private void importExportConfig() {
         javafx.stage.FileChooser chooser = new javafx.stage.FileChooser();
-        chooser.setTitle("选择配置文件");
+        chooser.setTitle(Lang.t("选择配置文件"));
         chooser.setInitialFileName("export_config.txt");
-        chooser.getExtensionFilters().add(new javafx.stage.FileChooser.ExtensionFilter("整合包导出配置", "*.txt"));
+        chooser.getExtensionFilters().add(new javafx.stage.FileChooser.ExtensionFilter(Lang.t("整合包导出配置"), "*.txt"));
         java.io.File file = chooser.showOpenDialog(win.stage);
         if (file == null) return;
         try {
@@ -3083,24 +3402,46 @@ public class PageInstanceSetup implements Page {
             }
             exportConfiguredName = ini.getOrDefault("Name", "");
             exportConfiguredVersion = ini.getOrDefault("Version", "");
-            String packPath = ini.getOrDefault("PackPath", "");
-            exportConfiguredPackPath = packPath.isEmpty() ? null : packPath;
-            // 页面重建时由 buildExport 回填
+            final String packPath = ini.getOrDefault("PackPath", "").trim();
             if (exportNameField != null) {
                 exportNameField.setText(exportConfiguredName);
                 exportVersionField.setText(exportConfiguredVersion);
             }
             java.util.List<String> rules = new ArrayList<>();
             for (String line : segments.length > 1 ? segments[1].split("\r?\n") : new String[0]) rules.add(line);
-            exportRulesOverride = rules;
-            exportExtraFiles = null;
+            final java.util.List<String> extraFiles = new ArrayList<>();
             if (segments.length > 2) {
-                java.util.List<String> extra = new ArrayList<>();
-                for (String line : segments[2].split("\r?\n")) extra.add(line);
-                exportExtraFiles = extra;
+                for (String line : segments[2].split("\r?\n")) extraFiles.add(line);
             }
-            win.toast("已读取配置文件：" + file.getName(), "导出内容列表已按配置文件固定，点「取消配置覆盖」恢复勾选。", 1);
-            win.openSetup("export");
+            // PackPath 能指定任意写盘位置，追加文件能把本机任意文件打进压缩包；
+            // 两项都来自外部文件，先让用户确认再生效
+            StringBuilder warn = new StringBuilder();
+            if (!packPath.isEmpty()) {
+                warn.append(Lang.t("· 导出位置被固定为：")).append(packPath).append('\n');
+            }
+            int realExtras = 0;
+            for (String line : extraFiles) {
+                String p = line.trim();
+                if (p.isEmpty() || p.startsWith("#") || p.startsWith("=")) continue;
+                if (realExtras < 5) warn.append(Lang.t("· 会打包本地文件：")).append(p).append('\n');
+                realExtras++;
+            }
+            if (realExtras > 5) warn.append(Lang.tf("· 以及另外 %d 个本地路径\n", realExtras - 5));
+            final Runnable apply = () -> {
+                exportConfiguredPackPath = packPath.isEmpty() ? null : packPath;
+                exportRulesOverride = rules;
+                exportExtraFiles = extraFiles.isEmpty() ? null : extraFiles;
+                win.toast("已读取配置文件：" + file.getName(),
+                        "导出内容列表已按配置文件固定，点「取消配置覆盖」恢复勾选。", 1);
+                win.openSetup("export");
+            };
+            if (warn.length() == 0) {
+                apply.run();
+            } else {
+                Dialogs.confirm(win, "配置文件会改动本机内容", warn.toString()
+                                + Lang.t("\n这些设置来自外部文件，确认按此配置导出吗？"),
+                        apply);
+            }
         } catch (Exception e) {
             win.toast("读取配置失败", e.getMessage(), 3);
         }
@@ -3113,7 +3454,6 @@ public class PageInstanceSetup implements Page {
         win.toast("已恢复手动勾选。", "", 1);
     }
 
-    /** 勾选生成的规则列表。 */
     private java.util.List<String> currentExportRules() {
         java.util.List<String> rules = new ArrayList<>();
         rules.add("");
@@ -3140,7 +3480,6 @@ public class PageInstanceSetup implements Page {
         return rules;
     }
 
-    /** 把启动脚本和资源打到根目录。 */
     private void packLauncherFiles(Path payloadRoot) throws Exception {
         Path base = Resources.appDir();
         for (String script : new String[]{"TCraftLauncher.bat", "TCraftLauncher-debug.bat", "TCraftLauncher.sh"}) {
@@ -3149,17 +3488,14 @@ public class PageInstanceSetup implements Page {
                 Files.copy(src, payloadRoot.resolve(script), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             }
         }
-        // 当前启动器本体（exe 或 jar），让整合包拿到就能直接运行
         Path self = Resources.jar();
         if (self != null && Files.isRegularFile(self)) {
             String name = self.getFileName().toString().toLowerCase();
             String target = name.endsWith(".exe") ? "TCraftLauncher.exe" : "TCraftLauncher.jar";
             Files.copy(self, payloadRoot.resolve(target), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         }
-        // 资源目录
         Path res = base.resolve("res");
         if (Files.isDirectory(res)) copyDirectory(res, payloadRoot.resolve("res"));
-        // 说明文件
         String readme = "TCraft Launcher JavaFX 版整合包附带的启动器文件说明" + System.lineSeparator()
                 + System.lineSeparator()
                 + "本压缩包已包含启动器程序、启动脚本与资源文件。" + System.lineSeparator()
@@ -3169,7 +3505,6 @@ public class PageInstanceSetup implements Page {
         Files.writeString(payloadRoot.resolve("启动器文件说明.txt"), readme, StandardCharsets.UTF_8);
     }
 
-    /** 打包背景、视频、音乐和 Logo。 */
     private void packLauncherCustom(Path payloadRoot) throws Exception {
         Path gameTcl = Paths.get(data.gameDir, "TCL");
         if (!Files.isDirectory(gameTcl)) return;
@@ -3201,7 +3536,6 @@ public class PageInstanceSetup implements Page {
         }
     }
 
-    /** 把追加内容复制到根目录。 */
     private void copyExtraFiles(Path payloadRoot) {
         if (exportExtraFiles == null) return;
         for (String line : exportExtraFiles) {
@@ -3225,5 +3559,4 @@ public class PageInstanceSetup implements Page {
             }
         }
     }
-
 }

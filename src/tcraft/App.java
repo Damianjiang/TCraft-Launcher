@@ -5,32 +5,18 @@ import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
-import javafx.scene.SnapshotParameters;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.image.PixelReader;
-import javafx.scene.image.WritableImage;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
-import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.util.Duration;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 
-/** 启动入口：先出启动画面，再进主界面。 */
 public class App extends Application {
-
-    /** 截图/自检模式，会改窗口尺寸，不写用户配置。 */
-    public static boolean SNAPSHOT_MODE;
-    /** --perf 采样模式，跳过更新检查等后台任务。 */
-    public static boolean PERF_MODE;
 
     private MainWindow window;
 
@@ -43,10 +29,10 @@ public class App extends Application {
         StartupWindow splash = Boot.startupWindow;
         if (splash == null) splash = StartupWindow.open();
         final StartupWindow ui = splash;
-        ui.setStatus("正在检查资源是否齐全…", 25);
+        ui.setStatus(Lang.t("正在检查资源是否齐全…"), 25);
 
         try {
-            // 全局异常兜底：FX 线程弹窗，后台线程只记日志。
+            // 全局异常：FX 线程弹窗，后台只记日志
             Thread.setDefaultUncaughtExceptionHandler((thread, throwable) ->
                     Errors.uncaught(thread, throwable, false));
             Thread.currentThread().setUncaughtExceptionHandler((thread, throwable) ->
@@ -54,8 +40,8 @@ public class App extends Application {
             Theme.init();
             Lang.reload();
             Theme.applyComponentOpacity();
-            ui.setStatus("正在检查资源是否齐全…", 45);
-            // 清残留 easytier-core，不挡启动
+            applyInitialTheme();
+            ui.setStatus(Lang.t("正在检查资源是否齐全…"), 45);
             Thread cleanup = new Thread(EasyTier::killLeftovers, "TCL-Cleanup");
             cleanup.setDaemon(true);
             cleanup.start();
@@ -65,13 +51,33 @@ public class App extends Application {
         }
 
         try {
-            ui.setStatus("正在准备主界面…", 62);
+            ui.setStatus(Lang.t("正在准备主界面…"), 62);
             window = new MainWindow(stage);
-            ui.setStatus("正在准备主界面…", 82);
+            // 预热 Java 扫描，首次进设置页不卡
+            Thread javaScan = new Thread(() -> {
+                try {
+                    Data.get().scanJavaRuntimes();
+                } catch (Exception ignored) {
+                }
+            }, "TCL-Java-Scan");
+            javaScan.setDaemon(true);
+            javaScan.start();
+            // 预取 mesa-loader，首次启动游戏不用等下载
+            if (Shell.windows() && Data.get().getInt("LaunchAdvanceRenderer", 0) > 0) {
+                Thread mesa = new Thread(() -> {
+                    try {
+                        Mesa.ensure();
+                    } catch (Exception ignored) {
+                    }
+                }, "TCL-Mesa-Prefetch");
+                mesa.setDaemon(true);
+                mesa.start();
+            }
+            ui.setStatus(Lang.t("正在准备主界面…"), 82);
             stage.show();
             stage.setAlwaysOnTop(false);
             window.playIntro();
-            ui.setStatus("准备完成", 100);
+            ui.setStatus(Lang.t("准备完成"), 100);
         } catch (Throwable t) {
             showFatal(splash, t);
             return;
@@ -86,7 +92,6 @@ public class App extends Application {
         top.setOnFinished(e -> stage.setAlwaysOnTop(false));
         top.play();
 
-        // 提前握手，第一次进资源页能省 1~2 秒。
         Http.warmup(
                 "https://api.modrinth.com/v2/tag/game_version",
                 "https://cdn.modrinth.com/",
@@ -94,19 +99,25 @@ public class App extends Application {
                 "https://launchercontent.mojang.com/v2/news.json",
                 "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json");
 
-        // 等官方清单回来再刷新本页。
         Data.get().refreshVersions(false, () -> {
             if (window != null) window.refreshRight();
         });
 
-        handleSnapshotArgs();
-        handlePerfArgs();
-        // 启动更新检查放在截图/性能采样之后，避免干扰自检
         Updates.checkOnStartup(window);
         startStartupInstance();
     }
 
-    /** --launch-instance "<实例名>"：首帧后选中该实例并启动。 */
+    private void applyInitialTheme() {
+        int preset = Data.get().getInt("UiThemePreset", -1);
+        if (preset == 14) {
+            Theme.applyCustomTheme();
+        } else if (preset >= 0) {
+            Theme.applyPreset(preset);
+        } else {
+            Theme.applyWallpaperThemeSync();
+        }
+    }
+
     private void startStartupInstance() {
         String name = null;
         List<String> args = getParameters().getRaw();
@@ -133,7 +144,7 @@ public class App extends Application {
                 }
             }
             if (target == null) {
-                window.toast("快捷方式启动失败", "未找到实例「" + wanted + "」", 2);
+                window.toast("快捷方式启动失败", Lang.tf("未找到实例「%s」", wanted), 2);
                 return;
             }
             if (!Data.usableJava(Data.get().javaPath)) {
@@ -144,7 +155,6 @@ public class App extends Application {
             data.selectedInstance = data.instances.indexOf(target);
             data.save();
             window.openPage("launch", false);
-            // 等切页动画走完再点启动
             PauseTransition delay = new PauseTransition(Duration.millis(900));
             delay.setOnFinished(x -> {
                 try {
@@ -158,45 +168,6 @@ public class App extends Application {
         wait.play();
     }
 
-    /** --perf=秒数：空闲后采样，打印 CPU 和堆。 */
-    private void handlePerfArgs() {
-        int secs = -1;
-        for (String a : getParameters().getRaw()) {
-            if (a.startsWith("--perf=")) {
-                try {
-                    secs = Integer.parseInt(a.substring(7));
-                } catch (NumberFormatException ignored) {
-                }
-            }
-        }
-        if (secs <= 0) return;
-        PERF_MODE = true;
-        final int window = secs;
-        // 空转 5 秒再采样
-        PauseTransition warm = new PauseTransition(Duration.seconds(5));
-        warm.setOnFinished(e -> {
-            com.sun.management.OperatingSystemMXBean os =
-                    (com.sun.management.OperatingSystemMXBean) java.lang.management.ManagementFactory.getOperatingSystemMXBean();
-            long cpu0 = os.getProcessCpuTime();
-            long wall0 = System.nanoTime();
-            PauseTransition sample = new PauseTransition(Duration.seconds(window));
-            sample.setOnFinished(ev -> {
-                long cpu1 = os.getProcessCpuTime();
-                double wallSec = (System.nanoTime() - wall0) / 1e9;
-                double corePercent = (cpu1 - cpu0) / 1e9 / wallSec * 100;
-                Runtime rt = Runtime.getRuntime();
-                System.out.printf("[PERF] 空闲 %.0fs：CPU %.1f%% 单核（%.3f 核）· 堆 %.1f/%.1f MB · 线程 %d%n",
-                        wallSec, corePercent, corePercent / 100.0,
-                        (rt.totalMemory() - rt.freeMemory()) / 1048576.0, rt.totalMemory() / 1048576.0,
-                        java.lang.management.ManagementFactory.getThreadMXBean().getThreadCount());
-                Platform.exit();
-            });
-            sample.play();
-        });
-        warm.play();
-    }
-
-    /** 启动失败：写 crash.txt、关加载窗、弹窗。 */
     private void showFatal(StartupWindow splash, Throwable t) {
         Path crash = Boot.writeCrash(t);
         if (splash != null) splash.close();
@@ -226,7 +197,8 @@ public class App extends Application {
         stack.setWrapText(true);
         stack.setStyle("-fx-font-size: 11px; -fx-text-fill: #5b6472; -fx-font-family: Consolas, monospace;");
 
-        Label where = new Label(crash == null ? "崩溃日志写入失败" : "完整堆栈已写入：\n" + crash);
+        Label where = new Label(crash == null ? Lang.t("崩溃日志写入失败")
+                : Lang.t("完整堆栈已写入：\n") + crash);
         where.setWrapText(true);
         where.setStyle("-fx-font-size: 11px; -fx-text-fill: #5b6472;");
 
@@ -238,7 +210,7 @@ public class App extends Application {
                 + (crash == null ? "" : "\n日志：" + crash);
         Button copy = new Button(Lang.t("导出错误报告"));
         Button openDir = new Button(Lang.t("打开日志文件夹"));
-        Button close = new Button("关闭");
+        Button close = new Button(Lang.t("关闭"));
         copy.setOnAction(e -> {
             try {
                 String stamp = java.time.LocalDateTime.now()
@@ -251,9 +223,9 @@ public class App extends Application {
                 java.nio.file.Files.writeString(file, "\uFEFF" + report,
                         java.nio.charset.StandardCharsets.UTF_8);
                 Shell.openFolder(dir.toString());
-                copy.setText("已导出：" + file.getFileName());
+                copy.setText(Lang.t("已导出：") + file.getFileName());
             } catch (Exception ex) {
-                copy.setText("导出失败");
+                copy.setText(Lang.t("导出失败"));
             }
         });
         String crashPath = crash == null ? null : crash.getParent().toString();
@@ -283,184 +255,9 @@ public class App extends Application {
         fail.toFront();
     }
 
-    private void handleSnapshotArgs() {
-        List<String> args = getParameters().getRaw();
-        String page = null, dialog = null, selArg = null, themeArg = null, blurArg = null;
-        boolean langMenu = false;
-        for (String a : args) {
-            if (a.startsWith("--page=")) page = a.substring(7);
-            if (a.startsWith("--dialog=")) dialog = a.substring(9);
-            if (a.startsWith("--sel=")) selArg = a.substring(6);   // 切到第 N 个账户
-            if (a.startsWith("--theme=")) themeArg = a.substring(8); // 换主题，验证扩散动画
-            if (a.equals("--langmenu")) langMenu = true;  // 打开语言弹层
-            if (a.startsWith("--blur=")) blurArg = a.substring(7);  // 改背景模糊半径
-        }
-        final boolean openLang = langMenu;
-        // 只有真的带截图参数才进截图模式，否则正常启动会被当成自检
-        if (page == null && dialog == null && !openLang) return;
-        SNAPSHOT_MODE = true; // 截图链路，不回写用户状态
-        final String targetPage = page;
-        final String targetDialog = dialog;
-        final String targetSel = selArg;
-        final String targetTheme = themeArg;
-        final String targetBlur = blurArg;
-        PauseTransition wait = new PauseTransition(Duration.millis(1600));
-        wait.setOnFinished(e -> {
-            if (targetBlur != null) {
-                // 只改内存，不写配置
-                Data.get().setRuntime("UiBackgroundBlur", targetBlur);
-                window.rebuildUi();
-            }
-            if (targetPage != null) {
-                if (targetPage.startsWith("setup:")) {
-                    window.pendingSetupSection = targetPage.substring(6);
-                    window.openPage("setup", false);
-                } else if (targetPage.startsWith("other:")) {
-                    Data.get().otherSection = targetPage.substring(6);
-                    window.openPage("other", false);
-                } else if (targetPage.startsWith("download:")) {
-                    Data.get().downloadCategory = targetPage.substring(9);
-                    window.openPage("download", false);
-                } else if (targetPage.startsWith("link:")) {
-                    PageLink.debugState(targetPage.substring(5));
-                    window.openPage("link", false);
-                } else if (targetPage.startsWith("select:")) {
-                    // 直接进版本选择页
-                    Data.get().downloadCategory = "原版游戏";
-                    window.openPage("download", false);
-                    PauseTransition sel = new PauseTransition(Duration.millis(300));
-                    sel.setOnFinished(x -> window.debugSelectVersion(targetPage.substring(7)));
-                    sel.play();
-                } else if (targetPage.startsWith("detail:")) {
-                    // 同步搜索，异步的话会先拍到启动页
-                    final String q = targetPage.substring(7);
-                    ResourceInfo ri = null;
-                    try {
-                        java.util.List<Object> hits = Modrinth.search(q, "mod", 1);
-                        if (!hits.isEmpty()) {
-                            java.util.Map<String, Object> m = Json.obj(hits.get(0));
-                            ri = ResourceInfo.modrinth(Json.str(m, "project_id", ""), Json.str(m, "slug", ""),
-                                    Json.str(m, "title", ""), "mod");
-                            ri.desc = Json.str(m, "description", "");
-                            ri.icon = Json.str(m, "icon_url", "");
-                            ri.downloads = (long) Json.num(m, "downloads", 0);
-                            String cats = String.valueOf(m.get("categories")).toLowerCase();
-                            for (String loader : new String[]{"fabric", "forge", "neoforge", "quilt"}) {
-                                if (cats.contains(loader)) ri.loaders.add(loader);
-                            }
-                        }
-                    } catch (Exception ignored) {
-                    }
-                    if (ri == null) {
-                        window.toast("详情页自检失败", "没搜到「" + q + "」", 2);
-                    } else {
-                        window.pendingResource = ri;
-                        window.openPage("resourceDetail", false);
-                    }
-                } else {
-                    window.openPage(targetPage, false);
-                }
-            }
-            if ("account".equals(targetDialog)) window.showAccountDialog();
-            else if ("skin".equals(targetDialog) || "skinview".equals(targetDialog)) {
-                // 有真实账户就用，没有临时离线账户
-                boolean view = "skinview".equals(targetDialog);
-                Data.Account a = null;
-                Data dd = Data.get();
-                if (!dd.accounts.isEmpty()) {
-                    a = dd.accounts.get(Math.max(0, Math.min(dd.selectedAccount, dd.accounts.size() - 1)));
-                }
-                if (a == null) {
-                    a = new Data.Account("TestSkin", Data.offlineUuid("TestSkin"), "Steve.png", false);
-                }
-                if (view) a.online = true; else a.online = false;
-                Dialogs.skinPicker(window, a);
-            }
-            else if ("nide".equals(targetDialog)) Dialogs.nideCard(window);
-            else if ("ms".equals(targetDialog)) Dialogs.msLoginCard(window);
-            else if ("ygg".equals(targetDialog)) Dialogs.yggdrasilCard(window);
-            else if ("luck".equals(targetDialog) || "count".equals(targetDialog)) {
-                window.openPage("other", false);
-                PauseTransition after = new PauseTransition(Duration.millis(400));
-                after.setOnFinished(x -> {
-                    if (window.currentPageNode() instanceof PageOther po) {
-                        if ("luck".equals(targetDialog)) po.debugLuck(); else po.debugLaunchCount();
-                    }
-                });
-                after.play();
-            }
-            else if ("confirm".equals(targetDialog)) Dialogs.confirm(window, "关闭 Minecraft",
-                    "确定要强制关闭正在运行的 Minecraft 吗？\n未保存的游戏进度可能会丢失。", () -> {}, true);
-            if (targetSel != null) {
-                // 切到第 N 个账户
-                PauseTransition pick = new PauseTransition(Duration.millis(500));
-                pick.setOnFinished(x -> {
-                    if (window.currentPageNode() instanceof PageAccountManager pam) {
-                        pam.select(Integer.parseInt(targetSel));
-                    }
-                });
-                pick.play();
-            }
-            if (openLang) window.debugLanguageMenu();
-            final String shotName = targetPage != null ? targetPage.replace(':', '_')
-                    : targetDialog != null ? "dialog_" + targetDialog : "home";
-            if (targetTheme != null) {
-                // 换主题后立刻拍，抓扩散中间帧
-                PauseTransition pick = new PauseTransition(Duration.millis(1400));
-                pick.setOnFinished(x -> {
-                    Data.get().set("UiThemePreset", Integer.parseInt(targetTheme));
-                    Data.get().set("UiAutoThemeFromBackground", false);
-                    window.applyThemeFrom(window.root.getWidth() * 0.55, window.root.getHeight() * 0.42);
-                    PauseTransition mid = new PauseTransition(Duration.millis(120));
-                    mid.setOnFinished(m -> {
-                        snapshot(shotName + "_ripple.png");
-                        Platform.exit();
-                    });
-                    mid.play();
-                });
-                pick.play();
-                return;
-            }
-            // 默认等 3500ms，可用 -Dtcl.shot.delay 覆盖
-            PauseTransition shot = new PauseTransition(
-                    Duration.millis(Long.getLong("tcl.shot.delay", 3500L)));
-            shot.setOnFinished(ev -> {
-                snapshot(shotName + ".png");
-                Platform.exit();
-            });
-            shot.play();
-        });
-        wait.play();
-    }
-
-    private void snapshot(String name) {
-        try {
-            // 先跑 CSS 和布局再量尺寸
-            window.root.applyCss();
-            window.root.layout();
-            System.out.println("[SNAPSHOT] scene=" + window.stage.getScene().getWidth() + "x"
-                    + window.stage.getScene().getHeight() + " modal=" + window.debugModalSize()
-                    + " | " + window.debugRightInfo());
-            Path dir = Theme.root().resolve("snapshots");
-            Files.createDirectories(dir);
-            SnapshotParameters params = new SnapshotParameters();
-            params.setFill(Color.web("#20242c"));
-            // 不设 viewport，按 root 自己的 bounds 拍
-            WritableImage image = window.root.snapshot(params, null);
-            int w = (int) image.getWidth(), h = (int) image.getHeight();
-            BufferedImage bi = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
-            PixelReader pr = image.getPixelReader();
-            for (int y = 0; y < h; y++) {
-                for (int x = 0; x < w; x++) bi.setRGB(x, y, pr.getArgb(x, y));
-            }
-            ImageIO.write(bi, "png", dir.resolve(name).toFile());
-        } catch (Exception ignored) {
-        }
-    }
-
     @Override
     public void stop() {
-        EasyTier.stop();
-        // 异常残留交给下次 killLeftovers。
+        // FX 线程上同步等 easytier 会卡住退出，交给后台线程收尾
+        EasyTier.stopAsync();
     }
 }

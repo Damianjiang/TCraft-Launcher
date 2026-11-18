@@ -9,12 +9,12 @@ import javafx.scene.control.TextField;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
 
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** 账户管理、确认框这类通用弹窗。 */
 public final class Dialogs {
 
     private Dialogs() {
@@ -24,7 +24,6 @@ public final class Dialogs {
         confirm(win, title, message, onOk, false);
     }
 
-    /** 警告样式：标题和主按钮变红，罩暗红遮罩。 */
     public static void confirm(MainWindow win, String title, String message, Runnable onOk, boolean warn) {
         VBox card = new VBox(0);
         card.setPadding(new Insets(22, 22, 23, 22));
@@ -34,7 +33,6 @@ public final class Dialogs {
         card.setEffect(Theme.shadow(22, 4, 0.32, Theme.text));
         Label t = Ui.semi(title, 23, warn ? Theme.red : Theme.accentDark);
         t.setPadding(new Insets(0, 70, 9, 7));
-        // 长标题换行，不用省略号
         t.setWrapText(true);
         Region line = Ui.line(warn ? Theme.red : Theme.accentDark, 2);
         line.setMaxWidth(Double.MAX_VALUE);
@@ -55,7 +53,6 @@ public final class Dialogs {
         win.showModal(card, true, warn ? Theme.warnMask : null);
     }
 
-    /** 单按钮信息框。 */
     public static void message(MainWindow win, String title, String message) {
         message(win, title, message, false, "确定");
     }
@@ -69,7 +66,6 @@ public final class Dialogs {
         card.setEffect(Theme.shadow(22, 4, 0.32, Theme.text));
         Label t = Ui.semi(title, 23, warn ? Theme.red : Theme.accentDark);
         t.setPadding(new Insets(0, 70, 9, 7));
-        // 长标题换行，不用省略号
         t.setWrapText(true);
         Region line = Ui.line(warn ? Theme.red : Theme.accentDark, 2);
         line.setMaxWidth(Double.MAX_VALUE);
@@ -86,7 +82,6 @@ public final class Dialogs {
         win.showModal(card, true, warn ? Theme.warnMask : null);
     }
 
-    /** 带输入框的弹窗：确定回调非空文本，取消回调 null。 */
     public static void input(MainWindow win, String title, String hint, String defaultValue,
                              java.util.function.Consumer<String> onOk) {
         VBox card = new VBox(0);
@@ -128,11 +123,9 @@ public final class Dialogs {
         win.openPage("account", true);
     }
 
-    /** 弹窗统一骨架。 */
     public static VBox msgCard(String title) {
         VBox card = new VBox(0);
         card.setPadding(new Insets(22, 22, 18, 22));
-        // 英文标题和按钮更长，窄卡片会把文字截成省略号
         boolean en = Lang.mode == 1;
         card.setPrefWidth(en ? 480 : 410);
         card.setMinWidth(en ? 460 : 400);
@@ -146,7 +139,6 @@ public final class Dialogs {
         return card;
     }
 
-    /** 选择账户类型后进对应登录流程。 */
     public static void addAccount(MainWindow win, int initialMode) {
         VBox card = msgCard("添加账户");
 
@@ -179,7 +171,6 @@ public final class Dialogs {
         win.showModal(card);
     }
 
-    /** 离线账户：UUID 按用户名生成，名称不合规只警告。 */
     public static void offlineCard(MainWindow win) {
         VBox card = msgCard("添加离线模式账户");
         VBox form = new VBox(0);
@@ -190,7 +181,6 @@ public final class Dialogs {
                 Ui.field("建议使用英文字符、数字以及下划线命名，且长度不超过 16 个字符"));
         TextField name = (TextField) nameRow.getChildren().get(1);
         name.setPrefHeight(32);
-        // TextField 没有 maxLength，用 TextFormatter 截断
         name.setTextFormatter(new javafx.scene.control.TextFormatter<String>(
                 change -> change.getControlNewText().length() <= 60 ? change : null));
         HBox.setHgrow(name, Priority.ALWAYS);
@@ -220,9 +210,9 @@ public final class Dialogs {
                 win.toast("已添加账户", n, 1);
             };
             if (!isValidMcName(n)) {
-                // 名称不合规只警告，允许继续
-                confirm(win, "警告", "离线模式账户用户名建议仅使用英文字符、数字以及下划线，"
-                        + "且长度不超过 16 个字符。确定要继续吗？", doAdd);
+                // 两段是独立词条，各自 Lang.t 后拼接，整串查不到表
+                confirm(win, "警告", Lang.t("离线模式账户用户名建议仅使用英文字符、数字以及下划线，")
+                        + Lang.t("且长度不超过 16 个字符。确定要继续吗？"), doAdd);
                 return;
             }
             doAdd.run();
@@ -242,7 +232,6 @@ public final class Dialogs {
         win.showModal(card);
     }
 
-    /** 单选弹窗，确定后回传行号。 */
     public static void select(MainWindow win, String title, String[] options,
                               String btn1, String btn2, boolean isWarn,
                               java.util.function.IntConsumer onOk) {
@@ -281,7 +270,6 @@ public final class Dialogs {
         win.showModal(card, true, isWarn ? Theme.warnMask : null);
     }
 
-    /** MC 命名规则：字母、数字、下划线，不超过 16 字符。 */
     private static boolean isValidMcName(String n) {
         if (n == null || n.isEmpty() || n.length() > 16) return false;
         for (char c : n.toCharArray()) {
@@ -291,15 +279,14 @@ public final class Dialogs {
         return true;
     }
 
-    /** 微软登录：设备码流程，浏览器授权完自动完成。 */
     public static void msLoginCard(MainWindow win) {
         if (!MsAuth.available()) {
-            // 开源版没有 client id，只给说明
             VBox card = msgCard("登录微软账号");
             VBox form = new VBox(10);
             form.setPadding(new Insets(15, 7, 0, 7));
-            form.getChildren().add(Ui.hint("这个版本没有内置微软登录凭据，开源版去掉了正版登录。"
-                    + "要用正版登录，请自行构建完整版并注入自己的 client id，构建说明见 docs/构建与发布.md。", 0));
+            // Ui.hint 内部对整串做 Lang.t，拼接串必须先按片段译好
+            form.getChildren().add(Ui.hint(Lang.t("这个版本没有内置微软登录凭据，开源版去掉了正版登录。")
+                    + Lang.t("要用正版登录，请自行构建完整版并注入自己的 client id，构建说明见 docs/构建与发布.md。"), 0));
             HBox actions = new HBox(12);
             actions.setAlignment(Pos.CENTER_RIGHT);
             actions.getChildren().add(Ui.button("知道了", Ui.BTN_NORMAL, win::closeModal));
@@ -314,8 +301,8 @@ public final class Dialogs {
         form.setPadding(new Insets(15, 7, 0, 7));
         double wrapWidth = Lang.mode == 1 ? 430 : 360;
 
-        Label hint = Ui.wrap(Ui.label("用浏览器打开微软设备登录页，输入下面的代码完成微软账号登录，"
-                + "授权后启动器会自动继续。", 13, Theme.gray2), wrapWidth);
+        Label hint = Ui.wrap(Ui.label(Lang.t("用浏览器打开微软设备登录页，输入下面的代码完成微软账号登录，")
+                + Lang.t("授权后启动器会自动继续。"), 13, Theme.gray2), wrapWidth);
         hint.setLineSpacing(3);
 
         Label code = Ui.bold("获取中…", 24, Theme.accentDark);
@@ -345,7 +332,6 @@ public final class Dialogs {
 
         StackPane open = Ui.button("打开登录页", Ui.BTN_THEME, () -> {
             String url = verification[0];
-            // 微软的链接页支持 ?otc= 预填代码，省得手动输入
             if ("https://www.microsoft.com/link".equals(url) && !userCode[0].isEmpty()) {
                 url += "?otc=" + userCode[0];
             }
@@ -379,10 +365,10 @@ public final class Dialogs {
             Thread t = new Thread(() -> {
                 try {
                     MsAuth.DeviceCode dc = MsAuth.requestDeviceCode();
-                    verification[0] = dc.verificationUri;
-                    userCode[0] = dc.userCode;
                     javafx.application.Platform.runLater(() -> {
                         if (cancelled.get()) return;
+                        verification[0] = dc.verificationUri;
+                        userCode[0] = dc.userCode;
                         code.setText(dc.userCode);
                         open.setDisable(false);
                         status.setText(Lang.tf("等待浏览器授权，每 %d 秒自动检查一次…", dc.interval));
@@ -396,7 +382,6 @@ public final class Dialogs {
                         if (!cancelled.get()) applyMsAccount(win, d, r, skin);
                     });
                 } catch (MsAuth.CancelledException ignored) {
-                    // 窗口已经关掉
                 } catch (Exception ex) {
                     if (cancelled.get()) return;
                     javafx.application.Platform.runLater(() -> {
@@ -424,7 +409,6 @@ public final class Dialogs {
         start.run();
     }
 
-    /** 登录成功后写入账户并刷新界面。 */
     private static void applyMsAccount(MainWindow win, Data d, MsAuth.Result r, String skin) {
         String name = r.name.isEmpty() ? "Player" : r.name;
         String key = normUuid(r.uuid);
@@ -460,7 +444,6 @@ public final class Dialogs {
         return uuid == null ? "" : uuid.replace("-", "").toLowerCase(java.util.Locale.ROOT);
     }
 
-    /** 第三方 Yggdrasil 登录。 */
     public static void yggdrasilCard(MainWindow win) {
         VBox card = msgCard("登录第三方账户");
         final Data d = Data.get();
@@ -477,7 +460,7 @@ public final class Dialogs {
         password.setFont(Theme.font(13));
         password.setPrefHeight(32);
         final StackPane[] lRef = new StackPane[1];
-        StackPane login = Ui.button("登录并添加", Ui.BTN_HIGHLIGHT, () -> {
+        Runnable submitAction = () -> {
             String srv = (server.getText() == null ? "" : server.getText().trim());
             String usr = (email.getText() == null ? "" : email.getText().trim());
             String pwd = password.getText();
@@ -485,6 +468,7 @@ public final class Dialogs {
                 win.toast("请完整填写", "服务器地址与用户名不能为空。", 2);
                 return;
             }
+            if (lRef[0] == null || lRef[0].isDisabled()) return;
             lRef[0].setDisable(true);
             Thread worker = new Thread(() -> {
                 try {
@@ -496,7 +480,6 @@ public final class Dialogs {
                         if (session.available.isEmpty()) {
                             throw new Yggdrasil.AuthException(0, "这个账号还没有游戏角色，请先在皮肤站创建角色");
                         }
-                        // 有多个角色时让用户选，选完再用 refresh 指定 selectedProfile
                         profile = session.available.size() == 1
                                 ? session.available.get(0) : chooseProfile(win, session.available);
                         if (profile == null) {
@@ -541,16 +524,12 @@ public final class Dialogs {
             }, "TCL-Ygg");
             worker.setDaemon(true);
             worker.start();
-        });
-        lRef[0] = login;
-        Runnable submit = () -> {
-            if (login.isDisabled()) return;
-            var h = login.getOnMouseClicked();
-            if (h != null) h.handle(null);
         };
-        server.setOnAction(e -> submit.run());
-        email.setOnAction(e -> submit.run());
-        password.setOnAction(e -> submit.run());
+        StackPane login = Ui.button("登录并添加", Ui.BTN_HIGHLIGHT, submitAction);
+        lRef[0] = login;
+        server.setOnAction(e -> submitAction.run());
+        email.setOnAction(e -> submitAction.run());
+        password.setOnAction(e -> submitAction.run());
         HBox actions = new HBox();
         actions.setAlignment(Pos.CENTER_RIGHT);
         actions.getChildren().add(login);
@@ -559,7 +538,6 @@ public final class Dialogs {
         win.showModal(card);
     }
 
-    /** 账号下有多个角色时选一个，后台线程等结果；取消返回 null。 */
     private static Yggdrasil.Profile chooseProfile(MainWindow win, java.util.List<Yggdrasil.Profile> list)
             throws InterruptedException {
         java.util.concurrent.atomic.AtomicReference<Yggdrasil.Profile> picked =
@@ -593,7 +571,6 @@ public final class Dialogs {
         return picked.get();
     }
 
-    /** 统一通行证登录，走 auth.mc-user.com 的 Yggdrasil。 */
     public static void nideCard(MainWindow win) {
         VBox card = msgCard("登录统一通行证");
         final Data d = Data.get();
@@ -611,10 +588,8 @@ public final class Dialogs {
         Label link = Ui.label("注册账号", 12, Theme.accentDark);
         link.setCursor(javafx.scene.Cursor.HAND);
         link.setOnMouseClicked(e -> {
-            // 填了账号走找回密码，没填走注册
             boolean hasName = email.getText() != null && !email.getText().trim().isEmpty();
             if (!hasName) {
-                // 注册页要带服务器码，空码会拼出 404
                 String c = normalizeNideCode(code.getText());
                 if (c.isEmpty()) {
                     win.toast("需要服务器码", "注册页地址由服务器码决定，请先填写服务器码（向服务器管理员索取）。", 3);
@@ -640,7 +615,6 @@ public final class Dialogs {
             lRef[0].setDisable(true);
             Thread worker = new Thread(() -> {
                 try {
-                    // 统一通行证也是 Yggdrasil，只是 API 根按服务器码分
                     Yggdrasil.Server auth = new Yggdrasil.Server(
                             "https://auth.mc-user.com:233/" + c + "/", "统一通行证");
                     Yggdrasil.Session session = Yggdrasil.authenticate(auth, usr, pwd,
@@ -694,7 +668,6 @@ public final class Dialogs {
         win.showModal(card);
     }
 
-    /** 只取路径第一段作为服务器码，兼容整条 URL。 */
     private static String normalizeNideCode(String raw) {
         String s = raw == null ? "" : raw.trim();
         if (s.isEmpty()) return "";
@@ -713,7 +686,6 @@ public final class Dialogs {
         return s.trim();
     }
 
-    /** 校验尺寸后复制到 res/images/Skins，返回相对路径。 */
     private static String importLocalSkin(String playerName, java.nio.file.Path source) throws Exception {
         if (!java.nio.file.Files.isRegularFile(source)) throw new Exception("皮肤文件不存在");
         javafx.scene.image.Image img = new javafx.scene.image.Image(source.toUri().toString());
@@ -730,7 +702,6 @@ public final class Dialogs {
         return "Skins/" + safe + ".png";
     }
 
-    /** 皮肤弹窗：选来源先预览，点确定才写入 account.skin。 */
     public static void skinPicker(MainWindow win, Data.Account account) {
         boolean readonly = account.online;
         VBox card = msgCard(Lang.t(readonly ? "查看皮肤" : "编辑皮肤") + " - " + account.name);
@@ -739,11 +710,10 @@ public final class Dialogs {
         VBox body = new VBox(10);
         body.setPadding(new Insets(15, 7, 0, 7));
 
-        // 选中只改暂存，确定才写入
-        final int[] type = {0}; // 0 默认，1 Steve，2 Alex，3 正版，4 本地，5 LittleSkin，6 自定义站
+        final int[] type = {0};
         final String[] pName = {readonly ? account.name : ""};
         final String[] pApi = {""};
-        final String[] skinRes = {account.skin == null ? "" : account.skin}; // 当前预览的资源名
+        final String[] skinRes = {account.skin == null ? "" : account.skin};
         final int[] ticket = {0};
 
         Skin3D viewer = new Skin3D(196, 240);
@@ -756,7 +726,6 @@ public final class Dialogs {
         previewBack.setBackground(Ui.fill(Theme.brush7, 5));
         previewBack.setPadding(new Insets(0, 0, 0, 0));
 
-        // 要在 lambda 之前声明，输入区就地展开
         TextField nameField = Ui.field(readonly ? "玩家名" : "玩家名 / 角色名");
         TextField apiField = Ui.field("皮肤站地址，例如 https://littleskin.cn/csl");
         hide(apiField);
@@ -820,7 +789,7 @@ public final class Dialogs {
                         win.refreshAccountBadge();
                         viewer.dispose();
                         win.closeModal();
-                        // 静默重建，避免换页闪动
+                        // 静默重建，不闪换页动画
                         win.openPage(win.currentKey, false);
                         win.toast("皮肤已更换", account.name + " · " + account.skin, 1);
                     }));
@@ -834,14 +803,14 @@ public final class Dialogs {
         body.getChildren().addAll(main, bottom);
         card.getChildren().add(body);
 
-        // 打开时高亮当前生效的来源
         type[0] = sourceOf(account);
         for (int i = 0; i < items.length; i++) items[i].setSelected(i == type[0]);
 
+        // ESC / 点蒙层 / 被链式弹窗顶掉时也要停掉 3D 预览的自转
+        win.setModalCloseHook(viewer::dispose);
         win.showModal(card);
     }
 
-    /** 按 account.skin 反推当前生效的来源。 */
     private static int sourceOf(Data.Account account) {
         String s = account.skin == null ? "" : account.skin;
         if (s.startsWith("Skins/")) return 4;
@@ -850,19 +819,16 @@ public final class Dialogs {
         return 0;
     }
 
-    /** 隐藏并取消占位，否则弹窗会被撑高。 */
     private static void hide(Node n) {
         n.setVisible(false);
         n.setManaged(false);
     }
 
-    /** 显示并恢复占位。 */
     private static void show(Node n) {
         n.setVisible(true);
         n.setManaged(true);
     }
 
-    /** 选中来源，内置项直接预览。 */
     private static void selectSource(int t, int[] type, Ui.ListItem[] items, VBox inputArea,
                                     javafx.scene.control.TextField nameField,
                                     javafx.scene.control.TextField apiField,
@@ -872,7 +838,7 @@ public final class Dialogs {
         type[0] = t;
         for (int i = 0; i < items.length; i++) items[i].setSelected(i == t);
         switch (t) {
-            case 0 -> { // 按 UUID 判断 Steve 还是 Alex
+            case 0 -> {
                 hide(inputArea);
                 String g = defaultGender(account.uuid);
                 applyBuiltin(g, skinRes, viewer);
@@ -885,7 +851,7 @@ public final class Dialogs {
                 hide(inputArea);
                 applyBuiltin("Alex", skinRes, viewer);
             }
-            case 4 -> { // 选完立即预览
+            case 4 -> {
                 hide(inputArea);
                 javafx.stage.FileChooser chooser = new javafx.stage.FileChooser();
                 chooser.setTitle("选择皮肤图片");
@@ -904,8 +870,8 @@ public final class Dialogs {
                     Errors.error("导入本地皮肤失败", ex);
                 }
             }
-            case 3, 5, 6 -> { // 需要输入时展开
-                if (t == 6) show(apiField); else hide(apiField); // 只有自定义皮肤站要填 CSL 地址
+            case 3, 5, 6 -> {
+                if (t == 6) show(apiField); else hide(apiField);
                 show(inputArea);
             }
             default -> {
@@ -913,14 +879,12 @@ public final class Dialogs {
         }
     }
 
-    /** 内置皮肤应用到 3D 预览。 */
     private static void applyBuiltin(String which, String[] skinRes, Skin3D viewer) {
         String res = which + ".png";
         skinRes[0] = res;
         viewer.setSkinFile(res);
     }
 
-    /** 拉取皮肤，成功后同步到 3D 预览。 */
     private static void fetchSource(MainWindow win, int[] type, String[] pName, String[] pApi,
                                     javafx.scene.control.TextField nameField,
                                     javafx.scene.control.TextField apiField,
@@ -956,7 +920,7 @@ public final class Dialogs {
                 return;
             }
             javafx.application.Platform.runLater(() -> {
-                if (my != ticket[0]) return; // 已切走，丢弃过期回写
+                if (my != ticket[0]) return;
                 skinRes[0] = target;
                 viewer.setSkinFile(target);
                 win.toast("已获取皮肤", who, 1);
@@ -966,7 +930,6 @@ public final class Dialogs {
         worker.start();
     }
 
-    /** 正版皮肤：查 UUID 后从 sessionserver 下载。 */
     private static String fetchMojangSkin(String nameOrUuid, String accountName) throws Exception {
         String id = nameOrUuid.trim();
         String uuid;
@@ -1012,7 +975,6 @@ public final class Dialogs {
                 String decoded = new String(java.util.Base64.getDecoder().decode(b64),
                         java.nio.charset.StandardCharsets.UTF_8);
                 Map<String, Object> tx = Json.obj(Json.obj(Json.parse(decoded), "textures"));
-                // 官方用大写 SKIN，私服可能小写，两个都查
                 String url = Json.str(Json.obj(tx, "SKIN"), "url", "");
                 if (url.isEmpty()) url = Json.str(Json.obj(tx, "skin"), "url", "");
                 if (!url.isEmpty()) return url;
@@ -1022,13 +984,11 @@ public final class Dialogs {
         return "";
     }
 
-    /** CSL 接口取皮肤地址或 hash 后下载。 */
     private static String fetchCslSkin(String base, String who, String accountName) throws Exception {
         String site = base == null ? "" : base.trim();
         if (site.isEmpty()) site = "https://littleskin.cn";
         while (site.endsWith("/")) site = site.substring(0, site.length() - 1);
         String cslBase = site.toLowerCase().endsWith("/csl") ? site : site + "/csl";
-        // 站点根，纹理地址挂在根上
         String root = cslBase.substring(0, cslBase.length() - 4);
         String csl = httpGetString(cslBase + "/" + java.net.URLEncoder.encode(who, "UTF-8") + ".json");
         Map<String, Object> json = Json.obj(Json.parse(csl));
@@ -1044,7 +1004,6 @@ public final class Dialogs {
         return saveFetchedSkin(url, accountName);
     }
 
-    /** 兼容两种 CSL 皮肤结构。 */
     private static Map<String, Object> cslSkinNode(Map<String, Object> root) {
         Map<String, Object> textures = Json.obj(root, "textures");
         for (String k : new String[]{"SKIN", "skin"}) {
@@ -1058,10 +1017,8 @@ public final class Dialogs {
         return new java.util.HashMap<>();
     }
 
-    /** 下载皮肤到 res/images/Skins，返回相对路径。 */
     private static String saveFetchedSkin(String skinUrl, String accountName) throws Exception {
         byte[] data = httpGetBytes(skinUrl);
-        // 404 页面可能是 HTML，检查 PNG 头
         if (data == null || data.length < 8 || data[0] != (byte) 0x89 || data[1] != 0x50) {
             throw new Exception("皮肤地址返回的不是 PNG 图片");
         }
@@ -1083,7 +1040,6 @@ public final class Dialogs {
         return new String(httpGetBytes(url), java.nio.charset.StandardCharsets.UTF_8);
     }
 
-    /** 用 UUID 四个特定位异或，奇数算 Alex。 */
     private static String defaultGender(String uuidWithDash) {
         String u = uuidWithDash == null ? "" : uuidWithDash.replace("-", "");
         if (u.length() != 32) return "Steve";
@@ -1105,5 +1061,80 @@ public final class Dialogs {
         if (s.length() != 32) return u == null ? "" : u;
         return s.substring(0, 8) + "-" + s.substring(8, 12) + "-" + s.substring(12, 16)
                 + "-" + s.substring(16, 20) + "-" + s.substring(20);
+    }
+
+    /** 颜色标签弹窗：和「检查更新」等弹窗同一套卡片样式（标题 + 强调线 + 内容 + 底部按钮） */
+    public static void colorTag(MainWindow win, Data.Instance ins, Runnable onChanged) {
+        win.showModal(buildColorCard(win, ins, onChanged), true);
+    }
+
+    /** 单独拆出来，便于本地探针渲染核对 */
+    static VBox buildColorCard(MainWindow win, Data.Instance ins, Runnable onChanged) {
+        VBox card = msgCard("颜色标签");
+        card.setPrefWidth(430);
+        card.setMinWidth(400);
+
+        VBox body = new VBox(12);
+        body.setPadding(new Insets(14, 7, 0, 7));
+
+        Label hint = Ui.label("给这个实例选一个颜色标记，列表里会显示一根竖条。", 13, Theme.gray2);
+        hint.setWrapText(true);
+        hint.setMaxWidth(380);
+
+        FlowPane wrap = new FlowPane(10, 10);
+        wrap.setPrefWrapLength(370);
+        String current = ins == null ? "" : InstanceMeta.colorTag(ins);
+        for (String[] preset : InstanceMeta.COLOR_TAGS) {
+            StackPane dot = new StackPane();
+            dot.setPrefSize(34, 34);
+            dot.setMinSize(34, 34);
+            dot.setMaxSize(34, 34);
+            dot.setBackground(Ui.fill(colorOf(preset[1]), 17));
+            dot.setCursor(javafx.scene.Cursor.HAND);
+            if (!current.isEmpty() && current.equalsIgnoreCase(preset[1])) {
+                // 当前标签：白色内圈 + 深色外描边，一眼看出已选中
+                Region ring = new Region();
+                ring.setPrefSize(16, 16);
+                ring.setMinSize(16, 16);
+                ring.setMaxSize(16, 16);
+                ring.setBackground(Ui.fill(Color.WHITE, 8));
+                ring.setMouseTransparent(true);
+                dot.getChildren().add(ring);
+            }
+            Ui.tooltip(dot, preset[0]);
+            dot.setOnMouseClicked(e -> {
+                if (win != null) win.closeModal();
+                InstanceMeta.setColorTag(ins, preset[1]);
+                if (onChanged != null) onChanged.run();
+                if (win != null) win.toast("已设置颜色标签", preset[0], 1);
+            });
+            wrap.getChildren().add(dot);
+        }
+        body.getChildren().addAll(hint, wrap);
+
+        HBox actions = new HBox(12);
+        actions.setAlignment(Pos.CENTER_RIGHT);
+        actions.setPadding(new Insets(16, 7, 0, 7));
+        actions.getChildren().addAll(
+                Ui.button("清除标签", Ui.BTN_NORMAL, () -> {
+                    if (win != null) win.closeModal();
+                    InstanceMeta.setColorTag(ins, "");
+                    if (onChanged != null) onChanged.run();
+                    if (win != null) win.toast("已清除颜色标签", ins.name, 1);
+                }),
+                Ui.button("取消", Ui.BTN_HIGHLIGHT, () -> {
+                    if (win != null) win.closeModal();
+                }));
+
+        card.getChildren().addAll(body, actions);
+        return card;
+    }
+
+    private static javafx.scene.paint.Color colorOf(String hex) {
+        try {
+            return javafx.scene.paint.Color.web(hex);
+        } catch (Exception e) {
+            return Theme.gray3;
+        }
     }
 }

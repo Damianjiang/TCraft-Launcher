@@ -19,14 +19,12 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.function.Consumer;
 
-/** 设置页：左侧分类，右侧设置卡片。 */
 public class PageSetup implements Page {
 
     private final MainWindow win;
     private final Data data = Data.get();
     private final String initialSection;
     private VBox navPanel;
-    /** 启动页的内存占用条容器。 */
     private VBox ramDisplayHost;
 
     public PageSetup(MainWindow win, String section) {
@@ -38,7 +36,6 @@ public class PageSetup implements Page {
 
     @Override
     public double leftWidth() {
-        // 英文分类名更长，侧栏固定 160 会被截成省略号
         return Lang.mode == 1 ? 190 : 160;
     }
 
@@ -73,9 +70,17 @@ public class PageSetup implements Page {
                 {"8", "网络", "network", "network"},
                 {"6", "更多", "tool-case", "more"}
         };
+        List<String[]> visibleSections = new ArrayList<>();
+        for (String[] s : sections) if (!setupSectionHidden(s[3])) visibleSections.add(s);
+        if (visibleSections.isEmpty()) visibleSections.add(sections[0]);
+        boolean sectionVisible = false;
+        for (String[] s : visibleSections) if (s[3].equals(data.setupSection)) sectionVisible = true;
+        if (!sectionVisible) {
+            data.setupSection = visibleSections.get(0)[3];
+            win.pendingSetupSection = data.setupSection;
+        }
         navPanel = items;
-        for (String[] s : sections) items.getChildren().add(navItem(s[1], s[2], s[3], s[0]));
-        // 返回固定在下栏，不跟着功能列表滚走，跟实例设置、任务页保持一致
+        for (String[] s : visibleSections) items.getChildren().add(navItem(s[1], s[2], s[3], s[0]));
         Ui.ListItem back = new Ui.ListItem(Theme.icon("arrow-left", 16, Theme.text), "返回", null, 34);
         back.setOnMouseClicked(e -> win.openPage("launch", true));
         VBox.setMargin(back, new Insets(6, 0, 0, 0));
@@ -98,7 +103,6 @@ public class PageSetup implements Page {
         Ui.ListItem item = new Ui.ListItem(Theme.icon(icon, 17, Theme.text), title, null, 34);
         item.setSelected(key.equals(data.setupSection));
         item.setUserData(key);
-        // 这些分区才有初始化按钮
         if (java.util.Set.of("launch", "link", "ui", "system", "java", "log").contains(key)) {
             StackPane reset = Ui.iconButton("rotate-ccw", 22, 13, "初始化本页设置", () -> resetSection(key));
             reset.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED, e -> e.consume());
@@ -108,7 +112,7 @@ public class PageSetup implements Page {
             if (key.equals(data.setupSection)) return;
             data.setupSection = key;
             win.pendingSetupSection = key;
-            win.refreshRight();
+            win.refreshRight(true);
         });
         return item;
     }
@@ -137,6 +141,10 @@ public class PageSetup implements Page {
                 data.set("LaunchAdvanceClasspathHead", "");
                 data.set("LaunchAdvanceLockMemory", false);
                 data.set("LaunchAdvanceNoJavaw", false);
+                data.set("LaunchAdvanceRenderer", 0);
+                data.set("LaunchAdvanceGraphicCard", false);
+                data.set("LaunchCrashAnalysis", true);
+                data.set("LaunchAdvanceDisableCrashAnalysis", false);
             }
             case "link" -> {
                 data.set("LinkLatencyMode", 0);
@@ -165,6 +173,7 @@ public class PageSetup implements Page {
                 data.set("UiBackgroundRotate", 0);
                 data.set("UiBackgroundColorful", true);
                 data.set("UiVolume", 60);
+                data.set("UiMusicVolume", 600);
                 Theme.applyComponentOpacity();
                 win.rebuildUi();
             }
@@ -187,8 +196,15 @@ public class PageSetup implements Page {
             }
             case "java" -> {
                 data.invalidateJavaScan();
-                data.javaPath = data.detectJava();
-                data.save();
+                // detectJava 要起一堆 java 进程试版本，放后台，扫完再写回
+                Threads.start("TCL-JavaDetect", () -> {
+                    String detected = data.detectJava();
+                    javafx.application.Platform.runLater(() -> {
+                        data.javaPath = detected;
+                        data.save();
+                        win.refreshRight();
+                    });
+                });
             }
             case "log" -> data.set("SystemDebugMode", false);
             default -> {
@@ -222,6 +238,17 @@ public class PageSetup implements Page {
         return scroll;
     }
 
+    private boolean setupSectionHidden(String id) {
+        String key = switch (id) {
+            case "launch" -> "UiHiddenSetupLaunch";
+            case "link" -> "UiHiddenSetupLink";
+            case "ui" -> "UiHiddenSetupUi";
+            case "system" -> "UiHiddenSetupSystem";
+            default -> "";
+        };
+        return !key.isEmpty() && data.getBool(key, false);
+    }
+
     private void header(VBox page, String title, String subtitle) {
         VBox head = new VBox(5);
         Label sub = Ui.label(subtitle, 13, Theme.text);
@@ -239,22 +266,18 @@ public class PageSetup implements Page {
         return card;
     }
 
-    /** 5 项，索引就是设置值。 */
     private static final String[] ISOLATION_ITEMS = {
             "关闭", "隔离可安装 Mod 的版本", "隔离非正式版",
             "隔离可安装 Mod 的版本与非正式版", "隔离所有版本"};
-    /** 界面 5 项映射到 0/2/3/4/5 五个真实值。 */
     private static final int[] VISIBILITY_VALUES = {0, 2, 3, 4, 5};
     private static final String[] VISIBILITY_ITEMS = {
             "游戏启动后立即关闭", "游戏启动后隐藏，游戏退出后自动关闭",
             "游戏启动后隐藏，游戏退出后重新打开", "游戏启动后最小化", "游戏启动后仍保持不变"};
-    /** 索引 0 到 4 依次是高、中、低、极高、实时。 */
     private static final String[] PRIORITY_ITEMS = {
             "高（优先保证游戏运行，游戏性能更佳，但可能造成其他程序卡顿）", "中（平衡）",
             "低（优先保证其他程序运行，但可能让游戏卡顿，适合挂机时使用）",
             "极高（比 高 更优先，可能造成整机卡顿）", "实时（最高，可能导致整个系统卡死，极度不推荐）"};
     private static final String[] WINDOW_TYPE_ITEMS = {"全屏", "默认", "与启动器尺寸一致", "自定义尺寸", "最大化"};
-    /** 索引 0/1/2/3/4，3 表示不指定，4 表示调优 G1GC。 */
     private static final String[] GC_ITEMS = {
             "尽量使用 ZGC", "尽量使用分代 ZGC", "标准 G1GC", "不指定（可自定义）", "调优 G1GC"};
 
@@ -277,7 +300,6 @@ public class PageSetup implements Page {
         comboRow(arg, "进程优先级", PRIORITY_ITEMS, data.getInt("LaunchPriority", 1),
                 i -> data.set("LaunchPriority", i));
 
-        // 只有自定义尺寸才显示宽高输入框
         int winType = data.getInt("LaunchWindowType", 1);
         HBox sizeRow = new HBox(6);
         sizeRow.setAlignment(Pos.CENTER_LEFT);
@@ -321,7 +343,6 @@ public class PageSetup implements Page {
                 data.getInt("LaunchRamInitial", 0));
         initRam.setPrefWidth(260);
         initRam.setMinWidth(120);
-        // 数值标签不参与压缩，窄窗口下截断成省略号的只会是滑条
         maxVal.setMinWidth(Region.USE_PREF_SIZE);
         initVal.setMinWidth(Region.USE_PREF_SIZE);
         Runnable syncRamEnabled = () -> {
@@ -346,7 +367,7 @@ public class PageSetup implements Page {
         HBox initRow = new HBox(12, initRam, initVal);
         maxRow.setAlignment(Pos.CENTER_LEFT);
         initRow.setAlignment(Pos.CENTER_LEFT);
-        // 滑条常驻显示，自动配置时置灰，用户能看到当前内存分配而不是整块消失
+        // 滑条常驻，自动配置时置灰，保留内存分配可见性
         mem.add(radios, Ui.settingRow("最大内存", maxRow), Ui.settingRow("初始内存", initRow));
         auto.setOnAction(() -> {
             data.set("LaunchRamType", 0);
@@ -369,7 +390,7 @@ public class PageSetup implements Page {
         final Timeline[] ramTick = new Timeline[1];
         ramTick[0] = new Timeline(new KeyFrame(javafx.util.Duration.seconds(2), e -> {
             if (page.getScene() == null) {
-                ramTick[0].stop(); // 页面换掉就停
+                ramTick[0].stop();
             } else {
                 refreshMemoryDisplay(data.getInt("LaunchRam", 4096));
             }
@@ -380,7 +401,6 @@ public class PageSetup implements Page {
         Ui.Card adv = addCard(page, "高级选项");
         adv.setCollapsible(true);
         adv.setCollapsed(true);
-        // 支持 ${library_directory} 这类替换标记
         TextArea jvm = new TextArea(data.get("LaunchJvmArgs", ""));
         jvm.setPromptText(Lang.t("留空则使用默认值"));
         jvm.setWrapText(true);
@@ -390,6 +410,14 @@ public class PageSetup implements Page {
         jvm.setStyle("-fx-font-size: 12; -fx-control-inner-background: transparent;");
         jvm.textProperty().addListener((o, a, b) -> data.set("LaunchJvmArgs", b));
         adv.add(Ui.settingRow("Java 虚拟机参数", jvm));
+        StackPane restoreJvm = Ui.button("还原为默认", Ui.BTN_NORMAL, () -> {
+            jvm.setText("");
+            data.set("LaunchJvmArgs", "");
+            win.toast("已还原", "JVM 参数已恢复为空（使用游戏默认）", 1);
+        });
+        HBox jvmActions = new HBox(8, restoreJvm);
+        jvmActions.setAlignment(Pos.CENTER_LEFT);
+        adv.add(jvmActions);
         textRow(adv, "游戏参数", "留空则使用默认值", data.get("LaunchGameArgs", ""),
                 s -> data.set("LaunchGameArgs", s));
         TextField pre = textRow(adv, "启动前执行命令", "留空则不执行", data.get("LaunchPreCommand", ""),
@@ -407,9 +435,21 @@ public class PageSetup implements Page {
         });
         adv.add(waitCmd);
 
-        // 决定启动用哪个 javaw.exe
-        List<String> javas = findJavas();
-        if (javas.isEmpty()) javas = new ArrayList<>(List.of(data.javaPath.isEmpty() ? "未找到 Java" : data.javaPath));
+        // 决定启动用哪个 javaw.exe；没缓存时不在这里起一堆进程，先占位再后台扫
+        List<String> javas;
+        if (data.hasJavaScanCache()) {
+            javas = findJavas();
+        } else {
+            javas = new ArrayList<>(List.of(data.javaPath.isEmpty() ? "未找到 Java" : data.javaPath));
+            Threads.start("TCL-JavaScan", () -> {
+                data.scanJavaRuntimes();
+                javafx.application.Platform.runLater(() -> {
+                    if (win.currentKey == null || !win.currentKey.equals("setup")) return;
+                    if (!"launch".equals(data.setupSection)) return;
+                    win.refreshRight();
+                });
+            });
+        }
         ComboBox<String> javaCombo = Ui.combo(javas.toArray(new String[0]), Math.max(0, javas.indexOf(data.javaPath)));
         javaCombo.setOnAction(e -> {
             String path = javaCombo.getSelectionModel().getSelectedItem();
@@ -428,6 +468,43 @@ public class PageSetup implements Page {
                 s -> data.set("LaunchAdvanceClasspathHead", s));
         adv.add(directCheck("锁定内存分配（-Xms = -Xmx）", "LaunchAdvanceLockMemory", false));
         adv.add(directCheck("显示控制台窗口（java.exe）", "LaunchAdvanceNoJavaw", false));
+        Ui.Check crash = Ui.checkBox("游戏异常退出时自动分析崩溃原因", false);
+        crash.setSelected(data.crashAnalysisEnabled());
+        crash.setOnAction(() -> {
+            data.set("LaunchCrashAnalysis", crash.isSelected());
+            // 同步写 WPF 的反向键，换回旧版启动器时保持一致
+            data.set("LaunchAdvanceDisableCrashAnalysis", !crash.isSelected());
+        });
+        adv.add(crash);
+        if (Shell.windows()) {
+            comboRow(adv, "渲染器", new String[]{"默认（游戏自带渲染器）", "软件渲染（llvmpipe）",
+                    "DirectX 12（d3d12）", "Vulkan（zink）"}, data.getInt("LaunchAdvanceRenderer", 0),
+                    i -> {
+                        data.set("LaunchAdvanceRenderer", i);
+                        if (i > 0) {
+                            // 首次选择时后台拉取 mesa-loader，别等进游戏前才卡界面
+                            Threads.start("TCL-Mesa", () -> {
+                                try {
+                                    Mesa.ensure();
+                                    javafx.application.Platform.runLater(
+                                            () -> win.toast("渲染器组件已就绪", "下次启动游戏时生效", 1));
+                                } catch (Exception ex) {
+                                    javafx.application.Platform.runLater(
+                                            () -> win.toast("渲染器组件下载失败", String.valueOf(ex.getMessage()), 2));
+                                }
+                            });
+                        }
+                    });
+            Ui.Check gpu = directCheck("使用高性能显卡（写入 Windows 显卡首选项）", "LaunchAdvanceGraphicCard", false);
+            gpu.setOnAction(() -> {
+                data.set("LaunchAdvanceGraphicCard", gpu.isSelected());
+                if (gpu.isSelected() && !data.javaPath.isEmpty()) {
+                    Shell.preferHighPerformanceGpu(data.javaPath);
+                    win.toast("已写入显卡首选项", "下次启动游戏时生效", 1);
+                }
+            });
+            adv.add(gpu);
+        }
         adv.add(Ui.hint("版本独立设置中还有更多高级选项可供调整。", 0));
 
         StackPane switchBtn = Ui.extraTextButton("arrow-right", "版本独立设置", win::openInstanceSetup);
@@ -438,7 +515,6 @@ public class PageSetup implements Page {
         page.getChildren().add(switchLayer);
     }
 
-    /** 直接绑定配置键的复选框。 */
     private Ui.Check directCheck(String text, String key, boolean def) {
         Ui.Check box = Ui.checkBox(text, false);
         box.setSelected(data.getBool(key, def));
@@ -446,7 +522,6 @@ public class PageSetup implements Page {
         return box;
     }
 
-    /** 物理内存总量 MB，取不到回退 4096。 */
     private static long physicalRamMb() {
         try {
             com.sun.management.OperatingSystemMXBean os =
@@ -463,7 +538,6 @@ public class PageSetup implements Page {
         return v == 0 ? "自动" : v + " MB";
     }
 
-    /** 用物理内存和游戏分配值填占用条。 */
     private void refreshMemoryDisplay(int gameRamMb) {
         VBox host = ramDisplayHost;
         if (host == null) return;
@@ -541,23 +615,13 @@ public class PageSetup implements Page {
         dl.add(note);
     }
 
-    /** 未解锁隐藏主题的提示文案，点锁定项时用。 */
-    private String unlockHint() {
-        int launches = data.getInt("SystemCount", 0);
-        String next = Theme.nextHiddenThemeName();
-        if (next.isEmpty()) return "隐藏主题已全部解锁。";
-        return Lang.tf("隐藏主题每累计启动 %d 次解锁一个（当前已启动 %d 次，再启动 %d 次可解锁「%s」）。",
-                Theme.UNLOCK_EVERY_LAUNCHES, launches, Theme.launchesToNextUnlock(launches),
-                Lang.t(next));
-    }
-
     private void buildUi(VBox page) {
         header(page, "个性化", "主题、背景、声音与外观。每项改动即时生效。");
         Ui.Card theme = addCard(page, "主题与配色");
         theme.add(Ui.label("主题的强调色会应用到按钮、滑块与选中态，切换后立即生效。", 12, Theme.gray2));
-        // 未全解锁时显示进度
         if (!Theme.nextHiddenThemeName().isEmpty()) {
             int left = Theme.launchesToNextUnlock(data.getInt("SystemCount", 0));
+            // 键与 res 表一字不差（表里带「可」字），差一字就查不到
             Label prog = Ui.label(Lang.tf("隐藏主题 %d/%d · 每累计启动 %d 次解锁一个，再启动 %d 次可解锁「%s」",
                             Theme.unlockedHiddenIds().size(), Theme.HIDDEN_THEMES.length,
                             Theme.UNLOCK_EVERY_LAUNCHES, left, Lang.t(Theme.nextHiddenThemeName())),
@@ -568,54 +632,39 @@ public class PageSetup implements Page {
         FlowPane swatches = new FlowPane(18, 10);
         swatches.setPadding(new Insets(6, 0, 4, 0));
         int current = data.getInt("UiThemePreset", -1);
-        // 未解锁时半透明并加标记，点击只提示
-        for (int i0 = 0; i0 < Theme.THEME_NAMES.length; i0++) {
-            final int i = i0;
-            if (i == 14) continue;
-            boolean selected = current == i;
-            Ui.RadioBox rb = Ui.radioBox(Theme.THEME_NAMES[i], selected);
-            if (!Theme.isThemeUnlocked(i)) {
-                rb.setOpacity(0.55);
-                rb.getChildren().add(Theme.icon("sparkles", 12, Theme.gray3));
-                rb.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_CLICKED, e -> {
-                    e.consume(); // 没解锁不能选
-                    win.toast("隐藏主题未解锁", unlockHint(), 0);
-                });
-            } else {
+        // 先排可选主题，未解锁的垫底置灰——混在中间整片看着乱
+        for (int pass = 0; pass < 2; pass++) {
+            for (int i0 = 0; i0 < Theme.THEME_NAMES.length; i0++) {
+                final int i = i0;
+                if (i == 14) continue;
+                boolean locked = !Theme.isThemeUnlocked(i);
+                if (locked != (pass == 1)) continue;
+                boolean selected = current == i;
+                Ui.RadioBox rb = Ui.radioBox(Theme.THEME_NAMES[i], selected);
+                if (locked) {
+                    rb.setDisable(true);
+                    rb.setOpacity(0.55);
+                }
                 rb.setOnAction(() -> {
                     data.set("UiThemePreset", i);
                     data.set("UiAutoThemeFromBackground", false);
-                    // 不调 applyPreset，否则七曜彩每次会叠两次色相
-                    // 整页静默重建，从按钮位置扩散揭开
                     javafx.geometry.Bounds b = rb.localToScene(rb.getBoundsInLocal());
                     win.applyThemeFrom(b.getCenterX(), b.getCenterY());
                     win.toast("主题已切换", Theme.THEME_NAMES[i], 1);
                 });
+                swatches.getChildren().add(rb);
             }
-            swatches.getChildren().add(rb);
         }
         theme.add(swatches);
-        Ui.Check autoTheme = Ui.checkBox("根据背景图自动调整主题色", false);
-        autoTheme.setSelected(data.getBool("UiAutoThemeFromBackground", true));
-        autoTheme.setOnAction(() -> {
-            data.set("UiAutoThemeFromBackground", autoTheme.isSelected());
-            if (autoTheme.isSelected()) {
-                data.set("UiThemePreset", -1);
-                Theme.applyWallpaperTheme();
-                win.rebuildUi();
-            }
-        });
-        theme.add(autoTheme);
         Ui.Check logo = Ui.checkBox("打开启动器时显示 TCL 图标", false);
         logo.setSelected(data.getBool("UiLauncherLogo", true));
         logo.setOnAction(() -> data.set("UiLauncherLogo", logo.isSelected()));
         theme.add(logo);
-        // 拖动时实时重算表面色
         Ui.SliderBar componentSlider = sliderRow(theme, "组件半透明", 0, 100, data.getInt("UiComponentOpacity", 50), v -> {
             data.set("UiComponentOpacity", v.intValue());
             Theme.applyComponentOpacity();
         }, "%");
-        componentSlider.setOnMouseReleased(e -> win.rebuildUi()); // 松开后全局重建
+        componentSlider.setOnMouseReleased(e -> win.rebuildUi());
         sliderRow(theme, "不透明度", 40, 100, Math.round((data.getInt("UiLauncherTransparent", 600) + 400) / 10.0), v -> {
             data.set("UiLauncherTransparent", (int) (v * 10 - 400));
             win.applyWindowOpacity();
@@ -637,7 +686,7 @@ public class PageSetup implements Page {
         Ui.Card detail = addCard(page, "界面细节");
         sliderRow(detail, "窗口圆角", 0, 24, data.getInt("UiWindowRadius", 6), v -> {
             data.set("UiWindowRadius", v.intValue());
-            win.rebuildUi();
+            win.applyWindowRadius();
         }, " px");
         sliderRow(detail, "动画速度", 0, 200, data.getInt("UiAnimSpeed", 100), v -> {
             data.set("UiAnimSpeed", v.intValue());
@@ -658,58 +707,298 @@ public class PageSetup implements Page {
         skip.setOnAction(() -> data.set("UiSkipIntroAnim", skip.isSelected()));
         detail.add(skip);
 
+        comboRow(detail, "标题栏高度", new String[]{"40", "44", "48（默认）", "54", "60"},
+                Math.max(0, Math.min(4, switch (data.getInt("UiTitleBarHeight", 48)) {
+                    case 40 -> 0;
+                    case 44 -> 1;
+                    case 54 -> 3;
+                    case 60 -> 4;
+                    default -> 2;
+                })), i -> {
+                    data.set("UiTitleBarHeight", new int[]{40, 44, 48, 54, 60}[i]);
+                    win.rebuildUi();
+                });
+        comboRow(detail, "标题栏 Logo", new String[]{"不显示", "默认文字 TCL", "自定义文字", "自定义图片（TCL/Logo.png）"},
+                Math.max(0, Math.min(3, data.getInt("UiLogoType", 1))), i -> {
+                    data.set("UiLogoType", i);
+                    win.rebuildUi();
+                });
+        TextField logoText = textRow(detail, "标题栏文字", "TCL", data.get("UiLogoText", "TCL"), s -> {
+            data.set("UiLogoText", s);
+        });
+        // 输入过程中不要重建整个界面，失焦或回车时再刷新
+        logoText.focusedProperty().addListener((o, a, focused) -> {
+            if (!focused) win.rebuildUi();
+        });
+        logoText.setOnAction(e -> win.rebuildUi());
+        Ui.Check leftTitle = Ui.checkBox("标题栏内容居左", false);
+        leftTitle.setSelected(data.getBool("UiTitleLeft", false));
+        leftTitle.setOnAction(() -> {
+            data.set("UiTitleLeft", leftTitle.isSelected());
+            win.rebuildUi();
+        });
+        detail.add(leftTitle);
+        FlowPane logoButtons = new FlowPane(10, 10);
+        logoButtons.getChildren().addAll(
+                Ui.button("更改图片", Ui.BTN_NORMAL, this::pickLogoFile),
+                Ui.button("清空图片", Ui.BTN_RED, () -> {
+                    Path p = Paths.get(data.gameDir, "TCL", "Logo.png");
+                    try {
+                        Files.deleteIfExists(p);
+                        if (data.getInt("UiLogoType", 1) == 3) data.set("UiLogoType", 1);
+                        win.rebuildUi();
+                        win.toast("已清空标题栏图片", "", 1);
+                    } catch (Exception e) {
+                        win.toast("清空失败", e.getMessage(), 3);
+                    }
+                }));
+        detail.add(logoButtons);
+        sliderRow(detail, "弹出菜单不透明度", 0, 100, data.getInt("UiMenuOpacity", 100), v -> {
+            data.set("UiMenuOpacity", v.intValue());
+        }, "%");
+        comboRow(detail, "最大帧率（下次启动生效）", new String[]{"不限制", "30 FPS", "60 FPS", "90 FPS",
+                "120 FPS", "144 FPS", "240 FPS"}, Math.max(0, data.getInt("UiMaxFps", 0) == 0 ? 0
+                : data.getInt("UiMaxFps", 0) == 30 ? 1 : data.getInt("UiMaxFps", 0) == 60 ? 2
+                : data.getInt("UiMaxFps", 0) == 90 ? 3 : data.getInt("UiMaxFps", 0) == 120 ? 4
+                : data.getInt("UiMaxFps", 0) == 144 ? 5 : 6), i -> {
+                    data.set("UiMaxFps", new int[]{0, 30, 60, 90, 120, 144, 240}[i]);
+                });
+
+        Ui.Card fontCard = addCard(page, "字体");
+        Theme.loadUserFonts();
+        java.util.List<String> fontOpts = new ArrayList<>();
+        fontOpts.add(Lang.tf("跟随系统默认（%s）", Theme.fontFamily()));
+        for (String family : Theme.userFonts()) fontOpts.add(family);
+        String currentFont = data.get("UiCustomFont", "");
+        int fontSel = 0;
+        for (int i = 0; i < Theme.userFonts().size(); i++) {
+            if (Theme.userFonts().get(i).equals(currentFont)) fontSel = i + 1;
+        }
+        ComboBox<String> fontCombo = Ui.combo(fontOpts.toArray(new String[0]), fontSel);
+        fontCombo.setPrefWidth(300);
+        fontCombo.setOnAction(e -> {
+            int i = fontCombo.getSelectionModel().getSelectedIndex();
+            data.set("UiCustomFont", i <= 0 ? "" : Theme.userFonts().get(i - 1));
+            Theme.loadUserFonts();
+            win.rebuildUi();
+            win.toast("字体已切换", i <= 0 ? Lang.t("跟随系统默认") : Theme.userFonts().get(i - 1), 1);
+        });
+        fontCard.add(Ui.settingRow("界面字体", fontCombo));
+        Label fontPreview = new Label("字体预览 The quick brown fox 中文 123");
+        fontPreview.setFont(Theme.font(16));
+        fontPreview.setWrapText(true);
+        fontCard.add(fontPreview);
+        FlowPane fontButtons = new FlowPane(10, 10);
+        fontButtons.getChildren().addAll(
+                Ui.button("选择字体文件", Ui.BTN_NORMAL, this::pickFontFile),
+                Ui.button("打开字体文件夹", Ui.BTN_NORMAL, () -> {
+                    try {
+                        Files.createDirectories(Theme.fontDir());
+                        Shell.openFolder(Theme.fontDir().toString());
+                    } catch (Exception e) {
+                        win.toast("无法打开文件夹", e.getMessage(), 3);
+                    }
+                }),
+                Ui.button("重新加载字体", Ui.BTN_NORMAL, () -> {
+                    Theme.loadUserFonts();
+                    win.openSetup("ui");
+                    win.toast("字体已重新加载", Lang.tf("共 %d 个自定义字体", Theme.userFonts().size()), 1);
+                }),
+                Ui.button("恢复默认字体", Ui.BTN_RED, () -> {
+                    data.set("UiCustomFont", "");
+                    Theme.loadUserFonts();
+                    win.rebuildUi();
+                    win.toast("已恢复默认字体", "", 1);
+                }));
+        fontCard.add(fontButtons);
+        fontCard.add(Ui.hint("把 .ttf / .otf 字体放进 游戏目录/TCL/Fonts 后点「重新加载字体」，"
+                + "即可在列表中选择；macOS / Linux 会自动使用系统自带的苹方 / Noto Sans CJK。", 0));
+
+        Ui.Card hidden = addCard(page, "功能隐藏");
+        String[][] pages = {
+                {"启动页", "UiHiddenLaunch"},
+                {"实例页", "UiHiddenInstance"},
+                {"下载页", "UiHiddenDownload"},
+                {"联机页", "UiHiddenLink"},
+                {"更多页", "UiHiddenOther"},
+                {"设置入口", "UiHiddenPageSetup"},
+                {"版本选择", "UiHiddenFunctionSelect"},
+                {"Mod 更新", "UiHiddenFunctionModUpdate"},
+                {"版本修改", "UiHiddenFunctionInstanceModify"},
+                {"设置-启动", "UiHiddenSetupLaunch"},
+                {"设置-联机", "UiHiddenSetupLink"},
+                {"设置-个性化", "UiHiddenSetupUi"},
+                {"设置-系统", "UiHiddenSetupSystem"},
+        };
+        FlowPane hiddenBox = new FlowPane(14, 8);
+        for (String[] pageDef : pages) {
+            Ui.Check box = Ui.checkBox(pageDef[0], false);
+            box.setSelected(data.getBool(pageDef[1], false));
+            box.setOnAction(() -> {
+                boolean willHide = box.isSelected();
+                boolean isPage = pageDef[1].equals("UiHiddenLaunch") || pageDef[1].equals("UiHiddenInstance")
+                        || pageDef[1].equals("UiHiddenDownload") || pageDef[1].equals("UiHiddenLink")
+                        || pageDef[1].equals("UiHiddenOther");
+                // 不能把所有导航页都藏掉
+                if (isPage) {
+                    int visible = 0;
+                    for (String[] p : pages) {
+                        boolean otherPage = p[1].equals("UiHiddenLaunch") || p[1].equals("UiHiddenInstance")
+                                || p[1].equals("UiHiddenDownload") || p[1].equals("UiHiddenLink")
+                                || p[1].equals("UiHiddenOther");
+                        if (!otherPage) continue;
+                        boolean isHidden = p[1].equals(pageDef[1]) ? willHide : data.getBool(p[1], false);
+                        if (!isHidden) visible++;
+                    }
+                    if (visible == 0) {
+                        box.setSelected(false);
+                        win.toast("至少保留一个页面", "不能隐藏全部导航页", 2);
+                        return;
+                    }
+                }
+                if (pageDef[1].startsWith("UiHiddenSetup")) {
+                    int visible = 0;
+                    for (String[] p : pages) {
+                        if (!p[1].startsWith("UiHiddenSetup")) continue;
+                        boolean isHidden = p[1].equals(pageDef[1]) ? willHide : data.getBool(p[1], false);
+                        if (!isHidden) visible++;
+                    }
+                    if (visible == 0) {
+                        box.setSelected(false);
+                        win.toast("至少保留一个设置分类", "不能隐藏全部设置分类", 2);
+                        return;
+                    }
+                }
+                data.set(pageDef[1], willHide);
+                win.refreshAfterHide(pageDef[1]);
+            });
+            hiddenBox.getChildren().add(box);
+        }
+        hidden.add(hiddenBox);
+        if (data.getBool("UiHiddenFunctionHidden", false)) {
+            hidden.setVisible(false);
+            hidden.setManaged(false);
+        }
+
+        int preset = data.getInt("UiThemePreset", -1);
+        if (preset == 14) {
+            Ui.Card customTheme = addCard(page, "自定义主题色");
+            sliderRowDebounced(customTheme, "色调", 0, 360, data.getInt("UiLauncherHue", 210), v -> {
+                data.set("UiLauncherHue", v.intValue());
+                Theme.applyCustomTheme();
+            }, "°");
+            sliderRowDebounced(customTheme, "饱和度", 0, 100, data.getInt("UiLauncherSat", 72), v -> {
+                data.set("UiLauncherSat", v.intValue());
+                Theme.applyCustomTheme();
+            }, "%");
+            sliderRowDebounced(customTheme, "亮度", 0, 100, data.getInt("UiLauncherLight", 55), v -> {
+                data.set("UiLauncherLight", v.intValue());
+                Theme.applyCustomTheme();
+            }, "%");
+            sliderRowDebounced(customTheme, "标题栏色相偏移", 0, 180, data.getInt("UiLauncherDelta", 20), v -> {
+                data.set("UiLauncherDelta", v.intValue());
+                Theme.applyCustomTheme();
+            }, "°");
+        }
+
         boolean videoMode = data.getInt("UiBackgroundType", 0) == 1;
         int videoCount = videoMode ? win.scanVideos().size() : 0;
         int imageCount = 0;
         if (!videoMode) {
             try (var s = Files.list(Paths.get(data.gameDir, "TCL", "Pictures"))) {
-                imageCount = (int) s.filter(Files::isRegularFile).count();
+                imageCount = (int) s.filter(Files::isRegularFile).filter(Theme::isWallpaperImage).count();
             } catch (Exception ignored) {
             }
         }
-        // 标题带上真实数量
+        // 标题对齐 WPF：有内容才带计数，整键带计数避免半截「 个）」查不到
         String bgTitle = videoMode
-                ? (videoCount > 0 ? "背景（视频 " + videoCount + " 个）" : "背景")
-                : (imageCount > 0 ? "背景（图片 " + imageCount + " 张）" : "背景");
+                ? (videoCount > 0 ? Lang.tf("背景视频（%d 个）", videoCount) : "背景视频")
+                : (imageCount > 0 ? Lang.tf("背景图片（%d 张）", imageCount) : "背景图片");
         Ui.Card bg = addCard(page, bgTitle);
-        comboRow(bg, "背景类型", new String[]{"图片", "视频"}, data.getInt("UiBackgroundType", 0), i -> {
-            data.set("UiBackgroundType", i);
-            win.refreshVideoBackground(false);
-            win.refreshRight(); // 两套面板互换，只换右栏
-        });
+        comboRow(bg, "背景类型", new String[]{"图片（静态背景）", "视频（动态背景）"},
+                data.getInt("UiBackgroundType", 0), i -> {
+                    data.set("UiBackgroundType", i);
+                    win.refreshVideoBackground(true);
+                    win.refreshRight();
+                });
         if (!videoMode) {
-            comboRow(bg, "自适应方式", new String[]{"填充", "适应", "拉伸", "平铺"}, data.getInt("UiBackgroundSuit", 0), i -> {
-                data.set("UiBackgroundSuit", i);
-                win.applyBackground();
-            });
-            comboRow(bg, "自动轮播", new String[]{"关闭", "每 5 分钟", "每 15 分钟", "每 30 分钟", "每 60 分钟"},
-                    data.getInt("UiBackgroundRotate", 0), i -> data.set("UiBackgroundRotate", i));
-            sliderRow(bg, "不透明度", 0, 100, data.getInt("UiBackgroundOpacity", 1000) / 10, v -> {
-                data.set("UiBackgroundOpacity", (int) (v * 10));
-                win.applyBackground();
-            }, "%");
-            sliderRow(bg, "背景模糊", 0, 20, data.getInt("UiBackgroundBlur", 0), v -> {
-                data.set("UiBackgroundBlur", v.intValue());
-                win.applyBackground();
-            }, " px");
+            // 有图片才显示自适应/轮播/不透明度/模糊，对齐 WPF 的显隐逻辑
+            if (imageCount > 0) {
+                // 下拉顺序与存储值对齐 WPF：自动0/平铺4/居中1/拉伸3/左上5/左中9/左下7/中上11/居中2/中下12/右上6/右中10/右下8
+                String[] suitNames = {"自动", "平铺", "居中", "拉伸", "左上 (保持长宽比)",
+                        "左中 (保持长宽比)", "左下 (保持长宽比)", "中上 (保持长宽比)",
+                        "居中 (保持长宽比)", "中下 (保持长宽比)", "右上 (保持长宽比)",
+                        "右中 (保持长宽比)", "右下 (保持长宽比)"};
+                int[] suitVals = {0, 4, 1, 3, 5, 9, 7, 11, 2, 12, 6, 10, 8};
+                int suitStored = data.getInt("UiBackgroundSuit", 0);
+                int suitIndex = 0;
+                for (int i = 0; i < suitVals.length; i++) if (suitVals[i] == suitStored) suitIndex = i;
+                ComboBox<String> suitCombo = Ui.combo(suitNames, suitIndex);
+                suitCombo.setPrefWidth(220);
+                suitCombo.setOnAction(e -> {
+                    int i = suitCombo.getSelectionModel().getSelectedIndex();
+                    data.set("UiBackgroundSuit", suitVals[Math.max(0, i)]);
+                    win.applyBackground();
+                });
+                bg.add(Ui.settingRow("自适应方式", suitCombo));
+
+                String[] rotateNames = {"关闭", "每 1 分钟", "每 5 分钟", "每 15 分钟", "每 30 分钟", "每 60 分钟"};
+                int[] rotateVals = {0, 1, 5, 15, 30, 60};
+                int rotStored = data.getInt("UiBackgroundRotate", 0);
+                int rotIndex = 0;
+                for (int i = 0; i < rotateVals.length; i++) if (rotateVals[i] == rotStored) rotIndex = i;
+                ComboBox<String> rotateCombo = Ui.combo(rotateNames, rotIndex);
+                rotateCombo.setPrefWidth(220);
+                rotateCombo.setOnAction(e -> {
+                    int i = rotateCombo.getSelectionModel().getSelectedIndex();
+                    data.set("UiBackgroundRotate", rotateVals[Math.max(0, i)]);
+                    win.startWallpaperRotation();
+                });
+                bg.add(Ui.settingRow("自动轮播", rotateCombo));
+
+                sliderRow(bg, "不透明度", 0, 100, data.getInt("UiBackgroundOpacity", 1000) / 10, v -> {
+                    data.set("UiBackgroundOpacity", (int) (v * 10));
+                    win.applyBackground();
+                }, "%");
+                sliderRow(bg, "背景模糊", 0, 40, data.getInt("UiBackgroundBlur", 0), v -> {
+                    data.set("UiBackgroundBlur", v.intValue());
+                    win.applyBackground();
+                }, " px");
+            }
             Ui.Check colorful = Ui.checkBox("叠加彩色背景", false);
             colorful.setSelected(data.getBool("UiBackgroundColorful", true));
             colorful.setOnAction(() -> data.set("UiBackgroundColorful", colorful.isSelected()));
             bg.add(colorful);
+            Ui.Check autoTheme = Ui.checkBox("根据背景图自动调整主题色", false);
+            autoTheme.setSelected(data.getBool("UiAutoThemeFromBackground", true));
+            autoTheme.setOnAction(() -> {
+                data.set("UiAutoThemeFromBackground", autoTheme.isSelected());
+                if (autoTheme.isSelected()) {
+                    data.set("UiThemePreset", -1);
+                    Theme.applyWallpaperTheme();
+                } else {
+                    // 关掉跟随壁纸：把此刻的取色固化成自定义主题，别掉回默认蓝
+                    Theme.saveCurrentAsCustom(data);
+                    data.set("UiThemePreset", 14);
+                }
+                win.rebuildUi();
+            });
+            bg.add(autoTheme);
             FlowPane bgButtons = new FlowPane(10, 10);
             bgButtons.getChildren().addAll(
                     Ui.button("打开文件夹", Ui.BTN_NORMAL, this::openBackgroundFolder),
                     Ui.button("刷新背景图片", Ui.BTN_NORMAL, () -> {
                         win.refreshWallpaper(false);
-                        win.toast("背景已刷新", "已重新加载壁纸", 1);
+                        win.toast("背景图片已刷新", "", 1);
                     }),
-                    Ui.button("清空背景图片", Ui.BTN_RED, () -> {
-                        win.refreshWallpaper(true);
-                        win.toast("已恢复内置背景", "背景图片已重置", 1);
-                    }));
+                    Ui.button("清空背景图片", Ui.BTN_RED, () -> Dialogs.confirm(win,
+                            "清空背景图片", Lang.t("即将删除背景图片文件夹中的所有文件。\n此操作不可撤销，是否确定？"), () -> {
+                                clearBackgroundFolder();
+                                win.refreshWallpaper(true);
+                                win.refreshRight();
+                            }, true)));
             bg.add(bgButtons);
         } else {
-            // 有视频时才显示这些
             if (videoCount > 0) {
                 sliderRow(bg, "音量", 0, 100, data.getInt("UiVideoVolume", 500) / 10, v -> {
                     data.set("UiVideoVolume", (int) Math.round(v * 10));
@@ -730,6 +1019,10 @@ public class PageSetup implements Page {
                 win.updateVideoAudio();
             });
             bg.add(vidMute);
+            Ui.Check vidPause = Ui.checkBox("启动器失去焦点时暂停（省 CPU）", false);
+            vidPause.setSelected(data.getBool("UiVideoPauseOnBlur", true));
+            vidPause.setOnAction(() -> data.set("UiVideoPauseOnBlur", vidPause.isSelected()));
+            bg.add(vidPause);
             FlowPane vidButtons = new FlowPane(10, 10);
             vidButtons.getChildren().addAll(
                     Ui.button("打开文件夹", Ui.BTN_NORMAL, this::openVideoFolder),
@@ -741,18 +1034,137 @@ public class PageSetup implements Page {
                                 win.refreshRight();
                             }, true)));
             bg.add(vidButtons);
+            bg.add(Ui.hint("支持 mp4 / m4v / mov（H.264）。mkv、avi、wmv、webm 等 JavaFX 无法解码，需要先转成 mp4；"
+                    + "多个视频循环播放。建议使用 720p 以内的素材，分辨率越高 CPU 占用越大。", 0));
         }
 
         Ui.Card sound = addCard(page, "背景音乐");
-        sliderRow(sound, "音量", 0, 100, data.getInt("UiVolume", 60), v -> {
+        sliderRow(sound, "音量", 0, 100, Music.volumePercent(), v -> {
             data.set("UiVolume", v.intValue());
+            data.set("UiMusicVolume", v.intValue() * 10);
             try {
                 Music.setVolume(v.intValue());
             } catch (Throwable ignored) {
             }
         }, "%");
-        // 静音是视频专属的，音乐没有静音开关
+        sound.add(directCheck("随机播放", "UiMusicRandom", false));
+        sound.add(directCheck("启动时自动播放", "UiMusicAuto", false));
+        sound.add(directCheck("游戏启动后自动开始播放，游戏退出后自动暂停播放", "UiMusicStart", true));
+        sound.add(directCheck("游戏启动后自动暂停播放，游戏退出后自动开始播放", "UiMusicStop", true));
+        FlowPane musicButtons = new FlowPane(10, 10);
+        musicButtons.getChildren().addAll(
+                Ui.button("打开文件夹", Ui.BTN_NORMAL, this::openMusicFolder),
+                Ui.button("刷新背景音乐", Ui.BTN_NORMAL, () -> {
+                    Music.reload(data.gameDir);
+                    win.refreshExtraButtons();
+                    win.toast("背景音乐已刷新",
+                            Lang.tf("共 %d 首", Music.trackCount()), 1);
+                }),
+                Ui.button("清空背景音乐", Ui.BTN_RED, () -> Dialogs.confirm(win,
+                        "清空背景音乐", Lang.t("即将删除背景音乐文件夹中的所有文件。\n此操作不可撤销，是否确定？"), () -> {
+                            clearMusicFolder();
+                            Music.clear();
+                            win.refreshExtraButtons();
+                            win.refreshRight();
+                        }, true)));
+        sound.add(musicButtons);
         sound.add(Ui.hint("将 .mp3 / .wav 音乐放入 游戏目录/TCL/Music 后，右下角会出现音乐按钮。", 0));
+    }
+
+    private void pickLogoFile() {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle(Lang.t("选择标题栏图片"));
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(
+                Lang.t("图片文件"), "*.png", "*.jpg", "*.jpeg", "*.gif"));
+        File file = chooser.showOpenDialog(win.stage);
+        if (file == null) return;
+        try {
+            Path dir = Paths.get(data.gameDir, "TCL");
+            Files.createDirectories(dir);
+            Path dst = dir.resolve("Logo.png");
+            Files.copy(file.toPath(), dst, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            data.set("UiLogoType", 3);
+            win.rebuildUi();
+            win.toast("标题栏图片已更换", file.getName(), 1);
+        } catch (Exception e) {
+            win.toast("更换图片失败", e.getMessage(), 3);
+        }
+    }
+
+    private void pickFontFile() {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle(Lang.t("选择字体文件"));
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(
+                Lang.t("字体文件"), "*.ttf", "*.otf", "*.ttc"));
+        File file = chooser.showOpenDialog(win.stage);
+        if (file == null) return;
+        try {
+            Files.createDirectories(Theme.fontDir());
+            Path dst = Theme.fontDir().resolve(file.getName());
+            Files.copy(file.toPath(), dst, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            Theme.loadUserFonts();
+            String family = null;
+            try (var in = Files.newInputStream(dst)) {
+                javafx.scene.text.Font loaded = javafx.scene.text.Font.loadFont(in, 13);
+                if (loaded != null) family = loaded.getFamily();
+            } catch (Exception ignored) {
+            }
+            if (family != null) data.set("UiCustomFont", family);
+            win.openSetup("ui");
+            win.toast("字体已安装", family == null ? file.getName() : family, 1);
+        } catch (Exception e) {
+            win.toast("安装字体失败", e.getMessage(), 3);
+        }
+    }
+
+    private void clearBackgroundFolder() {
+        int removed = 0;
+        try {
+            Path dir = Paths.get(data.gameDir, "TCL", "Pictures");
+            if (Files.isDirectory(dir)) {
+                try (var s = Files.list(dir)) {
+                    for (Path p : s.filter(Files::isRegularFile).toList()) {
+                        try {
+                            Files.delete(p);
+                            removed++;
+                        } catch (Exception ignored) {
+                        }
+                    }
+                }
+            }
+            win.toast("已清空背景图片", Lang.tf("删除了 %d 个文件", removed), 1);
+        } catch (Exception e) {
+            win.toast("清空失败", e.getMessage(), 3);
+        }
+    }
+
+    private void openMusicFolder() {
+        try {
+            Path dir = Music.folder(data.gameDir);
+            Files.createDirectories(dir);
+            Shell.openFolder(dir.toString());
+        } catch (Exception e) {
+            win.toast("无法打开文件夹", e.getMessage(), 3);
+        }
+    }
+
+    private void clearMusicFolder() {
+        int removed = 0;
+        try {
+            Path dir = Music.folder(data.gameDir);
+            if (Files.isDirectory(dir)) {
+                for (Path p : Music.tracks(data.gameDir)) {
+                    try {
+                        Files.delete(p);
+                        removed++;
+                    } catch (Exception ignored) {
+                    }
+                }
+            }
+            win.toast("已清空背景音乐", Lang.tf("删除了 %d 个文件", removed), 1);
+        } catch (Exception e) {
+            win.toast("清空失败", e.getMessage(), 3);
+        }
     }
 
     private void openBackgroundFolder() {
@@ -775,7 +1187,6 @@ public class PageSetup implements Page {
         }
     }
 
-    /** 删视频文件夹里的文件，保留子目录。 */
     private void clearVideoFolder() {
         int removed = 0;
         try {
@@ -819,13 +1230,27 @@ public class PageSetup implements Page {
         download.add(bmclHint);
         textRow(download, "最大线程数", "64", data.get("SystemMaxThreads", "64"), s -> data.set("SystemMaxThreads", s));
         textRow(download, "速度限制", "不限", data.get("SystemSpeedLimit", ""), s -> data.set("SystemSpeedLimit", s));
-        // 目标文件夹只读，改入口在实例页左侧的文件夹列表
+        textRow(download, "缓存文件夹", "留空使用默认", data.get("SystemSystemCache", ""), s -> {
+            data.set("SystemSystemCache", s == null ? "" : s.trim());
+            RemoteImages.resetCacheDir();
+        });
+        download.add(Ui.hint("下载缓存与社区图片都会放到这里；改到剩余空间更大的盘可以避免 C 盘被占满。", 0));
         Label target = Ui.label("请在 实例页左侧「文件夹列表」中更改下载目标文件夹。"
                 + "在某个文件夹或游戏版本上右键，即可选择打开对应文件夹。", 12, Theme.gray3);
         target.setWrapText(true);
         download.add(Ui.settingRow("目标文件夹", target));
 
         Ui.Card communityRes = addCard(page, "社区资源");
+        comboRow(communityRes, "默认资源来源", new String[]{"全部来源", "优先 CurseForge", "优先 Modrinth"},
+                Math.max(0, Math.min(2, data.getInt("ToolDownloadMod", 0))),
+                i -> data.set("ToolDownloadMod", i));
+        comboRow(communityRes, "Mod 管理样式", new String[]{"显示文件名", "优先显示 Mod 自带名称"},
+                Math.max(0, Math.min(1, data.getInt("ToolModLocalNameStyle", 0))),
+                i -> data.set("ToolModLocalNameStyle", i));
+        comboRow(communityRes, "下载文件名格式", new String[]{
+                "保留原始文件名", "标题-版本", "仅标题", "原文-版本", "标题-原文"},
+                Math.max(0, Math.min(4, data.getInt("ToolDownloadTranslateV2", 0))),
+                i -> data.set("ToolDownloadTranslateV2", i));
         textRow(communityRes, "CurseForge Key", "默认", data.get("SystemCurseKey", ""),
                 s -> data.set("SystemCurseKey", s));
         communityRes.add(Ui.label("留空时使用内置公共 Key；OptiFabric 等 CurseForge 资源需要有效 Key 才能获取列表。",
@@ -857,14 +1282,15 @@ public class PageSetup implements Page {
         proxy.add(directCheck("启动游戏时使用此代理", "SystemHttpProxyForGame", false));
 
         Ui.Card language = addCard(page, "辅助功能");
-        ComboBox<String> lang = Ui.combo(new String[]{"简体中文", "English", "繁體中文"}, Lang.mode);
+        String[] langNames = {"简体中文", "English", "繁體中文", "跟随系统"};
+        ComboBox<String> lang = Ui.combo(langNames, Math.max(0, Math.min(3, Lang.setting)));
         lang.setOnAction(e -> {
             int index = lang.getSelectionModel().getSelectedIndex();
-            if (index == Lang.mode) return;
+            if (index == Lang.setting) return;
             Lang.setMode(index);
             data.set("SystemLanguage", index);
             win.rebuildUi();
-            win.toast("语言已切换", Lang.langName(), 1);
+            win.toast("语言已切换", index == 3 ? Lang.langName() : Lang.langName(), 1);
         });
         language.add(Ui.settingRow("语言", lang));
         FlowPane i18n = new FlowPane(10, 10);
@@ -898,9 +1324,9 @@ public class PageSetup implements Page {
         dataBtns.getChildren().addAll(
                 Ui.button("导出全部数据", Ui.BTN_NORMAL, () -> {
                     FileChooser chooser = new FileChooser();
-                    chooser.setTitle("导出全部数据");
+                    chooser.setTitle(Lang.t("导出全部数据"));
                     chooser.setInitialFileName("tcl-config.properties");
-                    chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("配置文件", "*.properties"));
+                    chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(Lang.t("配置文件"), "*.properties"));
                     File file = chooser.showSaveDialog(win.stage);
                     if (file != null) {
                         boolean ok = data.exportConfig(file.toPath());
@@ -909,18 +1335,25 @@ public class PageSetup implements Page {
                 }),
                 Ui.button("导入全部数据", Ui.BTN_NORMAL, () -> {
                     FileChooser chooser = new FileChooser();
-                    chooser.setTitle("导入全部数据");
-                    chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("配置文件", "*.properties"));
+                    chooser.setTitle(Lang.t("导入全部数据"));
+                    chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(Lang.t("配置文件"), "*.properties"));
                     File file = chooser.showOpenDialog(win.stage);
-                    if (file != null) {
-                        boolean ok = data.importConfig(file.toPath());
-                        if (ok) {
-                            win.rebuildUi();
-                            win.toast("导入完成", "配置已重新加载", 1);
-                        } else {
-                            win.toast("导入失败", file.getName(), 3);
-                        }
-                    }
+                    if (file == null) return;
+                    Dialogs.confirm(win, "导入全部数据",
+                            // 四段拼接整串查不到表，合并为单个完整键
+                            Lang.tf("将导入 %s 中的配置，同名设置会被文件内容覆盖。\n\n"
+                                    + "出于安全考虑，导入时不会应用启动前命令、Java 路径、下载源、代理，"
+                                    + "以及 JVM / 游戏附加参数，这些只能在本机手动设置。\n\n确认导入吗？",
+                                    file.getName()),
+                            () -> {
+                                boolean ok = data.importConfig(file.toPath());
+                                if (ok) {
+                                    win.rebuildUi();
+                                    win.toast("导入完成", "配置已重新加载，敏感项已忽略", 1);
+                                } else {
+                                    win.toast("导入失败", file.getName(), 3);
+                                }
+                            });
                 }),
                 Ui.button("复制识别码", Ui.BTN_NORMAL, () -> {
                     javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
@@ -930,6 +1363,11 @@ public class PageSetup implements Page {
                 }));
         other.add(dataBtns);
         other.add(directCheck("每次启动时检查更新", "CheckUpdateOnStartup", true));
+        other.add(directCheck("接收正式版更新提示", "ToolUpdateRelease", true));
+        other.add(directCheck("接收测试版更新提示", "ToolUpdateSnapshot", false));
+        other.add(directCheck("游戏语言自动设为中文（仅当游戏内为英文时）", "ToolHelpChinese", true));
+        other.add(directCheck("禁用硬件加速（下次启动生效，远程桌面/老显卡可用）",
+                "SystemDisableHardwareAcceleration", false));
         other.add(Ui.hint("启动后从 GitHub Releases 读取最新版本与更新日志；发现新版本会弹窗提示，无法连接时会提示网络问题。", 0));
         HBox updateRow = new HBox(12);
         updateRow.setAlignment(Pos.CENTER_LEFT);
@@ -943,14 +1381,12 @@ public class PageSetup implements Page {
         uninstallCard(page);
     }
 
-    /** 社区卡片。 */
     private void communityCard(VBox page) {
         Ui.Card community = addCard(page, "社区");
         community.add(Ui.hint("有问题反馈？想获取更新？加入我们的启动器交流群吧！", 0));
         community.add(standaloneButton("加入 QQ 群", Ui.BTN_HIGHLIGHT, 150, this::openCommunity));
     }
 
-    /** 不撑满整行的按钮。 */
     private StackPane standaloneButton(String text, int type, int minWidth, Runnable action) {
         StackPane btn = Ui.button(text, type, action);
         btn.setMinWidth(minWidth);
@@ -958,14 +1394,12 @@ public class PageSetup implements Page {
         return btn;
     }
 
-    /** 官方 QQ 群邀请链接。 */
     private void openCommunity() {
         if (!Shell.openUrl("https://qm.qq.com/q/UONlv4VgwE")) {
             win.toast("打开链接失败", "https://qm.qq.com/q/UONlv4VgwE", 3);
         }
     }
 
-    /** 卸载启动器数据，先停 EasyTier 再删。 */
     private void uninstallCard(VBox page) {
         Ui.Card danger = addCard(page, "卸载");
         Path appData = Resources.home();
@@ -978,32 +1412,36 @@ public class PageSetup implements Page {
                         Lang.tf("即将删除：\n· %s（配置、日志、缓存、联机内核）\n\n"
                                 + "游戏目录与存档不会被触碰。此操作不可撤销，确认后启动器立即退出。", appData),
                         () -> {
-                            // 停掉残留进程，释放内核二进制
                             try {
                                 EasyTier.killLeftovers();
                                 EasyTier.stop();
                             } catch (Throwable ignored) {
                             }
-                            // 趁 JVM 还在时删除，失败项收集起来
-                            List<String> failed = new ArrayList<>();
-                            deleteDirCollect(appData, failed);
-                            if (!failed.isEmpty()) {
-                                Errors.error("卸载：有 " + failed.size() + " 项删除失败（详见 errors.log）",
-                                        new RuntimeException("删除失败：" + String.join("；", failed)),
-                                        Errors.Behavior.NONE);
-                                Platform.runLater(() -> win.toast("部分文件删除失败",
-                                        "已记录到日志，请重启系统后重试", 3));
-                            }
-                            Platform.exit();
-                            Thread t = new Thread(() -> {
-                                try {
-                                    Thread.sleep(500);
-                                } catch (Exception ignored) {
-                                }
-                                System.exit(0);
-                            }, "TCL-Uninstall");
-                            t.setDaemon(true);
-                            t.start();
+                            // 递归删整个数据目录放后台，删完再退出
+                            Threads.start("TCL-Uninstall", () -> {
+                                // 趁 JVM 还在时删除，失败项收集起来
+                                List<String> failed = new ArrayList<>();
+                                deleteDirCollect(appData, failed);
+                                javafx.application.Platform.runLater(() -> {
+                                    if (!failed.isEmpty()) {
+                                        Errors.error("卸载：有 " + failed.size() + " 项删除失败（详见 errors.log）",
+                                                new RuntimeException("删除失败：" + String.join("；", failed)),
+                                                Errors.Behavior.NONE);
+                                        win.toast("部分文件删除失败",
+                                                "已记录到日志，请重启系统后重试", 3);
+                                    }
+                                    javafx.application.Platform.exit();
+                                    Thread t = new Thread(() -> {
+                                        try {
+                                            Thread.sleep(500);
+                                        } catch (Exception ignored) {
+                                        }
+                                        System.exit(0);
+                                    }, "TCL-Uninstall-Exit");
+                                    t.setDaemon(true);
+                                    t.start();
+                                });
+                            });
                         }, true)));
     }
 
@@ -1021,15 +1459,11 @@ public class PageSetup implements Page {
         FlowPane actions = new FlowPane(10, 10);
         actions.getChildren().addAll(
                 Ui.button("导入 Java…", Ui.BTN_HIGHLIGHT, this::importJava),
-                Ui.button("下载 Java…", Ui.BTN_NORMAL, () -> {
-                    String url = "https://learn.microsoft.com/java/openjdk/download#openjdk-17";
-                    if (!Shell.openUrl(url)) win.toast("打开链接失败", url, 3);
-                }),
+                Ui.button("下载 Java…", Ui.BTN_NORMAL, this::chooseJavaDownload),
+                Ui.button("搜索目录…", Ui.BTN_NORMAL, this::pickJavaFolder),
                 Ui.button("重新搜索", Ui.BTN_NORMAL, () -> {
                     data.invalidateJavaScan();
-                    applyDetectedJava();
-                    win.toast("搜索完成", data.javaPath.isEmpty() ? "未找到 Java" : data.javaPath,
-                            data.javaPath.isEmpty() ? 2 : 1);
+                    win.refreshRight();
                 }),
                 Ui.button("打开数据文件夹", Ui.BTN_NORMAL, () -> {
                     try {
@@ -1039,16 +1473,27 @@ public class PageSetup implements Page {
                     } catch (Exception e) {
                         win.toast("无法打开文件夹", e.getMessage(), 3);
                     }
-                }),
-                Ui.button("初始化此项", Ui.BTN_RED, () -> {
-                    data.invalidateJavaScan();
-                    applyDetectedJava();
-                    win.toast("已初始化", "Java 列表已恢复为自动搜索结果", 1);
                 }));
         manage.add(actions);
 
         Ui.Card found = addCard(page, "已发现的 Java");
-        List<Data.JavaRuntime> javas = data.scanJavaRuntimes();
+        Label orderHint = Ui.label("用右侧箭头调整优先级：列表越靠前的 Java 越优先被自动选用。", 12, Theme.gray3);
+        orderHint.setWrapText(true);
+        found.add(orderHint);
+        if (!data.hasJavaScanCache()) {
+            // 首次扫描要探测很多路径，放后台，扫完自动刷新
+            found.add(Ui.label("正在扫描本机的 Java…", 12.5, Theme.gray2));
+            Threads.start("TCL-JavaScan", () -> {
+                data.scanJavaRuntimes();
+                javafx.application.Platform.runLater(() -> {
+                    if (win.currentKey == null || !win.currentKey.equals("setup")) return;
+                    if (!"java".equals(data.setupSection)) return;
+                    win.refreshRight();
+                });
+            });
+            return;
+        }
+        List<Data.JavaRuntime> javas = orderedJavas();
         VBox list = new VBox(2);
         for (Data.JavaRuntime rt : javas) {
             boolean selected = rt.path().equals(data.javaPath);
@@ -1056,6 +1501,15 @@ public class PageSetup implements Page {
             Ui.ListItem item = new Ui.ListItem(Theme.icon("coffee", 17, selected ? Theme.accent : Theme.text),
                     name, rt.path(), 44);
             item.setSelected(selected);
+            // 上移 / 下移：写进 LaunchJavaOrder，自动选择时按这个顺序挑
+            StackPane up = Ui.iconButton("arrow-up", 26, 15, "上移", () -> moveJava(rt, -1));
+            StackPane down = Ui.iconButton("arrow-down", 26, 15, "下移", () -> moveJava(rt, 1));
+            up.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED,
+                    javafx.scene.input.MouseEvent::consume);
+            down.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED,
+                    javafx.scene.input.MouseEvent::consume);
+            item.addAction(up);
+            item.addAction(down);
             item.setOnMouseClicked(e -> {
                 if (data.javaPath.equals(rt.path())) return;
                 data.setJavaRuntime(rt.path(), rt.major());
@@ -1070,6 +1524,56 @@ public class PageSetup implements Page {
         found.add(list);
     }
 
+    private List<Data.JavaRuntime> orderedJavas() {
+        List<Data.JavaRuntime> all = data.scanJavaRuntimes();
+        String raw = data.get("LaunchJavaOrder", "");
+        if (raw == null || raw.isBlank()) return all;
+        List<String> order = new ArrayList<>();
+        for (String part : raw.split("\\|")) {
+            if (!part.isBlank()) order.add(part);
+        }
+        List<Data.JavaRuntime> sorted = new ArrayList<>();
+        for (String path : order) {
+            for (Data.JavaRuntime rt : all) {
+                if (rt.path().equals(path) && !sorted.contains(rt)) sorted.add(rt);
+            }
+        }
+        for (Data.JavaRuntime rt : all) if (!sorted.contains(rt)) sorted.add(rt);
+        return sorted;
+    }
+
+    private void moveJava(Data.JavaRuntime rt, int dir) {
+        List<Data.JavaRuntime> list = orderedJavas();
+        int index = -1;
+        for (int i = 0; i < list.size(); i++) {
+            if (list.get(i).path().equals(rt.path())) {
+                index = i;
+                break;
+            }
+        }
+        int to = index + dir;
+        if (index < 0 || to < 0 || to >= list.size()) return;
+        list.add(to, list.remove(index));
+        StringBuilder sb = new StringBuilder();
+        for (Data.JavaRuntime r : list) {
+            if (sb.length() > 0) sb.append('|');
+            sb.append(r.path());
+        }
+        data.set("LaunchJavaOrder", sb.toString());
+        Data.JavaRuntime first = list.get(0);
+        data.setJavaRuntime(first.path(), first.major());
+        win.openSetup("java");
+        win.toast("优先级已调整", Lang.t("首选 ") + first.path(), 1);
+    }
+
+    private void chooseJavaDownload() {
+        String[] options = new String[JavaInstaller.COMPONENTS.length];
+        for (int i = 0; i < options.length; i++) options[i] = JavaInstaller.COMPONENTS[i][0];
+        Dialogs.select(win, "下载 Java 运行时",
+                options, "开始下载", "取消", false,
+                index -> JavaInstaller.startInstallAsync(win, JavaInstaller.COMPONENTS[index][1]));
+    }
+
     private static void copyLangFile(Path target) throws Exception {
         Files.createDirectories(target.getParent());
         try (java.io.InputStream in = Theme.resStream("LangTables.txt")) {
@@ -1078,19 +1582,6 @@ public class PageSetup implements Page {
         }
     }
 
-    /** 自动选一个可用 Java，并记为已确认。 */
-    private void applyDetectedJava() {
-        String path = data.detectJava();
-        if (path.isEmpty()) {
-            data.javaPath = "";
-            data.save();
-        } else {
-            data.setJavaRuntime(path, Data.javaMajor(path));
-        }
-        win.refreshRight();
-    }
-
-    /** 手动导入并校验 Java。 */
     private void importJava() {
         FileChooser chooser = new FileChooser();
         chooser.setTitle(Lang.t("选择 Java 可执行文件"));
@@ -1102,7 +1593,7 @@ public class PageSetup implements Page {
         if (file == null) return;
         int major = Data.javaMajor(file.getAbsolutePath());
         if (major <= 0) {
-            win.toast("无法识别该 Java", "请选择 bin 目录下的 " + (winOs ? "javaw.exe" : "java"), 2);
+            win.toast("无法识别该 Java", Lang.tf("请选择 bin 目录下的 %s", winOs ? "javaw.exe" : "java"), 2);
             return;
         }
         data.setJavaRuntime(file.getAbsolutePath(), major);
@@ -1110,7 +1601,26 @@ public class PageSetup implements Page {
         win.toast("Java 已导入", "Java " + major + " · " + file.getAbsolutePath(), 1);
     }
 
-    /** 启动设置里的 Java 下拉列表。 */
+    // 有些 Java 装在非常规位置，自动扫描覆盖不到，手动指定目录
+    private void pickJavaFolder() {
+        javafx.stage.DirectoryChooser chooser = new javafx.stage.DirectoryChooser();
+        chooser.setTitle(Lang.t("选择要搜索 Java 的文件夹"));
+        java.io.File dir = chooser.showDialog(win.stage);
+        if (dir == null) return;
+        win.toast("正在搜索", dir.getAbsolutePath(), 0);
+        Threads.start("TCL-JavaDirScan", () -> {
+            List<Data.JavaRuntime> found = data.scanJavaIn(dir.toPath(), 6);
+            javafx.application.Platform.runLater(() -> {
+                win.refreshRight();
+                if (found.isEmpty()) {
+                    win.toast("没有找到 Java", "换个目录再试，或直接选择 bin\\java.exe", 3);
+                } else {
+                    win.toast(Lang.tf("找到 %d 个 Java", found.size()), found.get(0).path(), 1);
+                }
+            });
+        });
+    }
+
     private List<String> findJavas() {
         List<String> out = new ArrayList<>();
         for (Data.JavaRuntime rt : data.scanJavaRuntimes()) out.add(rt.path());
@@ -1118,7 +1628,6 @@ public class PageSetup implements Page {
         return out;
     }
 
-    /** Color 转 #rrggbb，给内联 CSS 用。 */
     private static String toHex(javafx.scene.paint.Color c) {
         return String.format("#%02x%02x%02x",
                 (int) Math.round(c.getRed() * 255),
@@ -1169,7 +1678,6 @@ public class PageSetup implements Page {
         view.setEditable(false);
         view.setWrapText(true);
         view.setPrefHeight(300);
-        // 不设 -fx-text-fill 会继承主题色，浅色卡片上变白字
         view.setStyle("-fx-font-family: 'Consolas', 'Microsoft YaHei UI'; -fx-font-size: 11.5;"
                 + " -fx-control-inner-background: transparent;"
                 + " -fx-background-color: transparent;"
@@ -1182,28 +1690,50 @@ public class PageSetup implements Page {
         live.add(status);
         final Timeline[] tick = new Timeline[1];
         final String[] lastKey = {""};
+        final java.util.concurrent.atomic.AtomicBoolean busy = new java.util.concurrent.atomic.AtomicBoolean();
         tick[0] = new Timeline(new KeyFrame(javafx.util.Duration.millis(600), e -> {
             if (page.getScene() == null) {
                 tick[0].stop();
                 return;
             }
-            // 文件大小和筛选条件都没变就不重读整份日志
+            // 上一轮还在读盘就跳过这一拍，省得任务排队堆积
+            if (busy.get()) return;
             long size;
             try {
                 size = Files.size(logFile);
             } catch (Exception ex) {
                 size = 0;
             }
-            String key = size + "|" + level.getSelectionModel().getSelectedIndex() + "|" + filter.getText();
+            final int levelIdx = level.getSelectionModel().getSelectedIndex();
+            final String query = filter.getText() == null ? "" : filter.getText();
+            String key = size + "|" + levelIdx + "|" + query;
             if (key.equals(lastKey[0])) return;
             lastKey[0] = key;
-            String[] lines = readLogLines(logFile);
-            String text = filterLog(lines, level.getSelectionModel().getSelectedIndex(), filter.getText());
-            if (!text.equals(view.getText())) {
-                view.setText(text);
-                if (autoScroll.isSelected()) view.setScrollTop(Double.MAX_VALUE);
-            }
-            status.setText(Lang.tf("实时监听 %s · %d 行", logFile.getFileName(), lines.length));
+            busy.set(true);
+            // 读盘和过滤都放后台，512 KiB 在主线程每 600ms 跑一遍会卡住界面
+            Threads.start("TCL-Log-View", () -> {
+                String[] lines = new String[0];
+                String text = "";
+                try {
+                    lines = readLogLines(logFile);
+                    text = filterLog(lines, levelIdx, query);
+                } catch (Exception ignored) {
+                } finally {
+                    busy.set(false);
+                }
+                final String[] fLines = lines;
+                final String fText = text;
+                javafx.application.Platform.runLater(() -> {
+                    if (page.getScene() == null) return;
+                    if (!fText.equals(view.getText())) {
+                        view.setText(fText);
+                        if (autoScroll.isSelected()) view.setScrollTop(Double.MAX_VALUE);
+                    }
+                    status.setText(lastLogReadError.isEmpty()
+                            ? Lang.tf("实时监听 %s · %d 行", logFile.getFileName(), fLines.length)
+                            : Lang.tf("读取失败：%s（当前显示内存日志）", lastLogReadError));
+                });
+            });
         }));
         tick[0].setCycleCount(javafx.animation.Animation.INDEFINITE);
         tick[0].play();
@@ -1245,15 +1775,45 @@ public class PageSetup implements Page {
         }
     }
 
-    /** 读日志尾部 500 行，读不到就用内存日志。 */
+    private volatile String lastLogReadError = "";
+
     private String[] readLogLines(Path file) {
         try {
             if (Files.isRegularFile(file)) {
-                List<String> lines = Files.readAllLines(file, java.nio.charset.StandardCharsets.UTF_8);
-                if (lines.size() > 500) lines = lines.subList(lines.size() - 500, lines.size());
-                return lines.toArray(new String[0]);
+                // 只读末尾 512 KiB，整份读入会把 FX 线程拖死
+                long size = Files.size(file);
+                long start = Math.max(0, size - 512 * 1024L);
+                byte[] bytes = new byte[(int) (size - start)];
+                try (java.nio.channels.FileChannel ch = java.nio.channels.FileChannel.open(
+                        file, java.nio.file.StandardOpenOption.READ)) {
+                    ch.position(start);
+                    java.nio.ByteBuffer bb = java.nio.ByteBuffer.wrap(bytes);
+                    while (bb.hasRemaining()) {
+                        if (ch.read(bb) < 0) break;
+                    }
+                }
+                String text = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+                if (start > 0) {
+                    int firstBreak = text.indexOf('\n');
+                    if (firstBreak < 0) return new String[0];
+                    text = text.substring(firstBreak + 1);
+                }
+                if (text.startsWith("\uFEFF")) text = text.substring(1);
+                if (text.isEmpty()) return new String[0];
+                String[] all = text.split("\n", -1);
+                int from = Math.max(0, all.length - 500);
+                String[] tail = new String[all.length - from];
+                for (int i = from; i < all.length; i++) {
+                    String line = all[i];
+                    if (line.endsWith("\r")) line = line.substring(0, line.length() - 1);
+                    tail[i - from] = line;
+                }
+                lastLogReadError = "";
+                return tail;
             }
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            // 读盘失败回退内存日志时，状态栏要说明，不能装作一切正常
+            lastLogReadError = e.getMessage() == null ? e.toString() : e.getMessage();
         }
         return data.log.toArray(new String[0]);
     }
@@ -1271,30 +1831,36 @@ public class PageSetup implements Page {
         return sb.toString();
     }
 
-    /** 导出当前会话日志或完整 launcher.log。 */
     private void exportLog(Path source, boolean all) {
         FileChooser chooser = new FileChooser();
-        chooser.setTitle(all ? "导出全部日志" : "导出当前日志");
+        chooser.setTitle(all ? Lang.t("导出全部日志") : Lang.t("导出当前日志"));
         chooser.setInitialFileName(all ? "launcher-full.log" : "launcher-current.log");
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("日志文件", "*.log"));
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(Lang.t("日志文件"), "*.log"));
         File file = chooser.showSaveDialog(win.stage);
         if (file == null) return;
-        try {
-            String content = all && Files.isRegularFile(source)
-                    ? Files.readString(source, java.nio.charset.StandardCharsets.UTF_8)
-                    : String.join("\n", data.log);
-            // 旧版本日志可能残留未脱敏的令牌
-            Files.writeString(file.toPath(), Redact.apply(content), java.nio.charset.StandardCharsets.UTF_8);
-            win.toast("导出完成", file.getName(), 1);
-        } catch (Exception e) {
-            win.toast("导出失败", e.getMessage(), 3);
-        }
+        // 日志可能很大，读取、脱敏、写盘都放后台
+        final Path sourcePath = source;
+        final boolean allLog = all;
+        Thread worker = new Thread(() -> {
+            try {
+                String content = allLog && Files.isRegularFile(sourcePath)
+                        ? Files.readString(sourcePath, java.nio.charset.StandardCharsets.UTF_8)
+                        : String.join("\n", data.log);
+                Files.writeString(file.toPath(), Redact.apply(content), java.nio.charset.StandardCharsets.UTF_8);
+                javafx.application.Platform.runLater(() -> win.toast("导出完成", file.getName(), 1));
+            } catch (Exception e) {
+                String msg = e.getMessage() == null ? "未知错误" : e.getMessage();
+                javafx.application.Platform.runLater(() -> win.toast("导出失败", msg, 3));
+            }
+        }, "TCL-ExportLog");
+        worker.setDaemon(true);
+        worker.start();
     }
 
     private void buildCache(VBox page) {
         header(page, "存储与清理", "看清启动器与游戏各自的磁盘占用，安全释放空间。");
         Path base = Resources.home();
-        Path cacheDir = base.resolve("cache");
+        Path cacheDir = data.cacheDir();
 
         Ui.Card overview = addCard(page, "存储总览");
         Label note = Ui.label("后台计算中…", 12, Theme.gray3);
@@ -1312,9 +1878,8 @@ public class PageSetup implements Page {
         VBox list = new VBox(4);
         usage.add(list);
 
-        // 只清可再生缓存，不碰配置、背景、音乐和存档
         Runnable[] refresh = new Runnable[1];
-        refresh[0] = () -> new Thread(() -> {
+        refresh[0] = () -> Threads.start("TCL-Cache-Scan", () -> {
             long game = dirSize(Paths.get(data.gameDir), 30000);
             long cache = dirSize(cacheDir, 20000);
             long logs = logSize(base);
@@ -1331,7 +1896,7 @@ public class PageSetup implements Page {
                         cacheRow("临时日志文件", logCheck, logs),
                         cacheRow("临时文件（.tmp / .part）", tempCheck, temp));
             });
-        }, "TCL-Cache-Scan").start();
+        });
         refresh[0].run();
 
         Ui.Card ops = addCard(page, "操作");
@@ -1343,20 +1908,20 @@ public class PageSetup implements Page {
         actions.getChildren().addAll(
                 Ui.button("清理所选缓存", Ui.BTN_RED, () ->
                         Dialogs.confirm(win, "清理所选缓存",
-                                "将删除：\n· " + (cacheCheck.isSelected() ? "启动器下载缓存" : "（跳过）启动器下载缓存")
-                                        + "\n· " + (logCheck.isSelected() ? "临时日志文件" : "（跳过）临时日志文件")
-                                        + "\n· " + (tempCheck.isSelected() ? "临时文件（.tmp / .part）" : "（跳过）临时文件")
-                                        + "\n\n不会删除游戏存档与已安装版本。是否继续？",
+                                // 复选框组合有 8 种整串，逐段翻译才都能命中
+                                Lang.t("将删除：\n· ") + (cacheCheck.isSelected() ? Lang.t("启动器下载缓存") : Lang.t("（跳过）启动器下载缓存"))
+                                        + "\n· " + (logCheck.isSelected() ? Lang.t("临时日志文件") : Lang.t("（跳过）临时日志文件"))
+                                        + "\n· " + (tempCheck.isSelected() ? Lang.t("临时文件（.tmp / .part）") : Lang.t("（跳过）临时文件"))
+                                        + Lang.t("\n\n不会删除游戏存档与已安装版本。是否继续？"),
                                 () -> {
                                     boolean clearCache = cacheCheck.isSelected();
                                     boolean clearTemp = tempCheck.isSelected();
                                     boolean clearLog = logCheck.isSelected();
-                                    // 删文件可能很慢，放后台，完成后再回 UI
-                                    new Thread(() -> {
+                                    Threads.start("TCL-Cache-Clean", () -> {
                                         long freed = 0;
                                         if (clearCache) {
                                             freed += dirSize(cacheDir, 20000);
-                                            deleteDir(cacheDir);
+                                            deleteContents(cacheDir);
                                         }
                                         if (clearTemp) freed += deleteTemp(cacheDir);
                                         if (clearLog) freed += deleteLogs(base);
@@ -1365,15 +1930,15 @@ public class PageSetup implements Page {
                                             win.toast("清理完成", "已释放 " + bytes(total), 1);
                                             if (refresh[0] != null) refresh[0].run();
                                         });
-                                    }, "TCL-Cache-Clean").start();
+                                    });
                                 }, true)),
-                Ui.button("检查无用文件", Ui.BTN_NORMAL, () -> new Thread(() -> {
+                Ui.button("检查无用文件", Ui.BTN_NORMAL, () -> Threads.start("TCL-Junk-Scan", () -> {
                     long[] result = scanJunk(cacheDir, base);
                     Platform.runLater(() -> win.toast("检查完成",
-                            result[0] == 0 ? "没有发现无用文件"
-                                    : "发现 " + result[0] + " 个无用文件，共 " + bytes(result[1]),
+                            result[0] == 0 ? Lang.t("没有发现无用文件")
+                                    : Lang.tf("发现 %d 个无用文件，共 %s", result[0], bytes(result[1])),
                             result[0] == 0 ? 1 : 0));
-                }, "TCL-Junk-Scan").start()),
+                })),
                 Ui.button("刷新", Ui.BTN_NORMAL, () -> {
                     if (refresh[0] != null) refresh[0].run();
                 }),
@@ -1433,7 +1998,6 @@ public class PageSetup implements Page {
         return n.endsWith(".tmp") || n.endsWith(".part");
     }
 
-    /** 30 天没改、0 字节或 .tmp/.part 的文件。 */
     private long[] scanJunk(Path cacheDir, Path base) {
         long count = 0, size = 0;
         long cutoff = System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000;
@@ -1507,7 +2071,6 @@ public class PageSetup implements Page {
         return size[0];
     }
 
-    /** 递归删目录，失败项收进 failedSink。 */
     private static java.util.List<String> deleteDirCollect(Path dir, java.util.List<String> failedSink) {
         if (!Files.isDirectory(dir)) return failedSink;
         Path running = Resources.jar(); // 正在用的 jar 被 JVM 锁着，删不掉，跳过它别当失败
@@ -1528,9 +2091,21 @@ public class PageSetup implements Page {
         return failedSink;
     }
 
-    /** 尽力而为地删，失败忽略。 */
     private void deleteDir(Path dir) {
         deleteDirCollect(dir, new java.util.ArrayList<>());
+    }
+
+    private void deleteContents(Path dir) {
+        if (!Files.isDirectory(dir)) return;
+        try (var stream = Files.list(dir)) {
+            for (Path child : stream.toList()) {
+                try {
+                    deleteDir(child);
+                } catch (Exception ignored) {
+                }
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     private String bytes(long b) {
@@ -1540,7 +2115,6 @@ public class PageSetup implements Page {
         return b + " B";
     }
 
-    /** 三项界面选项映射到 0 自动、1 官方、2 镜像优先。 */
     private static final int[] FILE_SOURCES = {2, 0, 1};
 
     private void buildNetwork(VBox page) {
@@ -1578,15 +2152,15 @@ public class PageSetup implements Page {
                     win.toast("代理设置", "已保存并应用", 1);
                 }),
                 Ui.button("测试当前代理", Ui.BTN_NORMAL, () -> {
-                    proxyNote.setText("正在测试代理…");
-                    new Thread(() -> {
+                    proxyNote.setText(Lang.t("正在测试代理…"));
+                    Threads.start("TCL-Proxy-Test", () -> {
                         String result = testProxy();
                         Platform.runLater(() -> {
                             proxyNote.setText(result);
                             win.toast(result.startsWith("连接成功") ? "代理可用" : "代理不可用", result,
                                     result.startsWith("连接成功") ? 1 : 3);
                         });
-                    }, "TCL-Proxy-Test").start();
+                    });
                 }));
         proxy.add(actions);
         proxyNote.setText(Data.get().describeProxy());
@@ -1595,7 +2169,6 @@ public class PageSetup implements Page {
         Label speedNote = Ui.label("测速结果只代表当前网络到该源的连通质量，不影响已下载的内容。", 12, Theme.gray3);
         speedNote.setWrapText(true);
         speed.add(speedNote);
-        // 自定义源与系统页共用 SystemBmclRoot
         TextField customRoot = textRow(speed, "自定义源", "留空用内置源", data.get("SystemBmclRoot", ""),
                 s -> data.set("SystemBmclRoot", s == null ? "" : s.trim()));
         Label customHint = Ui.label("填自建或内网的 BMCLAPI 兼容镜像根（如 http://192.168.1.10:8080），"
@@ -1603,7 +2176,6 @@ public class PageSetup implements Page {
         customHint.setWrapText(true);
         speed.add(customHint);
         String[] sources = {"官方源 (piston-meta.mojang.com)", "BMCLAPI (bmclapi2.bangbang93.com)", "自定义源"};
-        // 对应 2 官方、0 镜像和自定义
         int[] wpfIndex = {2, 0};
         VBox results = new VBox(2);
         Label[] values = new Label[sources.length];
@@ -1623,7 +2195,6 @@ public class PageSetup implements Page {
             rows[i] = row;
             results.getChildren().add(row);
         }
-        // 自定义源没填就隐藏第 3 行
         Runnable syncCustomRow = () -> {
             String c = customRoot.getText() == null ? "" : customRoot.getText().trim();
             rows[2].setVisible(!c.isEmpty());
@@ -1636,7 +2207,7 @@ public class PageSetup implements Page {
         speed.add(summary);
         final int[] recommended = {-1};
         final boolean[] tested = {false};
-        final int[] customOn = {0}; // 1 = 测速时自定义源参与
+        final int[] customOn = {0};
         FlowPane speedActions = new FlowPane(10, 10);
         StackPane applyBtn = Ui.button("应用推荐源", Ui.BTN_NORMAL, () -> {
             if (!tested[0] || recommended[0] < 0) {
@@ -1645,7 +2216,6 @@ public class PageSetup implements Page {
             }
             int idx = recommended[0];
             if (idx >= 2) {
-                // 自定义源走镜像优先，Downloader 会读 SystemBmclRoot
                 data.set("SystemDownloadSource", 2);
                 data.set("SystemVersionSource", 0);
                 win.toast("已应用", "下载源已切换为 " + names[2].getText(), 1);
@@ -1659,7 +2229,7 @@ public class PageSetup implements Page {
         });
         final StackPane[] testBtn = new StackPane[1];
         testBtn[0] = Ui.button("开始测速", Ui.BTN_HIGHLIGHT, () -> {
-            summary.setText("测速中…（单次超时 5 秒）");
+            summary.setText(Lang.t("测速中…（单次超时 5 秒）"));
             String raw = customRoot.getText() == null ? "" : customRoot.getText().trim();
             while (raw.endsWith("/")) raw = raw.substring(0, raw.length() - 1);
             final String customUrl;
@@ -1676,23 +2246,25 @@ public class PageSetup implements Page {
                 values[i].setText("— ms");
                 values[i].setTextFill(Theme.gray3);
             }
-            new Thread(() -> {
+            Threads.start("TCL-SourceTest", () -> {
                 long[] ms = new long[liveUrls.length];
                 customOn[0] = customUrl.isEmpty() ? 0 : 1;
                 for (int i = 0; i < liveUrls.length; i++) {
-                    if (i == 2 && customUrl.isEmpty()) { ms[i] = -2; continue; } // -2 = 未参与
+                    if (i == 2 && customUrl.isEmpty()) { ms[i] = -2; continue; }
                     long start = System.currentTimeMillis();
+                    java.net.HttpURLConnection conn = null;
                     try {
-                        java.net.HttpURLConnection conn = (java.net.HttpURLConnection)
+                        conn = (java.net.HttpURLConnection)
                                 java.net.URI.create(liveUrls[i]).toURL().openConnection();
                         conn.setConnectTimeout(5000);
                         conn.setReadTimeout(5000);
                         conn.setRequestMethod("HEAD");
                         conn.getResponseCode();
-                        conn.disconnect();
                         ms[i] = System.currentTimeMillis() - start;
                     } catch (Exception e) {
                         ms[i] = -1;
+                    } finally {
+                        if (conn != null) conn.disconnect();
                     }
                 }
                 int best = -1;
@@ -1706,25 +2278,24 @@ public class PageSetup implements Page {
                 Platform.runLater(() -> {
                     for (int i = 0; i < values.length; i++) {
                         if (i == 2 && customOn[0] == 0) {
-                            values[i].setText("未设置");
+                            values[i].setText(Lang.t("未设置"));
                             values[i].setTextFill(Theme.gray3);
                             continue;
                         }
-                        values[i].setText(ms[i] < 0 ? "超时" : ms[i] + " ms");
+                        values[i].setText(ms[i] < 0 ? Lang.t("超时") : ms[i] + " ms");
                         values[i].setTextFill(ms[i] < 0 ? Theme.red
                                 : ms[i] < 100 ? Theme.green : ms[i] < 300 ? Theme.orange : Theme.red);
                     }
-                    summary.setText(bestIndex < 0 ? "全部下载源均不可用，请检查网络或代理设置。"
-                            : "推荐：" + bestName);
+                    summary.setText(bestIndex < 0 ? Lang.t("全部下载源均不可用，请检查网络或代理设置。")
+                            : Lang.t("推荐：") + bestName);
                     testBtn[0].setDisable(false);
                 });
-            }, "TCL-SourceTest").start();
+            });
         });
         speedActions.getChildren().addAll(testBtn[0], applyBtn);
         speed.add(speedActions);
     }
 
-    /** 请求官方版本清单，测当前代理延迟。 */
     private String testProxy() {
         Data d = Data.get();
         int mode = d.getInt("SystemHttpProxyType", 1);
@@ -1742,7 +2313,8 @@ public class PageSetup implements Page {
                         new java.net.InetSocketAddress(host, Integer.parseInt(port)));
             }
         } catch (Exception e) {
-            return "代理参数无效：" + e.getMessage();
+            // 返回串经 setText/toast 展示，都不经过 localize，创建处翻译
+            return Lang.tf("代理参数无效：%s", e.getMessage());
         }
         long start = System.currentTimeMillis();
         try {
@@ -1771,7 +2343,6 @@ public class PageSetup implements Page {
 
     private void comboRow(Ui.Card card, String label, String[] items, int selected, Consumer<Integer> onChange) {
         ComboBox<String> combo = Ui.combo(items, selected);
-        // 占满右侧整列，长文案不截断
         combo.setPrefWidth(220);
         combo.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(combo, Priority.ALWAYS);
@@ -1812,4 +2383,31 @@ public class PageSetup implements Page {
         return slider;
     }
 
+    // 拖动时只更新数字，动作合并到停下 80ms 后执行，不然每个事件都重建样式表
+    private Ui.SliderBar sliderRowDebounced(Ui.Card card, String label, double min, double max, double value,
+                                            Consumer<Double> onChange, String suffix) {
+        Ui.SliderBar slider = Ui.sliderBar(min, max, value);
+        slider.setPrefWidth(240);
+        Label val = Ui.label(Math.round(value) + suffix, 12, Theme.text);
+        val.setMinWidth(54);
+        final double[] pending = {value};
+        final boolean[] waiting = {false};
+        final javafx.animation.PauseTransition debounce =
+                new javafx.animation.PauseTransition(javafx.util.Duration.millis(80));
+        debounce.setOnFinished(e -> {
+            if (!waiting[0]) return;
+            waiting[0] = false;
+            onChange.accept(pending[0]);
+        });
+        slider.setOnChanged(v -> {
+            val.setText(Math.round(v) + suffix);
+            pending[0] = v;
+            waiting[0] = true;
+            debounce.playFromStart();
+        });
+        HBox box = new HBox(10, slider, val);
+        box.setAlignment(Pos.CENTER_LEFT);
+        card.add(Ui.settingRow(label, box));
+        return slider;
+    }
 }

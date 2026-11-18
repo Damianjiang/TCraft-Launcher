@@ -13,7 +13,6 @@ import java.io.InputStream;
 
 import javax.imageio.ImageIO;
 
-/** 启动加载窗：检查资源、下载 JavaFX、准备界面时显示。 */
 public final class StartupWindow {
 
     private static final int W = 460;
@@ -22,11 +21,16 @@ public final class StartupWindow {
     private static final Color TEXT = new Color(0x34, 0x3d, 0x4a);
     private static final Color GRAY = new Color(0x73, 0x73, 0x73);
     private static final Color TRACK = new Color(0xe6, 0xe8, 0xeb);
+    private static final Font FONT_LOGO = new Font("Microsoft YaHei UI", Font.BOLD, 20);
+    private static final Font FONT_TITLE = new Font("Microsoft YaHei UI", Font.BOLD, 17);
+    private static final Font FONT_STATUS = new Font("Microsoft YaHei UI", Font.PLAIN, 12);
+    private static final Font FONT_PCT = new Font("Microsoft YaHei UI", Font.PLAIN, 11);
 
     private final Window window;
     private final Panel panel;
     private final long openedAt = System.currentTimeMillis();
-    private volatile String status = "准备 TCL 启动器中…";
+    // AWT 自绘文案不经 localize，创建时就要按当前语言取值（Boot 已先读好 SystemLanguage）
+    private volatile String status = Lang.t("准备 TCL 启动器中…");
     private volatile int percent = -1;
     private volatile boolean closed;
     private Thread animator;
@@ -62,7 +66,6 @@ public final class StartupWindow {
         }
     }
 
-    /** 无界面或创建失败时的空实现。 */
     private StartupWindow(boolean headless) {
         window = null;
         panel = null;
@@ -130,7 +133,6 @@ public final class StartupWindow {
         return String.format(java.util.Locale.ROOT, "%.1f MB", bytes / 1048576.0);
     }
 
-    /** 加载卡片绘制，窗口和预览共用。 */
     static void paintCard(Graphics2D g2, String text, int value, Image logo) {
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
@@ -145,16 +147,16 @@ public final class StartupWindow {
             g2.setColor(ACCENT);
             g2.fillRoundRect(26, 49, 72, 72, 16, 16);
             g2.setColor(Color.WHITE);
-            g2.setFont(new Font("Microsoft YaHei UI", Font.BOLD, 20));
+            g2.setFont(FONT_LOGO);
             g2.drawString("TCL", 42, 92);
         }
 
         g2.setColor(TEXT);
-        g2.setFont(new Font("Microsoft YaHei UI", Font.BOLD, 17));
+        g2.setFont(FONT_TITLE);
         g2.drawString("TCraft Launcher", 116, 46);
 
         g2.setColor(GRAY);
-        g2.setFont(new Font("Microsoft YaHei UI", Font.PLAIN, 12));
+        g2.setFont(FONT_STATUS);
         g2.drawString(clip(text, 330, g2), 116, 75);
 
         int x = 116, y = 101, w = 318, h = 8;
@@ -165,7 +167,7 @@ public final class StartupWindow {
             g2.setColor(ACCENT);
             g2.fillRoundRect(x, y, fill, h, h, h);
             g2.setColor(new Color(0x8c, 0x8c, 0x8c));
-            g2.setFont(new Font("Microsoft YaHei UI", Font.PLAIN, 11));
+            g2.setFont(FONT_PCT);
             String p = value + "%";
             g2.drawString(p, x + w - g2.getFontMetrics().stringWidth(p), y - 7);
         } else {
@@ -181,11 +183,12 @@ public final class StartupWindow {
     private static String clip(String text, int width, Graphics2D g2) {
         if (text == null) return "";
         if (g2.getFontMetrics().stringWidth(text) <= width) return text;
-        String out = text;
-        while (out.length() > 1 && g2.getFontMetrics().stringWidth(out + "…") > width) {
-            out = out.substring(0, out.length() - 1);
-        }
-        return out + "…";
+        // 按平均字宽估一次截断点，别逐字符量（O(n²)）
+        java.awt.FontMetrics fm = g2.getFontMetrics();
+        int avg = Math.max(1, fm.stringWidth(text) / text.length());
+        int keep = Math.max(1, (width - fm.stringWidth("…")) / avg);
+        if (keep >= text.length()) keep = text.length() - 1;
+        return text.substring(0, keep) + "…";
     }
 
     private final class Panel extends java.awt.Panel {

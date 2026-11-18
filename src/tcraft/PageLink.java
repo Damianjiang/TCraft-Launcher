@@ -20,7 +20,6 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 
-/** 联机页：选择、加载、完成三种状态。 */
 public class PageLink implements Page {
 
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -29,43 +28,32 @@ public class PageLink implements Page {
 
     private static volatile State state = State.SELECT;
     private static boolean serverSide;
-    /** Base64 联机码，房主生成后复制给朋友。 */
     private static String linkCode = "";
     private static String networkName = "";
     private static String networkSecret = "";
     private static int serverPort = 25565;
-    /** 上一次粘贴的联机码，下次加入时预填。 */
     private static String lastCode = "";
     private static volatile String loadingStage = "准备联机模块…";
     private static String loadingError = null;
     private static int rpcPort = -1;
     private static String clientAddress = "";
-    /** 联机码版本号，不一致就互不认码。 */
     private static final int LINK_CODE_VERSION = 3;
-    private static double linkPing;
-    private static int peopleCount = 1;
-    /** 自己的 NAT 类型，10 表示未知。 */
-    private static int myNat = 10;
-    /** 目标节点，加入方是房主。 */
-    private static EasyTier.Peer targetPeer;
-    /** 发现节点 ID，-1 表示待选。 */
+    // 联机线程写、FX 线程读，double 不加 volatile 有撕裂风险
+    private static volatile double linkPing;
+    private static volatile int peopleCount = 1;
+    private static volatile int myNat = 10;
+    private static volatile EasyTier.Peer targetPeer;
     private static int discoverNodeId = -1;
-    /** 联机码里带的房主节点地址，加入时优先直连。 */
     private static String pendingNode = "";
-    /** 实际使用的节点地址与测速结果，会写进联机码和复制文案。 */
     private static String selectedNode = "";
     private static int selectedNodePing = -1;
-    /** 完成页连接质量提示。 */
     private static String hintText = "";
     private static int hintType = -1;
     private static VBox hintSlot;
     private static volatile Thread worker;
-    /** 每次重建完成页递增，旧的状态轮询线程看到变化就退出。 */
     private static volatile int peerGeneration;
-    /** 加载进度 0~1。 */
     private static final javafx.beans.property.DoubleProperty loadingProgress =
             new javafx.beans.property.SimpleDoubleProperty(0.06);
-    /** 加载卡片里的说明文字。 */
     private static Label loadingDescLabel;
 
     private final MainWindow win;
@@ -86,7 +74,6 @@ public class PageLink implements Page {
             default -> root.getChildren().add(buildSelect());
         }
 
-        // 底部水印，悬停变强调色
         Label always = Ui.label("TCraft", 12.5, Theme.text);
         always.setOpacity(0.4);
         always.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_ENTERED,
@@ -196,12 +183,11 @@ public class PageLink implements Page {
     private Node buildLoading() {
         if (loadingError != null) return buildError();
 
-        // 加载卡片，底部 2px 进度条
         StackPane card = new StackPane();
         card.setMinWidth(300);
         card.setPrefWidth(430);
         card.setMaxWidth(430);
-        card.setMaxHeight(Region.USE_PREF_SIZE); // 不设会被外层拉成整页高
+        card.setMaxHeight(Region.USE_PREF_SIZE);
         card.setBackground(Ui.fill(Theme.cardBg, 12));
         card.setBorder(Ui.border(Color.web("#000000", 0.07), 12, 1));
 
@@ -221,7 +207,6 @@ public class PageLink implements Page {
         row.getChildren().addAll(loading, texts);
         card.getChildren().add(row);
 
-        // 底部进度条，宽度按进度
         Rectangle fill = new Rectangle();
         fill.setHeight(2);
         fill.setFill(Theme.accent);
@@ -325,7 +310,7 @@ public class PageLink implements Page {
         hintText = "";
         hintType = -1;
         column.getChildren().addAll(hintSlot, card, infoCard());
-        updateFinishInfo(); // 先填一遍提示和数值
+        updateFinishInfo();
 
         StackPane holder = new StackPane(column);
         holder.setAlignment(Pos.CENTER);
@@ -334,7 +319,6 @@ public class PageLink implements Page {
         return holder;
     }
 
-    /** 房主给联机码，加入方给地址。 */
     private String finishDesc() {
         if (serverSide) {
             return Lang.tf("把下面的 Base64 联机码整段发给朋友，让他们在「加入房间」里粘贴即可。\n%s\n%s",
@@ -348,7 +332,6 @@ public class PageLink implements Page {
     private static Label peopleLabel;
 
     private Node infoCard() {
-        // 房主显示端口，加入方显示 IP
         HBox row = new HBox(0);
         row.setAlignment(Pos.CENTER_LEFT);
         row.setPadding(new Insets(0, 3, 0, 3));
@@ -373,7 +356,6 @@ public class PageLink implements Page {
         return row;
     }
 
-    /** 延迟 >=10ms 取整，没测到显示连接优化中。 */
     private static String pingText(double ping) {
         if (ping <= 0) return "连接优化中";
         return ping >= 10 ? String.format(java.util.Locale.ROOT, "%.0f ms", ping)
@@ -388,10 +370,9 @@ public class PageLink implements Page {
         return serverPort;
     }
 
-    /** 每秒刷延迟和人数，断线或房主跑掉直接提示。 */
     private void refreshPeersAsync() {
         final int port = rpcPort;
-        if (port < 0) return; // 没启动时没有 CLI 可查
+        if (port < 0) return;
         final int generation = ++peerGeneration;
         Thread t = new Thread(() -> {
             int fails = 0;
@@ -411,6 +392,8 @@ public class PageLink implements Page {
                     final boolean lost = !anyOther;
                     final boolean hostGone = !serverSide && !hasServer;
                     javafx.application.Platform.runLater(() -> {
+                        // 页面不在前台就只监测不弹 UI，回到页面再提示
+                        if (!"link".equals(win.currentKey)) return;
                         updateFinishInfo();
                         if (!warned[0] && hostGone) {
                             Dialogs.confirm(win, "联机结束", "房主已离开房间！", this::doExitRoom);
@@ -437,7 +420,6 @@ public class PageLink implements Page {
         t.start();
     }
 
-    /** 把延迟、人数和提示刷到完成页。 */
     private static void updateFinishInfo() {
         if (pingLabel != null) pingLabel.setText(Lang.t(pingText(linkPing)));
         if (peopleLabel != null) peopleLabel.setText(Lang.tf("%d 人", peopleCount));
@@ -451,10 +433,10 @@ public class PageLink implements Page {
                 else text = Lang.t("你或者房主的网络环境不太好，");
                 boolean custom = !Data.get().get("LinkRelay", "").isBlank();
                 text += Lang.t(custom ? "正通过自定义节点进行中继。" : "正使用社区节点进行中继。");
-                type = 1; // 黄
+                type = 1;
             } else if (myNat >= 1 && myNat < 5 && targetPeer.natType >= 5) {
                 text = Lang.t("你的网络环境比房主更好！如果你来当房主，其他玩家或许能更加流畅！");
-                type = 0; // 蓝
+                type = 0;
             }
         }
         if (!text.equals(hintText) || type != hintType) {
@@ -500,7 +482,6 @@ public class PageLink implements Page {
         return line;
     }
 
-    /** 复制 Base64 联机码和当前实际节点，整段发给朋友即可。 */
     private void copyCode() {
         String text = Lang.tf("在 TCL 启动器「联机 → 加入房间」中粘贴下面的 Base64 联机码，即可加入房间：\n%s\n%s",
                 linkCode, nodeText());
@@ -510,14 +491,12 @@ public class PageLink implements Page {
         win.toast("已复制联机码！", nodeText(), 1);
     }
 
-    /** 实际使用的节点地址，带测速结果。 */
     private static String nodeText() {
         if (selectedNode.isEmpty()) return Lang.t("节点：未知");
         String ping = selectedNodePing >= 0 ? Lang.tf("（%d ms）", selectedNodePing) : "";
         return Lang.tf("节点：%s%s", selectedNode, ping);
     }
 
-    /** 联机码太长，按固定宽度折行显示。 */
     private static String wrapCode(String code) {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < code.length(); i++) {
@@ -528,7 +507,6 @@ public class PageLink implements Page {
     }
 
     private void exitRoom() {
-        // 还有别人在线时先确认
         if (serverSide && peopleCount > 1) {
             Dialogs.confirm(win, "退出联机",
                     "你确定要关闭联机房间吗？\n所有玩家都需要重新粘贴联机码才可加入游戏！",
@@ -567,7 +545,6 @@ public class PageLink implements Page {
             win.toast("联机已禁用", "请先在 设置 → 联机 中启用联机功能。", 2);
             return;
         }
-        // 无 TUN 模式不需要管理员权限
         TextField field = Ui.field("25565");
         field.setText("25565");
         field.setPrefHeight(32);
@@ -587,7 +564,7 @@ public class PageLink implements Page {
                     }
                     serverSide = true;
                     serverPort = port;
-                    discoverNodeId = -1; // 房主运行时再挑发现节点
+                    discoverNodeId = -1;
                     pendingNode = "";
                     String hexPort = Integer.toHexString(port).toUpperCase(java.util.Locale.ROOT);
                     while (hexPort.length() < 4) hexPort = "0" + hexPort;
@@ -606,7 +583,6 @@ public class PageLink implements Page {
         TextField field = Ui.field("粘贴 Base64 联机码");
         field.setText(lastCode);
         field.setPrefHeight(32);
-        // 整段粘贴后自动识别并连接
         PauseTransition auto = new PauseTransition(javafx.util.Duration.millis(200));
         auto.setOnFinished(e -> {
             if (field.getScene() == null) return;
@@ -623,12 +599,13 @@ public class PageLink implements Page {
                 lastCode.isEmpty() ? "" : "使用上一次的联机码", field, this::joinWithCode);
     }
 
-    /** 解析 Base64 联机码并开始加入，成功返回 true。 */
     private boolean joinWithCode(String raw) {
-        if (state == State.LOADING) return true; // 自动连上后又被点了一次确定
+        if (state == State.LOADING) return true;
+        lastDecodeError = "";
         Map<String, Object> payload = decodeLinkCode(raw);
         if (payload == null) {
-            win.toast("联机码有误", "请粘贴房主发给你的完整 Base64 联机码。", 2);
+            win.toast("联机码有误", lastDecodeError.isEmpty()
+                    ? "请粘贴房主发给你的完整 Base64 联机码。" : lastDecodeError, 2);
             return false;
         }
         int version = (int) Json.num(payload, "v", 0);
@@ -661,29 +638,24 @@ public class PageLink implements Page {
         return true;
     }
 
-    /** 房间名和密码只允许字母、数字、下划线与短横线，避免拼接进启动参数。 */
     private static boolean safeToken(String s) {
         return s != null && s.matches("[A-Za-z0-9_-]{1,64}");
     }
 
-    /** 节点地址不允许空白和引号，防止被拆成额外的启动参数。 */
     private static boolean safeNode(String s) {
         return s != null && s.length() <= 300
                 && s.matches("[A-Za-z][A-Za-z0-9+.-]*://[^\\s\"'`]{1,290}");
     }
 
-    /** 从整段粘贴内容里提取 Base64 联机码，解不出来返回 null。 */
     private static Map<String, Object> decodeLinkCode(String raw) {
         String token = extractToken(raw);
         return token.isEmpty() ? null : decodePayload(token);
     }
 
-    /** 提取有效联机码：先整段解，再去掉空白找最长片段。 */
     private static String extractToken(String raw) {
         if (raw == null) return "";
         String text = raw.trim();
         if (decodePayload(text) != null) return text;
-        // 显示时会按 44 字符折行，粘贴回来带换行也要能认
         text = text.replaceAll("\\s+", "");
         if (decodePayload(text) != null) return text;
         java.util.regex.Matcher m = java.util.regex.Pattern
@@ -695,59 +667,28 @@ public class PageLink implements Page {
         return decodePayload(best) != null ? best : "";
     }
 
+    private static String lastDecodeError = "";
+
     private static Map<String, Object> decodePayload(String token) {
         if (token == null || token.length() < 8 || token.length() > 4096) return null;
         try {
             byte[] bytes = Base64.getUrlDecoder().decode(
                     token.replace('+', '-').replace('/', '_'));
-            Map<String, Object> payload = Json.obj(Json.parse(new String(bytes, StandardCharsets.UTF_8)));
-            return payload.containsKey("v") ? payload : null;
+            String text = new String(bytes, StandardCharsets.UTF_8);
+            try {
+                Map<String, Object> payload = Json.obj(Json.parse(text));
+                lastDecodeError = "";
+                return payload.containsKey("v") ? payload : null;
+            } catch (Json.MalformedException e) {
+                // lastDecodeError 经 toast 展示，整串查不到表，创建处翻译
+                lastDecodeError = Lang.tf("联机码内容不是合法 JSON：%s",
+                        e.getMessage() == null ? Lang.t("格式损坏") : e.getMessage());
+                return null;
+            }
         } catch (Exception e) {
+            lastDecodeError = Lang.tf("联机码 Base64 解码失败：%s",
+                    e.getMessage() == null ? Lang.t("格式损坏") : e.getMessage());
             return null;
-        }
-    }
-
-    /** 只给 --page=link 截图用。 */
-    static void debugState(String name) {
-        switch (name) {
-            case "loading" -> {
-                state = State.LOADING;
-                serverSide = true;
-                loadingStage = "正在启动联机模块…";
-                loadingError = null;
-            }
-            case "error" -> {
-                state = State.LOADING;
-                serverSide = true;
-                loadingError = "无法连接到房主：可能的原因是网络环境不佳、房主已关闭房间或联机码输错。";
-            }
-            case "finish" -> {
-                state = State.FINISH;
-                serverSide = true;
-                loadingError = null;
-                networkName = "P63DD-2QK8X";
-                networkSecret = "02000";
-                serverPort = 25565;
-                discoverNodeId = 0;
-                selectedNode = "tcp://etnode.zkitefly.eu.org:11010";
-                selectedNodePing = 23;
-                linkCode = buildLinkCode();
-                // 房主一个人时的样子
-                linkPing = 0;
-                peopleCount = 1;
-            }
-            case "finishClient" -> {
-                state = State.FINISH;
-                serverSide = false;
-                loadingError = null;
-                clientAddress = "localhost:25565";
-                linkPing = 0;
-                peopleCount = 3;
-            }
-            default -> {
-                state = State.SELECT;
-                loadingError = null;
-            }
         }
     }
 
@@ -781,7 +722,6 @@ public class PageLink implements Page {
         javafx.application.Platform.runLater(() -> {
             Label desc = loadingDescLabel;
             if (state == State.LOADING && desc != null && desc.getScene() != null) {
-                // 只改这一行字
                 desc.setText(display);
                 double from = loadingProgress.get();
                 double to = Math.min(0.92, from + 0.12);
@@ -796,7 +736,6 @@ public class PageLink implements Page {
         });
     }
 
-    /** 读监听端口，非法就回退随机端口。 */
     private static int configuredPort() {
         try {
             int p = Integer.parseInt(Data.get().get("LinkPort", "11010").trim());
@@ -806,7 +745,6 @@ public class PageLink implements Page {
         }
     }
 
-    /** 联机流程：装模块、取节点、启动 core、等连上。 */
     private void runLink() {
         try {
             EasyTier.ensureInstalled(false, (stage, v) -> setStage(stage));
@@ -815,7 +753,6 @@ public class PageLink implements Page {
             setStage("正在获取节点列表…");
             java.util.List<String> peerAddresses = resolvePeers();
             if (Thread.currentThread().isInterrupted()) return;
-            // 房主生成 Base64 联机码，带上实际使用的节点地址
             if (serverSide) linkCode = buildLinkCode();
 
             int port = EasyTier.freePort();
@@ -825,7 +762,7 @@ public class PageLink implements Page {
             int clientPort = EasyTier.freePort();
             String host = (serverSide ? "Server-" : "Client-") + stableName();
 
-            // 无 TUN 模式：普通用户权限即可组网，房主服务通过虚拟 IP 暴露
+            // 无 TUN：普通用户即可组网，房主服务走虚拟 IP
             StringBuilder a = new StringBuilder("--no-tun --console-log-level info");
             a.append(" --network-name=").append(networkName)
                     .append(" --network-secret=").append(networkSecret)
@@ -850,17 +787,15 @@ public class PageLink implements Page {
 
             waitUntilConnected(port);
             if (Thread.currentThread().isInterrupted()) return;
-            if (!serverSide) waitStable(port); // 加入方再多等最多 5 秒
+            if (!serverSide) waitStable(port);
 
             state = State.FINISH;
             javafx.application.Platform.runLater(() -> {
                 win.reloadPage();
-                // 房主的联机码直接进剪贴板
                 if (serverSide) copyCode();
                 else win.toast("已加入房间", clientAddress, 1);
             });
         } catch (InterruptedException e) {
-            // 用户取消
         } catch (Exception e) {
             if (Thread.currentThread().isInterrupted() || state == State.SELECT) return;
             EasyTier.stop();
@@ -876,12 +811,11 @@ public class PageLink implements Page {
         }
     }
 
-    /** 轮询 CLI 直到能 ping 到目标节点。 */
     private void waitUntilConnected(int port) throws Exception {
         long begin = System.currentTimeMillis();
         while (System.currentTimeMillis() - begin < 90_000) {
             if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
-            Thread.sleep(500); // 先等 core 起好
+            Thread.sleep(500);
             if (EasyTier.crashed()) {
                 String tail = EasyTier.logTail(6);
                 throw new Exception(Lang.t("联机模块已崩溃，请重试或查看日志。")
@@ -904,7 +838,6 @@ public class PageLink implements Page {
                 : Lang.t("无法连接到房主：可能的原因是网络环境不佳、房主已关闭房间或联机码输错。"));
     }
 
-    /** 加入方再等 5 秒，让连接优化成直连。 */
     private void waitStable(int port) {
         setStage("连接优化中……");
         for (int i = 0; i < 50; i++) {
@@ -919,11 +852,10 @@ public class PageLink implements Page {
         }
     }
 
-    /** 折算节点列表：人数、最低延迟节点。 */
     private static void applyPeers(java.util.List<EasyTier.Peer> peers) {
         if (peers == null) return;
         EasyTier.Peer best = null;
-        int count = 1; // 自己也算一个人
+        int count = 1;
         for (EasyTier.Peer p : peers) {
             if (p.type == EasyTier.PEER_SELF) {
                 myNat = p.natType;
@@ -939,7 +871,6 @@ public class PageLink implements Page {
         if (best != null) linkPing = best.ping;
     }
 
-    /** 节点测速结果，键是节点地址。 */
     private static final Map<String, Integer> nodeLatency = new java.util.concurrent.ConcurrentHashMap<>();
 
     private static int latencyOf(String address) {
@@ -947,7 +878,6 @@ public class PageLink implements Page {
         return ms == null ? -1 : ms;
     }
 
-    /** 并发测速后按延迟升序返回，测不通的保持原顺序排后面。 */
     private static List<String> rankByLatency(List<String> addresses) {
         List<String> probe = new ArrayList<>();
         for (String one : addresses) {
@@ -957,7 +887,7 @@ public class PageLink implements Page {
         }
         List<String> ranked = new ArrayList<>(probe);
         if (!probe.isEmpty()) {
-            // 节点太多就只测前 12 个，避免联机等待过久
+            // 节点太多就只测前 12 个，联机等不了那么久
             List<String> measure = probe.size() > 12 ? new ArrayList<>(probe.subList(0, 12)) : probe;
             nodeLatency.putAll(EasyTier.measureNodes(measure, 1200));
             ranked.sort((a, b) -> {
@@ -976,17 +906,15 @@ public class PageLink implements Page {
         return ranked;
     }
 
-    /** 取节点列表：自动模式先测速，房主挑最快节点，加入方按联机码找。 */
     private java.util.List<String> resolvePeers() {
         List<String> out = new ArrayList<>();
         nodeLatency.clear();
         Data d = Data.get();
-        // 加入方始终使用联机码里房主的实际节点，避免双方连到不同节点
+        // 加入方始终使用联机码里房主的实际节点，双方必须连到同一个节点
         if (!serverSide && !pendingNode.isBlank()) {
             out.add(pendingNode);
             selectedNode = pendingNode;
         }
-        // 0 自动、1~3 指定内置节点、4 自定义
         int peer = d.getInt("LinkPeer", 0);
         String custom = d.get("LinkCustomPeer", "");
         if (custom == null || custom.isBlank()) custom = d.get("LinkRelay", ""); // 兼容旧配置
@@ -1044,7 +972,6 @@ public class PageLink implements Page {
                 setStage(Lang.tf("已选择节点 %s", best));
                 return out;
             }
-            // 加入方没带节点地址时按节点 ID 找
             if (pendingNode.isBlank()) {
                 if (discoverNodeId > 0) {
                     EasyTier.Node discover = null;
@@ -1073,7 +1000,6 @@ public class PageLink implements Page {
                     }
                 }
             }
-            // 中继节点也测速，快的先用
             List<String> relays = new ArrayList<>();
             for (EasyTier.Node n : nodes) {
                 if (!n.allowRelay || out.contains(n.address)) continue;
@@ -1091,7 +1017,6 @@ public class PageLink implements Page {
             if (out.isEmpty()) throw new Exception("没有可用的发现节点");
             return out;
         } catch (Exception e) {
-            // 官方源不可用就退回内置节点，同样测速后排序
             Data.get().log("联机：节点列表不可用，改用内置节点（" + e.getMessage() + "）");
             List<String> fallback = new ArrayList<>(java.util.Arrays.asList(EasyTier.PUBLIC_PEERS));
             for (String one : rankByLatency(fallback)) {
@@ -1116,7 +1041,6 @@ public class PageLink implements Page {
         }
     }
 
-    /** Base64 联机码：房间名、密码、端口、发现节点 ID 与实际节点地址。 */
     private static String buildLinkCode() {
         String payload = "{\"v\":" + LINK_CODE_VERSION
                 + ",\"n\":" + Json.quote(networkName)
@@ -1127,7 +1051,6 @@ public class PageLink implements Page {
         return Base64.getEncoder().encodeToString(payload.getBytes(StandardCharsets.UTF_8));
     }
 
-    /** 稳定的节点名。 */
     private String stableName() {
         int hash = (System.getProperty("user.name", "player") + "@" + System.getProperty("os.name", ""))
                 .hashCode() & 0x7fffffff;
@@ -1156,7 +1079,6 @@ public class PageLink implements Page {
         card.getChildren().addAll(Ui.bold(title, 17, Theme.text), body);
         if (!hint.isEmpty()) card.getChildren().add(Ui.label(hint, 12, Theme.gray2));
         card.getChildren().addAll(field, actions);
-        // 回车等同于点确定，少点一下
         field.setOnAction(e -> submit.run());
         win.showModal(card);
         javafx.application.Platform.runLater(field::requestFocus);

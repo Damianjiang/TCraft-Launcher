@@ -19,7 +19,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-/** 实例页，左文件夹右列表，支持网格视图。 */
 public class PageInstance implements Page {
 
     private final MainWindow win;
@@ -29,7 +28,6 @@ public class PageInstance implements Page {
     private String query = "";
     private PauseTransition searchDebounce;
     private int sortMode = 0;
-    /** 当前合集筛选，空串表示全部。 */
     private String collectionFilter = "";
     private HBox collectionChips;
     private ScrollPane collectionBar;
@@ -41,7 +39,6 @@ public class PageInstance implements Page {
     public PageInstance(MainWindow win, boolean selectMode) {
         this.win = win;
         this.selectMode = selectMode;
-        // 视图模式和排序存配置
         this.gridView = data.getBool("UiInstanceGridView", false);
         this.sortMode = Math.max(0, Math.min(3, data.getInt("UiInstanceSort", 0)));
     }
@@ -66,7 +63,7 @@ public class PageInstance implements Page {
         Ui.SearchBox search = Ui.searchBox("搜索实例");
         search.textProperty().addListener((o, a, b) -> {
             query = b == null ? "" : b.toLowerCase();
-            // 连续输入时只重建一次列表，避免每个按键都重排
+            // 连续输入时只重建一次列表，不必每个按键都重排
             if (searchDebounce == null) {
                 searchDebounce = new PauseTransition(Duration.millis(180));
                 searchDebounce.setOnFinished(e -> refreshList());
@@ -107,13 +104,11 @@ public class PageInstance implements Page {
         toolbar.setAlignment(Pos.CENTER_LEFT);
         toolbar.setMaxWidth(Double.MAX_VALUE);
         toolbar.setPadding(new Insets(14, 25, 4, 25));
-        // 搜索框自带卡底，别再包圆角容器
         HBox.setHgrow(search, Priority.ALWAYS);
         search.setMinWidth(120);
         search.setPrefWidth(260);
         toolbar.getChildren().addAll(search, sort, toolIcons);
 
-        // 没有合集时整条隐藏
         collectionChips = new HBox(6);
         collectionChips.setAlignment(Pos.CENTER_LEFT);
         collectionChips.setPadding(new Insets(2, 0, 2, 0));
@@ -157,7 +152,6 @@ public class PageInstance implements Page {
         if (refreshRunner != null) refreshRunner.run();
     }
 
-    /** 重建合集标签栏。 */
     private void refreshCollectionBar() {
         if (collectionBar == null || collectionChips == null) return;
         List<String> all = InstanceMeta.CollectionsStore.listAll();
@@ -174,7 +168,6 @@ public class PageInstance implements Page {
         for (String one : all) collectionChips.getChildren().add(collectionChip(one, one));
     }
 
-    /** 一个合集标签，value 为空表示全部。 */
     private Node collectionChip(String text, String value) {
         boolean selected = collectionFilter.equals(value);
         Label lab = Ui.label(text, 12.5, selected ? Color.WHITE : Theme.text);
@@ -288,7 +281,6 @@ public class PageInstance implements Page {
         for (Data.Instance ins : list) parent.getChildren().add(instanceRow(ins));
     }
 
-    /** 实例属于当前游戏目录或它的隔离子目录。 */
     private static boolean belongsTo(String folder, String gameDir) {
         if (folder == null || folder.isEmpty() || gameDir == null || gameDir.isEmpty()) return true;
         try {
@@ -316,10 +308,15 @@ public class PageInstance implements Page {
         switch (sortMode) {
             case 1 -> list.sort(Comparator.comparing(a -> a.name.toLowerCase()));
             case 2 -> list.sort((a, b) -> b.version.compareTo(a.version));
-            case 3 -> list.sort((a, b) -> Long.compare(b.lastPlayed, a.lastPlayed));
+            case 3 -> list.sort((a, b) -> Long.compare(addedAtOf(b), addedAtOf(a)));
             default -> list.sort((a, b) -> Long.compare(b.lastPlayed, a.lastPlayed));
         }
         return list;
+    }
+
+    // 旧配置没有 addedAt，退回 lastPlayed
+    private static long addedAtOf(Data.Instance ins) {
+        return ins.addedAt > 0 ? ins.addedAt : ins.lastPlayed;
     }
 
     private Node instanceRow(Data.Instance ins) {
@@ -334,7 +331,6 @@ public class PageInstance implements Page {
         item.addAction(more);
         item.setOnMouseClicked(e -> chooseInstance(ins));
         if (data.instances.indexOf(ins) == data.selectedInstance) item.setSelected(true);
-        // 颜色标签：左侧 4px 竖条
         String tag = InstanceMeta.colorTag(ins);
         if (tag.isEmpty()) return item;
         javafx.scene.shape.Rectangle bar = new javafx.scene.shape.Rectangle(4, 28);
@@ -350,7 +346,6 @@ public class PageInstance implements Page {
         return host;
     }
 
-    /** 十六进制转 Color，非法值退回灰色。 */
     private static Color colorOf(String hex) {
         try {
             return Color.web(hex);
@@ -375,7 +370,6 @@ public class PageInstance implements Page {
         sub.setWrapText(true);
         sub.setMaxWidth(156);
         inner.getChildren().addAll(iconBox, name, sub);
-        // 颜色标签：卡片顶部一条 4px 横条
         String tag = InstanceMeta.colorTag(ins);
         if (!tag.isEmpty()) {
             Region bar = new Region();
@@ -402,109 +396,64 @@ public class PageInstance implements Page {
         if (selectMode) {
             win.toast("版本选择", "已选择 " + ins.name, 1);
             win.openPage("launch", true);
+        } else if (data.getBool("UiHiddenFunctionInstanceModify", false)) {
+            win.launchGame();
         } else {
             win.openInstanceSetup();
         }
     }
 
-    /** 实例「更多」菜单。 */
     private void showInstanceMenu(Node anchor, Data.Instance ins) {
-        Ui.menuCard(anchor,
-                Ui.MenuRow.of("启动游戏", "play", () -> {
-                    data.selectedInstance = data.instances.indexOf(ins);
-                    data.save();
-                    win.launchGame();
-                }),
-                Ui.MenuRow.separator(),
-                Ui.MenuRow.of("实例设置", "settings", () -> {
-                    data.selectedInstance = data.instances.indexOf(ins);
-                    data.instanceSection = "overview";
-                    data.save();
-                    win.openInstanceSetup();
-                }),
-                Ui.MenuRow.of("重命名", "pencil", () -> renameInstance(ins)),
-                Ui.MenuRow.of("复制实例", "copy", () -> duplicateInstance(ins)),
-                Ui.MenuRow.of("备份为压缩包", "archive", () -> backupInstance(ins)),
-                Ui.MenuRow.of("导出整合包", "package", () -> exportInstance(ins)),
-                Ui.MenuRow.of("更换图标", "image", () -> changeIcon(ins)),
-                Ui.MenuRow.of("颜色标签", "palette", () -> openSubMenu(() -> showColorMenu(anchor, ins))),
-                Ui.MenuRow.of("加入合集", "layers", () -> openSubMenu(() -> showCollectionMenu(anchor, ins))),
-                Ui.MenuRow.of("打开实例文件夹", "folder-open", () -> openFolder(Isolation.run(ins).toString())),
-                Ui.MenuRow.of("创建桌面快捷方式", "external-link", () -> createInstanceShortcut(ins)),
-                Ui.MenuRow.of(ins.favorite ? "取消收藏" : "加入收藏夹", "heart", () -> {
-                    ins.favorite = !ins.favorite;
+        Ui.menuCard(anchor, instanceRows(anchor, ins).toArray(new Ui.MenuRow[0]));
+    }
+
+    /** 一级菜单的行；二级菜单「返回」时原地重建同一份内容 */
+    private List<Ui.MenuRow> instanceRows(Node anchor, Data.Instance ins) {
+        List<Ui.MenuRow> rows = new ArrayList<>();
+        rows.add(Ui.MenuRow.of("启动游戏", "play", () -> {
+            data.selectedInstance = data.instances.indexOf(ins);
+            data.save();
+            win.launchGame();
+        }));
+        rows.add(Ui.MenuRow.separator());
+        if (!data.getBool("UiHiddenFunctionInstanceModify", false)) {
+            rows.add(Ui.MenuRow.of("实例设置", "settings", () -> {
+                data.selectedInstance = data.instances.indexOf(ins);
+                data.instanceSection = "overview";
+                data.save();
+                win.openInstanceSetup();
+            }));
+        }
+        rows.add(Ui.MenuRow.of("重命名", "pencil", () -> renameInstance(ins)));
+        rows.add(Ui.MenuRow.of("复制实例", "copy", () -> duplicateInstance(ins)));
+        rows.add(Ui.MenuRow.of("备份为压缩包", "archive", () -> backupInstance(ins)));
+        rows.add(Ui.MenuRow.of("导出整合包", "package", () -> exportInstance(ins)));
+        rows.add(Ui.MenuRow.of("更换图标", "image", () -> changeIcon(ins)));
+        rows.add(Ui.MenuRow.of("颜色标签", "palette", () -> Dialogs.colorTag(win, ins, this::refreshList)));
+        rows.add(Ui.MenuRow.submenu("加入合集", "layers", () -> showCollectionMenu(Ui.activeMenu(), anchor, ins)));
+        rows.add(Ui.MenuRow.of("打开实例文件夹", "folder-open", () -> openFolder(Isolation.run(ins).toString())));
+        rows.add(Ui.MenuRow.of("创建桌面快捷方式", "external-link", () -> createInstanceShortcut(ins)));
+        rows.add(Ui.MenuRow.of(ins.favorite ? "取消收藏" : "加入收藏夹", "heart", () -> {
+            ins.favorite = !ins.favorite;
+            data.save();
+            rebuild();
+        }));
+        rows.add(Ui.MenuRow.separator());
+        rows.add(Ui.MenuRow.of("删除", "trash-2", () -> Dialogs.confirm(win, "删除实例",
+                Lang.tf("确定要删除实例「%s」吗？\n只会从列表中移除，不会删除磁盘文件。", ins.name), () -> {
+                    data.instances.remove(ins);
+                    data.selectedInstance = 0;
                     data.save();
                     rebuild();
-                }),
-                Ui.MenuRow.separator(),
-                Ui.MenuRow.of("删除", "trash-2", () -> Dialogs.confirm(win, "删除实例",
-                        Lang.tf("确定要删除实例「%s」吗？\n只会从列表中移除，不会删除磁盘文件。", ins.name), () -> {
-                            data.instances.remove(ins);
-                            data.selectedInstance = 0;
-                            data.save();
-                            rebuild();
-                            win.toast("实例已删除", ins.name, 1);
-                        }, true)));
+                    win.toast("实例已删除", ins.name, 1);
+                }, true)));
+        return rows;
     }
 
-    /** 等一级卡片收起再开二级卡片。 */
-    private void openSubMenu(Runnable action) {
-        javafx.animation.PauseTransition wait =
-                new javafx.animation.PauseTransition(javafx.util.Duration.millis(100));
-        wait.setOnFinished(e -> action.run());
-        wait.play();
-    }
-
-    /** 颜色标签二级卡片。 */
-    private void showColorMenu(Node anchor, Data.Instance ins) {
-        VBox content = new VBox(0);
-        Label head = Ui.label("颜色标签", 12, Theme.gray2);
-        head.setOpacity(0.6);
-        VBox.setMargin(head, new Insets(4, 10, 2, 10));
-        FlowPane wrap = new FlowPane(6, 6);
-        wrap.setPadding(new Insets(2, 6, 6, 6));
-        final javafx.stage.Popup[] holder = new javafx.stage.Popup[1];
-        for (String[] preset : InstanceMeta.COLOR_TAGS) {
-            StackPane dot = new StackPane();
-            dot.setPrefSize(30, 30);
-            dot.setMinSize(30, 30);
-            dot.setMaxSize(30, 30);
-            dot.setBackground(Ui.fill(colorOf(preset[1]), 15));
-            dot.setCursor(Cursor.HAND);
-            Ui.tooltip(dot, preset[0]);
-            dot.setOnMouseClicked(e -> {
-                Ui.closeMenuCard(holder[0]);
-                InstanceMeta.setColorTag(ins, preset[1]);
-                refreshList();
-                win.toast("已设置颜色标签", preset[0], 1);
-            });
-            wrap.getChildren().add(dot);
-        }
-        content.getChildren().addAll(head, wrap);
-        Ui.ListItem clear = new Ui.ListItem(Theme.icon("x", 16, Theme.text), "清除标签", null, 34);
-        clear.setOnMouseClicked(e -> {
-            Ui.closeMenuCard(holder[0]);
-            InstanceMeta.setColorTag(ins, "");
-            refreshList();
-            win.toast("已清除颜色标签", ins.name, 1);
-        });
-        content.getChildren().add(clear);
-        Region sep = new Region();
-        sep.setMinHeight(1);
-        sep.setMaxHeight(1);
-        sep.setBackground(Ui.fill(Theme.gray6, 0));
-        VBox.setMargin(sep, new Insets(5, 8, 5, 8));
-        content.getChildren().add(sep);
-        content.getChildren().add(backRow(holder, anchor, ins));
-        holder[0] = Ui.menuCardNode(anchor, content, 232);
-    }
-
-    /** 加入合集二级卡片。 */
-    private void showCollectionMenu(Node anchor, Data.Instance ins) {
+    private void showCollectionMenu(javafx.stage.Popup popup, Node anchor, Data.Instance ins) {
         VBox content = new VBox(0);
         List<String> all = InstanceMeta.CollectionsStore.listAll();
         List<String> owned = InstanceMeta.collections(ins);
-        final javafx.stage.Popup[] holder = new javafx.stage.Popup[1];
         if (all.isEmpty()) {
             Label empty = Ui.label("还没有合集，先新建一个吧。", 12, Theme.gray2);
             empty.setWrapText(true);
@@ -524,7 +473,7 @@ public class PageInstance implements Page {
         }
         Ui.ListItem create = new Ui.ListItem(Theme.icon("circle-plus", 16, Theme.text), "新建合集…", null, 34);
         create.setOnMouseClicked(e -> {
-            Ui.closeMenuCard(holder[0]);
+            Ui.closeMenuCard(popup);
             Dialogs.input(win, "新建合集", "实例会加入这个新合集。", "", name -> {
                 if (name == null) return;
                 String error = InstanceMeta.CollectionsStore.validateName(name, "");
@@ -545,24 +494,18 @@ public class PageInstance implements Page {
         sep.setBackground(Ui.fill(Theme.gray6, 0));
         VBox.setMargin(sep, new Insets(5, 8, 5, 8));
         content.getChildren().add(sep);
-        content.getChildren().add(backRow(holder, anchor, ins));
-        holder[0] = Ui.menuCardNode(anchor, content, 232);
+        content.getChildren().add(backRow(popup, anchor, ins));
+        Ui.swapMenuCard(popup, content, 210);
     }
 
-    /** 返回行，收起当前卡片再开一级。 */
-    private Ui.ListItem backRow(javafx.stage.Popup[] holder, Node anchor, Data.Instance ins) {
+    /** 返回行：同一张卡片里换回一级菜单，不关窗、不重播动画 */
+    private Ui.ListItem backRow(javafx.stage.Popup popup, Node anchor, Data.Instance ins) {
         Ui.ListItem back = new Ui.ListItem(Theme.icon("arrow-left", 16, Theme.text), "返回", null, 34);
-        back.setOnMouseClicked(e -> {
-            Ui.closeMenuCard(holder[0]);
-            javafx.animation.PauseTransition wait =
-                    new javafx.animation.PauseTransition(javafx.util.Duration.millis(100));
-            wait.setOnFinished(x -> showInstanceMenu(anchor, ins));
-            wait.play();
-        });
+        back.setOnMouseClicked(e -> Ui.swapMenuCard(popup,
+                Ui.menuRows(instanceRows(anchor, ins).toArray(new Ui.MenuRow[0])), 210));
         return back;
     }
 
-    /** 只改记录名，不动磁盘目录。 */
     private void renameInstance(Data.Instance ins) {
         Dialogs.input(win, "重命名实例", "新的实例名称", ins.name, name -> {
             String n = name == null ? "" : name.trim();
@@ -580,11 +523,11 @@ public class PageInstance implements Page {
         });
     }
 
-    /** 换图标，按实例名复制进 res/images/Icons。 */
     private void changeIcon(Data.Instance ins) {
         FileChooser chooser = new FileChooser();
-        chooser.setTitle("选择实例图标");
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PNG 图片", "*.png"));
+        // OS 对话框不会经过 localize，创建处直接取翻译
+        chooser.setTitle(Lang.t("选择实例图标"));
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(Lang.t("PNG 图片"), "*.png"));
         File file = chooser.showOpenDialog(win.stage);
         if (file == null) return;
         try {
@@ -603,7 +546,6 @@ public class PageInstance implements Page {
         }
     }
 
-    /** 复制实例并重写版本 json 的 id。 */
     private void duplicateInstance(Data.Instance ins) {
         String defaultName = ins.name + "-副本";
         Dialogs.input(win, "复制实例", "新实例会得到独立的版本文件、Mod 与存档。", defaultName, name -> {
@@ -628,6 +570,7 @@ public class PageInstance implements Page {
                         Data.Instance copy = new Data.Instance(name, name, ins.loader, ins.loaderVersion,
                                 ins.description, ins.icon, System.currentTimeMillis(), false, targetFolder,
                                 isolated ? Isolation.ON : Isolation.OFF);
+                        copy.addedAt = System.currentTimeMillis();
                         data.instances.add(copy);
                         data.selectedInstance = data.instances.size() - 1;
                         data.save();
@@ -644,7 +587,6 @@ public class PageInstance implements Page {
         });
     }
 
-    /** 复制整个目录，返回文件数。 */
     private static int copyDirectory(java.nio.file.Path src, java.nio.file.Path dest) throws Exception {
         if (!java.nio.file.Files.isDirectory(src)) {
             throw new java.io.FileNotFoundException("版本目录不存在：" + src);
@@ -669,7 +611,6 @@ public class PageInstance implements Page {
         return count[0];
     }
 
-    /** 版本 json 改名并把 id 改成新实例名。 */
     static void rewriteVersionJson(java.nio.file.Path dir, String oldId, String newId) throws Exception {
         java.nio.file.Path oldJson = dir.resolve(oldId + ".json");
         if (!java.nio.file.Files.isRegularFile(oldJson)) {
@@ -692,7 +633,6 @@ public class PageInstance implements Page {
         if (!oldJson.equals(newJson)) java.nio.file.Files.delete(oldJson);
     }
 
-    /** 校验新实例名。 */
     private String validateInstanceName(String name, String folder) {
         String trimmed = name == null ? "" : name.trim();
         if (trimmed.isEmpty()) return Lang.t("名称不能为空。");
@@ -711,7 +651,6 @@ public class PageInstance implements Page {
         return "";
     }
 
-    /** 跳到实例设置的导出页。 */
     private void exportInstance(Data.Instance ins) {
         data.selectedInstance = data.instances.indexOf(ins);
         data.instanceSection = "export";
@@ -719,73 +658,77 @@ public class PageInstance implements Page {
         win.openInstanceSetup();
     }
 
-    /** 建直接启动该实例的桌面快捷方式。 */
     private void createInstanceShortcut(Data.Instance ins) {
-        try {
-            String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
-            boolean windows = os.contains("win");
-            boolean mac = os.contains("mac");
-            java.nio.file.Path root = Theme.root();
-            java.nio.file.Path script = root.resolve(windows ? "TCraftLauncher.bat" : "TCraftLauncher.sh");
-            if (!java.nio.file.Files.isRegularFile(script)) {
-                throw new Exception("找不到启动脚本 " + script + "，请确认使用的是完整版程序。");
-            }
-            java.nio.file.Path desktop = java.nio.file.Paths.get(
-                    System.getProperty("user.home"), "Desktop");
-            java.nio.file.Files.createDirectories(desktop);
-            String baseName = "启动 " + safeFileName(ins.name);
-            java.nio.file.Path link;
-            if (windows) {
-                link = uniquePath(desktop, baseName, ".lnk");
-                String icon = root.resolve("res").resolve("images").resolve("icon.ico").toString();
-                String ps = "$s=(New-Object -ComObject WScript.Shell).CreateShortcut('" + q(link.toString()) + "');"
-                        + "$s.TargetPath='" + q(script.toString()) + "';"
-                        + "$s.Arguments='--launch-instance \"" + q(ins.name) + "\"';"
-                        + "$s.WorkingDirectory='" + q(root.toString()) + "';"
-                        + "$s.IconLocation='" + q(icon) + "';"
-                        + "$s.Description='启动 " + q(ins.name) + " - TCraft Launcher';"
-                        + "$s.WindowStyle=1;$s.Save()";
-                ProcessBuilder pb = new ProcessBuilder("powershell", "-NoProfile", "-NonInteractive",
-                        "-Command", ps);
-                pb.redirectErrorStream(true);
-                Process p = pb.start();
-                String output = new String(p.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
-                if (p.waitFor() != 0 || !java.nio.file.Files.isRegularFile(link)) {
-                    throw new Exception("WScript.Shell 未能生成快捷方式："
-                            + (output.isBlank() ? "无输出" : output.trim()));
+        // PowerShell 要等进程返回，留在 FX 线程会把整个界面卡住
+        Threads.start("TCL-Shortcut", () -> {
+            try {
+                String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
+                boolean windows = os.contains("win");
+                boolean mac = os.contains("mac");
+                java.nio.file.Path script = Resources.launchTarget();
+                if (script == null) {
+                    // 异常消息最终进 Errors 报告弹窗，Errors UI 不经过 localize
+                    throw new Exception(Lang.t("找不到启动器程序（TCraftLauncher.exe / TCraftLauncher.sh），请确认使用的是完整版程序。"));
                 }
-            } else if (mac) {
-                link = uniquePath(desktop, baseName, ".command");
-                java.nio.file.Files.writeString(link,
-                        "#!/bin/sh\ncd " + shellQuote(root.toString())
-                                + "\nexec ./TCraftLauncher.sh --launch-instance " + shellQuote(ins.name) + "\n",
-                        java.nio.charset.StandardCharsets.UTF_8);
-                link.toFile().setExecutable(true);
-            } else {
-                link = uniquePath(desktop, baseName, ".desktop");
-                String entry = "[Desktop Entry]\nType=Application\nName=" + baseName + "\n"
-                        + "Exec=" + desktopQuote(script.toString()) + " --launch-instance "
-                        + desktopQuote(ins.name) + "\n"
-                        + "Path=" + root + "\n"
-                        + "Icon=" + root.resolve("res").resolve("images").resolve("icon-256.png") + "\n"
-                        + "Terminal=false\nCategories=Game;\n";
-                java.nio.file.Files.writeString(link, entry, java.nio.charset.StandardCharsets.UTF_8);
-                link.toFile().setExecutable(true);
+                java.nio.file.Path appDir = script.getParent() != null ? script.getParent() : Theme.root();
+                if (!windows) script.toFile().setExecutable(true);
+                java.nio.file.Path desktop = Shell.desktopDir();
+                java.nio.file.Files.createDirectories(desktop);
+                String baseName = "启动 " + safeFileName(ins.name);
+                java.nio.file.Path link;
+                if (windows) {
+                    link = uniquePath(desktop, baseName, ".lnk");
+                    java.nio.file.Path icon = Resources.iconFile("icon.ico");
+                    String ps = "[Console]::OutputEncoding=[Text.Encoding]::UTF8;"
+                            + "$s=(New-Object -ComObject WScript.Shell).CreateShortcut('" + q(link.toString()) + "');"
+                            + "$s.TargetPath='" + q(script.toString()) + "';"
+                            + "$s.Arguments='--launch-instance \"" + q(ins.name) + "\"';"
+                            + "$s.WorkingDirectory='" + q(appDir.toString()) + "';"
+                            + (icon == null ? "" : "$s.IconLocation='" + q(icon.toString()) + "';")
+                            + "$s.Description='启动 " + q(ins.name) + " - TCraft Launcher';"
+                            + "$s.WindowStyle=1;$s.Save()";
+                    ProcessBuilder pb = new ProcessBuilder("powershell", "-NoProfile", "-NonInteractive",
+                            "-Command", ps);
+                    pb.redirectErrorStream(true);
+                    Process p = pb.start();
+                    String output = new String(p.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                    if (p.waitFor() != 0 || !java.nio.file.Files.isRegularFile(link)) {
+                        throw new Exception("WScript.Shell 未能生成快捷方式："
+                                + (output.isBlank() ? "无输出" : output.trim()));
+                    }
+                } else if (mac) {
+                    link = uniquePath(desktop, baseName, ".command");
+                    java.nio.file.Files.writeString(link,
+                            "#!/bin/sh\ncd " + shellQuote(appDir.toString())
+                                    + "\nexec " + shellQuote(script.getFileName().toString())
+                                    + " --launch-instance " + shellQuote(ins.name) + "\n",
+                            java.nio.charset.StandardCharsets.UTF_8);
+                    link.toFile().setExecutable(true);
+                } else {
+                    link = uniquePath(desktop, baseName, ".desktop");
+                    java.nio.file.Path icon = Resources.iconFile("icon-256.png");
+                    String entry = "[Desktop Entry]\nType=Application\nName=" + baseName + "\n"
+                            + "Exec=" + desktopQuote(script.toString()) + " --launch-instance "
+                            + desktopQuote(ins.name) + "\n"
+                            + "Path=" + desktopQuote(appDir.toString()) + "\n"
+                            + (icon == null ? "" : "Icon=" + desktopQuote(icon.toString()) + "\n")
+                            + "Terminal=false\nCategories=Game;\n";
+                    java.nio.file.Files.writeString(link, entry, java.nio.charset.StandardCharsets.UTF_8);
+                    link.toFile().setExecutable(true);
+                }
+                javafx.application.Platform.runLater(() -> win.toast("快捷方式已创建", link.toString(), 1));
+            } catch (Exception e) {
+                javafx.application.Platform.runLater(() -> Errors.error("创建实例快捷方式失败", e));
             }
-            win.toast("快捷方式已创建", link.toString(), 1);
-        } catch (Exception e) {
-            Errors.error("创建实例快捷方式失败", e);
-        }
+        });
     }
 
-    /** 非法文件名字符换成下划线。 */
     private static String safeFileName(String name) {
         String result = name == null ? "" : name.trim();
         for (char c : "\\/:*?\"<>|".toCharArray()) result = result.replace(c, '_');
         return result.isEmpty() ? "实例" : result;
     }
 
-    /** 同名文件依次加序号。 */
     private static java.nio.file.Path uniquePath(java.nio.file.Path dir, String base, String ext) {
         java.nio.file.Path candidate = dir.resolve(base + ext);
         int index = 2;
@@ -796,17 +739,14 @@ public class PageInstance implements Page {
         return candidate;
     }
 
-    /** PowerShell 单引号字面量转义。 */
     private static String q(String s) {
         return s == null ? "" : s.replace("'", "''");
     }
 
-    /** POSIX shell 单引号字面量转义。 */
     private static String shellQuote(String s) {
         return "'" + (s == null ? "" : s.replace("'", "'\\''")) + "'";
     }
 
-    /** .desktop 的 Exec 字段转义。 */
     private static String desktopQuote(String s) {
         String value = s == null ? "" : s;
         value = value.replace("\\", "\\\\").replace("\"", "\\\"")
@@ -814,14 +754,14 @@ public class PageInstance implements Page {
         return "\"" + value + "\"";
     }
 
-    /** 把实例目录打成 zip，后台跑。 */
     private void backupInstance(Data.Instance ins) {
         FileChooser chooser = new FileChooser();
-        chooser.setTitle("备份为压缩包");
+        chooser.setTitle(Lang.t("备份为压缩包"));
         chooser.setInitialFileName(ins.name + "-备份-"
                 + java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
                 + ".zip");
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("压缩包", "*.zip"));
+        // 过滤器描述显示在 OS 对话框里
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(Lang.t("压缩包"), "*.zip"));
         File out = chooser.showSaveDialog(win.stage);
         if (out == null) return;
         java.nio.file.Path src = java.nio.file.Paths.get(ins.folder);
@@ -867,7 +807,6 @@ public class PageInstance implements Page {
 
         for (Data.FolderItem folder : data.folders) {
             boolean current = folder.path.equals(data.gameDir);
-            // 用标准列表项，不用白底卡片
             Ui.ListItem item = new Ui.ListItem(
                     Theme.icon(current ? "folder-open" : "folder", 18, current ? Theme.accent : Theme.text),
                     folder.name, folder.path, 40);
@@ -894,7 +833,7 @@ public class PageInstance implements Page {
         Ui.tooltip(addFolder, "将一个已有的 Minecraft 文件夹添加到列表，也可以直接把文件夹拖进窗口");
         addFolder.setOnMouseClicked(e -> {
             DirectoryChooser chooser = new DirectoryChooser();
-            chooser.setTitle("选择 .minecraft 文件夹");
+            chooser.setTitle(Lang.t("选择 .minecraft 文件夹"));
             File file = chooser.showDialog(win.stage);
             if (file != null) addGameFolder(win, file.toPath());
         });
@@ -913,10 +852,9 @@ public class PageInstance implements Page {
         return scroll;
     }
 
-    /** 扫描 versions 生成实例条目。 */
-    private static void scanVersions(Data data, java.nio.file.Path gameDir) {
+    private static String scanVersions(Data data, java.nio.file.Path gameDir) {
         java.nio.file.Path versions = gameDir.resolve("versions");
-        if (!java.nio.file.Files.isDirectory(versions)) return;
+        if (!java.nio.file.Files.isDirectory(versions)) return "";
         String folderKey = gameDir.toAbsolutePath().normalize().toString();
         try (var stream = java.nio.file.Files.list(versions)) {
             stream.filter(java.nio.file.Files::isDirectory).forEach(dir -> {
@@ -935,50 +873,69 @@ public class PageInstance implements Page {
                         : lower.contains("neoforge") ? "NeoForge" : lower.contains("optifine") ? "OptiFine" : "原版";
                 String icon = "Fabric".equals(loader) ? "Fabric.png" : "Forge".equals(loader) ? "CobbleStone.png"
                         : "NeoForge".equals(loader) ? "NeoForge.png" : "Grass.png";
-                data.instances.add(new Data.Instance(name, name, loader, "",
-                        "已导入的版本", icon, System.currentTimeMillis(), false, folderKey));
+                Data.Instance imported = new Data.Instance(name, name, loader, "",
+                        "已导入的版本", icon, System.currentTimeMillis(), false, folderKey);
+                imported.addedAt = System.currentTimeMillis();
+                data.instances.add(imported);
             });
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            return e.getMessage() == null ? e.toString() : e.getMessage();
         }
+        return "";
     }
 
-    /** 导入整合包：预读、确认、命名再安装。 */
     static void importModpack(MainWindow win) {
         FileChooser chooser = new FileChooser();
-        chooser.setTitle("选择整合包");
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Minecraft 整合包", "*.zip", "*.mrpack"));
+        chooser.setTitle(Lang.t("选择整合包"));
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(Lang.t("Minecraft 整合包"), "*.zip", "*.mrpack"));
         File file = chooser.showOpenDialog(win.stage);
         if (file == null) return;
         importModpack(win, file.toPath());
     }
 
-    /** 从文件路径开始导入，拖拽和文件选择共用同一套流程。 */
     static void importModpack(MainWindow win, java.nio.file.Path packPath) {
         File file = packPath.toFile();
         win.toast("正在预读整合包", file.getName(), 0);
         Thread thread = new Thread(() -> {
-            Modpacks.PackInfo info = Modpacks.readInfo(packPath);
+            Modpacks.PackInfo info;
+            try {
+                info = Modpacks.readInfo(packPath);
+            } catch (Throwable t) {
+                // 深层嵌套的 zip/JSON 可能抛 StackOverflowError，不兜底会让 UI 永远停在"正在预读"
+                javafx.application.Platform.runLater(() ->
+                        Dialogs.confirm(win, "预读整合包失败",
+                                Lang.tf("读取整合包时出错：%s", t.getMessage() == null ? t.toString() : t.getMessage()),
+                                () -> {
+                                }));
+                return;
+            }
             javafx.application.Platform.runLater(() -> {
                 if (!info.valid) {
-                    Dialogs.confirm(win, "无法识别整合包",
-                            "无法从该压缩包中识别出整合包清单。\n当前支持 Modrinth (.mrpack)、CurseForge (.zip)、MultiMC、HMCL 与 MCBBS 格式。",
+                    // readError 已在创建处翻译，前缀判断会随语言变化，改为与「无法识别」串恒等比较；
+                    // 空串（清单认出但版本缺失）仍按未识别处理
+                    boolean broken = info.readError != null && !info.readError.isEmpty()
+                            && !info.readError.equals(Modpacks.unrecognizedError());
+                    Dialogs.confirm(win, broken ? "整合包读取失败" : "无法识别整合包",
+                            broken ? info.readError
+                                    : "无法从该压缩包中识别出整合包清单。\n当前支持 Modrinth (.mrpack)、CurseForge (.zip)、MultiMC、HMCL 与 MCBBS 格式。",
                             () -> {
                             });
                     return;
                 }
+                // 拼接整串不会命中表键，各标签段创建时逐段翻译
                 StringBuilder sb = new StringBuilder();
-                sb.append("类型：").append(info.typeName).append("\n");
-                sb.append("名称：").append(info.name).append("\n");
-                sb.append("游戏版本：").append(info.mcVersion).append("\n");
-                sb.append("加载器：").append(info.loader.isEmpty() ? "无" : info.loader + " " + info.loaderVersion);
+                sb.append(Lang.t("类型：")).append(info.typeName).append("\n");
+                sb.append(Lang.t("名称：")).append(info.name).append("\n");
+                sb.append(Lang.t("游戏版本：")).append(info.mcVersion).append("\n");
+                sb.append(Lang.t("加载器：")).append(info.loader.isEmpty() ? Lang.t("无") : info.loader + " " + info.loaderVersion);
                 if (!info.unsupportedLoaders.isEmpty()) {
                     Dialogs.confirm(win, "暂不支持的加载器",
-                            "该整合包使用了 TCL 不支持的加载器：" + String.join("、", info.unsupportedLoaders)
-                                    + "\n无法完成安装。", () -> {
+                            Lang.t("该整合包使用了 TCL 不支持的加载器：") + String.join("、", info.unsupportedLoaders)
+                                    + Lang.t("\n无法完成安装。"), () -> {
                             });
                     return;
                 }
-                sb.append("\n\n是否开始安装？");
+                sb.append(Lang.t("\n\n是否开始安装？"));
                 Dialogs.confirm(win, "导入整合包", sb.toString(), () ->
                         Dialogs.input(win, "输入版本名称", "", info.name, name -> {
                             if (name == null) return;
@@ -990,7 +947,6 @@ public class PageInstance implements Page {
         thread.start();
     }
 
-    /** 添加已有游戏目录；按钮选择和拖入文件夹共用。 */
     static void addGameFolder(MainWindow win, java.nio.file.Path dragged) {
         Data data = Data.get();
         java.nio.file.Path target = resolveGameDir(dragged);
@@ -999,9 +955,12 @@ public class PageInstance implements Page {
             return;
         }
         String path = target.toAbsolutePath().normalize().toString();
+        boolean windows = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win");
         Data.FolderItem existing = null;
         for (Data.FolderItem folder : data.folders) {
-            if (java.nio.file.Paths.get(folder.path).toAbsolutePath().normalize().toString().equalsIgnoreCase(path)) {
+            String known = java.nio.file.Paths.get(folder.path).toAbsolutePath().normalize().toString();
+            // Windows 路径大小写不敏感，其他平台必须精确相等
+            if (windows ? known.equalsIgnoreCase(path) : known.equals(path)) {
                 existing = folder;
                 break;
             }
@@ -1011,13 +970,16 @@ public class PageInstance implements Page {
             data.folders.add(new Data.FolderItem(name, path));
         }
         data.gameDir = path;
-        scanVersions(data, target);
+        String scanError = scanVersions(data, target);
         data.save();
         win.openPage(win.currentKey, false);
-        win.toast(existing == null ? "已添加游戏目录" : "已切换游戏目录", path, 1);
+        if (scanError.isEmpty()) {
+            win.toast(existing == null ? "已添加游戏目录" : "已切换游戏目录", path, 1);
+        } else {
+            win.toast(Lang.tf("版本扫描失败：%s", scanError), path, 2);
+        }
     }
 
-    /** 识别拖入的目录：.minecraft 本体、上级目录或带常见游戏文件的目录。 */
     private static java.nio.file.Path resolveGameDir(java.nio.file.Path path) {
         if (path == null || !java.nio.file.Files.isDirectory(path)) return null;
         if (java.nio.file.Files.isDirectory(path.resolve("versions"))) return path;
@@ -1037,5 +999,4 @@ public class PageInstance implements Page {
     private static void openFolder(String path) {
         Shell.openFolder(path);
     }
-
 }

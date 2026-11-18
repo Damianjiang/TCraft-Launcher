@@ -21,7 +21,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-/** 下载页：原版游戏版本列表和社区资源分类。 */
 public class PageDownload implements Page {
 
     private final MainWindow win;
@@ -68,7 +67,6 @@ public class PageDownload implements Page {
         item.setUserData(key);
         item.setSelected(key.equals(data.downloadCategory));
         StackPane refresh = Ui.iconButton("refresh-cw", 22, 13, "刷新", () -> {
-            // 切到该分类并强制重新加载
             data.downloadCategory = key;
             win.toast("正在刷新", title, 0);
             if ("原版游戏".equals(key)) {
@@ -78,7 +76,7 @@ public class PageDownload implements Page {
                     }
                 });
             }
-            win.refreshRight();
+            win.refreshRight(true);
         });
         refresh.addEventHandler(MouseEvent.MOUSE_CLICKED, e -> e.consume());
         refresh.addEventFilter(MouseEvent.MOUSE_CLICKED, e -> {
@@ -90,7 +88,7 @@ public class PageDownload implements Page {
         item.setOnMouseClicked(e -> {
             if (key.equals(data.downloadCategory)) return;
             data.downloadCategory = key;
-            win.refreshRight();
+            win.refreshRight(true);
         });
         VBox.setMargin(item, new Insets(0, 0, 1, 0));
         return item;
@@ -107,7 +105,6 @@ public class PageDownload implements Page {
         scroll.setContent(page);
         buildContent(page);
         if (startLayer == null) return scroll;
-        // 开始下载是页面级浮层，不随内容滚动
         StackPane root = new StackPane(scroll, startLayer);
         root.setMaxWidth(Double.MAX_VALUE);
         root.setMaxHeight(Double.MAX_VALUE);
@@ -129,7 +126,6 @@ public class PageDownload implements Page {
 
     private VBox vanillaBox;
     private VBox selectBox;
-    /** 列表和选择页叠放，切换时交叉淡化。 */
     private StackPane pagesOverlap;
     private Data.McVersion selectVersion;
     private TextField selectNameField;
@@ -138,22 +134,19 @@ public class PageDownload implements Page {
     private StackPane restoreBtn;
     private boolean inSelectPage;
     private boolean nameEdited;
-    /** 程序写名称时抑制 TextChanged。 */
     private boolean settingName;
     private VBox hintBox;
     private final java.util.List<LoaderCard> loaderCardList = new java.util.ArrayList<>();
-    /** 各加载器选中的版本，空串表示没选。 */
     private final Map<String, String> sel = new java.util.HashMap<>();
     private StackPane startLayer;
     private StackPane startButton;
 
-    /** 一张加载器卡。 */
     private static class LoaderCard {
         String key;
         String title;
-        String blockImg;   // 图标文件名
-        String loaderKey;   // Loaders 常量，空串表示没法自动拉列表
-        boolean installerOnly; // 只下载安装器
+        String blockImg;
+        String loaderKey;
+        boolean installerOnly;
         Ui.Card card;
         Node statusIcon;
         Label statusLabel;
@@ -162,14 +155,13 @@ public class PageDownload implements Page {
         VBox list;
         String error;  // 错误文案，null 表示正常
         boolean available = true;
-        java.util.List<String> versions; // null 表示还没拉
+        java.util.List<String> versions;
         boolean fetched;
     }
 
     private void buildVanilla(VBox page) {
-        // 官方清单在后台拉，完成后重建列表
         data.refreshVersions(false, () -> {
-            // 选择页或已切页时不重建，避免打乱动画
+            // 选择页或已切页时不重建，别打乱动画
             if (win.currentPageNode() != this) return;
             if (inSelectPage) return;
             if ("download".equals(win.currentKey) && "原版游戏".equals(data.downloadCategory)) {
@@ -179,7 +171,6 @@ public class PageDownload implements Page {
         vanillaBox = new VBox(0);
         vanillaBox.setMaxWidth(Double.MAX_VALUE);
         if (data.versions.isEmpty()) {
-            // 还没清单，先放加载卡
             StackPane box = new StackPane(Ui.loadingCard("正在获取 Minecraft 版本列表…"));
             box.setAlignment(Pos.TOP_CENTER);
             box.setPadding(new Insets(30, 0, 0, 0));
@@ -202,7 +193,6 @@ public class PageDownload implements Page {
         latest.setSpacing(0);
         latest.setContentPadding(new Insets(4, 12, 10, 12));
         if (release != null) {
-            // McVersion 是共享对象，改 lore 会污染全局
             Data.McVersion copy = new Data.McVersion(release.id, release.type, release.time);
             copy.lore = data.isFallbackVersions() ? Lang.t("离线兜底数据 · ") + release.time
                     : Lang.t("最新正式版，发布于 ") + release.time;
@@ -222,7 +212,6 @@ public class PageDownload implements Page {
             if (list.isEmpty()) continue;
             Ui.Card card = Ui.card(group);
             card.setContentPadding(new Insets(0, 12, 10, 12));
-            // 折叠时不建行，展开再构建，几百行一次建完会卡
             card.setLazyContent(() -> {
                 for (Data.McVersion v : list) card.add(versionRow(v, false));
             });
@@ -240,9 +229,7 @@ public class PageDownload implements Page {
         page.getChildren().add(pagesOverlap);
     }
 
-    // 点版本只记录选择并切到选择态，真正安装要等「开始下载」
 
-    /** 建选择页和各加载器卡。 */
     private void buildSelectPage() {
         selectBox = new VBox(0);
         selectBox.setMaxWidth(Double.MAX_VALUE);
@@ -308,14 +295,15 @@ public class PageDownload implements Page {
             if (inSelectPage && startButton != null && !startButton.isDisabled()) startInstallFromSelect();
         });
         selectNameField.textProperty().addListener((o, a, b) -> {
-            if (!settingName) nameEdited = true;   // 程序赋值不算用户编辑
+            if (!settingName) nameEdited = true;
             refreshRenameHint();
             updateStartButton();
         });
 
         VBox selectContent = new VBox(10);
         selectContent.getChildren().add(nameCard);
-        VBox.setMargin(nameCard, new Insets(0, 15, 0, 15));
+        // 和下面的加载器卡片同一条左边缘，原来多缩进 15px 会看着「没对齐」
+        VBox.setMargin(nameCard, new Insets(0, 0, 0, 0));
         selectContent.getChildren().add(hintBox);
         for (LoaderCard lc : loaderCardList) selectContent.getChildren().add(lc.card);
         selectContent.setPadding(new Insets(2, 2, 0, 2));
@@ -325,7 +313,6 @@ public class PageDownload implements Page {
         refreshAll();
     }
 
-    /** 建加载器卡，展开后异步拉版本列表。 */
     private LoaderCard makeLoaderCard(String key, String title, String blockImg, String loaderKey, boolean installerOnly) {
         LoaderCard lc = new LoaderCard();
         lc.key = key;
@@ -344,14 +331,17 @@ public class PageDownload implements Page {
         card.header.setPrefHeight(40);
         card.header.setMaxHeight(40);
         Label t = card.titleLabel();
+        // 只保底不锁死：短标题仍按 112 对齐，Cleanroom/LabyMod 这类长标题能完整显示
         t.setMinWidth(112);
-        t.setPrefWidth(112);
+        t.setMaxWidth(Region.USE_PREF_SIZE);
         lc.statusIcon = Ui.image(blockImg, 18, 18, true);
         lc.statusIcon.setVisible(false);
         lc.statusLabel = Ui.label("可以添加", 11.5, Theme.gray4);
+        javafx.scene.control.Tooltip statusTip = new javafx.scene.control.Tooltip();
+        statusTip.textProperty().bind(lc.statusLabel.textProperty());
+        javafx.scene.control.Tooltip.install(lc.statusLabel, statusTip);
         lc.clearBtn = Ui.iconButton("x", 22, 11, "清除选择", () -> clearCard(lc));
         lc.clearBtn.setVisible(false);
-        // header 顺序是标题、弹簧、箭头
         card.header.getChildren().add(1, lc.statusIcon);
         card.header.getChildren().add(2, lc.statusLabel);
         card.header.getChildren().add(4, lc.clearBtn);
@@ -363,7 +353,6 @@ public class PageDownload implements Page {
         return lc;
     }
 
-    /** 有缓存直接建行，否则后台拉。 */
     private void loadCardList(LoaderCard lc) {
         if (lc.versions != null) {
             rebuildList(lc);
@@ -373,9 +362,8 @@ public class PageDownload implements Page {
         prefetchOne(lc);
     }
 
-    /** 后台拉版本列表，安装器类卡也拉真实列表。 */
     private void prefetchOne(LoaderCard lc) {
-        if (lc.fetched) return;   // 预取和展开只发一次请求
+        if (lc.fetched) return;
         lc.fetched = true;
         String mc = selectVersion == null ? "" : selectVersion.id;
         Thread t = new Thread(() -> {
@@ -403,12 +391,10 @@ public class PageDownload implements Page {
         t.start();
     }
 
-    /** 预拉所有卡的版本列表。 */
     private void prefetchAll() {
         for (LoaderCard lc : loaderCardList) prefetchOne(lc);
     }
 
-    /** 重建版本列表行。 */
     private void rebuildList(LoaderCard lc) {
         if (lc.list == null) return;
         lc.list.getChildren().clear();
@@ -420,7 +406,7 @@ public class PageDownload implements Page {
             if (lc.error != null) {
                 lc.list.getChildren().add(Ui.hint(lc.title + " 版本列表获取失败：" + lc.error, 2));
             } else {
-                lc.list.getChildren().add(Ui.hint("该 Minecraft 版本没有可用的 " + lc.title, 1));
+                lc.list.getChildren().add(Ui.hint(Lang.t("该 Minecraft 版本没有可用的 ") + lc.title, 1));
             }
             return;
         }
@@ -437,7 +423,6 @@ public class PageDownload implements Page {
         return "GitHub Releases（安装器）";
     }
 
-    /** 点一行即选中并折叠。 */
     private void addVersionRow(LoaderCard lc, String version, String info) {
         boolean installerOnly = lc.installerOnly;
         Ui.ListItem row = new Ui.ListItem(Ui.image(lc.blockImg, 22, 22, true), version, info, 40);
@@ -448,14 +433,13 @@ public class PageDownload implements Page {
                 downloadInstaller(lc, version);
             } else {
                 String cur = sel.getOrDefault(lc.key, "");
-                if (cur.equals(version)) clearCard(lc);   // 再点一次取消
+                if (cur.equals(version)) clearCard(lc);
                 else selectVersionFor(lc, version);
             }
         });
         lc.list.getChildren().add(row);
     }
 
-    /** 选中后折叠。 */
     private void selectVersionFor(LoaderCard lc, String version) {
         sel.put(lc.key, version);
         if (lc.card != null) lc.card.setCollapsed(true);
@@ -468,7 +452,6 @@ public class PageDownload implements Page {
         refreshAll();
     }
 
-    /** 选了 Fabric 自动带 Fabric API，Fabric 加 OptiFine 自动带 OptiFabric。 */
     private boolean autoSelect(LoaderCard lc) {
         if (!Loaders.FABRICAPI.equals(lc.key) && !Loaders.OPTIFABRIC.equals(lc.key)) return false;
         if (lc.versions == null || lc.versions.isEmpty()) return false;
@@ -483,7 +466,6 @@ public class PageDownload implements Page {
         return true;
     }
 
-    /** 刷新各卡显隐、状态、提示和开始下载按钮。 */
     private void refreshAll() {
         String mc = selectVersion == null ? "" : selectVersion.id;
         int drop = dropOf(mc);
@@ -520,7 +502,6 @@ public class PageDownload implements Page {
         refreshSelectIcon();
     }
 
-    /** 名称卡图标跟随主加载器。 */
     private void refreshSelectIcon() {
         if (selectIcon == null) return;
         String img;
@@ -537,8 +518,8 @@ public class PageDownload implements Page {
         switch (lc.key) {
             case Loaders.FORGE: return isStandard(mc);
             case Loaders.NEOFORGE: return gte(mc, "1.20.1");
-            case Loaders.FABRIC: return drop > 130;  // 1.13 以上
-            case Loaders.LITELOADER: return !mc.isEmpty() && drop < 130;  // 1.13 以下
+            case Loaders.FABRIC: return drop > 130;
+            case Loaders.LITELOADER: return !mc.isEmpty() && drop < 130;
             case Loaders.LEGACYFABRIC:
                 // 确认没有可用版本才折叠，获取中或失败仍显示
                 return !(lc.versions != null && lc.versions.isEmpty() && lc.error == null);
@@ -546,11 +527,10 @@ public class PageDownload implements Page {
             case Loaders.OPTIFABRIC:
                 return !sel.getOrDefault(Loaders.FABRIC, "").isEmpty()
                         && !sel.getOrDefault(Loaders.OPTIFINE, "").isEmpty();
-            default: return true; // 一直显示
+            default: return true;
         }
     }
 
-    /** 按已选组件合成默认实例名。 */
     private String getSelectName() {
         if (selectVersion == null) return "";
         String name = selectVersion.id;
@@ -567,7 +547,6 @@ public class PageDownload implements Page {
         return name;
     }
 
-    /** 名称没被改过时，跟着组件选择自动命名。 */
     private void autoName() {
         if (nameEdited || selectVersion == null || selectNameField == null) {
             refreshRenameHint();
@@ -578,7 +557,6 @@ public class PageDownload implements Page {
         else refreshRenameHint();
     }
 
-    /** 程序写名称，不算用户编辑。 */
     private void setName(String text) {
         settingName = true;
         try {
@@ -591,7 +569,6 @@ public class PageDownload implements Page {
         updateStartButton();
     }
 
-    /** 改过名才显示原名提示和恢复按钮。 */
     private void refreshRenameHint() {
         if (renameHint == null || selectVersion == null) return;
         String cur = selectNameField.getText() == null ? "" : selectNameField.getText();
@@ -605,7 +582,6 @@ public class PageDownload implements Page {
         return version;
     }
 
-    /** 连 managed 一起切，避免留下空位。 */
     private static void collapse(Node n, boolean on) {
         if (n == null) return;
         n.setVisible(on);
@@ -620,7 +596,6 @@ public class PageDownload implements Page {
         startButton.setOpacity(valid ? 1 : 0.55);
     }
 
-    /** 刷新提示条。 */
     private void refreshHints() {
         if (hintBox == null) return;
         hintBox.getChildren().clear();
@@ -648,7 +623,6 @@ public class PageDownload implements Page {
         hintBox.setManaged(show);
     }
 
-    /** 把版本转成序数用于显隐判断，旧版返回 0。 */
     private int dropOf(String id) {
         if (id == null || id.isEmpty()) return 0;
         String s = id.toLowerCase();
@@ -681,7 +655,6 @@ public class PageDownload implements Page {
         return sb.length() == 0 ? 0 : Integer.parseInt(sb.toString());
     }
 
-    /** 是不是标准版本格式（1.x / 2x.x），决定 Forge 卡显不显示。 */
     private boolean isStandard(String id) {
         if (id == null) return false;
         if (id.matches("1\\.\\d.*")) return true;
@@ -689,12 +662,10 @@ public class PageDownload implements Page {
         return false;
     }
 
-    /** 按 drop 序数比较版本。 */
     private boolean gte(String id, String other) {
         return dropOf(id) >= dropOf(other);
     }
 
-    /** 点版本：记录选择并切到选择态，不下载。 */
     private void minecraftSelected(Data.McVersion v) {
         if (inSelectPage) return;
         selectVersion = v;
@@ -707,7 +678,6 @@ public class PageDownload implements Page {
         renameHint.setVisible(false);
         restoreBtn.setVisible(false);
         sel.clear();
-        // 清空缓存，按新版本重拉
         for (LoaderCard lc : loaderCardList) {
             lc.versions = null;
             lc.error = "获取中……";
@@ -740,14 +710,13 @@ public class PageDownload implements Page {
                         new KeyValue(vanillaBox.opacityProperty(), 0, Interpolator.LINEAR)),
                 new KeyFrame(Duration.millis(100),
                         new KeyValue(vanillaBox.translateXProperty(), -50, Ui.fluentOut(5)),
-                        new KeyValue(selectBox.opacityProperty(), 0),   // 保持到 100ms
+                        new KeyValue(selectBox.opacityProperty(), 0),
                         new KeyValue(selectBox.translateXProperty(), 40)),
                 new KeyFrame(Duration.millis(170),
                         new KeyValue(selectBox.opacityProperty(), 1, Interpolator.LINEAR)),
                 new KeyFrame(Duration.millis(260),
                         new KeyValue(selectBox.translateXProperty(), 0, Ui.fluentOut(5))));
         t.setOnFinished(e -> {
-            // 退场完成后隐藏
             vanillaBox.setVisible(false);
             vanillaBox.setManaged(false);
         });
@@ -755,7 +724,6 @@ public class PageDownload implements Page {
         showStartButton(true);
     }
 
-    /** 回到版本列表，反向动画。 */
     private void exitSelectPage() {
         if (!inSelectPage) return;
         inSelectPage = false;
@@ -777,7 +745,7 @@ public class PageDownload implements Page {
                         new KeyValue(selectBox.opacityProperty(), 0, Interpolator.LINEAR)),
                 new KeyFrame(Duration.millis(100),
                         new KeyValue(selectBox.translateXProperty(), 50, Ui.fluentOut(5)),
-                        new KeyValue(vanillaBox.opacityProperty(), 0),  // 保持到 100ms
+                        new KeyValue(vanillaBox.opacityProperty(), 0),
                         new KeyValue(vanillaBox.translateXProperty(), -50)),
                 new KeyFrame(Duration.millis(170),
                         new KeyValue(vanillaBox.opacityProperty(), 1, Interpolator.LINEAR)),
@@ -791,7 +759,6 @@ public class PageDownload implements Page {
         showStartButton(false);
     }
 
-    /** 校验名称后开始安装。 */
     private void startInstallFromSelect() {
         if (selectVersion == null) return;
         String name = selectNameField.getText() == null ? "" : selectNameField.getText().trim();
@@ -802,9 +769,8 @@ public class PageDownload implements Page {
         Inst inst = buildInst(name);
         Runnable begin = () -> {
             Downloader.startInstall(win, inst);
-            exitSelectPage(); // 装完回版本列表
+            exitSelectPage();
         };
-        // 有加载器且关掉了版本隔离时确认一次
         int isolation = data.getInt("LaunchIsolation", 4);
         if (inst.hasLoader() && isolation == 0) {
             Dialogs.confirm(win, "版本隔离提示",
@@ -817,7 +783,6 @@ public class PageDownload implements Page {
         begin.run();
     }
 
-    /** 汇总选择生成安装请求。 */
     private Inst buildInst(String name) {
         Inst inst = new Inst();
         inst.name = name;
@@ -834,7 +799,6 @@ public class PageDownload implements Page {
         return inst;
     }
 
-    /** 安装器卡：下安装器到 TCL/installers，不自动安装。 */
     private void downloadInstaller(LoaderCard lc, String version) {
         String url = Loaders.installerUrl(lc.loaderKey, version);
         if (url.isEmpty()) {
@@ -859,7 +823,6 @@ public class PageDownload implements Page {
         t.start();
     }
 
-    /** 显示时从 0.6 弹到 1。 */
     private void showStartButton(boolean show) {
         if (startLayer == null || startButton == null) return;
         startLayer.setVisible(show);
@@ -877,23 +840,10 @@ public class PageDownload implements Page {
         t.play();
     }
 
-    /** 调试用：按版本号进选择态，找不到退回最新正式版。 */
-    void debugSelectVersion(String versionId) {
-        for (Data.McVersion v : data.versions) {
-            if (v.id.equalsIgnoreCase(versionId)) {
-                minecraftSelected(v);
-                return;
-            }
-        }
-        Data.McVersion any = data.firstOf("release");
-        if (any != null) minecraftSelected(any);
-    }
-
     private Node versionRow(Data.McVersion v, boolean pinned) {
         Node icon = Ui.image(v.icon(), 30, 30, true);
         String info = v.lore != null ? v.lore : v.time;
         Ui.ListItem row = new Ui.ListItem(icon, v.id, info, pinned ? 44 : 42);
-        // 行右侧的下载图标只进选择态
         StackPane download = Ui.iconButton("download", 28, 15, "选择并配置安装", () -> minecraftSelected(v));
         download.addEventHandler(MouseEvent.MOUSE_CLICKED, e -> e.consume());
         row.addAction(download);
@@ -904,7 +854,6 @@ public class PageDownload implements Page {
     private static final int RESOURCE_PAGE_SIZE = 40;
     private static final String[] WPF_VERSIONS = {"26.2", "26.1", "1.21.11", "1.21.8", "1.21.4", "1.21.1",
             "1.20.1", "1.19.2", "1.18.2", "1.16.5", "1.12.2", "1.7.10"};
-    /** Mod 类型表，列为名称、CurseForge 分类和 Modrinth slug。 */
     private static final String[][] MOD_TAGS = {
             {"全部", "", ""}, {"世界元素", "406", "worldgen"}, {"生物群系", "407", ""},
             {"维度", "410", ""}, {"矿物与资源", "408", ""}, {"天然结构", "409", ""},
@@ -917,10 +866,8 @@ public class PageDownload implements Page {
             {"信息显示", "423", ""}, {"服务器", "435", "social"}, {"支持库", "421", "library"},
     };
 
-    /** 首次加载时挂的加载卡，数据回来移除。 */
     private Node resourceLoadingHost;
 
-    /** 双源部分失败时的提示。 */
     private HBox hintError;
     private Label hintErrorText;
 
@@ -936,14 +883,16 @@ public class PageDownload implements Page {
         search.setMinWidth(0);
         Label nameLabel = Ui.label("名称", 13, Theme.text);
         Label srcLabel = Ui.label("来源", 13, Theme.text);
-        ComboBox<String> sourceCombo = Ui.combo(new String[]{"全部", "CurseForge", "Modrinth"}, 0);
+        ComboBox<String> sourceCombo = Ui.combo(new String[]{"全部", "CurseForge", "Modrinth"},
+                Math.max(0, Math.min(2, Data.get().getInt("ToolDownloadMod", 0))));
         sourceCombo.setMaxWidth(Double.MAX_VALUE);
+        sourceCombo.setOnAction(e -> Data.get().set("ToolDownloadMod",
+                sourceCombo.getSelectionModel().getSelectedIndex()));
 
         Label verLabel = Ui.label("版本", 13, Theme.text);
         ComboBox<String> versionCombo = new ComboBox<>();
         versionCombo.setEditable(true);
         versionCombo.getItems().add(Lang.t("全部 (也可自行输入)"));
-        // 自动带上当前实例的原版版本
         Data.Instance cur = data.instance();
         if (cur != null) {
             String vanilla = cur.version;
@@ -996,7 +945,6 @@ public class PageDownload implements Page {
         filters.add(tagLabel, 3, 1);
         filters.add(tagCombo, 4, 1);
 
-        // 版本有效时才显示加载器，隐藏时版本框跨列
         Runnable updateLoaderVisibility = () -> {
             String v = versionCombo.getEditor().getText() == null ? "" : versionCombo.getEditor().getText().trim();
             boolean show = isMod && (v.contains(".") || v.contains("w"));
@@ -1026,7 +974,6 @@ public class PageDownload implements Page {
         card.add(rows);
         page.getChildren().add(card);
 
-        // 分页：上一页、页码、下一页
         HBox pager = new HBox(10);
         pager.setAlignment(Pos.CENTER);
         StackPane prev = Ui.iconButton("chevron-left", 28, 16, "上一页", null);
@@ -1047,7 +994,6 @@ public class PageDownload implements Page {
             resourcePage = 0;
             fetchRef[0].run();
         };
-        // 来源、类型、加载器变了自动搜，名称和版本按 Enter
         sourceCombo.setOnAction(e -> searchAction.run());
         tagCombo.setOnAction(e -> searchAction.run());
         loaderCombo.setOnAction(e -> {
@@ -1085,7 +1031,6 @@ public class PageDownload implements Page {
         searchBtn.setMinWidth(140);
         resetBtn.setMinWidth(140);
         actions.getChildren().addAll(searchBtn, resetBtn);
-        // 只有整合包页显示这个按钮
         if ("整合包".equals(category)) {
             actions.getChildren().add(
                     Ui.button("安装已有整合包", Ui.BTN_NORMAL, () -> PageInstance.importModpack(win)));
@@ -1118,7 +1063,9 @@ public class PageDownload implements Page {
         };
     }
 
-    /** 双源搜索，合并后按下载量排序。 */
+    // 资源搜索的请求代次：只有最后一次请求的结果允许写进界面
+    private int resourceRequestGen;
+
     private void fetchResources(String q, String category, String projectType, int classId,
                                 ComboBox<String> sourceCombo, ComboBox<String> versionCombo,
                                 ComboBox<String> loaderCombo, ComboBox<String> tagCombo,
@@ -1144,15 +1091,19 @@ public class PageDownload implements Page {
         boolean wantMr = !source.equals("CurseForge");
         boolean wantCf = !source.equals("Modrinth");
         if (resourceLoadingHost != null && resourceLoadingHost.getParent() instanceof javafx.scene.layout.Pane host) {
-            // 移除顶部加载卡
             host.getChildren().remove(resourceLoadingHost);
         }
-        rows.getChildren().setAll(Ui.loadingCard(resourcePage == 0 ? "正在搜索…"
-                : "正在加载第 " + (resourcePage + 1) + " 页…"));
-        new Thread(() -> {
+        final int gen = ++resourceRequestGen;
+        // loadingCard 节点是异步替换的，localize 不再经过，创建处翻译
+        rows.getChildren().setAll(Ui.loadingCard(resourcePage == 0 ? Lang.t("正在搜索…")
+                : Lang.tf("正在加载第 %d 页…", resourcePage + 1)));
+        // 请求期间禁用翻页，连点会发出多个请求，旧结果还会盖掉新页面
+        prev.setDisable(true);
+        next.setDisable(true);
+        Thread worker = new Thread(() -> {
             // 两个源并发请求，串行要等两倍
             List<Resource> list = java.util.Collections.synchronizedList(new ArrayList<>());
-            String[] err = new String[2]; // 0 是 Modrinth，1 是 CurseForge
+            String[] err = new String[2];
             java.util.concurrent.CountDownLatch latch =
                     new java.util.concurrent.CountDownLatch((wantMr ? 1 : 0) + (wantCf ? 1 : 0));
 
@@ -1202,7 +1153,11 @@ public class PageDownload implements Page {
                 });
             }
             try {
-                latch.await();
+                // 有上限地等待：网络卡住时也要把界面从「正在搜索」里放出来
+                if (!latch.await(25, java.util.concurrent.TimeUnit.SECONDS)) {
+                    if (err[0] == null) err[0] = "请求超时";
+                    if (err[1] == null) err[1] = "请求超时";
+                }
             } catch (InterruptedException ie) {
                 Thread.currentThread().interrupt();
             }
@@ -1215,6 +1170,8 @@ public class PageDownload implements Page {
             String fError = mrError != null ? mrError : cfError;
             boolean hasMore = list.size() >= RESOURCE_PAGE_SIZE;
             javafx.application.Platform.runLater(() -> {
+                // 已经发了更新的请求，这批结果直接丢弃
+                if (gen != resourceRequestGen) return;
                 rows.getChildren().clear();
                 // 一路失败时提示结果可能不全
                 String partial = null;
@@ -1232,16 +1189,18 @@ public class PageDownload implements Page {
                 }
                 if (hintError != null) {
                     boolean show = partial != null;
-                    if (show && hintErrorText != null) hintErrorText.setText(partial);
+                    if (show && hintErrorText != null) hintErrorText.setText(Lang.t(partial));
                     hintError.setVisible(show);
                     hintError.setManaged(show);
                     VBox.setMargin(hintError, new Insets(0, 0, show ? 12 : 0, 0));
                 }
                 if (fList.isEmpty()) {
+                    // fError 可能是「请求超时」等表内词，也可能是原始网络错误（Lang.t 原样回退）
                     status.setText(fError == null
                             ? Lang.t(resourcePage == 0 ? "该分类暂无资源" : "没有更多结果")
-                            : Lang.tf("无法获取%s列表：", Lang.t(category)) + fError);
-                    rows.getChildren().add(Ui.label(fError == null ? "换个关键词或放宽筛选试试。" : fError, 12.5, Theme.gray2));
+                            : Lang.tf("无法获取%s列表：", Lang.t(category)) + Lang.t(fError));
+                    rows.getChildren().add(Ui.label(fError == null ? Lang.t("换个关键词或放宽筛选试试。")
+                            : Lang.t(fError), 12.5, Theme.gray2));
                     prev.setDisable(resourcePage <= 0);
                     next.setDisable(true);
                     pageLab.setText(String.valueOf(resourcePage + 1));
@@ -1256,10 +1215,11 @@ public class PageDownload implements Page {
                 next.setDisable(!hasMore);
                 pageLab.setText(String.valueOf(resourcePage + 1));
             });
-        }, "TCL-Resource-Search").start();
+        }, "TCL-Resource-Search");
+        worker.setDaemon(true);
+        worker.start();
     }
 
-    /** Modrinth 结果转 Resource，并提取加载器。 */
     private Resource mrResource(Object h, String projectType) {
         java.util.Map<String, Object> m = Json.obj(h);
         Resource r = new Resource();
@@ -1287,7 +1247,6 @@ public class PageDownload implements Page {
         return row;
     }
 
-    /** 打开资源详情整页。 */
     private void openDetail(Resource r, String platform) {
         ResourceInfo info = new ResourceInfo();
         info.platform = platform;
@@ -1303,7 +1262,6 @@ public class PageDownload implements Page {
         info.projectType = r.projectType;
         info.resourceType = r.projectType;
         info.loaders.addAll(r.loaders);
-        // 版本和加载器来自当前实例
         Data.Instance ins = data.instance();
         if (ins != null) {
             info.targetVersion = ins.version == null ? "" : ins.version;
@@ -1321,7 +1279,7 @@ public class PageDownload implements Page {
         if (!url.startsWith("http")) {
             return Ui.image(url.isEmpty() ? "NoIcon.png" : url, size, size, true);
         }
-        // 远程图走 RemoteImages，避免每张图一条连接
+        // 远程图统一走 RemoteImages，别每张图开一条连接
         StackPane box = new StackPane();
         box.setPrefSize(size, size);
         box.setMinSize(size, size);
@@ -1333,7 +1291,6 @@ public class PageDownload implements Page {
             box.getChildren().add(imageView(cached, size));
             return box;
         }
-        // 先放占位，图到了再替换
         box.getChildren().add(Ui.image("NoIcon.png", size, size, true));
         if (RemoteImages.failed(url)) return box;
         RemoteImages.load(url, size, img -> {
@@ -1358,7 +1315,6 @@ public class PageDownload implements Page {
         return null;
     }
 
-            /** 收藏夹列表。 */
     private void buildFavorites(VBox page) {
         if (data.favorites.isEmpty()) {
             Ui.Card card = Ui.card("资源收藏夹");
@@ -1380,7 +1336,6 @@ public class PageDownload implements Page {
         page.getChildren().add(card);
     }
 
-    /** 收藏项，可看详情、开网页、取消收藏。 */
     private Node favoriteRow(Data.Favorite f) {
         Resource r = new Resource();
         r.name = f.name.isEmpty() ? f.slug : f.name;
@@ -1450,7 +1405,7 @@ public class PageDownload implements Page {
 
     private static class Resource {
         String name, desc, icon;
-        String pid = "";  // Modrinth project_id
+        String pid = "";
         String slug = "";
         String website = "";
         String projectType = "mod";
@@ -1469,7 +1424,7 @@ public class PageDownload implements Page {
             case "数据包" -> "datapack";
             case "资源包" -> "resourcepack";
             case "光影包" -> "shader";
-            case "世界" -> "map"; // Modrinth 没有 Map 类型，世界数据来自 CurseForge
+            case "世界" -> "map";
             default -> "mod";
         };
     }
