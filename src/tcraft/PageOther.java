@@ -194,7 +194,7 @@ public class PageOther implements Page {
                         String text = Json.str(n, "text", Json.str(n, "shortText", ""));
                         String link = Json.str(n, "readMoreLink", "");
                         Ui.Card card = Ui.card(title);
-                        // 官方新闻配图：newsPageImage.url 是 /v2/images/... 相对路径，拼域名后异步加载
+                        // 配图为相对路径，拼域名异步加载
                         String imgPath = Json.str(Json.obj(n, "newsPageImage"), "url", "");
                         if (imgPath.isEmpty()) imgPath = Json.str(Json.obj(n, "playPageImage"), "url", "");
                         if (!imgPath.isEmpty()) {
@@ -221,8 +221,8 @@ public class PageOther implements Page {
                 javafx.application.Platform.runLater(() -> {
                     stopSkeletons(skeletons);
                     page.getChildren().removeAll(skeletons);
-                    page.getChildren().add(Ui.hint("获取新闻失败："
-                            + (ex.getMessage() == null ? "网络错误" : ex.getMessage()), 2));
+                    page.getChildren().add(Ui.hint(Lang.t("获取新闻失败：")
+                            + (ex.getMessage() == null ? Lang.t("网络错误") : ex.getMessage()), 2));
                 });
             }
         }, "TCL-News");
@@ -230,7 +230,7 @@ public class PageOther implements Page {
         thread.start();
     }
 
-    // 新闻列表骨架屏：标题条 + 图片区镐子动画 + 文字条，整体呼吸闪烁
+    // 骨架屏：标题条+镐子动画+文字条呼吸闪烁
     private List<Node> newsSkeletons(int count) {
         List<Node> out = new ArrayList<>();
         for (int i = 0; i < count; i++) {
@@ -253,7 +253,7 @@ public class PageOther implements Page {
             card.getChildren().addAll(titleBar, img, line1, line2);
             out.add(card);
         }
-        // 所有骨架条 + 图片底色一起做呼吸闪烁；节点离场后动画自动停（无 scene）
+        // 骨架条与图片底统一呼吸闪烁，离场自停
         javafx.animation.Timeline pulse = new javafx.animation.Timeline(
                 new javafx.animation.KeyFrame(javafx.util.Duration.ZERO,
                         new javafx.animation.KeyValue(skeletonOpacity, 1.0)),
@@ -289,7 +289,7 @@ public class PageOther implements Page {
         return r;
     }
 
-    // 新闻横幅图：异步加载，UniformToFill 铺满固定高度，加载中显示镐子动画（对齐 WPF 行为）
+    // 横幅图异步加载，UniformToFill 固定高（对齐 WPF）
     private Node newsImage(String url) {
         final double h = 160;
         StackPane box = new StackPane();
@@ -315,7 +315,7 @@ public class PageOther implements Page {
         return box;
     }
 
-    // UniformToFill：按图片与容器比例取较大缩放，居中裁切溢出，圆角裁切
+    // UniformToFill：取大缩放，居中裁切+圆角
     private void showNewsImage(StackPane box, javafx.scene.image.Image img, double h) {
         javafx.scene.image.ImageView iv = new javafx.scene.image.ImageView(img);
         iv.setPreserveRatio(true);
@@ -385,7 +385,7 @@ public class PageOther implements Page {
                 if (fError != null) {
                     win.toast("清理失败", fError, 2);
                 } else {
-                    win.toast("已清理垃圾", "删除了 " + removedCount + " 个缓存文件。", 1);
+                    win.toast("已清理垃圾", Lang.tf("删除了 %d 个缓存文件。", removedCount), 1);
                 }
             });
         });

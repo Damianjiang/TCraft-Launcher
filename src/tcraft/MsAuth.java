@@ -153,7 +153,7 @@ public final class MsAuth {
         try {
             m = parse(r.body);
         } catch (RuntimeException e) {
-            throw new Exception(Lang.t("登录响应格式异常：" + e.getMessage()));
+            throw new Exception(Lang.t("登录响应格式异常：") + e.getMessage());
         }
         String token = Json.str(m, "access_token", "");
         if (token.isEmpty()) throw new Exception(Lang.t("微软没有返回访问令牌"));
@@ -185,7 +185,7 @@ public final class MsAuth {
         try {
             xblMap = parse(xbl.body);
         } catch (RuntimeException e) {
-            throw new Exception(Lang.t("登录响应格式异常：" + e.getMessage()));
+            throw new Exception(Lang.t("登录响应格式异常：") + e.getMessage());
         }
         String xblToken = Json.str(xblMap, "Token", "");
         String uhs = displayClaim(xblMap, "uhs");
@@ -217,7 +217,7 @@ public final class MsAuth {
         try {
             xstsMap = parse(xsts.body);
         } catch (RuntimeException e) {
-            throw new Exception(Lang.t("登录响应格式异常：" + e.getMessage()));
+            throw new Exception(Lang.t("登录响应格式异常：") + e.getMessage());
         }
         String xstsToken = Json.str(xstsMap, "Token", "");
         uhs = displayClaim(xstsMap, "uhs");
@@ -236,7 +236,7 @@ public final class MsAuth {
         try {
             mcMap = parse(mc.body);
         } catch (RuntimeException e) {
-            throw new Exception(Lang.t("登录响应格式异常：" + e.getMessage()));
+            throw new Exception(Lang.t("登录响应格式异常：") + e.getMessage());
         }
         String token = Json.str(mcMap, "access_token", "");
         if (token.isEmpty()) throw new Exception(Lang.t("Minecraft 登录失败：该账户可能未拥有游戏"));
@@ -264,7 +264,7 @@ public final class MsAuth {
         try {
             pm = parse(profile.body);
         } catch (RuntimeException e) {
-            throw new Exception(Lang.t("登录响应格式异常：" + e.getMessage()));
+            throw new Exception(Lang.t("登录响应格式异常：") + e.getMessage());
         }
         r.uuid = formatUuid(Json.str(pm, "id", ""));
         r.name = Json.str(pm, "name", "");

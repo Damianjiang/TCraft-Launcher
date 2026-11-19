@@ -62,7 +62,7 @@ public final class Skin3D extends Region {
             }
         }));
         autoTimer.setCycleCount(Timeline.INDEFINITE);
-        // 弹窗关掉或被顶掉时 scene 会变 null，这里停表，别让模型 25fps 空转
+        // scene 变 null 即停表，防模型空转
         sceneProperty().addListener((o, oldScene, newScene) -> applyRunState());
         autoTimer.play();
     }

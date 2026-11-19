@@ -27,6 +27,7 @@ public final class Resources {
     }
 
     private static Path homeDir;
+    private static boolean logsMigrated;
 
     public static synchronized Path home() {
         if (homeDir != null) return homeDir;
@@ -37,6 +38,54 @@ public final class Resources {
         }
         homeDir = dir;
         return dir;
+    }
+
+    // 日志统一放 .tcl/log，不再散落在 .tcl 根目录
+    public static Path logDir() {
+        Path dir = home().resolve("log");
+        try {
+            Files.createDirectories(dir);
+        } catch (Exception ignored) {
+        }
+        if (!logsMigrated) migrateOldLogs(dir);
+        return dir;
+    }
+
+    public static Path errorLogFile() {
+        return logDir().resolve("errors.log");
+    }
+
+    // 清旧版流水日志，启动只留 errors.log/crash.txt
+    public static void cleanupNoiseLogs() {
+        try {
+            Path dir = logDir();
+            for (String name : new String[]{"launcher.log", "launcher.log.1", "launch.log",
+                    "stub.log", "java-error.log"}) {
+                Files.deleteIfExists(dir.resolve(name));
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static void migrateOldLogs(Path logDir) {
+        logsMigrated = true;
+        Path home = home();
+        for (String name : new String[]{"launcher.log", "launcher.log.1", "launch.log",
+                "errors.log", "crash.txt", "stub.log", "java-error.log", "java-version.txt"}) {
+            Path src = home.resolve(name);
+            Path dst = logDir.resolve(name);
+            if (!Files.isRegularFile(src)) continue;
+            try {
+                // 目标已存在即新日志已开写，删旧防两套
+                if (Files.exists(dst)) {
+                    Files.deleteIfExists(src);
+                    continue;
+                }
+                Files.move(src, dst, StandardCopyOption.REPLACE_EXISTING);
+            } catch (Exception ignored) {
+                // 文件正被 stub 占用时下次启动再搬
+            }
+        }
     }
 
     private static Path resolveHome() {
@@ -148,7 +197,7 @@ public final class Resources {
         }
         Path rt = ensureJavaFx(ui);
         ui.setStatus("正在启动 TCL…", 95);
-        relaunch(jar(), rt, platform(), args);
+        relaunch(jar(), rt, platform(), args, ui);
     }
 
     public static Path iconFile(String name) {
@@ -214,7 +263,7 @@ public final class Resources {
         Path ready = dir.resolve(".ready");
         // 清掉非当前版本的 jar，同名模块多版本会让启动失败
         removeStaleJfxJars(dir, classifier, version);
-        // .ready 不可信，按 jar 内 javafx.properties 校验；旧 JavaFX 21 jar 在 JDK 17 下会直接失败
+        // .ready 不可信，按 javafx.properties 校验
         boolean jarsPresent = true;
         for (String module : JFX_MODULES) {
             if (!Files.isRegularFile(dir.resolve(jarName(module, classifier, version)))) {
@@ -355,7 +404,7 @@ public final class Resources {
                     }
                 }
             }
-            // .sha1 拿不到就当这个源坏了，换下一个仓库重试；没有校验值的 jar 不能落盘
+            // 无 .sha1 视为坏源换仓；无校验不落盘
             String expected = fetchText(url + ".sha1");
             if (expected == null) throw new IOException("拿不到 .sha1 校验值：" + url);
             String actual = sha1(tmp);
@@ -410,7 +459,7 @@ public final class Resources {
                 String low = name.toLowerCase(java.util.Locale.ROOT);
                 if (!low.endsWith(".dll") && !low.endsWith(".dylib") && !low.endsWith(".so")) continue;
                 Path out = dir.resolve(name);
-                // 旧 JavaFX 21 留下的同名 DLL 一律覆盖，不然 17 jar 配到 21 本地库
+                // 同名 DLL 一律覆盖，防 17/21 本地库混配
                 try (InputStream in = jf.getInputStream(en)) {
                     Files.copy(in, out, StandardCopyOption.REPLACE_EXISTING);
                 }
@@ -434,13 +483,16 @@ public final class Resources {
         return String.join(File.pathSeparator, paths);
     }
 
-    private static void relaunch(Path jar, Path rt, String plat, String[] args) throws IOException {
+    private static void relaunch(Path jar, Path rt, String plat, String[] args, StartupWindow ui)
+            throws IOException {
         String os = System.getProperty("os.name", "").toLowerCase();
         String exe = os.contains("win") ? "javaw.exe" : "java";
         List<String> cmd = new ArrayList<>();
         cmd.add(Paths.get(System.getProperty("java.home"), "bin", exe).toString());
         cmd.add("-Dtcl.runtime=" + plat);
+        cmd.add("-Dtcl.quietStart=true");
         cmd.add("-Dtcraft.dir=" + home());
+        if (os.contains("mac")) cmd.add("-Dapple.application.name=TCraft Launcher");
         cmd.add("-Dfile.encoding=UTF-8");
         cmd.add("-Djava.library.path=" + rt);
         cmd.add("--module-path=" + modulePath(rt, plat));
@@ -452,14 +504,29 @@ public final class Resources {
         cmd.add("tcraft.Boot");
         if (args != null && args.length > 0) cmd.addAll(Arrays.asList(args));
 
-        Path log = home().resolve("launch.log");
-        Files.createDirectories(home());
+        Path log = logDir().resolve("launch.log");
+        Path ready = logDir().resolve(".window-ready");
+        Files.deleteIfExists(ready);
+        // 新 JVM 需要拿实例锁，旧进程先放手，否则它会自己退出
+        Boot.releaseInstanceLock();
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.redirectErrorStream(true);
         pb.redirectInput(ProcessBuilder.Redirect.from(
                 new File(os.contains("win") ? "NUL:" : "/dev/null")));
-        pb.redirectOutput(ProcessBuilder.Redirect.appendTo(log.toFile()));
+        // 诊断输出覆盖写，防无限增长
+        pb.redirectOutput(ProcessBuilder.Redirect.to(log.toFile()));
         pb.start();
+        // 旧进程启动窗留到主界面出现，防弹两次
+        long until = System.currentTimeMillis() + 8000;
+        while (System.currentTimeMillis() < until) {
+            if (Files.isRegularFile(ready)) break;
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
         System.exit(0);
     }
 }

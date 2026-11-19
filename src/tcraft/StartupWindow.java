@@ -29,7 +29,7 @@ public final class StartupWindow {
     private final Window window;
     private final Panel panel;
     private final long openedAt = System.currentTimeMillis();
-    // AWT 自绘文案不经 localize，创建时就要按当前语言取值（Boot 已先读好 SystemLanguage）
+    // AWT 文案不走 localize，创建时取当前语言
     private volatile String status = Lang.t("准备 TCL 启动器中…");
     private volatile int percent = -1;
     private volatile boolean closed;
@@ -56,6 +56,7 @@ public final class StartupWindow {
 
     public static StartupWindow open() {
         try {
+            if (Shell.mac()) return new StartupWindow(true);   // macOS 不起 AWT 窗，防双 toolkit 抢 NSApplication
             if (java.awt.GraphicsEnvironment.isHeadless()) return new StartupWindow(true);
             StartupWindow[] box = new StartupWindow[1];
             javax.swing.SwingUtilities.invokeAndWait(() -> box[0] = new StartupWindow());
@@ -69,6 +70,11 @@ public final class StartupWindow {
     private StartupWindow(boolean headless) {
         window = null;
         panel = null;
+    }
+
+    // 新 JVM 不弹启动窗，旧进程窗口留到主界面出现
+    public static StartupWindow none() {
+        return new StartupWindow(true);
     }
 
     public boolean isShowing() {
@@ -90,10 +96,14 @@ public final class StartupWindow {
         if (closed) return;
         closed = true;
         if (window == null) return;
-        long wait = 520 - (System.currentTimeMillis() - openedAt);
+        // 主窗口一显示就立刻让出置顶，别让启动卡继续压在主界面上
+        try {
+            window.setAlwaysOnTop(false);
+        } catch (Exception ignored) {
+        }
+        long wait = 300 - (System.currentTimeMillis() - openedAt);
         Runnable dispose = () -> {
             try {
-                window.setAlwaysOnTop(false);
                 window.setVisible(false);
                 window.dispose();
             } catch (Exception ignored) {

@@ -34,7 +34,7 @@ public final class InstanceMeta {
         return versionDir(ins).resolve("TCL").resolve("Setup.ini");
     }
 
-    // 一次列表刷新会对每个实例读 2-3 遍 Setup.ini，按 lastModified 缓存整份内容
+    // Setup.ini 按 lastModified 缓存，免重复读
     private static final java.util.concurrent.ConcurrentHashMap<String, CachedIni> INI_CACHE =
             new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -54,7 +54,6 @@ public final class InstanceMeta {
         CachedIni cached = INI_CACHE.get(key);
         if (cached != null && cached.modified == modified) return cached.values;
         List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
-        // 去掉 UTF-8 BOM
         if (!lines.isEmpty() && lines.get(0).startsWith("\uFEFF")) {
             lines.set(0, lines.get(0).substring(1));
         }
@@ -110,7 +109,7 @@ public final class InstanceMeta {
             Files.write(file, out, StandardCharsets.UTF_8);
             INI_CACHE.remove(file.toAbsolutePath().toString());
         } catch (Exception e) {
-            // brief 会被 Errors.briefText 再做一次 Lang.t，查不到表时原样返回，先译不吃亏
+            // brief 会被二次 Lang.t，先译无害
             Errors.error(Lang.t("保存实例设置失败：") + ins.name + " / " + key, e);
         }
     }

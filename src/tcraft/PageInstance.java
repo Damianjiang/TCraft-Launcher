@@ -184,7 +184,7 @@ public class PageInstance implements Page {
         });
         // 合集标签支持右键改名删除
         if (!value.isEmpty()) {
-            Ui.tooltip(chip, value + "（右键可重命名或删除）");
+            Ui.tooltip(chip, value + Lang.t("（右键可重命名或删除）"));
             chip.setOnContextMenuRequested(e -> {
                 Ui.menuCard(chip,
                         Ui.MenuRow.of("重命名合集…", "pencil", () -> renameCollection(value)),
@@ -394,7 +394,7 @@ public class PageInstance implements Page {
         data.selectedInstance = Math.max(0, data.instances.indexOf(ins));
         data.save();
         if (selectMode) {
-            win.toast("版本选择", "已选择 " + ins.name, 1);
+            win.toast("版本选择", Lang.t("已选择 ") + ins.name, 1);
             win.openPage("launch", true);
         } else if (data.getBool("UiHiddenFunctionInstanceModify", false)) {
             win.launchGame();
@@ -407,7 +407,7 @@ public class PageInstance implements Page {
         Ui.menuCard(anchor, instanceRows(anchor, ins).toArray(new Ui.MenuRow[0]));
     }
 
-    /** 一级菜单的行；二级菜单「返回」时原地重建同一份内容 */
+    // 一级菜单的行；二级菜单「返回」时原地重建同一份内容
     private List<Ui.MenuRow> instanceRows(Node anchor, Data.Instance ins) {
         List<Ui.MenuRow> rows = new ArrayList<>();
         rows.add(Ui.MenuRow.of("启动游戏", "play", () -> {
@@ -498,7 +498,7 @@ public class PageInstance implements Page {
         Ui.swapMenuCard(popup, content, 210);
     }
 
-    /** 返回行：同一张卡片里换回一级菜单，不关窗、不重播动画 */
+    // 返回行：同一张卡片里换回一级菜单，不关窗、不重播动画
     private Ui.ListItem backRow(javafx.stage.Popup popup, Node anchor, Data.Instance ins) {
         Ui.ListItem back = new Ui.ListItem(Theme.icon("arrow-left", 16, Theme.text), "返回", null, 34);
         back.setOnMouseClicked(e -> Ui.swapMenuCard(popup,
@@ -666,12 +666,15 @@ public class PageInstance implements Page {
                 boolean windows = os.contains("win");
                 boolean mac = os.contains("mac");
                 java.nio.file.Path script = Resources.launchTarget();
-                if (script == null) {
+                // mac 裸 jar 无脚本，用当前 java 直接拉起
+                java.nio.file.Path jar = script == null && mac ? Resources.jar() : null;
+                if (script == null && jar == null) {
                     // 异常消息最终进 Errors 报告弹窗，Errors UI 不经过 localize
                     throw new Exception(Lang.t("找不到启动器程序（TCraftLauncher.exe / TCraftLauncher.sh），请确认使用的是完整版程序。"));
                 }
-                java.nio.file.Path appDir = script.getParent() != null ? script.getParent() : Theme.root();
-                if (!windows) script.toFile().setExecutable(true);
+                java.nio.file.Path appDir = script != null && script.getParent() != null ? script.getParent()
+                        : jar != null && jar.getParent() != null ? jar.getParent() : Theme.root();
+                if (!windows && script != null) script.toFile().setExecutable(true);
                 java.nio.file.Path desktop = Shell.desktopDir();
                 java.nio.file.Files.createDirectories(desktop);
                 String baseName = "启动 " + safeFileName(ins.name);
@@ -691,16 +694,26 @@ public class PageInstance implements Page {
                             "-Command", ps);
                     pb.redirectErrorStream(true);
                     Process p = pb.start();
+                    // 先等退出再读输出，防挂死拖死线程
+                    if (!p.waitFor(30, java.util.concurrent.TimeUnit.SECONDS)) {
+                        p.destroyForcibly();
+                        throw new Exception("WScript.Shell 创建快捷方式超时");
+                    }
                     String output = new String(p.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
-                    if (p.waitFor() != 0 || !java.nio.file.Files.isRegularFile(link)) {
+                    if (p.exitValue() != 0 || !java.nio.file.Files.isRegularFile(link)) {
                         throw new Exception("WScript.Shell 未能生成快捷方式："
                                 + (output.isBlank() ? "无输出" : output.trim()));
                     }
                 } else if (mac) {
                     link = uniquePath(desktop, baseName, ".command");
+                    // exec 不带斜杠只查 PATH 不看当前目录，必须写绝对路径
+                    String run = script != null
+                            ? shellQuote(script.toAbsolutePath().toString())
+                            : shellQuote(ProcessHandle.current().info().command().orElse("java"))
+                                    + " -jar " + shellQuote(jar.toAbsolutePath().toString());
                     java.nio.file.Files.writeString(link,
                             "#!/bin/sh\ncd " + shellQuote(appDir.toString())
-                                    + "\nexec " + shellQuote(script.getFileName().toString())
+                                    + "\nexec " + run
                                     + " --launch-instance " + shellQuote(ins.name) + "\n",
                             java.nio.charset.StandardCharsets.UTF_8);
                     link.toFile().setExecutable(true);
@@ -710,8 +723,8 @@ public class PageInstance implements Page {
                     String entry = "[Desktop Entry]\nType=Application\nName=" + baseName + "\n"
                             + "Exec=" + desktopQuote(script.toString()) + " --launch-instance "
                             + desktopQuote(ins.name) + "\n"
-                            + "Path=" + desktopQuote(appDir.toString()) + "\n"
-                            + (icon == null ? "" : "Icon=" + desktopQuote(icon.toString()) + "\n")
+                            + "Path=" + appDir.toString() + "\n"
+                            + (icon == null ? "" : "Icon=" + icon.toString() + "\n")
                             + "Terminal=false\nCategories=Game;\n";
                     java.nio.file.Files.writeString(link, entry, java.nio.charset.StandardCharsets.UTF_8);
                     link.toFile().setExecutable(true);
@@ -766,7 +779,7 @@ public class PageInstance implements Page {
         if (out == null) return;
         java.nio.file.Path src = java.nio.file.Paths.get(ins.folder);
         if (!java.nio.file.Files.isDirectory(src)) {
-            win.toast("备份失败", "实例目录不存在：" + ins.folder, 2);
+            win.toast("备份失败", Lang.t("实例目录不存在：") + ins.folder, 2);
             return;
         }
         win.toast("开始备份", ins.name + " → " + out.getName(), 1);
@@ -901,7 +914,7 @@ public class PageInstance implements Page {
             try {
                 info = Modpacks.readInfo(packPath);
             } catch (Throwable t) {
-                // 深层嵌套的 zip/JSON 可能抛 StackOverflowError，不兜底会让 UI 永远停在"正在预读"
+                // 深层嵌套可抛 SOE，须兜底防 UI 卡预读
                 javafx.application.Platform.runLater(() ->
                         Dialogs.confirm(win, "预读整合包失败",
                                 Lang.tf("读取整合包时出错：%s", t.getMessage() == null ? t.toString() : t.getMessage()),
@@ -911,8 +924,7 @@ public class PageInstance implements Page {
             }
             javafx.application.Platform.runLater(() -> {
                 if (!info.valid) {
-                    // readError 已在创建处翻译，前缀判断会随语言变化，改为与「无法识别」串恒等比较；
-                    // 空串（清单认出但版本缺失）仍按未识别处理
+                    // 前缀判断随语言变化，须与「无法识别」串恒等比较；空串同未识别
                     boolean broken = info.readError != null && !info.readError.isEmpty()
                             && !info.readError.equals(Modpacks.unrecognizedError());
                     Dialogs.confirm(win, broken ? "整合包读取失败" : "无法识别整合包",

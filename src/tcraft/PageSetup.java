@@ -142,7 +142,6 @@ public class PageSetup implements Page {
                 data.set("LaunchAdvanceLockMemory", false);
                 data.set("LaunchAdvanceNoJavaw", false);
                 data.set("LaunchAdvanceRenderer", 0);
-                data.set("LaunchAdvanceGraphicCard", false);
                 data.set("LaunchCrashAnalysis", true);
                 data.set("LaunchAdvanceDisableCrashAnalysis", false);
             }
@@ -435,7 +434,7 @@ public class PageSetup implements Page {
         });
         adv.add(waitCmd);
 
-        // 决定启动用哪个 javaw.exe；没缓存时不在这里起一堆进程，先占位再后台扫
+        // 选启动用 javaw；无缓存先占位后台扫
         List<String> javas;
         if (data.hasJavaScanCache()) {
             javas = findJavas();
@@ -455,8 +454,19 @@ public class PageSetup implements Page {
             String path = javaCombo.getSelectionModel().getSelectedItem();
             if (path == null || path.equals("未找到 Java")) return;
             if (data.javaPath.equals(path)) return;
-            data.setJavaRuntime(path, Data.javaMajor(path));
-            win.toast("Java 已切换", path, 1);
+            // javaMajor 可能起 java -version 子进程，识别放后台
+            win.toast("正在识别 Java 版本…", path, 0);
+            Threads.start("TCL-Java-Switch", () -> {
+                int major = Data.javaMajor(path);
+                javafx.application.Platform.runLater(() -> {
+                    if (major <= 0) {
+                        win.toast("无法识别该 Java", path, 2);
+                        return;
+                    }
+                    data.setJavaRuntime(path, major);
+                    win.toast("Java 已切换", path, 1);
+                });
+            });
         });
         adv.add(Ui.settingRow("Java 列表", javaCombo));
 
@@ -495,15 +505,6 @@ public class PageSetup implements Page {
                             });
                         }
                     });
-            Ui.Check gpu = directCheck("使用高性能显卡（写入 Windows 显卡首选项）", "LaunchAdvanceGraphicCard", false);
-            gpu.setOnAction(() -> {
-                data.set("LaunchAdvanceGraphicCard", gpu.isSelected());
-                if (gpu.isSelected() && !data.javaPath.isEmpty()) {
-                    Shell.preferHighPerformanceGpu(data.javaPath);
-                    win.toast("已写入显卡首选项", "下次启动游戏时生效", 1);
-                }
-            });
-            adv.add(gpu);
         }
         adv.add(Ui.hint("版本独立设置中还有更多高级选项可供调整。", 0));
 
@@ -910,7 +911,7 @@ public class PageSetup implements Page {
             } catch (Exception ignored) {
             }
         }
-        // 标题对齐 WPF：有内容才带计数，整键带计数避免半截「 个）」查不到
+        // 标题对齐 WPF：整键带计数，拼接串查不到表
         String bgTitle = videoMode
                 ? (videoCount > 0 ? Lang.tf("背景视频（%d 个）", videoCount) : "背景视频")
                 : (imageCount > 0 ? Lang.tf("背景图片（%d 张）", imageCount) : "背景图片");
@@ -924,7 +925,7 @@ public class PageSetup implements Page {
         if (!videoMode) {
             // 有图片才显示自适应/轮播/不透明度/模糊，对齐 WPF 的显隐逻辑
             if (imageCount > 0) {
-                // 下拉顺序与存储值对齐 WPF：自动0/平铺4/居中1/拉伸3/左上5/左中9/左下7/中上11/居中2/中下12/右上6/右中10/右下8
+                // 下拉顺序与存储值对齐 WPF
                 String[] suitNames = {"自动", "平铺", "居中", "拉伸", "左上 (保持长宽比)",
                         "左中 (保持长宽比)", "左下 (保持长宽比)", "中上 (保持长宽比)",
                         "居中 (保持长宽比)", "中下 (保持长宽比)", "右上 (保持长宽比)",
@@ -1200,7 +1201,7 @@ public class PageSetup implements Page {
                     }
                 }
             }
-            win.toast("已清空背景视频", "删除了 " + removed + " 个文件", 1);
+            win.toast("已清空背景视频", Lang.tf("删除了 %d 个文件", removed), 1);
         } catch (Exception e) {
             win.toast("清空失败", e.getMessage(), 3);
         }
@@ -1299,7 +1300,7 @@ public class PageSetup implements Page {
                 Ui.button("导出翻译文件", Ui.BTN_NORMAL, () -> {
                     try {
                         copyLangFile(i18nFile);
-                        win.toast("翻译文件", "已导出到 " + i18nFile, 1);
+                        win.toast("翻译文件", Lang.t("已导出到 ") + i18nFile, 1);
                     } catch (Exception e) {
                         win.toast("导出失败", e.getMessage(), 3);
                     }
@@ -1412,13 +1413,14 @@ public class PageSetup implements Page {
                         Lang.tf("即将删除：\n· %s（配置、日志、缓存、联机内核）\n\n"
                                 + "游戏目录与存档不会被触碰。此操作不可撤销，确认后启动器立即退出。", appData),
                         () -> {
-                            try {
-                                EasyTier.killLeftovers();
-                                EasyTier.stop();
-                            } catch (Throwable ignored) {
-                            }
                             // 递归删整个数据目录放后台，删完再退出
                             Threads.start("TCL-Uninstall", () -> {
+                                // killLeftovers 要枚举全部系统进程，FX 回调里做会卡住界面
+                                try {
+                                    EasyTier.killLeftovers();
+                                    EasyTier.stop();
+                                } catch (Throwable ignored) {
+                                }
                                 // 趁 JVM 还在时删除，失败项收集起来
                                 List<String> failed = new ArrayList<>();
                                 deleteDirCollect(appData, failed);
@@ -1543,27 +1545,32 @@ public class PageSetup implements Page {
     }
 
     private void moveJava(Data.JavaRuntime rt, int dir) {
-        List<Data.JavaRuntime> list = orderedJavas();
-        int index = -1;
-        for (int i = 0; i < list.size(); i++) {
-            if (list.get(i).path().equals(rt.path())) {
-                index = i;
-                break;
+        // 缓存过期时 orderedJavas 会触发全盘探测，排序列表放后台
+        Threads.start("TCL-Java-Order", () -> {
+            List<Data.JavaRuntime> list = orderedJavas();
+            int index = -1;
+            for (int i = 0; i < list.size(); i++) {
+                if (list.get(i).path().equals(rt.path())) {
+                    index = i;
+                    break;
+                }
             }
-        }
-        int to = index + dir;
-        if (index < 0 || to < 0 || to >= list.size()) return;
-        list.add(to, list.remove(index));
-        StringBuilder sb = new StringBuilder();
-        for (Data.JavaRuntime r : list) {
-            if (sb.length() > 0) sb.append('|');
-            sb.append(r.path());
-        }
-        data.set("LaunchJavaOrder", sb.toString());
-        Data.JavaRuntime first = list.get(0);
-        data.setJavaRuntime(first.path(), first.major());
-        win.openSetup("java");
-        win.toast("优先级已调整", Lang.t("首选 ") + first.path(), 1);
+            int to = index + dir;
+            if (index < 0 || to < 0 || to >= list.size()) return;
+            list.add(to, list.remove(index));
+            javafx.application.Platform.runLater(() -> {
+                StringBuilder sb = new StringBuilder();
+                for (Data.JavaRuntime r : list) {
+                    if (sb.length() > 0) sb.append('|');
+                    sb.append(r.path());
+                }
+                data.set("LaunchJavaOrder", sb.toString());
+                Data.JavaRuntime first = list.get(0);
+                data.setJavaRuntime(first.path(), first.major());
+                win.openSetup("java");
+                win.toast("优先级已调整", Lang.t("首选 ") + first.path(), 1);
+            });
+        });
     }
 
     private void chooseJavaDownload() {
@@ -1591,14 +1598,19 @@ public class PageSetup implements Page {
         chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(Lang.t("所有文件"), "*.*"));
         File file = chooser.showOpenDialog(win.stage);
         if (file == null) return;
-        int major = Data.javaMajor(file.getAbsolutePath());
-        if (major <= 0) {
-            win.toast("无法识别该 Java", Lang.tf("请选择 bin 目录下的 %s", winOs ? "javaw.exe" : "java"), 2);
-            return;
-        }
-        data.setJavaRuntime(file.getAbsolutePath(), major);
-        win.refreshRight();
-        win.toast("Java 已导入", "Java " + major + " · " + file.getAbsolutePath(), 1);
+        // 探测要起 java -version 子进程，选完文件后整段放后台
+        Threads.start("TCL-Java-Import", () -> {
+            int major = Data.javaMajor(file.getAbsolutePath());
+            javafx.application.Platform.runLater(() -> {
+                if (major <= 0) {
+                    win.toast("无法识别该 Java", Lang.tf("请选择 bin 目录下的 %s", winOs ? "javaw.exe" : "java"), 2);
+                    return;
+                }
+                data.setJavaRuntime(file.getAbsolutePath(), major);
+                win.refreshRight();
+                win.toast("Java 已导入", "Java " + major + " · " + file.getAbsolutePath(), 1);
+            });
+        });
     }
 
     // 有些 Java 装在非常规位置，自动扫描覆盖不到，手动指定目录
@@ -1637,8 +1649,8 @@ public class PageSetup implements Page {
 
     private void buildLog(VBox page) {
         header(page, "日志", "查看、导出与清理运行日志。");
-        Path logDir = Resources.home();
-        Path logFile = logDir.resolve("launcher.log");
+        Path logDir = Resources.logDir();
+        Path logFile = Resources.errorLogFile();
 
         Ui.Card ops = addCard(page, "日志操作");
         FlowPane buttons = new FlowPane(10, 10);
@@ -1686,7 +1698,7 @@ public class PageSetup implements Page {
                 + " -fx-highlight-text-fill: #ffffff;"
                 + " -fx-focus-color: transparent; -fx-faint-focus-color: transparent;");
         live.add(view);
-        Label status = Ui.label("实时监听 launcher.log…", 11.5, Theme.gray3);
+        Label status = Ui.label("实时监听 errors.log（只记录错误与崩溃）…", 11.5, Theme.gray3);
         live.add(status);
         final Timeline[] tick = new Timeline[1];
         final String[] lastKey = {""};
@@ -1710,7 +1722,7 @@ public class PageSetup implements Page {
             if (key.equals(lastKey[0])) return;
             lastKey[0] = key;
             busy.set(true);
-            // 读盘和过滤都放后台，512 KiB 在主线程每 600ms 跑一遍会卡住界面
+            // 读盘过滤放后台，600ms 一轮会卡主线程
             Threads.start("TCL-Log-View", () -> {
                 String[] lines = new String[0];
                 String text = "";
@@ -1742,7 +1754,10 @@ public class PageSetup implements Page {
         List<Path> files = new ArrayList<>();
         try (var s = Files.list(logDir)) {
             s.filter(Files::isRegularFile)
-                    .filter(p -> p.getFileName().toString().toLowerCase().endsWith(".log"))
+                    .filter(p -> {
+                        String n = p.getFileName().toString().toLowerCase();
+                        return n.endsWith(".log") || n.endsWith(".txt");
+                    })
                     .sorted(Comparator.comparing(p -> p.getFileName().toString()))
                     .forEach(files::add);
         } catch (Exception ignored) {
@@ -1882,7 +1897,7 @@ public class PageSetup implements Page {
         refresh[0] = () -> Threads.start("TCL-Cache-Scan", () -> {
             long game = dirSize(Paths.get(data.gameDir), 30000);
             long cache = dirSize(cacheDir, 20000);
-            long logs = logSize(base);
+            long logs = logSize(Resources.logDir());
             long temp = tempSize(cacheDir);
             Platform.runLater(() -> {
                 bars.getChildren().setAll(
@@ -1924,10 +1939,10 @@ public class PageSetup implements Page {
                                             deleteContents(cacheDir);
                                         }
                                         if (clearTemp) freed += deleteTemp(cacheDir);
-                                        if (clearLog) freed += deleteLogs(base);
+                                        if (clearLog) freed += deleteLogs(Resources.logDir());
                                         long total = freed;
                                         Platform.runLater(() -> {
-                                            win.toast("清理完成", "已释放 " + bytes(total), 1);
+                                            win.toast("清理完成", Lang.t("已释放 ") + bytes(total), 1);
                                             if (refresh[0] != null) refresh[0].run();
                                         });
                                     });
@@ -2218,12 +2233,12 @@ public class PageSetup implements Page {
             if (idx >= 2) {
                 data.set("SystemDownloadSource", 2);
                 data.set("SystemVersionSource", 0);
-                win.toast("已应用", "下载源已切换为 " + names[2].getText(), 1);
+                win.toast("已应用", Lang.t("下载源已切换为 ") + names[2].getText(), 1);
             } else {
                 int value = FILE_SOURCES[wpfIndex[idx]];
                 data.set("SystemDownloadSource", value);
                 data.set("SystemVersionSource", wpfIndex[idx]);
-                win.toast("已应用", "下载源已切换为 " + sources[idx], 1);
+                win.toast("已应用", Lang.t("下载源已切换为 ") + sources[idx], 1);
             }
             data.save();
         });
@@ -2383,7 +2398,7 @@ public class PageSetup implements Page {
         return slider;
     }
 
-    // 拖动时只更新数字，动作合并到停下 80ms 后执行，不然每个事件都重建样式表
+    // 拖动只更新数字，停下 80ms 后再重建样式
     private Ui.SliderBar sliderRowDebounced(Ui.Card card, String label, double min, double max, double value,
                                             Consumer<Double> onChange, String suffix) {
         Ui.SliderBar slider = Ui.sliderBar(min, max, value);

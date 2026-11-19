@@ -35,7 +35,7 @@ public final class Modpacks {
         public String readError = "";
     }
 
-    // 识别失败与压缩包损坏共用 readError 字段，调用方靠它区分弹窗文案，须恒等比较
+    // readError 供调用方区分文案，须恒等比较
     static String unrecognizedError() {
         return Lang.t("无法识别整合包格式（压缩包里没有清单文件）");
     }
@@ -501,8 +501,7 @@ public final class Modpacks {
             task.progress = 0.05;
             Tasks.INSTANCE.changed();
             extractContent(zip, tempDir, versionFolder, base, info, contentDirs);
-            // PreCommand 实际从本机配置（Data.json）读取执行（GameLauncher.java:674 附近），
-            // 不经 Setup.ini；这里清掉包内自带实例设置里的危险项
+            // 清掉包内自带设置里的危险项（PreCommand 只认本机配置）
             sanitizeImportedInstanceSettings(versionFolder);
 
             if (index != null) {
@@ -515,7 +514,7 @@ public final class Modpacks {
             } else if (manifest != null) {
                 downloadCurseForgeContent(win, readJson(zip, manifest), versionFolder, task);
             }
-            // 内容下载阶段也可能写进 TCL/（比如包里带 nide8auth.jar），下载完再清一遍
+            // 下载阶段也可能写 TCL/，装完再清一遍
             sanitizeImportedInstanceSettings(versionFolder);
 
             task.stage = "整理文件";
@@ -567,8 +566,7 @@ public final class Modpacks {
                 }
             }
 
-            // 登记实例：内容在 versions/，用自己的版本 json 继承加载器版本
-            // desc 会持久化进实例元数据，创建时翻译；旧实例保持创建时的语言
+            // 登记实例：内容在 versions/，继承加载器版本；desc 创建时翻译
             String desc = info.typeName + Lang.t(" 整合包 · MC ") + info.mcVersion
                     + (info.loader.isEmpty() ? "" : Lang.t("，") + info.loader + " " + info.loaderVersion);
             Data.Instance instance = new Data.Instance(instanceName, instanceName,
@@ -591,7 +589,7 @@ public final class Modpacks {
             task.progress = 0.92;
             Tasks.INSTANCE.changed();
 
-            // 游戏版本装完才置 DONE，否则实例 json 还没写，启动会提示找不到版本文件
+            // 装完版本才置 DONE，防启动找不到 json
             String loader = info.loader.isEmpty() ? "原版" : info.loader;
             String actual;
             try {
@@ -691,8 +689,8 @@ public final class Modpacks {
             java.util.Map<String, Object> hashes = Json.obj(f.get("hashes"));
             String sha1 = Json.str(hashes, "sha1", "");
             Path target = versionFolder.resolve(relPath).normalize();
-            if (!target.startsWith(versionFolder)) continue; // 路径可能带 ../，别写穿
-            // TCL/ 是启动器的配置目录，nide8auth.jar、authlib-injector.jar 等会被 -javaagent 挂进游戏 JVM
+            if (!target.startsWith(versionFolder)) continue; // 别写穿
+            // TCL/ 是配置目录，-javaagent 会挂进 JVM
             if (target.startsWith(versionFolder.resolve("TCL"))) {
                 data_log("跳过写向 TCL 目录的整合包内容：" + relPath);
                 continue;
@@ -793,8 +791,8 @@ public final class Modpacks {
                 }
             }
             Path target = versionFolder.resolve(sub).resolve(rv.fileName).normalize();
-            if (!target.startsWith(versionFolder)) continue; // 文件名可能带 ../，别写穿目录
-            // TCL/ 是启动器的配置目录，不允许被整合包内容写穿
+            if (!target.startsWith(versionFolder)) continue; // 别写穿目录
+            // TCL/ 是配置目录，不允许被写穿
             if (target.startsWith(versionFolder.resolve("TCL"))) {
                 data_log("跳过写向 TCL 目录的整合包内容：" + target.getFileName());
                 continue;
@@ -825,7 +823,7 @@ public final class Modpacks {
             var hashes = Json.obj(source.get("hashes"));
             Path target = versionFolder.resolve(relPath).normalize();
             if (!target.startsWith(versionFolder)) continue;
-            // TCL/ 是启动器的配置目录，不允许被整合包内容写穿
+            // TCL/ 是配置目录，不允许被写穿
             if (target.startsWith(versionFolder.resolve("TCL"))) {
                 data_log("跳过写向 TCL 目录的整合包内容：" + relPath);
                 continue;

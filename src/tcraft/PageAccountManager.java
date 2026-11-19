@@ -246,7 +246,7 @@ public class PageAccountManager implements Page {
 
     private String rowInfo(int index, boolean current) {
         Data.Account a = data.accounts.get(index);
-        // 拼接串查不到整键，两个调用点（构建/选中刷新）都不再过 localize，逐段创建时翻译
+        // 拼接串查不到整键，两处调用点均创建时翻译
         return Lang.t(loginType(a)) + (current ? Lang.t(" · 当前账户") : "");
     }
 

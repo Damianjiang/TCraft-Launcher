@@ -38,25 +38,17 @@ public final class JavaInstaller {
         return "linux";
     }
 
-    public static int indexOfComponent(String component) {
-        for (int i = 0; i < COMPONENTS.length; i++) {
-            if (COMPONENTS[i][1].equals(component)) return i;
-        }
-        return -1;
-    }
-
-    public static Path installedDir(String component) {
-        Path dir = Resources.home().resolve("java").resolve(platformKey()).resolve(component);
-        Path bin = dir.resolve("bin");
-        if (Files.isDirectory(bin)) return dir;
-        return null;
+    public static Path install(String component, java.util.function.Consumer<String> status,
+                               java.util.function.BooleanSupplier cancelled) throws Exception {
+        return install(component, status, cancelled, null);
     }
 
     public static Path install(String component, java.util.function.Consumer<String> status,
-                               java.util.function.BooleanSupplier cancelled) throws Exception {
+                               java.util.function.BooleanSupplier cancelled,
+                               java.util.function.DoubleConsumer progress) throws Exception {
         String key = platformKey();
         if (key.isEmpty()) throw new IOException(Lang.t("当前平台不受 Mojang Java 运行时支持"));
-        // source 语义与 Downloader.mirrors 一致：1=仅官方，其余 bmcl 优先带回退
+        // source 同 Downloader.mirrors：1=仅官方
         String text = Data.get().getInt("SystemDownloadSource", 0) == 1
                 ? Downloader.getText(ALL_JSON)
                 : Downloader.getText(ALL_JSON_BMCL, ALL_JSON);
@@ -78,9 +70,11 @@ public final class JavaInstaller {
         Files.createDirectories(temp);
 
         int total = files.size();
+        if (status != null) status.accept(Lang.t("正在准备 Java 运行时…"));
+        if (progress != null) progress.accept(0);
         java.util.concurrent.atomic.AtomicInteger done = new java.util.concurrent.atomic.AtomicInteger();
         Path backup = base.resolve("." + component + ".old");
-        // 新目录校验通过才算完成；未完成时 catch 里要把旧运行时还原回去
+        // 新目录就绪才算装完；没装完时 catch 里把旧运行时还原回去
         boolean installed = false;
         try {
             // 目录和符号链接先串行建好，几十上百个文件走并发池下载
@@ -158,6 +152,9 @@ public final class JavaInstaller {
                                     if (status != null && n % 5 == 0) {
                                         status.accept(Lang.tf("正在下载 Java 运行时 %d / %d", n, total));
                                     }
+                                    if (progress != null && n % 5 == 0 && total > 0) {
+                                        progress.accept(Math.min(0.95, 0.90 * n / total));
+                                    }
                                 }
                             } catch (Exception e) {
                                 firstError.compareAndSet(null, e);
@@ -180,7 +177,9 @@ public final class JavaInstaller {
                 if (firstError.get() != null) throw firstError.get();
             }
 
-            // 先把旧运行时改名备份，新的搬进去成功后再删备份，失败时旧运行时还在
+            // 旧运行时改名备份，成功后删，失败还原
+            if (status != null) status.accept(Lang.t("正在解压 Java 运行时…"));
+            if (progress != null) progress.accept(0.96);
             deleteDir(backup);
             if (Files.exists(target)) {
                 try {
@@ -209,9 +208,10 @@ public final class JavaInstaller {
             exe.toFile().setExecutable(true, false);
             installed = true;
             deleteDir(backup);
+            if (progress != null) progress.accept(1);
             return exe;
         } catch (Exception e) {
-            // 取消或下载失败：清掉临时目录；没验收通过就把备份的旧运行时还原，别让坏目录留任
+            // 失败即清临时目录并还原备份运行时
             deleteDir(temp);
             if (!installed && Files.exists(backup)) {
                 deleteDir(target);

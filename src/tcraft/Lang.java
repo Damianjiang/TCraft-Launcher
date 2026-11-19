@@ -6,9 +6,10 @@ import java.util.Map;
 
 public final class Lang {
 
-    public static int mode = 0;
-    public static int setting = 0;
-    private static final Map<String, String[]> TABLE = new HashMap<>();
+    public static volatile int mode = 0;
+    public static volatile int setting = 0;
+    // reload 整体换表，后台线程读到的要么旧表要么新表，不会读到半张
+    private static volatile Map<String, String[]> TABLE = Map.of();
 
     static {
         reload();
@@ -18,28 +19,29 @@ public final class Lang {
     }
 
     public static void reload() {
-        TABLE.clear();
+        Map<String, String[]> fresh = new HashMap<>();
         try {
             String text = loadTableText();
-            if (text.isEmpty()) return;
-            // 记事本保存的 UTF-8 可能带 BOM，不去掉第一条词条会失配
-            if (text.charAt(0) == '\uFEFF') text = text.substring(1);
-            for (String line : text.split("\\R")) {
-                if (line.isEmpty()) continue;
-                String[] cols = line.split("\t", -1);
-                if (cols.length < 2) continue;
-                String zh = unescape(cols[0]);
-                if (zh.isEmpty() || TABLE.containsKey(zh)) continue;
-                String en = unescape(cols[1]);
-                String tw = cols.length > 2 && !cols[2].isEmpty() ? unescape(cols[2]) : zh;
-                TABLE.put(zh, new String[]{en, tw});
+            if (!text.isEmpty()) {
+                // 记事本保存的 UTF-8 可能带 BOM，不去掉第一条词条会失配
+                if (text.charAt(0) == '\uFEFF') text = text.substring(1);
+                for (String line : text.split("\\R")) {
+                    if (line.isEmpty()) continue;
+                    String[] cols = line.split("\t", -1);
+                    if (cols.length < 2) continue;
+                    String zh = unescape(cols[0]);
+                    if (zh.isEmpty() || fresh.containsKey(zh)) continue;
+                    String en = unescape(cols[1]);
+                    String tw = cols.length > 2 && !cols[2].isEmpty() ? unescape(cols[2]) : zh;
+                    fresh.put(zh, new String[]{en, tw});
+                }
             }
         } catch (Exception ignored) {
         }
+        TABLE = fresh;
     }
 
-    // 自带资源读取：Boot/StartupWindow 在 JavaFX 之前就要读表，
-    // 不能经过 Theme（其静态字段初始化 javafx.scene.paint.Color，无 JavaFX 时直接 NoClassDefFoundError）
+    // JavaFX 前读表，不能经 Theme（会 NoClassDefFoundError）
     private static String loadTableText() {
         try {
             Path code = java.nio.file.Paths.get(
@@ -57,7 +59,7 @@ public final class Lang {
                     }
                 }
             } else {
-                // 开发态：从 classes 目录向上找 res/（与 Resources.appDir 的向上探测同思路）
+                // 开发态从 classes 向上找 res/
                 Path cur = code.getParent();
                 for (int i = 0; i < 5 && cur != null; i++) {
                     Path f = cur.resolve("res").resolve("LangTables.txt");
@@ -69,7 +71,7 @@ public final class Lang {
             }
         } catch (Throwable ignored) {
         }
-        // 兜底走 classpath；Class.getResourceAsStream 只定位资源，不会初始化 Theme
+        // 兜底走 classpath，不会初始化 Theme
         try (var in = Lang.class.getResourceAsStream("/res/LangTables.txt")) {
             if (in != null) {
                 return new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);

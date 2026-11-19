@@ -4,7 +4,7 @@ import java.util.regex.Pattern;
 
 final class Redact {
 
-    // 顺序敏感：先匹配完整键值对再兜底 token:，不然 key 换掉了、值还留半截
+    // 先匹配键值对再兜底 token:，防值留半截
     private static final Pattern[] SECRETS = {
             Pattern.compile("(?i)(access[_-]?token[\"'\\s:=]{0,5})[A-Za-z0-9._~+/=-]{8,}"),
             Pattern.compile("(?i)(refresh[_-]?token[\"'\\s:=]{0,5})[A-Za-z0-9._~+/=-]{8,}"),

@@ -91,7 +91,7 @@ public class MainWindow {
     private PauseTransition rightCacheCleanup;
     private Timeline rightRefreshAnim;
     private int rightRefreshToken;
-    // 正在退场、还没调用 onHide 的右栏页面；动画被打断时用它补一次 onHide
+    // 退场未完的页面；动画打断时补 onHide
     private Page rightPendingHide;
     // 已经隐藏过的页面：动画打断和正常结束，onHide 只该各调一次
     private Page lastHiddenPage;
@@ -216,7 +216,7 @@ public class MainWindow {
         data.set("SystemCount", launches);
         java.util.List<String> unlockedNow = Theme.applyLaunchUnlocks(launches);
         if (!unlockedNow.isEmpty()) {
-            // toast 内部会对整串做 Lang.t，拼接串查不到表，主题名与尾注要各自先译
+            // toast 对整串查表，拼接串须各自先译
             String names = String.join("、", unlockedNow.stream().map(Lang::t).toList());
             data.log("隐藏主题已解锁：" + names + "（累计启动 " + launches + " 次）");
             Platform.runLater(() -> toast("隐藏主题已解锁", names + Lang.t(" —— 可在 设置 → 个性化 中选用。"), 1));
@@ -226,7 +226,15 @@ public class MainWindow {
     }
 
     private void restoreWindowBounds() {
-        javafx.geometry.Rectangle2D vb = javafx.stage.Screen.getPrimary().getVisualBounds();
+        double px = Double.NaN, py = Double.NaN;
+        if (data.getBool("UiRememberWindowPos", false)) {
+            px = parseDouble(data.get("Window.X", ""), Double.NaN);
+            py = parseDouble(data.get("Window.Y", ""), Double.NaN);
+        }
+        // 记住了位置就按坐标所在那块屏算边界，多屏时别一律钳回主屏
+        javafx.geometry.Rectangle2D vb = Double.isNaN(px) || Double.isNaN(py)
+                ? javafx.stage.Screen.getPrimary().getVisualBounds()
+                : screenFor(px, py);
         // 最小尺寸不能超过屏幕，小屏缩放时 810x470 会超
         double minW = Math.min(810, Math.max(320, vb.getWidth() - 8));
         double minH = Math.min(470, Math.max(240, vb.getHeight() - 8));
@@ -238,14 +246,9 @@ public class MainWindow {
         h = Math.min(Math.max(minH, h), Math.max(minH, vb.getHeight() - 8));
         stage.setWidth(w);
         stage.setHeight(h);
-        double x = Double.NaN, y = Double.NaN;
-        if (data.getBool("UiRememberWindowPos", false)) {
-            x = parseDouble(data.get("Window.X", ""), Double.NaN);
-            y = parseDouble(data.get("Window.Y", ""), Double.NaN);
-        }
-        if (!Double.isNaN(x) && !Double.isNaN(y)) {
-            stage.setX(clamp(x, vb.getMinX(), Math.max(vb.getMinX(), vb.getMaxX() - w)));
-            stage.setY(clamp(y, vb.getMinY(), Math.max(vb.getMinY(), vb.getMaxY() - h)));
+        if (!Double.isNaN(px) && !Double.isNaN(py)) {
+            stage.setX(clamp(px, vb.getMinX(), Math.max(vb.getMinX(), vb.getMaxX() - w)));
+            stage.setY(clamp(py, vb.getMinY(), Math.max(vb.getMinY(), vb.getMaxY() - h)));
         } else {
             stage.setX(vb.getMinX() + Math.max(0, (vb.getWidth() - w) / 2));
             stage.setY(vb.getMinY() + Math.max(0, (vb.getHeight() - h) / 2));
@@ -744,7 +747,7 @@ public class MainWindow {
         final Data.Instance crashIns = data.instance();
         insForCrash = crashIns;
         data.log("游戏进程已启动，PID " + process.pid());
-        // 设置页键义：UiMusicStop=游戏期间暂停音乐，UiMusicStart=游戏期间继续播，与 WPF 键义相反
+        // UiMusicStop/Start 键义与 WPF 相反（游戏期暂停/继续）
         if (data.getBool("UiMusicStop", false)) Music.pauseForGame();
         else if (data.getBool("UiMusicStart", false)) Music.resumeAfterGame();
         int visibility = data.getInt("LaunchVisibility", 5);
@@ -778,6 +781,8 @@ public class MainWindow {
                         return;
                     }
                     stage.show();
+                    // show 只恢复可见不置顶，游戏窗口还在时主窗会被压在下面
+                    stage.toFront();
                     stageWasHidden = false;
                 }
                 if (stage.isIconified() && visibility == 4) stage.setIconified(false);
@@ -814,7 +819,7 @@ public class MainWindow {
         } else if (preset >= 0) {
             Theme.applyPreset(preset);
         } else {
-            // preset=-1：跟随壁纸取色；auto 开关只决定壁纸变化时是否动态跟随，不决定是否用壁纸色
+            // preset=-1 跟随壁纸；auto 仅管动态跟随
             Theme.applyWallpaperTheme();
         }
     }
@@ -1235,7 +1240,7 @@ public class MainWindow {
         return badge;
     }
 
-    // 只刷新顶部导航，不动标题栏/右栏，避免切换功能隐藏时整窗重建闪烁
+    // 只刷新顶部导航，不动标题栏/右栏，整窗重建会闪一下
     public void refreshNav() {
         if (navBox == null) return;
         navBox.getChildren().clear();
@@ -1545,7 +1550,7 @@ public class MainWindow {
         try {
             page = createPage(key);
         } catch (Exception e) {
-            Errors.error("重建「" + key + "」页面失败", e);
+            Errors.error(Lang.t("重建「") + key + Lang.t("」页面失败"), e);
             return;
         }
         switchToken++;
@@ -1576,14 +1581,13 @@ public class MainWindow {
             right = page.right();
         } catch (Exception e) {
             // 构造失败走错误反馈
-            Errors.error("构造「" + currentKey + "」右栏失败", e);
+            Errors.error(Lang.t("构造「") + currentKey + Lang.t("」右栏失败"), e);
             return;
         }
         if (rightRefreshAnim != null) {
             rightRefreshAnim.stop();
             rightRefreshAnim = null;
-            // stop() 之后 setOnFinished 不会再执行，旧页的 onHide 会丢；
-            // 这里补一次，PageTasks 的计时器、PageLaunch 的彩蛋都靠它收尾
+            // stop() 后 setOnFinished 不跑，在此补 onHide
             hidePage(rightPendingHide);
             rightPendingHide = null;
         }
@@ -1654,7 +1658,7 @@ public class MainWindow {
             right.setTranslateY(0);
             for (Node c : childrenOf(right)) {
                 c.setMouseTransparent(false);
-                c.setOpacity(1);
+                setOpacitySafe(c, 1);
                 c.setTranslateY(0);
             }
             rightRefreshAnim = null;
@@ -1700,7 +1704,7 @@ public class MainWindow {
         right.setTranslateY(0);
         for (Node c : childrenOf(right)) {
             c.setMouseTransparent(false);
-            c.setOpacity(1);
+            setOpacitySafe(c, 1);
             c.setTranslateY(0);
         }
     }
@@ -1752,7 +1756,7 @@ public class MainWindow {
         try {
             page = createPage(key);
         } catch (Exception e) {
-            // Errors.briefText 会再对 brief 做 Lang.t，查不到表时原样返回，先译不吃亏
+            // brief 会被二次 Lang.t，先译无害
             Errors.error(Lang.t("构造「") + key + Lang.t("」页面失败"), e);
             return;
         }
@@ -1778,7 +1782,8 @@ public class MainWindow {
             });
             delay.play();
         }
-        if (!oldKey.equals(key)) data.log("切换页面：" + key);
+        // 切页轨迹只留内存日志，不写盘
+        if (data.getBool("SystemDebugMode", false) && !oldKey.equals(key)) data.log("切换页面：" + key);
     }
 
     private boolean pageHidden(String key) {
@@ -1867,7 +1872,8 @@ public class MainWindow {
             right.setOpacity(1);
             right.setTranslateY(0);
             for (Node n : childrenOf(right)) {
-                n.setOpacity(0);
+                // 透明度绑在动画上直接 set 会抛；先解绑再写
+                setOpacitySafe(n, 0);
                 n.setTranslateY(-14);
             }
         }
@@ -1949,7 +1955,7 @@ public class MainWindow {
             right.setTranslateY(0);
             for (Node c : childrenOf(right)) {
                 c.setMouseTransparent(false);
-                c.setOpacity(1);
+                setOpacitySafe(c, 1);
                 c.setTranslateY(0);
             }
         }
@@ -1981,16 +1987,16 @@ public class MainWindow {
             Node c = controls.get(i);
             c.setMouseTransparent(false);
             if (!animate) {
-                c.setOpacity(1);
+                setOpacitySafe(c, 1);
                 c.setTranslateY(0);
                 continue;
             }
             int delay = Math.min(112, i * 14);
-            c.setOpacity(0);
+            setOpacitySafe(c, 0);
             c.setTranslateY(-12);
             // 级联只做前 8 个，其余直接落终态，收尾别拖太长
             if (i >= 8) {
-                c.setOpacity(1);
+                setOpacitySafe(c, 1);
                 c.setTranslateY(0);
                 continue;
             }
@@ -2012,7 +2018,7 @@ public class MainWindow {
         }
         currentScroll = findScroll(right);
         if (currentScroll != null) {
-            // 滚动每帧都来，只在回顶按钮可见性要翻转时才走全量 updateExtras
+            // 仅回顶按钮可见性翻转时才全量刷新
             scrollListener = (o, a, b) -> {
                 if (btnExtraTop != null && btnExtraTop.isVisible() != (currentScroll.getVvalue() > 0.03)) {
                     updateExtras();
@@ -2047,6 +2053,13 @@ public class MainWindow {
             out.add(target);
         }
         return out.size() > 24 ? out.subList(0, 24) : out;
+    }
+
+    // 绑定中的 opacity 不能 set；此处只需静态值
+    private static void setOpacitySafe(Node node, double value) {
+        if (node == null) return;
+        if (node.opacityProperty().isBound()) node.opacityProperty().unbind();
+        node.setOpacity(value);
     }
 
     private void animateCover(double target) {
@@ -2328,7 +2341,7 @@ public class MainWindow {
         stack.setMaxWidth(360);
         stack.setOpacity(0);
         stack.setTranslateX(60);
-        // 存活时长用原始毫秒，不乘动画系数，关动画时 aniMs=0 会让 toast 立即消失
+        // 时长用原始毫秒，防 aniMs=0 时 toast 即逝
         int duration = 800 + Math.max(5, Math.min(23, (message == null ? 0 : message.length() + title.length())) * 180);
         ActiveToast at = new ActiveToast(stack, card, progress, close, title, message, duration);
         stack.getProperties().put("toast", at);
@@ -2635,7 +2648,7 @@ public class MainWindow {
         StackPane.setMargin(card, new Insets(70, 0, 0, 0));
 
         List<Object[]> entries = new ArrayList<>();
-        // 条目 6 列：原文标题/原文副题/图标/动作/译文标题/译文副题，原文留在前两列供查重
+        // 6 列：标题/副题/图标/动作 + 译文两列
         entries.add(searchEntry("启动", "主页", "play", (Runnable) () -> openPage("launch", true)));
         entries.add(searchEntry("版本选择", "启动 → 版本选择", "layers", (Runnable) () -> openPage("versions", true)));
         entries.add(searchEntry("实例", "实例管理", "box", (Runnable) () -> openPage("instance", true)));
@@ -2757,7 +2770,7 @@ public class MainWindow {
         searchField = new TextFieldBridge(field);
     }
 
-    // 全局搜索条目：前 4 列沿用旧结构，后两列存 Lang.t 后的译文供过滤与显示
+    // 条目 6 列：标题/副题/图标/动作 + 译文两列（过滤用）
     private Object[] searchEntry(String title, String sub, String icon, Runnable action) {
         return new Object[]{title, sub, icon, action, Lang.t(title), Lang.t(sub)};
     }
@@ -2797,7 +2810,7 @@ public class MainWindow {
                 Lang.setMode(mode);
                 data.set("SystemLanguage", mode);
                 rebuildUi();
-                toast("界面语言", "已切换为 " + Lang.langName(), 1);
+                toast("界面语言", Lang.t("已切换为 ") + Lang.langName(), 1);
             });
         }
         langPopup = Ui.menuCard(anchor, rows);
@@ -3151,10 +3164,22 @@ public class MainWindow {
                         });
                     }, () -> launchCancelled);
                 }
-                launchStepText("构建启动参数", 0.58);
+                launchStepText("检查游戏需要的 Java", 0.58);
                 if (launchCancelled) return;
-                launchStepText("启动游戏", 0.82);
-                Process process = GameLauncher.launch(ins, launchServerIp);
+                String resolvedJava = GameLauncher.resolveJava(ins,
+                        s -> {
+                            data.launchLog(s);
+                            Platform.runLater(() -> {
+                                if (launchStep != null) launchStep.setText(s);
+                            });
+                        },
+                        () -> launchCancelled,
+                        p -> Platform.runLater(() -> setLaunchProgress(0.58 + p * 0.18)));
+                data.launchLog("Java：" + resolvedJava);
+                launchStepText("构建启动参数", 0.8);
+                if (launchCancelled) return;
+                launchStepText("启动游戏", 0.88);
+                Process process = GameLauncher.launch(ins, launchServerIp, resolvedJava);
                 launchServerIp = null;
                 data.launchLog("游戏已启动：" + ins.name);
                 Platform.runLater(() -> {
@@ -3177,7 +3202,7 @@ public class MainWindow {
                     wait.play();
                 });
             } catch (Exception ex) {
-                // 用户取消启动不报错，对齐 WPF；取消时 cancelLaunch 已关面板并 toast
+                // 取消不报错（对齐 WPF），面板已由 cancelLaunch 关
                 if (ex instanceof java.util.concurrent.CancellationException || launchCancelled) return;
                 String msg = ex.getMessage() == null ? "未知错误" : ex.getMessage();
                 data.launchLog("启动失败：" + msg);
@@ -3289,7 +3314,7 @@ public class MainWindow {
         ParallelTransition pt = new ParallelTransition(ft, tt);
         pt.setOnFinished(e -> {
             Platform.exit();
-            // Platform.exit() 只关 JavaFX，后台线程可能留住 JVM，延迟后强退
+            // Platform.exit() 不退后台线程，延迟强退
             Thread killer = new Thread(() -> {
                 try {
                     Thread.sleep(350);

@@ -301,7 +301,7 @@ public class PageResourceDetail implements Page {
         }
         if (ids.isEmpty()) return;
         if (info.isCurseForge()) {
-            // CurseForge 没有批量接口，只能并发逐个查；限 8 并发，25s 没回来的按未解析处理
+            // 无批量接口，8 并发逐查，25s 超时按未解析
             java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(ids.size());
             java.util.concurrent.Semaphore gate = new java.util.concurrent.Semaphore(8);
             for (String id : ids) {
@@ -836,7 +836,7 @@ public class PageResourceDetail implements Page {
                         askDownloadDeps(deps, unresolved, file, target.toPath());
                     } else {
                         if (!unresolved.isEmpty()) {
-                            win.toast("前置无法自动解析", "请手动下载：" + String.join("、", unresolved), 3);
+                            win.toast("前置无法自动解析", Lang.t("请手动下载：") + String.join("、", unresolved), 3);
                         }
                         startDownloadTask(desc, file, target.toPath(), new ArrayList<>());
                     }
@@ -920,7 +920,7 @@ public class PageResourceDetail implements Page {
                     int i = 0;
                     for (DepDownload d : deps) {
                         if (task.canceled) throw new java.io.IOException("已取消");
-                        // 远端 fileName 直接拼路径可能带 ../，归一化后必须还落在目标目录
+                        // fileName 可能带 ../，归一化后须在目标目录内
                         Path depTarget = dir.resolve(d.version.fileName.replace("~", "-")).toAbsolutePath().normalize();
                         if (!depTarget.startsWith(dirAbs)) {
                             data.log("前置文件名包含非法路径，已跳过：" + d.version.fileName);

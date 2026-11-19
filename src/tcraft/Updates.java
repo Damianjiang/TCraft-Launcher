@@ -78,7 +78,6 @@ public final class Updates {
         pendingRelease = null;
         pendingError = null;
         pendingGen = 0;
-        Data.get().log("检查更新：" + (manual ? "手动" : "自动"));
         if (manual) win.toast("正在检查更新", "正在读取 GitHub Releases…", 0);
         if (hint != null) hint.setText(Lang.t("正在检查…"));
 
@@ -94,8 +93,6 @@ public final class Updates {
             pendingRelease = release;
             pendingError = error;
             pendingGen = generation;
-            Data.get().log("检查结果就绪：" + (release == null
-                    ? (error == null ? "无结果" : String.valueOf(error)) : release.tag));
         }, "TCL-Update");
         thread.setDaemon(true);
         thread.start();
@@ -109,7 +106,7 @@ public final class Updates {
             Data.get().log("检查更新超时：12 秒没有返回");
         }, 12, java.util.concurrent.TimeUnit.SECONDS);
 
-        // 在 FX 线程轮询取结果，不依赖 Platform.runLater 和后台线程回调
+        // FX 线程轮询取结果，不依赖 runLater 回调
         stopPoller();
         poller = new Timeline(new KeyFrame(Duration.millis(120), e -> poll(generation, win, manual, hint)));
         poller.setCycleCount(Timeline.INDEFINITE);
@@ -141,7 +138,6 @@ public final class Updates {
                 }
                 return;
             }
-            Data.get().log("检查更新完成：" + release.tag);
             if (hint != null) hint.setText(Lang.tf("GitHub 最新版本 v%s", clean(release.tag)));
             if (manual) win.toast("检查更新", Lang.tf("GitHub 最新版本 v%s", clean(release.tag)), 1);
             handle(win, release, manual);
@@ -209,7 +205,7 @@ public final class Updates {
             return;
         }
         if (!isComparable(current)) {
-            // 自动检查遇到不可比版本号（dev 构建等）只记日志，弹窗留给手动检查
+            // 不可比版本只记日志，弹窗留给手动检查
             if (manual) {
                 showUpdate(win, release);
             } else {
@@ -248,7 +244,7 @@ public final class Updates {
         logContent.setPadding(new Insets(7, 9, 7, 9));
         logContent.setBackground(Ui.fill(Theme.fieldBg, 6));
         logContent.setBorder(Ui.border(Theme.gray6, 6, 1));
-        // 小框滚轮放慢对齐 WPF MyMsgText 的 DeltaMult=0.7（0.7×全局 3.0）
+        // 小框滚轮 0.7×全局，对齐 WPF DeltaMult
         ScrollPane logScroll = Ui.scroll(logContent, 2.1);
         logScroll.setPrefViewportHeight(190);
         logScroll.setMinHeight(110);
@@ -319,7 +315,7 @@ public final class Updates {
                 break;
             }
         }
-        // 没有符合开关的条目就报真实原因，不再拿首个条目兜底绕过测试版开关
+        // 无符合条目即报真实原因，不拿首条兜底
         if (entry == null) {
             throw new IOException("GitHub Releases 中没有符合测试版开关设置的版本");
         }
@@ -363,7 +359,7 @@ public final class Updates {
         Map<String, Object> obj = Json.obj(Json.parse(json));
         String tag = Json.str(obj, "tag_name", "").trim();
         if (tag.isEmpty()) throw new IOException("API 中没有 tag");
-        // latest 接口只给一个 tag，不满足开关就跳过该源，让 fetchPage 接着找
+        // latest 只给一个 tag，不满足即跳源
         if (!tagAllowed(tag)) {
             throw new IOException("API 返回的 " + tag + " 不在当前测试版开关允许范围内");
         }
@@ -394,7 +390,7 @@ public final class Updates {
                 .build();
         HttpResponse<String> response;
         try {
-            // orTimeout 自带定时器，DNS 卡住时也能按时断开，不依赖底层 socket
+            // orTimeout 自带定时器，DNS 卡住也能断
             response = Http.client().sendAsync(request,
                             HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
                     .orTimeout(6, java.util.concurrent.TimeUnit.SECONDS)

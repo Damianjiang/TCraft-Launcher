@@ -71,23 +71,98 @@ public final class GameLauncher {
         return chain;
     }
 
-    private static String autoJava(Data.Instance instance) throws Exception {
+    // 无 javaVersion 时按版本号猜最低可用 Java
+    private static int guessJava(String version) {
+        String v = version == null ? "" : version.toLowerCase(java.util.Locale.ROOT).trim();
+        try {
+            if (v.startsWith("1.")) {
+                String[] p = v.split("[^0-9]+");
+                int minor = p.length > 1 ? Integer.parseInt(p[1]) : 0;
+                if (minor <= 16) return 8;
+                if (minor == 20) {
+                    int patch = p.length > 2 ? Integer.parseInt(p[2]) : 0;
+                    return patch >= 5 ? 21 : 17;
+                }
+                return minor >= 21 ? 21 : 17;
+            }
+            String[] p = v.split("[^0-9]+");
+            int major = p.length > 0 && !p[0].isEmpty() ? Integer.parseInt(p[0]) : 0;
+            if (major >= 24) return 25;
+        } catch (Exception ignored) {
+        }
+        return 17;
+    }
+
+    // 版本 JSON 里写明的 Java 主版本；读不到就返回 0
+    public static int requiredJava(Data.Instance instance) throws Exception {
         List<Map<String, Object>> chain = readChain(gameDirOf(instance), instance.version);
         int required = 0;
         for (Map<String, Object> j : chain) {
             required = Math.max(required, (int) parseNum(
                     Json.str(Json.obj(j.get("javaVersion")), "majorVersion", "0"), 0));
         }
-        if (required <= 0) return "";
-        String best = "";
-        int bestMajor = Integer.MAX_VALUE;
-        for (Data.JavaRuntime rt : Data.get().scanJavaRuntimes()) {
-            if (rt.major() >= required && rt.major() < bestMajor) {
-                best = rt.path();
-                bestMajor = rt.major();
+        return required;
+    }
+
+    // 组件代号：8=legacy 17=gamma 21=delta 25=epsilon
+    private static String componentFor(int required) {
+        if (required <= 8) return "jre-legacy";
+        if (required <= 17) return "java-runtime-gamma";
+        if (required <= 21) return "java-runtime-delta";
+        return "java-runtime-epsilon";
+    }
+
+    private static String findJava(int required, boolean exactOnly) {
+        List<Data.JavaRuntime> list = Data.get().scanJavaRuntimes();
+        String exact = "";
+        String nearest = "";
+        int nearestMajor = Integer.MAX_VALUE;
+        for (Data.JavaRuntime rt : list) {
+            if (!Data.javaIs64(rt.path())) continue;
+            if (rt.major() == required && exact.isEmpty()) exact = rt.path();
+            if (rt.major() >= required && rt.major() < nearestMajor) {
+                nearest = rt.path();
+                nearestMajor = rt.major();
             }
         }
-        return best;
+        if (!exact.isEmpty()) return exact;
+        if (exactOnly || required <= 8) return "";
+        return nearest;
+    }
+
+    // 选 Java：实例指定>本机同版>更高版，兜底下载
+    public static String resolveJava(Data.Instance instance, java.util.function.Consumer<String> status,
+                                     java.util.function.BooleanSupplier cancelled,
+                                     java.util.function.DoubleConsumer progress) throws Exception {
+        Data data = Data.get();
+        int required = requiredJava(instance);
+        if (required <= 0) required = guessJava(instance.version);
+
+        String explicit = data.getInstance("Java", "");
+        if (explicit != null && !explicit.isBlank() && !"@auto".equals(explicit)) {
+            try {
+                int m = Files.isRegularFile(Paths.get(explicit)) ? Data.javaMajor(explicit) : 0;
+                if (m >= required && Data.javaIs64(explicit)) return explicit;
+                if (m > 0 && status != null) {
+                    status.accept(Lang.tf("实例指定的 Java %d 低于版本要求 %d，自动更换", m, required));
+                }
+            } catch (Exception ignored) {
+            }
+        }
+
+        String found = findJava(required, true);
+        if (found.isEmpty()) found = findJava(required, false);
+        if (!found.isEmpty()) return found;
+
+        String component = componentFor(required);
+        if (status != null) status.accept(Lang.tf("未找到 Java %d，正在自动下载", required));
+        Path exe = JavaInstaller.install(component, status, cancelled, progress);
+        int major = Data.javaMajor(exe.toString());
+        if (major > 0 && major < required) {
+            throw new Exception(Lang.tf("下载的 Java %d 仍低于版本要求的 %d", major, required));
+        }
+        data.invalidateJavaScan();
+        return exe.toString();
     }
 
     private static Path gameDirOf(Data.Instance instance) {
@@ -100,7 +175,7 @@ public final class GameLauncher {
 
     public static List<MissingFile> scanMissing(Data.Instance instance) throws Exception {
         Path game = gameDirOf(instance);
-        // 按 target 绝对路径去重：继承链里同一个库可能出现多次，重复条目会让 downloadMissing 双写同一 .part
+        // 按 target 去重，防 downloadMissing 双写 .part
         Map<Path, MissingFile> out = new java.util.LinkedHashMap<>();
         List<Map<String, Object>> chain = readChain(game, instance.version);
         if (chain.isEmpty()) throw new Exception("版本 JSON 无效或不存在：" + instance.version);
@@ -122,7 +197,7 @@ public final class GameLauncher {
                 String path = Json.str(artifact, "path", "");
                 String url = Json.str(artifact, "url", "");
                 if (path.isEmpty()) {
-                    // 旧式库只有 name + url 基地址，按 maven 约定拼相对路径（LiteLoader 等）
+                    // 旧式库按 maven 约定从 name+url 拼路径
                     String base = Json.str(lib, "url", "");
                     if (!base.isEmpty() && !libName.isEmpty()) {
                         if (!base.endsWith("/")) base += "/";
@@ -258,6 +333,10 @@ public final class GameLauncher {
         return launch(instance, null);
     }
 
+    public static Process launch(Data.Instance instance, String serverIp) throws Exception {
+        return launch(instance, serverIp, resolveJava(instance, null, null, null));
+    }
+
     private static void applyGameLanguage(Path run) {
         if (!Data.get().getBool("ToolHelpChinese", true)) return;
         Path options = run.resolve("options.txt");
@@ -286,18 +365,11 @@ public final class GameLauncher {
         }
     }
 
-    public static Process launch(Data.Instance instance, String serverIp) throws Exception {
+    public static Process launch(Data.Instance instance, String serverIp, String resolvedJava) throws Exception {
         Data data = Data.get();
-        // 实例指定的 Java 优先，其次全局
-        String instanceJava = data.getInstance("Java", "");
-        String javaExe = "@auto".equals(instanceJava) ? autoJava(instance) : instanceJava;
-        if (javaExe.isEmpty() || !Files.isRegularFile(Paths.get(javaExe))) javaExe = data.javaPath;
+        String javaExe = resolvedJava;
         if (javaExe == null || javaExe.isEmpty() || !Files.isRegularFile(Paths.get(javaExe))) {
-            throw new Exception("未找到可用的 Java，请先在设置中选择 Java 路径");
-        }
-        // 高性能显卡先把 Java 路径登记进注册表
-        if (data.getBool("LaunchAdvanceGraphicCard", false) && Shell.windows()) {
-            Shell.preferHighPerformanceGpu(javaExe);
+            throw new Exception("未找到可用的 Java，自动下载 Java 也没有成功");
         }
         boolean showConsole = data.getInstanceBool("Console", false)
                 || data.getBool("LaunchAdvanceNoJavaw", false);
@@ -327,7 +399,7 @@ public final class GameLauncher {
         Map<String, Object> merged = new LinkedHashMap<>();
         for (Map<String, Object> j : chain) merged.putAll(j);
 
-        // Java 版本不够时直接报错
+        // 理论上 resolveJava 已经按版本要求选好；这里只做最后校验
         int requiredJava = 0;
         for (Map<String, Object> j : chain) {
             requiredJava = Math.max(requiredJava,
@@ -337,7 +409,7 @@ public final class GameLauncher {
             int currentJava = Data.javaMajor(javaExe);
             if (currentJava > 0 && currentJava < requiredJava) {
                 throw new Exception("Minecraft " + instance.version + " 需要 Java " + requiredJava
-                        + "，当前 Java 为 " + currentJava + "，请在「设置 → 启动设置」中切换 Java");
+                        + "，自动选择的 Java 为 " + currentJava);
             }
         }
 
@@ -371,7 +443,7 @@ public final class GameLauncher {
                 if (Files.isRegularFile(jar)) {
                     classpath.add(jar);
                 } else if (!artifactUrl.isEmpty() || !Json.str(lib, "url", "").isEmpty()) {
-                    // 旧式库靠 lib.url 基地址补全，缺了不能再静默跳过，否则启动后必 NoClassDefFound
+                    // lib.url 缺失即报错，防启动后 NoClassDefFound
                     missingLibs.add(path);
                 }
             }
@@ -428,7 +500,9 @@ public final class GameLauncher {
             if (overdue) {
                 try {
                     valid = MsAuth.validate(account.accessToken);
-                } catch (Exception ignored) {
+                } catch (Exception e) {
+                    // 校验请求本身失败（网络抖动）不能当作令牌有效，交给刷新兜底
+                    valid = false;
                 }
             }
             if (!valid) {
@@ -556,7 +630,7 @@ public final class GameLauncher {
         }
         cmd.add("-Xmx" + ram + "M");
         cmd.add("-Xms" + xms + "M");
-        // AlwaysPreTouch 启动时就把堆页全部触碰一遍，免得游戏中途扩堆卡顿
+        // AlwaysPreTouch 预触堆页，防游戏中途扩堆
         if (lockMemory) cmd.add("-XX:+AlwaysPreTouch");
         cmd.add("-Dfile.encoding=UTF-8");
         int javaMajor = Data.javaMajor(javaExe);
@@ -568,7 +642,10 @@ public final class GameLauncher {
                 else cmd.add("-XX:+UseG1GC");
             }
             case 1 -> {
-                if (javaMajor >= 21) {
+                // ZGenerational 24 起废弃，老写法拒启动
+                if (javaMajor >= 23) {
+                    cmd.add("-XX:+UseZGC");
+                } else if (javaMajor >= 21) {
                     cmd.add("-XX:+UseZGC");
                     cmd.add("-XX:+ZGenerational");
                 } else {
@@ -597,20 +674,7 @@ public final class GameLauncher {
         }
         // 把当前代理同步给游戏 JVM
         if (data.getBool("SystemHttpProxyForGame", false)) {
-            int proxyMode = data.getInt("SystemHttpProxyType", 1);
-            String host = data.get("SystemProxyHost", "");
-            String port = data.get("SystemProxyPort", "7890");
-            if (!host.isEmpty() && (proxyMode == 2 || proxyMode == 3)) {
-                if (proxyMode == 3) {
-                    cmd.add("-DsocksProxyHost=" + host);
-                    cmd.add("-DsocksProxyPort=" + port);
-                } else {
-                    cmd.add("-Dhttp.proxyHost=" + host);
-                    cmd.add("-Dhttp.proxyPort=" + port);
-                    cmd.add("-Dhttps.proxyHost=" + host);
-                    cmd.add("-Dhttps.proxyPort=" + port);
-                }
-            }
+            cmd.addAll(data.proxyJvmArgs());
         }
         String brand = data.getInstance("Info", data.get("LaunchCustomInfo", "TCL"));
         if (brand == null || brand.isBlank()) brand = "TCraftLauncher";
@@ -667,7 +731,7 @@ public final class GameLauncher {
         }
         String extraJvm = data.getInstance("JvmArgs", data.get("InstanceJvmArgs", data.get("LaunchJvmArgs", "")));
         if (!extraJvm.isEmpty()) {
-            for (String a : splitArgs(extraJvm)) cmd.add(subst(a, vars));
+            for (String a : Shell.splitArgs(extraJvm)) cmd.add(subst(a, vars));
         }
         cmd.add(mainClass);
 
@@ -684,14 +748,14 @@ public final class GameLauncher {
                 cmd.add("--height");
                 cmd.add(String.valueOf(winH));
             }
-            for (String a : splitArgs(legacy)) cmd.add(subst(a, vars));
+            for (String a : Shell.splitArgs(legacy)) cmd.add(subst(a, vars));
         } else {
             cmd.addAll(resolveArgs(gameArgs, vars, features));
         }
         if (fullscreen) cmd.add("--fullscreen");
         String extraGame = data.getInstance("GameArgs", data.get("LaunchGameArgs", ""));
         if (!extraGame.isEmpty()) {
-            for (String a : splitArgs(extraGame)) cmd.add(subst(a, vars));
+            for (String a : Shell.splitArgs(extraGame)) cmd.add(subst(a, vars));
         }
         if (serverIp != null && !serverIp.trim().isEmpty()) {
             String[] parts = serverIp.trim().split(":");
@@ -712,7 +776,7 @@ public final class GameLauncher {
                 String arg = win ? "/c" : "-c";
                 Process preProcess = new ProcessBuilder(shell, arg, pre).directory(run.toFile())
                         .redirectErrorStream(true).start();
-                // 输出必须有人消费，不然命令打印多了管道塞满就互相等死；只排水，EOF 即退出
+                // 输出必须排水防管道塞死，EOF 即退
                 Thread consumer = new Thread(() -> {
                     try (BufferedReader br = new BufferedReader(
                             new InputStreamReader(preProcess.getInputStream(), StandardCharsets.UTF_8))) {
@@ -730,7 +794,7 @@ public final class GameLauncher {
                         data.launchLog("启动前命令超过 5 分钟未结束，已强制结束：" + pre);
                     }
                 } else {
-                    // 不等它结束也得兜底强杀，不然命令挂死会一直占着管道；销毁不放在排水线程里，免得和上面的等待竞态
+                    // 兜底强杀防挂死；销毁避开排水线程竞态
                     Thread reaper = new Thread(() -> {
                         try {
                             if (!preProcess.waitFor(10, java.util.concurrent.TimeUnit.SECONDS)) {
@@ -764,12 +828,15 @@ public final class GameLauncher {
         builder.redirectErrorStream(true);
         Process process = builder.start();
         data.launchLog("游戏目录：" + run);
-        data.launchLog("已启动游戏进程：" + String.join(" ", cmd));
+        // 日志只记 PID 与版本；诊断看游戏 latest.log
+        data.launchLog("已启动游戏进程，PID " + process.pid());
+        data.log("启动游戏：" + instance.version + "（PID " + process.pid() + "）");
         Thread reader = new Thread(() -> {
             try (BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
                 String line;
                 while ((line = br.readLine()) != null) {
-                    data.launchLog("[MC] " + line);
+                    // 只进内存环形缓冲，供异常退出时分析；不再逐行写盘
+                    data.launchLog(line);
                 }
             } catch (Exception ignored) {
             }
@@ -936,42 +1003,6 @@ public final class GameLauncher {
         return out;
     }
 
-    // 按空白切分参数，引号内的空格不切分，引号本身不保留
-    static List<String> splitArgs(String text) {
-        List<String> out = new ArrayList<>();
-        if (text == null || text.isEmpty()) return out;
-        StringBuilder cur = new StringBuilder();
-        char quote = 0;
-        boolean quoted = false;
-        for (int i = 0; i < text.length(); i++) {
-            char c = text.charAt(i);
-            if (quote != 0) {
-                if (c == '\\' && quote == '"' && i + 1 < text.length()
-                        && (text.charAt(i + 1) == '"' || text.charAt(i + 1) == '\\')) {
-                    cur.append(text.charAt(++i));
-                } else if (c == quote) {
-                    quote = 0;
-                } else {
-                    cur.append(c);
-                }
-            } else if (c == '"' || c == '\'') {
-                quote = c;
-                quoted = true;
-            } else if (Character.isWhitespace(c)) {
-                if (quoted || cur.length() > 0) {
-                    out.add(cur.toString());
-                    cur.setLength(0);
-                    quoted = false;
-                }
-            } else {
-                cur.append(c);
-            }
-        }
-        // 引号未闭合时把剩余内容当成一个参数，宁可少切也不要丢参数
-        if (quoted || cur.length() > 0) out.add(cur.toString());
-        return out;
-    }
-
     private static String nameToPath(String name) {
         if (name == null || name.isEmpty()) return "";
         String[] parts = name.split(":");
@@ -1020,7 +1051,7 @@ public final class GameLauncher {
             }
             throw new Exception("获取统一通行证下载信息失败：" + e.getMessage());
         }
-        // API 没给 hash 时直接用本地，不然每次启动都会整包重下（对齐 authlib-injector 的做法）
+        // API 无 hash 用本地，防每次整包重下
         if (Files.isRegularFile(jar) && jarHash.isEmpty()) return;
         if (Files.isRegularFile(jar) && sha1Of(jar).equalsIgnoreCase(jarHash)) return;
         try {

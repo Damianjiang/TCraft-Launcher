@@ -1063,12 +1063,11 @@ public final class Dialogs {
                 + "-" + s.substring(16, 20) + "-" + s.substring(20);
     }
 
-    /** 颜色标签弹窗：和「检查更新」等弹窗同一套卡片样式（标题 + 强调线 + 内容 + 底部按钮） */
+    // 与「检查更新」共用同一套弹窗卡片样式
     public static void colorTag(MainWindow win, Data.Instance ins, Runnable onChanged) {
         win.showModal(buildColorCard(win, ins, onChanged), true);
     }
 
-    /** 单独拆出来，便于本地探针渲染核对 */
     static VBox buildColorCard(MainWindow win, Data.Instance ins, Runnable onChanged) {
         VBox card = msgCard("颜色标签");
         card.setPrefWidth(430);

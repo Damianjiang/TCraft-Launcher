@@ -20,7 +20,7 @@ public final class Fetch {
     private static final long[] BACKOFF_MS = {200, 500, 1000, 2000, 3000};
     private static final long IDLE_TIMEOUT_MS = 20_000;
 
-    // 包可见：Downloader.transferWithProgress 写同一批 .part，必须共用这把锁
+    // 与 Downloader 共写 .part，锁须共用
     static final java.util.concurrent.ConcurrentHashMap<String, Object> PART_LOCKS =
             new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -30,7 +30,7 @@ public final class Fetch {
         Files.createDirectories(target.toAbsolutePath().getParent());
 
         final String expect = sha1 == null || sha1.isEmpty() ? null : sha1.toLowerCase();
-        // 没有哈希就没法确认旧 .part 是谁写的，续传可能拼出损坏文件，直接从头下
+        // 无哈希认不了旧 .part，直接重下
         if (expect == null) Files.deleteIfExists(part);
         MessageDigest digest = expect == null ? null : sha1();
 
@@ -81,7 +81,7 @@ public final class Fetch {
                     }
                     continue;
                 }
-                // 网络重试到此为止；目标被占用不是网络问题，重下多少遍都还是失败
+                // 占用类错误不属网络，重试无意义
                 try {
                     Files.move(part, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                 } catch (java.nio.file.FileSystemException e) {
@@ -164,7 +164,11 @@ public final class Fetch {
                 guard.touch();
                 int take = (int) Math.min(n, maxBytes - out.size());
                 if (take > 0) out.write(buffer, 0, take);
-                if (out.size() >= maxBytes) break;
+                if (out.size() >= maxBytes) {
+                    // 上限不是截断线：后面还有数据就是真超限，报错不给半截
+                    if (in.read() != -1) throw new java.io.IOException("响应超过大小上限");
+                    break;
+                }
             }
             return out.toByteArray();
         } finally {

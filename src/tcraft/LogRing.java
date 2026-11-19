@@ -60,8 +60,7 @@ final class LogRing extends AbstractList<String> {
         return new java.util.ArrayList<>(items).iterator();
     }
 
-    // 取最后 last 行的拷贝。subList 迭代会比对 modCount，游戏运行中后台
-    // 还在写日志，页面构建时直接迭代会抛 ConcurrentModificationException
+    // 返回拷贝快照；直接迭代 subList 与写日志并发会抛 CME
     public synchronized List<String> snapshot(int last) {
         ArrayList<String> copy = new ArrayList<>(items);
         int from = Math.max(0, copy.size() - Math.max(0, last));

@@ -72,7 +72,7 @@ public final class RemoteImages {
             fire(callback, null);
             return;
         }
-        // compute 保证"加入列表"和"是否第一个"对完成回调原子，否则回调会进孤儿列表再也不被调
+        // compute 保证登记与首例判定原子，防回调孤儿
         List<Consumer<Image>> waiters = WAITERS.compute(k, (kk, list) -> {
             if (list == null) list = new CopyOnWriteArrayList<>();
             list.add(callback);
@@ -198,7 +198,7 @@ public final class RemoteImages {
         }
     }
 
-    // 磁盘缓存一律按内容 SHA-1 命名，40 位十六进制之外的东西不归这里管
+    // 缓存按内容 SHA-1 命名，只删 40 位十六进制
     private static final java.util.regex.Pattern SHA1_NAME = java.util.regex.Pattern.compile("[0-9a-f]{40}");
 
     private static void prune(Path d) {

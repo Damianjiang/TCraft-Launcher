@@ -496,7 +496,7 @@ public final class Ui {
         animateBg(region, from, to, ms, null);
     }
 
-    // 同一节点同一槽位的动画先停旧的再播新的，快速 hover 终态才不会被上一段拽回去
+    // 同槽位先停旧动画再播新，防 hover 被拽回
     static void startExclusive(Node owner, Object slot, javafx.animation.Animation t) {
         Object old = owner.getProperties().put(slot, t);
         if (old instanceof javafx.animation.Animation running) running.stop();
@@ -574,7 +574,7 @@ public final class Ui {
             return new MenuRow(title, icon, action, false, false);
         }
 
-        /** 二级菜单入口：点它不关卡片，而是在同一张卡片里换内容（对齐 WPF 的二级卡片） */
+        // 二级菜单入口：原地换内容，不关卡片
         public static MenuRow submenu(String title, String icon, Runnable action) {
             return new MenuRow(title, icon, action, false, true);
         }
@@ -584,14 +584,14 @@ public final class Ui {
         }
     }
 
-    /** 当前打开的菜单卡片；二级菜单靠它拿到同一张卡片 */
+    // 当前打开的菜单卡片；二级菜单靠它拿到同一张卡片
     private static javafx.stage.Popup activeMenu;
 
     public static javafx.stage.Popup activeMenu() {
         return activeMenu;
     }
 
-    /** 只构建菜单行（不含卡片外壳），二级菜单原地换内容时复用 */
+    // 只构建菜单行（不含卡片外壳），二级菜单原地换内容时复用
     public static VBox menuRows(MenuRow... rows) {
         VBox box = new VBox(0);
         for (MenuRow row : rows) {
@@ -620,14 +620,7 @@ public final class Ui {
         return showMenuCard(anchor, card);
     }
 
-    public static javafx.stage.Popup menuCardNode(javafx.scene.Node anchor,
-                                                  javafx.scene.Node content, double width) {
-        VBox card = menuCardShell(width);
-        card.getChildren().add(content);
-        return showMenuCard(anchor, card);
-    }
-
-    /** 卡片给投影留的白边，和 WPF 版 MenuCard.ShadowPad 一致 */
+    // 卡片给投影留的白边，和 WPF 版 MenuCard.ShadowPad 一致
     private static final double MENU_SHADOW_PAD = 14;
 
     private static VBox menuCardShell(double width) {
@@ -645,17 +638,13 @@ public final class Ui {
         int pct = Data.get().getInt("UiMenuOpacity", 100);
         pct = Math.max(0, Math.min(100, pct));
         Color base = Theme.cardBg;
-        // WPF 的卡片底色是 #f5ffffff（96% 白）；组件半透明调低时不能再跟着一起透，
-        // 否则弹层叠在壁纸上等于没有底板，字看不清。这里给个 0.85 的底
+        // 底色固化 0.85：弹层叠壁纸须有底板，组件不能跟着透
         double alpha = Math.max(base.getOpacity(), 0.85) * pct / 100.0;
         if (pct > 0) alpha = Math.max(alpha, 0.30);
         return Color.color(base.getRed(), base.getGreen(), base.getBlue(), alpha);
     }
 
-    /**
-     * 菜单可用区域：优先用主窗口范围（菜单不能超出窗口），窗口取不到时退回所在屏幕。
-     * 两者取交集，保证既不出窗也不出屏。
-     */
+    // 可用区域=主窗与屏幕交集，取不到退回屏幕
     private static javafx.geometry.Rectangle2D menuArea(javafx.stage.Window owner,
                                                        javafx.geometry.Rectangle2D screen) {
         if (owner instanceof javafx.stage.Stage) {
@@ -674,10 +663,7 @@ public final class Ui {
         return screen;
     }
 
-    /**
-     * 按锚点算菜单最大高度，移植 WPF MenuCard.CalcMaxMenuHeight：
-     * 取「下方」和「上方」里更宽敞的一侧，留 16px 边距，再扣掉卡片内边距和投影留白。
-     */
+    // 移植 WPF CalcMaxMenuHeight：取更宽敞一侧扣边距
     private static double calcMaxMenuHeight(javafx.geometry.Bounds ab,
                                             javafx.geometry.Rectangle2D area) {
         double below = area.getMaxY() - ab.getMaxY() - 16;
@@ -720,10 +706,7 @@ public final class Ui {
         return popup;
     }
 
-    /**
-     * 二级菜单：在同一张卡片里换内容（对齐 WPF 的二级卡片——PanInstanceMenu.Children.Clear() 后重建）。
-     * 不关窗、不重播入场动画，卡片风格和位置与一级菜单完全一致。
-     */
+    // 二级菜单：同卡换内容，不关窗不重播动画
     public static void swapMenuCard(javafx.stage.Popup popup, javafx.scene.Node content, double width) {
         if (popup == null || !popup.isShowing() || popup.getContent().isEmpty()) return;
         javafx.scene.Node old = popup.getContent().get(0);
@@ -743,7 +726,7 @@ public final class Ui {
         box.visual.setOpacity(0);
         box.visual.getProperties().put("menuAnchor", anchor);
 
-        // Popup 显示中改宽度不生效（高度会自动跟内容走），宽度变了只能原位重开一次
+        // Popup 显示中改宽无效，须原位重开
         boolean widthChanged = Math.abs(popup.getWidth() - box.vw) > 1;
         popup.getContent().set(0, box.visual);
         popup.setHeight(box.vh);
@@ -766,7 +749,7 @@ public final class Ui {
         in.play();
     }
 
-    /** 排版结果：内容节点 + 弹窗整体尺寸（含投影留白） */
+    // 排版结果：内容节点 + 弹窗整体尺寸（含投影留白）
     private static final class MenuBox {
         javafx.scene.layout.Pane visual;
         double w;
@@ -776,8 +759,7 @@ public final class Ui {
 
     private static MenuBox layoutMenu(VBox card, javafx.geometry.Bounds ab,
                                      javafx.geometry.Rectangle2D area) {
-        // VBox.prefWidth() 不含 minWidth，不兜底会被压成一条、文字只剩一个字；
-        // 内容自身的最小宽度也要算进来（先放开 minWidth 才能量到真实值）
+        // prefWidth 不含 minWidth，兜底加内容最小宽
         card.setMinWidth(Region.USE_COMPUTED_SIZE);
         double naturalMin = card.minWidth(-1);
         double w = Math.max(210, Math.max(naturalMin, card.prefWidth(-1)));
@@ -801,7 +783,7 @@ public final class Ui {
     private static double[] placeMenu(MenuBox box, javafx.geometry.Bounds ab,
                                       javafx.geometry.Rectangle2D area) {
         double pad = MENU_SHADOW_PAD;
-        // 候选位置与 WPF 一致：右侧对齐/左侧对齐 × 下方/上方，取第一个能放进区域的
+        // 候选位置同 WPF：右/左 × 下/上，取第一个放得下
         double xRight = ab.getMaxX() - box.w - pad;
         double xLeft = ab.getMinX() - pad;
         double yBelow = ab.getMaxY() + 2 - pad;
@@ -829,11 +811,7 @@ public final class Ui {
         }
     }
 
-    /**
-     * 菜单滚动壳：外层 Pane 就是 Popup 的内容，尺寸固定为「卡片 + 投影留白」；
-     * 里面再套一层裁剪到卡片圆角的视口，卡片在视口里上下平移，右侧是自绘滚动条。
-     * 不用 ScrollPane：它的视口会吃掉圆角背景，fitToWidth 还会把卡片压窄。
-     */
+    // 滚动壳：外层卡尺寸内层裁圆角；不用 ScrollPane（裁背景）
     private static javafx.scene.layout.Pane scrollShell(VBox card, double w, double viewH, double contentH) {
         final double pad = MENU_SHADOW_PAD;
         final double vw = w + pad * 2;
@@ -844,7 +822,7 @@ public final class Ui {
         root.setMinSize(vw, vh);
         root.setPrefSize(vw, vh);
         root.setMaxSize(vw, vh);
-        // 外层也裁一刀：否则子节点的溢出会把 bounds 撑大，Popup 会跟着撑到屏幕外
+        // 外层再裁一刀，防子节点撑大 bounds
         root.setClip(new Rectangle(vw, vh));
 
         javafx.scene.layout.Pane view = new javafx.scene.layout.Pane();
@@ -855,7 +833,7 @@ public final class Ui {
         clip.setArcHeight(20);
         view.setClip(clip);
 
-        // 投影底板：视口会把卡片的阴影一起裁掉，所以阴影单独画一层垫在下面
+        // 视口会裁阴影，投影单独垫一层
         javafx.scene.layout.Region back = new javafx.scene.layout.Region();
         back.setManaged(false);
         back.resizeRelocate(pad, pad, w, viewH);
@@ -1972,7 +1950,7 @@ public final class Ui {
         return scroll(content, SmoothScroll.DEFAULT_WHEEL_SPEED);
     }
 
-    // wheelSpeed 每 pane 可调，弹窗小框要慢些对齐 WPF MyMsgText 的 DeltaMult=0.7
+    // 小框滚轮放慢，对齐 WPF DeltaMult=0.7
     public static ScrollPane scroll(Node content, double wheelSpeed) {
         if (content instanceof Region region) region.setMaxWidth(Double.MAX_VALUE);
         ScrollPane sp = new ScrollPane(content);

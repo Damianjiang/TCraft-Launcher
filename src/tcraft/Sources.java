@@ -85,7 +85,7 @@ public final class Sources {
     private static double probe(String url) {
         long t = System.nanoTime();
         try (Http.Body body = Http.open(url, Duration.ofSeconds(4), 0, PROBE_BYTES - 1)) {
-            // 对端可能无视 Range 灌整文件，读满上限就停，按实际读到的字节计速
+            // 对端可无视 Range 灌整文件，读满上限即停
             byte[] data = Fetch.readAll(body.in, 3000, PROBE_READ_CAP);
             long ms = Math.max(1, (System.nanoTime() - t) / 1_000_000);
             if (data.length <= 0) return -1;

@@ -21,7 +21,7 @@ public final class Servers {
         public String name = "";
         public String ip = "";
         public String icon = "";
-        // listRead 捕获的原始 NBT 字段（name/ip/icon 之外），listWrite 原样写回；新建的条目为 null
+        // listRead 捕获的额外 NBT 字段，listWrite 原样写回
         public java.util.Map<String, Object> extra;
     }
 
@@ -67,7 +67,7 @@ public final class Servers {
                     } else if ("ip".equals(key)) {
                         e.ip = str(value);
                     } else if ("icon".equals(key)) {
-                        // 文件里的 icon 是 PNG 字节数组：转 base64 给界面解码，原数组留在 extra 按原类型写回
+                        // icon 是 PNG 字节数组：base64 给界面，原样写回
                         if (value instanceof byte[] bytes) {
                             e.icon = java.util.Base64.getEncoder().encodeToString(bytes);
                             extra.put(key, value);
@@ -75,7 +75,7 @@ public final class Servers {
                             e.icon = str(value);
                         }
                     } else {
-                        // 新版 MC 的 hidden 等标记也在条目里，丢了会导致游戏端设置被抹掉
+                        // hidden 等标记须保留，防游戏端设置被抹
                         extra.put(key, value);
                     }
                 }
@@ -196,8 +196,7 @@ public final class Servers {
         }
 
         Object readPayload(int type, int depth) throws Exception {
-            // servers.dat 不该有深嵌套，超限的基本是构造出来的文件
-            // 消息经 PageInstanceSetup toast 原样展示，片段各自 Lang.t
+            // servers.dat 不该深嵌套，超限多为构造文件；消息片段各自 Lang.t
             if (depth > 128) throw new Exception(Lang.t("NBT 嵌套过深"));
             switch (type) {
                 case 1 -> {
@@ -301,7 +300,7 @@ public final class Servers {
             s.write(b);
         }
 
-        // 和 NbtReader 一一对应：一种 NBT 标签类型只映射一种 Java 类型，写回时才能还原
+        // 一种 NBT 类型只映射一种 Java 类型，才能写回
         static int typeOf(Object v) {
             if (v instanceof Byte) return 1;
             if (v instanceof Short) return 2;
@@ -475,7 +474,7 @@ public final class Servers {
             try {
                 root = Json.obj(Json.parse(json));
             } catch (RuntimeException e) {
-                // 含 tcraft.Json.MalformedException：垃圾 JSON 按离线处理，报真实原因
+                // 垃圾 JSON 按离线处理并报真实原因
                 result.errorMessage = Lang.t("服务器状态解析失败：") + (e.getMessage() == null || e.getMessage().isBlank()
                         ? Lang.t("响应不是有效的 JSON") : e.getMessage());
                 return result;

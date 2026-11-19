@@ -13,6 +13,7 @@ import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.util.Duration;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -26,8 +27,9 @@ public class App extends Application {
 
     @Override
     public void start(Stage stage) {
+        Platform.setImplicitExit(false);   // 启动游戏后可能隐藏主窗，隐式退出会把整个程序带崩
         StartupWindow splash = Boot.startupWindow;
-        if (splash == null) splash = StartupWindow.open();
+        if (splash == null) splash = StartupWindow.none();
         final StartupWindow ui = splash;
         ui.setStatus(Lang.t("正在检查资源是否齐全…"), 25);
 
@@ -53,31 +55,29 @@ public class App extends Application {
         try {
             ui.setStatus(Lang.t("正在准备主界面…"), 62);
             window = new MainWindow(stage);
-            // 预热 Java 扫描，首次进设置页不卡
-            Thread javaScan = new Thread(() -> {
-                try {
-                    Data.get().scanJavaRuntimes();
-                } catch (Exception ignored) {
-                }
-            }, "TCL-Java-Scan");
-            javaScan.setDaemon(true);
-            javaScan.start();
-            // 预取 mesa-loader，首次启动游戏不用等下载
-            if (Shell.windows() && Data.get().getInt("LaunchAdvanceRenderer", 0) > 0) {
-                Thread mesa = new Thread(() -> {
-                    try {
-                        Mesa.ensure();
-                    } catch (Exception ignored) {
-                    }
-                }, "TCL-Mesa-Prefetch");
-                mesa.setDaemon(true);
-                mesa.start();
-            }
+            // 首帧优先：扫 Java/预取运行库留到空闲
             ui.setStatus(Lang.t("正在准备主界面…"), 82);
             stage.show();
             stage.setAlwaysOnTop(false);
             window.playIntro();
             ui.setStatus(Lang.t("准备完成"), 100);
+            // 告诉首次运行留下的旧进程：主界面已经出来了，可以把启动窗收掉
+            try {
+                Files.writeString(Resources.logDir().resolve(".window-ready"), "1");
+            } catch (Exception ignored) {
+            }
+            Resources.cleanupNoiseLogs();
+            if (!Data.get().getBool("SystemDebugMode", false)) {
+                // 关掉重定向的 stdout/stderr 才能删 java-error.log
+                try {
+                    System.out.close();
+                    System.err.close();
+                } catch (Exception ignored) {
+                }
+                Resources.cleanupNoiseLogs();
+            }
+            long ms = (System.nanoTime() - Boot.STARTED_AT) / 1_000_000L;
+            Data.get().log("启动完成，用时 " + ms + " ms");
         } catch (Throwable t) {
             showFatal(splash, t);
             return;
@@ -91,6 +91,30 @@ public class App extends Application {
         PauseTransition top = new PauseTransition(Duration.millis(1500));
         top.setOnFinished(e -> stage.setAlwaysOnTop(false));
         top.play();
+
+        // 空闲后再做这两件事，让界面首帧先吃满磁盘与网络
+        PauseTransition idle = new PauseTransition(Duration.millis(2000));
+        idle.setOnFinished(e -> {
+            Thread javaScan = new Thread(() -> {
+                try {
+                    Data.get().scanJavaRuntimes();
+                } catch (Exception ignored) {
+                }
+            }, "TCL-Java-Scan");
+            javaScan.setDaemon(true);
+            javaScan.start();
+            if (Shell.windows() && Data.get().getInt("LaunchAdvanceRenderer", 0) > 0) {
+                Thread mesa = new Thread(() -> {
+                    try {
+                        Mesa.ensure();
+                    } catch (Exception ignored) {
+                    }
+                }, "TCL-Mesa-Prefetch");
+                mesa.setDaemon(true);
+                mesa.start();
+            }
+        });
+        idle.play();
 
         Http.warmup(
                 "https://api.modrinth.com/v2/tag/game_version",
@@ -147,23 +171,30 @@ public class App extends Application {
                 window.toast("快捷方式启动失败", Lang.tf("未找到实例「%s」", wanted), 2);
                 return;
             }
-            if (!Data.usableJava(Data.get().javaPath)) {
-                window.toast("需要先设置 Java", "请在 设置 → Java 中选择运行时后再启动。", 2);
-                return;
-            }
-            Data data = Data.get();
-            data.selectedInstance = data.instances.indexOf(target);
-            data.save();
-            window.openPage("launch", false);
-            PauseTransition delay = new PauseTransition(Duration.millis(900));
-            delay.setOnFinished(x -> {
-                try {
-                    window.launchGame();
-                } catch (Exception ex) {
-                    Errors.error("快捷方式自动启动失败", ex);
-                }
+            final Data.Instance chosen = target;
+            // usableJava 起子进程等 5s，勿在 FX 线程调
+            Threads.start("TCL-QuickLaunch", () -> {
+                boolean ok = Data.usableJava(Data.get().javaPath);
+                Platform.runLater(() -> {
+                    if (!ok) {
+                        window.toast("需要先设置 Java", "请在 设置 → Java 中选择运行时后再启动。", 2);
+                        return;
+                    }
+                    Data data = Data.get();
+                    data.selectedInstance = data.instances.indexOf(chosen);
+                    data.save();
+                    window.openPage("launch", false);
+                    PauseTransition delay = new PauseTransition(Duration.millis(900));
+                    delay.setOnFinished(x -> {
+                        try {
+                            window.launchGame();
+                        } catch (Exception ex) {
+                            Errors.error("快捷方式自动启动失败", ex);
+                        }
+                    });
+                    delay.play();
+                });
             });
-            delay.play();
         });
         wait.play();
     }
@@ -220,7 +251,7 @@ public class App extends Application {
                         : java.nio.file.Paths.get(System.getProperty("java.io.tmpdir"));
                 java.nio.file.Files.createDirectories(dir);
                 java.nio.file.Path file = dir.resolve("TCraft-启动失败-" + stamp + ".log");
-                java.nio.file.Files.writeString(file, "\uFEFF" + report,
+                java.nio.file.Files.writeString(file, "\uFEFF" + Redact.apply(report),
                         java.nio.charset.StandardCharsets.UTF_8);
                 Shell.openFolder(dir.toString());
                 copy.setText(Lang.t("已导出：") + file.getFileName());

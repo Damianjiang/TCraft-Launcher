@@ -89,7 +89,7 @@ public final class Http {
     }
 
     public static void rebuild() {
-        // 两个 client 单独构建好再落 volatile，别让请求撞上"一个新一个旧"的间隙
+        // 先建好再落 volatile，不留下新旧并存的间隙
         HttpClient redirect = build();
         HttpClient noRedirect = build(HttpClient.Redirect.NEVER);
         clientNoRedirect = noRedirect;
@@ -343,17 +343,20 @@ public final class Http {
         throw last == null ? new IOException(Lang.t("请求失败：") + url) : last;
     }
 
+    // 文本响应的解压上限，恶意源的大压缩比 gzip 会打满内存
+    private static final long TEXT_MAX_BYTES = 20L * 1024 * 1024;
+
     private static String readText(InputStream raw, HttpResponse<?> resp) throws IOException {
         String encoding = resp.headers().firstValue("content-encoding").orElse("");
         byte[] bytes;
         if (encoding.toLowerCase(java.util.Locale.ROOT).contains("gzip")) {
             // gzip 流要显式关，释放 inflater 的本地内存
             try (InputStream in = new java.util.zip.GZIPInputStream(raw)) {
-                bytes = Fetch.readAll(in, 20_000);
+                bytes = Fetch.readAll(in, 20_000, TEXT_MAX_BYTES);
             }
         } else {
             // 20 秒无新数据视为假死，交给外层重试
-            bytes = Fetch.readAll(raw, 20_000);
+            bytes = Fetch.readAll(raw, 20_000, TEXT_MAX_BYTES);
         }
         String type = resp.headers().firstValue("content-type").orElse("");
         java.nio.charset.Charset cs = StandardCharsets.UTF_8;
@@ -377,9 +380,9 @@ public final class Http {
                     .header("User-Agent", UA)
                     .GET()
                     .build();
-            HttpResponse<byte[]> resp;
+            HttpResponse<InputStream> resp;
             try {
-                resp = client.send(req, HttpResponse.BodyHandlers.ofByteArray());
+                resp = client.send(req, HttpResponse.BodyHandlers.ofInputStream());
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new IOException("请求被中断", e);
@@ -388,7 +391,12 @@ public final class Http {
                 continue;
             }
             int code = resp.statusCode();
-            if (code >= 200 && code < 300) return resp.body();
+            if (code >= 200 && code < 300) {
+                // 二进制响应也设上限，皮肤/图标等合法尺寸远小于 8MB
+                try (InputStream body = resp.body()) {
+                    return Fetch.readAll(body, 20_000, 8L * 1024 * 1024);
+                }
+            }
             if (!retryable(code)) throw new IOException("HTTP " + code);
             last = new IOException("HTTP " + code);
         }
@@ -405,13 +413,18 @@ public final class Http {
                 .header("User-Agent", UA)
                 .GET()
                 .build();
-        return client.sendAsync(req, HttpResponse.BodyHandlers.ofByteArray())
+        return client.sendAsync(req, HttpResponse.BodyHandlers.ofInputStream())
                 .handle((resp, err) -> {
                     if (err != null) throw new CompletionException(unwrap(err));
                     int code = resp.statusCode();
-                    if (code >= 200 && code < 300) return resp.body();
-                    long retryAfter = retryAfterMs(resp);
-                    throw new CompletionException(new StatusException(code, retryAfter));
+                    // 与 getBytes 同一个 8MB 上限，恶意源不能吃满堆
+                    try (java.io.InputStream body = resp.body()) {
+                        if (code >= 200 && code < 300) return Fetch.readAll(body, 20_000, 8L * 1024 * 1024);
+                        long retryAfter = retryAfterMs(resp);
+                        throw new CompletionException(new StatusException(code, retryAfter));
+                    } catch (java.io.IOException e) {
+                        throw new CompletionException(e);
+                    }
                 })
                 .exceptionallyCompose(e -> {
                     Throwable cause = unwrap(e);

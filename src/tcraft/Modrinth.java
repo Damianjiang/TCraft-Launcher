@@ -24,7 +24,7 @@ public final class Modrinth {
                                       List<String> versions, List<String> loaders,
                                       String category, int offset, String index) throws IOException {
         boolean hasQuery = query != null && !query.isEmpty();
-        // 这些值直接拼进 JSON 数组，先剥双引号防止截断注入
+        // 这些值直接拼进 JSON 数组，先剥双引号，截不断 JSON
         StringBuilder facets = new StringBuilder("[[\"project_type:")
                 .append(facet(projectType)).append("\"]");
         if (versions != null && !versions.isEmpty()) {
@@ -108,7 +108,7 @@ public final class Modrinth {
         return Json.arr(Json.parse(text));
     }
 
-    // 返回 null 只代表未收录，网络/解析失败要抛出去，不能装成"未收录"
+    // null 仅=未收录，网络/解析错误要抛出
     public static String[] checkUpdateBySha1(String sha1) {
         String text;
         try {

@@ -187,8 +187,10 @@ public class ResourceVersion {
         }
         if (allNonStandard) parts.add(Lang.t("游戏版本 ") + String.join("、", gameVersions));
         if (downloadCount > 0) {
+            // 英文的 k 是千位，沿用中文的除以一万会差十倍
             parts.add(Lang.t("下载 ") + (downloadCount > 100000
-                    ? Math.round(downloadCount / 10000d) + Lang.t(" 万") : downloadCount + " ") + Lang.t("次"));
+                    ? (Lang.mode == 1 ? Math.round(downloadCount / 1000d) + "k"
+                    : Math.round(downloadCount / 10000d) + Lang.t(" 万")) : downloadCount + " ") + Lang.t("次"));
         }
         String ago = timeAgo(releaseDate);
         if (!ago.isEmpty()) parts.add(Lang.t("更新于 ") + ago);
@@ -265,7 +267,7 @@ public class ResourceVersion {
             boolean na = xa.chars().allMatch(Character::isDigit) && !xa.isEmpty();
             boolean nb = xb.chars().allMatch(Character::isDigit) && !xb.isEmpty();
             if (na && nb) {
-                // 超长数字段（比如一长串日期）可能溢出 long，按相等处理，别让排序崩掉
+                // 超长数字溢出 long，按相等防排序崩
                 long va, vb;
                 try {
                     va = Long.parseLong(xa);

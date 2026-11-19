@@ -27,7 +27,8 @@ final class SmoothScroll {
     private static final Object KEY = new Object();
     private static final Object WHEEL_KEY = new Object();
 
-    static final double DEFAULT_WHEEL_SPEED = 3.0;
+    // 1.0≈原生一格 40px，3.0 会一划飞出
+    static final double DEFAULT_WHEEL_SPEED = 1.0;
 
     private static final double OMEGA = 20.0;
 
@@ -55,7 +56,7 @@ final class SmoothScroll {
         install(pane, DEFAULT_WHEEL_SPEED);
     }
 
-    // 滚轮系数每 pane 一份，弹窗小框传 2.1 对齐 WPF MyMsgText 的 DeltaMult=0.7
+    // 小框传 2.1 对齐 WPF DeltaMult=0.7
     static void install(ScrollPane pane, double wheelSpeed) {
         if (pane == null || pane.getProperties().get(KEY) instanceof SmoothScroll) return;
         pane.getProperties().put(WHEEL_KEY, wheelSpeed);
@@ -391,7 +392,7 @@ final class SmoothScroll {
         effectWatchers.clear();
     }
 
-    // 内容树变了缓存就作废；挂起期间变更要立刻补扫，别漏掉新出现的大特效
+    // 内容树变更即作废缓存，挂起期也要补扫
     private void invalidateEffectCache() {
         if (effectCache == null && effectWatchers.isEmpty()) return;
         effectCache = null;

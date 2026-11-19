@@ -1,4 +1,4 @@
-// Windows 外壳：构建时把 jar 追加到 exe 末尾，运行时解到 .tcl 再用系统 Java 启动
+// jar 追加 exe 尾，运行时解到 .tcl 用系统 Java 启动
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <stdio.h>
@@ -8,7 +8,7 @@
 
 #define APP_NAME "TCraft Launcher"
 #define JAR_NAME L"TCraftLauncher.jar"
-// 启动器数据固定放 exe 同目录 .tcl，不用 %TEMP% / %LOCALAPPDATA%
+// 数据固定在 exe 同目录 .tcl，不用 TEMP
 #define HOME_SUB L".tcl"
 #define CFG_NAME L"launcher.cfg"
 
@@ -24,10 +24,12 @@ unsigned int __stdcall GetACP(void);
 
 static wchar_t self_path[MAX_PATH_LEN];
 static wchar_t home_dir[MAX_PATH_LEN];
+static wchar_t log_dir[MAX_PATH_LEN];
 static wchar_t jar_path[MAX_PATH_LEN];
 static wchar_t g_args[4096];
 static wchar_t cfg_java[MAX_PATH_LEN]; // .tcl\launcher.cfg 里记住的 java 路径
 static int first_run;
+static HANDLE instance_mutex;
 
 // 中文按 UTF-8 转宽字符，再交给 MessageBoxW
 static void alert(const char *utf8) {
@@ -107,6 +109,9 @@ static int init_home(void) {
     copy_str(home_dir, exe_dir, MAX_PATH_LEN);
     cat_str(home_dir, L"\\" HOME_SUB, MAX_PATH_LEN);
     create_dirs(home_dir);
+    copy_str(log_dir, home_dir, MAX_PATH_LEN);
+    cat_str(log_dir, L"\\log", MAX_PATH_LEN);
+    create_dirs(log_dir);
     return dir_writable(home_dir);
 }
 
@@ -119,7 +124,7 @@ static void stub_log(const char *line) {
     int n;
 
     if (!home_dir[0]) return;
-    copy_str(p, home_dir, MAX_PATH_LEN);
+    copy_str(p, log_dir[0] ? log_dir : home_dir, MAX_PATH_LEN);
     cat_str(p, L"\\stub.log", MAX_PATH_LEN);
     h = CreateFileW(p, FILE_APPEND_DATA, FILE_SHARE_READ, NULL, OPEN_ALWAYS,
                     FILE_ATTRIBUTE_NORMAL, NULL);
@@ -130,15 +135,44 @@ static void stub_log(const char *line) {
     CloseHandle(h);
 }
 
-// 带一条路径的日志行（宽字符转 UTF-8 再写）
-static void stub_log_w(const char *tag, const wchar_t *value) {
-    char buf[1200];
-    char v8[MAX_PATH_LEN * 3];
+// 二次启动：提窗静默退出，不叠窗
+static void activate_existing_window(void) {
+    int i;
+    for (i = 0; i < 10; i++) {
+        HWND w = FindWindowW(NULL, L"TCraft Launcher");
+        if (w) {
+            ShowWindow(w, SW_RESTORE);
+            SetForegroundWindow(w);
+            return;
+        }
+        Sleep(200);
+    }
+}
 
-    v8[0] = 0;
-    if (value) WideCharToMultiByte(CP_UTF8, 0, value, -1, v8, sizeof(v8), NULL, NULL);
-    sprintf(buf, "%s = %s", tag, v8);
-    stub_log(buf);
+// 互斥量守 stub，Java 侧文件锁接管
+static int acquire_instance(void) {
+    wchar_t name[MAX_PATH_LEN];
+    wchar_t hexw[40];
+    char hex[40];
+    const wchar_t *p = self_path;
+    unsigned long h = 5381;
+    int i = 0;
+
+    while (*p) h = ((h << 5) + h) + (unsigned long)(*p++);
+    sprintf(hex, "%08lx", h);
+    copy_str(name, L"Local\\TCraftLauncher-", MAX_PATH_LEN);
+    while (hex[i] && i < 39) {
+        hexw[i] = (wchar_t)hex[i];
+        i++;
+    }
+    hexw[i] = 0;
+    cat_str(name, hexw, MAX_PATH_LEN);
+
+    instance_mutex = CreateMutexW(NULL, TRUE, name);
+    if (instance_mutex && GetLastError() == ERROR_ALREADY_EXISTS) {
+        return 1;
+    }
+    return 0;
 }
 
 // 递归删目录（失败就跳过，不弹任何东西）
@@ -172,7 +206,7 @@ static void remove_tree(const wchar_t *path, int depth) {
     RemoveDirectoryW(path);
 }
 
-// 清理老版本残留的 %LOCALAPPDATA%\TCraftLauncher（固定路径，失败忽略）
+// 清老版残留目录（固定路径，失败忽略）
 static void cleanup_legacy_home(void) {
     wchar_t alt[MAX_PATH_LEN];
     wchar_t old[MAX_PATH_LEN];
@@ -180,7 +214,7 @@ static void cleanup_legacy_home(void) {
     if (!GetEnvironmentVariableW(L"LOCALAPPDATA", alt, MAX_PATH_LEN) || !alt[0]) return;
     copy_str(old, alt, MAX_PATH_LEN);
     cat_str(old, L"\\TCraftLauncher", MAX_PATH_LEN);
-    if (wcscmp(old, home_dir) == 0) return; /* 路径相同则跳过，避免删掉自己 */
+    if (wcscmp(old, home_dir) == 0) return; /* 路径相同则跳过，不删自己 */
     if (GetFileAttributesW(old) == INVALID_FILE_ATTRIBUTES) return;
     remove_tree(old, 0);
 }
@@ -339,28 +373,7 @@ static int parse_major(const char *s) {
     return atoi(s);
 }
 
-// release 文件里的 OS_ARCH 判断是否 Windows x64；没有这项时看 exe 的 PE 头
-static int exe_is64(const wchar_t *path) {
-    HANDLE h;
-    unsigned char buf[0x400];
-    DWORD got = 0;
-    unsigned long pe;
-    int ok = 0;
-
-    h = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
-                    FILE_ATTRIBUTE_NORMAL, NULL);
-    if (h == INVALID_HANDLE_VALUE) return 0;
-    if (ReadFile(h, buf, sizeof(buf), &got, NULL) && got > 0x40 && buf[0] == 'M' && buf[1] == 'Z') {
-        pe = *(unsigned long *)(buf + 0x3C);
-        if (pe + 6 < got && buf[pe] == 'P' && buf[pe + 1] == 'E') {
-            unsigned machine = *(unsigned short *)(buf + pe + 4);
-            if (machine == 0x8664 || machine == 0xAA64) ok = 1;
-        }
-    }
-    CloseHandle(h);
-    return ok;
-}
-
+// 读 release 认版本，不起进程
 static int java_is64(const wchar_t *java) {
     wchar_t home[MAX_PATH_LEN];
     wchar_t rel[MAX_PATH_LEN];
@@ -368,115 +381,38 @@ static int java_is64(const wchar_t *java) {
     int got;
 
     copy_str(home, java, MAX_PATH_LEN);
-    strip_file(home); // 去掉 java(w).exe
+    strip_file(home);
     strip_file(home);
     copy_str(rel, home, MAX_PATH_LEN);
     cat_str(rel, L"\\release", MAX_PATH_LEN);
     got = read_file(rel, buf, sizeof(buf));
     if (got > 0) {
         buf[got] = 0;
-        if (strstr(buf, "OS_ARCH=\"x86_64\"") || strstr(buf, "OS_ARCH=\"amd64\"")
-                || strstr(buf, "OS_ARCH=\"aarch64\"")) {
-            return 1;
-        }
         if (strstr(buf, "OS_ARCH=\"x86\"")) return 0;
+        if (strstr(buf, "OS_ARCH=\"x86_64\"") || strstr(buf, "OS_ARCH=\"amd64\"")
+                || strstr(buf, "OS_ARCH=\"aarch64\"")) return 1;
     }
-    // release 缺 OS_ARCH 的老版本，直接读 exe 的机器类型
-    return exe_is64(java);
+    return 1; // 读不到就按 64 位处理，32 位 JRE 在启动时会自己报错
 }
 
-// 读主版本号：先看 release 文件（不启进程），读不到再退回 java -version
 static int java_feature(const wchar_t *java) {
     wchar_t home[MAX_PATH_LEN];
     wchar_t rel[MAX_PATH_LEN];
-    wchar_t probe[MAX_PATH_LEN];
-    wchar_t cmd[MAX_PATH_LEN * 2];
-    wchar_t logp[MAX_PATH_LEN];
-    SECURITY_ATTRIBUTES sa;
-    STARTUPINFOW si;
-    PROCESS_INFORMATION pi;
-    HANDLE out;
-    char buf[8192];
-    DWORD got = 0;
-    int major = 0;
-    int n;
+    char buf[4096];
+    int got;
     char *hit;
 
     copy_str(home, java, MAX_PATH_LEN);
     strip_file(home);
     strip_file(home);
-
     copy_str(rel, home, MAX_PATH_LEN);
     cat_str(rel, L"\\release", MAX_PATH_LEN);
-    {
-        int len = read_file(rel, buf, sizeof(buf));
-        if (len > 0) {
-            buf[len] = 0;
-            hit = strstr(buf, "JAVA_VERSION=\"");
-            if (hit) {
-                major = parse_major(hit + 14);
-                if (major > 0) return major;
-            }
-        }
-    }
-
-    // javaw.exe 在无控制台时不一定吐版本，探测统一换成同目录的 java.exe
-    copy_str(probe, java, MAX_PATH_LEN);
-    n = (int)wcslen(probe);
-    if (n > 9 && wcscmp(probe + n - 9, L"javaw.exe") == 0) {
-        int k;
-        for (k = 0; k < 8; k++) probe[n - 9 + k] = L"java.exe"[k];
-        probe[n - 1] = 0; // javaw.exe 是 9 个字符，换成 8 个后要补结尾
-        if (!file_exists(probe)) copy_str(probe, java, MAX_PATH_LEN);
-    }
-
-    copy_str(logp, home_dir, MAX_PATH_LEN);
-    cat_str(logp, L"\\java-version.txt", MAX_PATH_LEN);
-
-    sa.nLength = sizeof(sa);
-    sa.lpSecurityDescriptor = NULL;
-    sa.bInheritHandle = TRUE;
-    out = CreateFileW(logp, GENERIC_WRITE, FILE_SHARE_READ, &sa, CREATE_ALWAYS,
-                      FILE_ATTRIBUTE_NORMAL, NULL);
-    if (out == INVALID_HANDLE_VALUE) return 0;
-
-    copy_str(cmd, L"\"", MAX_PATH_LEN * 2);
-    cat_str(cmd, probe, MAX_PATH_LEN * 2);
-    cat_str(cmd, L"\" -version", MAX_PATH_LEN * 2);
-
-    ZeroMemory(&si, sizeof(si));
-    si.cb = sizeof(si);
-    si.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
-    si.hStdOutput = out;
-    si.hStdError = out;
-    si.wShowWindow = SW_HIDE;
-    ZeroMemory(&pi, sizeof(pi));
-
-    if (!CreateProcessW(probe, cmd, NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
-        CloseHandle(out);
-        DeleteFileW(logp);
-        return 0;
-    }
-    WaitForSingleObject(pi.hProcess, 8000);
-    CloseHandle(pi.hProcess);
-    CloseHandle(pi.hThread);
-    CloseHandle(out);
-
-    {
-        HANDLE rd = CreateFileW(logp, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-        if (rd == INVALID_HANDLE_VALUE) return 0;
-        ReadFile(rd, buf, sizeof(buf) - 1, &got, NULL);
-        CloseHandle(rd);
-    }
-    DeleteFileW(logp);
+    got = read_file(rel, buf, sizeof(buf));
+    if (got <= 0) return 0;
     buf[got] = 0;
-
-    hit = strstr(buf, "version \"");
-    if (hit) major = parse_major(hit + 9);
-    return major;
+    hit = strstr(buf, "JAVA_VERSION=\"");
+    return hit ? parse_major(hit + 14) : 0;
 }
-
 // 去引号、去结尾反斜杠（PATH 里偶尔写成 "C:\xx\bin\"）
 static void strip_path_entry(const wchar_t *in, wchar_t *out, int cap) {
     int i = 0, len;
@@ -559,179 +495,6 @@ static void scan_env_root(const wchar_t *name, const wchar_t *suffix, int depth)
     scan_tree(buf, depth);
 }
 
-#ifndef KEY_WOW64_64KEY
-#define KEY_WOW64_64KEY 0x0100
-#endif
-#ifndef KEY_READ
-#define KEY_READ 0x20019
-#endif
-
-// TCC 不带 advapi32 的导入库，注册表 API 走动态加载
-typedef long (__stdcall *RegOpenFn)(void *, const wchar_t *, unsigned long, unsigned long, void **);
-typedef long (__stdcall *RegEnumFn)(void *, unsigned long, wchar_t *, unsigned long *, wchar_t *,
-                                    unsigned long *, unsigned long *, void *);
-typedef long (__stdcall *RegQueryFn)(void *, const wchar_t *, unsigned long *, unsigned long *,
-                                     unsigned char *, unsigned long *);
-typedef long (__stdcall *RegCloseFn)(void *);
-
-static RegOpenFn pRegOpenKeyExW;
-static RegEnumFn pRegEnumKeyExW;
-static RegQueryFn pRegQueryValueExW;
-static RegCloseFn pRegCloseKey;
-
-static int reg_api_ready(void) {
-    static int state; // 0 未初始化 / 1 可用 / -1 失败
-    HMODULE m;
-
-    if (state) return state == 1;
-    m = LoadLibraryW(L"advapi32.dll");
-    state = -1;
-    if (m) {
-        pRegOpenKeyExW = (RegOpenFn)GetProcAddress(m, "RegOpenKeyExW");
-        pRegEnumKeyExW = (RegEnumFn)GetProcAddress(m, "RegEnumKeyExW");
-        pRegQueryValueExW = (RegQueryFn)GetProcAddress(m, "RegQueryValueExW");
-        pRegCloseKey = (RegCloseFn)GetProcAddress(m, "RegCloseKey");
-        if (pRegOpenKeyExW && pRegEnumKeyExW && pRegQueryValueExW && pRegCloseKey) state = 1;
-    }
-    return state == 1;
-}
-
-// 只在注册表里按名字筛 Java，真正可用性由 cand_add_home 验证
-static int looks_like_java_name(const wchar_t *text) {
-    static const wchar_t *keys[] = {L"JDK", L"JRE", L"OpenJDK", L"Java SE", L"Temurin",
-                                    L"Zulu", L"Corretto", L"Liberica", L"Semeru", L"GraalVM",
-                                    L"SapMachine", NULL};
-    int i;
-
-    for (i = 0; keys[i]; i++) {
-        if (wcsstr(text, keys[i])) return 1;
-    }
-    return 0;
-}
-
-// JavaSoft 下每个版本子键都有 JavaHome
-static void reg_java_home(HKEY hive, const wchar_t *sub) {
-    REGSAM views[2];
-    HKEY k;
-    int v;
-
-    views[0] = KEY_READ | KEY_WOW64_64KEY;
-    views[1] = KEY_READ;
-    for (v = 0; v < 2; v++) {
-        DWORD idx = 0, len;
-        wchar_t name[256];
-
-        if (pRegOpenKeyExW(hive, sub, 0, views[v], &k) != ERROR_SUCCESS) continue;
-        while (1) {
-            HKEY vk;
-            wchar_t home[MAX_PATH_LEN];
-            DWORD size = sizeof(home), type = 0;
-
-            len = 256;
-            if (pRegEnumKeyExW(k, idx++, name, &len, NULL, NULL, NULL, NULL) != ERROR_SUCCESS) break;
-            if (pRegOpenKeyExW(k, name, 0, KEY_READ, &vk) != ERROR_SUCCESS) continue;
-            if (pRegQueryValueExW(vk, L"JavaHome", NULL, &type, (LPBYTE)home, &size) == ERROR_SUCCESS
-                    && type == REG_SZ && home[0]) {
-                home[MAX_PATH_LEN - 1] = 0;
-                cand_add_home(home);
-            }
-            pRegCloseKey(vk);
-        }
-        pRegCloseKey(k);
-    }
-}
-
-// 卸载列表里有 InstallLocation，MSI 装的 JDK 基本都能这里捞到
-static void reg_uninstall(HKEY hive, const wchar_t *sub) {
-    HKEY k;
-    DWORD idx = 0, len;
-    wchar_t name[256];
-
-    if (pRegOpenKeyExW(hive, sub, 0, KEY_READ, &k) != ERROR_SUCCESS) return;
-    while (1) {
-        HKEY vk;
-        wchar_t display[512];
-        DWORD size, type = 0;
-
-        len = 256;
-        if (pRegEnumKeyExW(k, idx++, name, &len, NULL, NULL, NULL, NULL) != ERROR_SUCCESS) break;
-        if (pRegOpenKeyExW(k, name, 0, KEY_READ, &vk) != ERROR_SUCCESS) continue;
-        size = sizeof(display);
-        if (pRegQueryValueExW(vk, L"DisplayName", NULL, &type, (LPBYTE)display, &size) == ERROR_SUCCESS
-                && type == REG_SZ && looks_like_java_name(display)) {
-            wchar_t loc[MAX_PATH_LEN];
-            DWORD s2 = sizeof(loc), t2 = 0;
-
-            if (pRegQueryValueExW(vk, L"InstallLocation", NULL, &t2, (LPBYTE)loc, &s2) == ERROR_SUCCESS
-                    && t2 == REG_SZ && loc[0]) {
-                loc[MAX_PATH_LEN - 1] = 0;
-                cand_add_home(loc);
-                scan_tree(loc, 3);
-            }
-        }
-        pRegCloseKey(vk);
-    }
-    pRegCloseKey(k);
-}
-
-static void scan_registry(void) {
-    static const wchar_t *home_keys[] = {
-        L"SOFTWARE\\JavaSoft\\Java Development Kit",
-        L"SOFTWARE\\JavaSoft\\Java Runtime Environment",
-        L"SOFTWARE\\JavaSoft\\JDK",
-        NULL
-    };
-    int i;
-
-    if (!reg_api_ready()) return;
-    for (i = 0; home_keys[i]; i++) {
-        reg_java_home(HKEY_LOCAL_MACHINE, home_keys[i]);
-        reg_java_home(HKEY_CURRENT_USER, home_keys[i]);
-    }
-    reg_uninstall(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall");
-    reg_uninstall(HKEY_LOCAL_MACHINE, L"SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall");
-    reg_uninstall(HKEY_CURRENT_USER, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall");
-}
-
-// 各大发行版在 Program Files 下的固定名字
-static void scan_vendor_dirs(const wchar_t *base) {
-    static const wchar_t *vendors[] = {
-        L"Java", L"Microsoft", L"Eclipse Adoptium", L"Eclipse Foundation",
-        L"AdoptOpenJDK", L"BellSoft", L"Zulu", L"Amazon Corretto",
-        L"Semeru", L"GraalVM", L"JetBrains", L"RedHat", L"SapMachine", NULL
-    };
-    int i;
-
-    for (i = 0; vendors[i]; i++) {
-        wchar_t p[MAX_PATH_LEN];
-
-        copy_str(p, base, MAX_PATH_LEN);
-        cat_str(p, L"\\", MAX_PATH_LEN);
-        cat_str(p, vendors[i], MAX_PATH_LEN);
-        scan_tree(p, 3);
-    }
-}
-
-// 其它盘符根目录下的常见开发目录
-static void scan_drives(void) {
-    static const wchar_t *dirs[] = {L"\\Java", L"\\jdk", L"\\JDK", L"\\dev", L"\\tools", NULL};
-    DWORD mask = GetLogicalDrives();
-    int d, i;
-
-    for (d = 2; d < 26; d++) {
-        if (!(mask & (1u << d))) continue;
-        for (i = 0; dirs[i]; i++) {
-            wchar_t p[16];
-
-            p[0] = (wchar_t)(L'A' + d);
-            p[1] = L':';
-            p[2] = 0;
-            cat_str(p, dirs[i], 16);
-            scan_tree(p, 3);
-        }
-    }
-}
-
 static void scan_path(void) {
     static wchar_t all[32768];
     wchar_t one[MAX_PATH_LEN];
@@ -753,61 +516,70 @@ static void scan_path(void) {
     }
 }
 
-// 收集候选：注册表 → 上次记录的 → JAVA_HOME → 安装目录 → PATH → 其它盘
-static void collect_candidates(void) {
-    wchar_t jh[MAX_PATH_LEN];
+// 常规安装位置只看一层子目录
+static void scan_common_dirs(void) {
+    static const wchar_t *bases[] = {
+        L"ProgramW6432", L"ProgramFiles", L"ProgramFiles(x86)", NULL
+    };
+    static const wchar_t *vendors[] = {
+        L"Java", L"Microsoft", L"Eclipse Adoptium", L"Eclipse Foundation",
+        L"AdoptOpenJDK", L"BellSoft", L"Zulu", L"Amazon Corretto",
+        L"Semeru", L"GraalVM", L"JetBrains", L"RedHat", L"SapMachine", NULL
+    };
+    int b, i;
 
-    cand_count = 0;
-
-    // 注册表最可靠，MSI 装的 Java 一定登记在这里
-    scan_registry();
-
-    if (cfg_java[0] && file_exists(cfg_java)) cand_add(cfg_java);
-
-    // 启动器自己安装的 Java 17：.tcl\java\windows-x64\jre17\...
-    {
-        wchar_t tcl_java[MAX_PATH_LEN];
-
-        copy_str(tcl_java, home_dir, MAX_PATH_LEN);
-        cat_str(tcl_java, L"\\java\\windows-x64", MAX_PATH_LEN);
-        cand_add_home(tcl_java);
-        scan_tree(tcl_java, 3);
-    }
-
-    // JAVA_HOME 只是候选之一，它可能指向旧版
-    if (GetEnvironmentVariableW(L"JAVA_HOME", jh, MAX_PATH_LEN) && jh[0]) cand_add_home(jh);
-
-    // 32 位进程下 ProgramFiles 指向 (x86)，ProgramW6432 才是真身
-    scan_env_root(L"ProgramW6432", NULL, 2);
-    scan_env_root(L"ProgramFiles", NULL, 2);
-    scan_env_root(L"ProgramFiles(x86)", NULL, 2);
-    {
-        static const wchar_t *envs[] = {L"ProgramW6432", L"ProgramFiles", L"ProgramFiles(x86)", NULL};
-        int i;
-
-        for (i = 0; envs[i]; i++) {
-            wchar_t buf[MAX_PATH_LEN];
-            if (GetEnvironmentVariableW(envs[i], buf, MAX_PATH_LEN) && buf[0]) scan_vendor_dirs(buf);
+    for (b = 0; bases[b]; b++) {
+        wchar_t base[MAX_PATH_LEN];
+        if (!GetEnvironmentVariableW(bases[b], base, MAX_PATH_LEN) || !base[0]) continue;
+        for (i = 0; vendors[i]; i++) {
+            wchar_t root[MAX_PATH_LEN];
+            copy_str(root, base, MAX_PATH_LEN);
+            cat_str(root, L"\\", MAX_PATH_LEN);
+            cat_str(root, vendors[i], MAX_PATH_LEN);
+            scan_tree(root, 2);
         }
     }
-    scan_env_root(L"LOCALAPPDATA", L"\\Programs", 3);
     scan_env_root(L"USERPROFILE", L"\\.jdks", 2);
-    scan_env_root(L"USERPROFILE", L"\\scoop\\apps", 3);
-    scan_env_root(L"APPDATA", L"\\.minecraft\\runtime", 4);
-    scan_env_root(L"ProgramData", L"\\chocolatey\\lib", 3);
-
-    // PATH 常含转发目录，放在后面，避免占满候选名额
-    scan_path();
-    scan_drives();
+    scan_env_root(L"APPDATA", L"\\.minecraft\\runtime", 2);
 }
 
-// 无 UI 的快速挑选：先认上次记住的路径，再退回全盘扫描
+// 候选：上次记录/自带 Java/JAVA_HOME/PATH/常见目录
+static void collect_candidates(void) {
+    wchar_t jh[MAX_PATH_LEN];
+    wchar_t tcl_java[MAX_PATH_LEN];
+
+    cand_count = 0;
+    if (cfg_java[0] && file_exists(cfg_java)) cand_add(cfg_java);
+
+    copy_str(tcl_java, home_dir, MAX_PATH_LEN);
+    cat_str(tcl_java, L"\\java\\windows-x64", MAX_PATH_LEN);
+    cand_add_home(tcl_java);
+    scan_tree(tcl_java, 2);
+
+    if (GetEnvironmentVariableW(L"JAVA_HOME", jh, MAX_PATH_LEN) && jh[0]) cand_add_home(jh);
+    scan_path();
+    scan_common_dirs();
+}
+
+static void consider_candidate(int i, int *best, int *best_major) {
+    int major = java_feature(cands[i]);
+    int is64 = java_is64(cands[i]);
+
+    if (major <= 0) return;
+    if (major > found_major) found_major = major;
+    if (major < 17) return;
+    if (!is64) return;
+    if (*best < 0 || major > *best_major) {
+        *best = i;
+        *best_major = major;
+    }
+}
+
+// 候选一次性收齐，找不到交给自动下载
 static int pick_best_java(wchar_t *out, int cap) {
     int i, best = -1, best_major = 0;
 
     found_major = 0;
-
-    // 上次选定的路径优先，但必须重新确认是 17+
     if (cfg_java[0] && file_exists(cfg_java)) {
         int major = java_feature(cfg_java);
         if (major >= 17 && java_is64(cfg_java)) {
@@ -818,20 +590,7 @@ static int pick_best_java(wchar_t *out, int cap) {
     }
 
     collect_candidates();
-
-    for (i = 0; i < cand_count; i++) {
-        int major = java_feature(cands[i]);
-        int is64 = java_is64(cands[i]);
-
-        if (major <= 0) continue;
-        if (major > found_major) found_major = major;
-        if (major < 17) continue;
-        if (!is64) continue; // JavaFX 17 的 Windows 原生库是 x64，32 位 JRE 不能用于启动
-        if (best < 0 || major > best_major) {
-            best = i;
-            best_major = major;
-        }
-    }
+    for (i = 0; i < cand_count; i++) consider_candidate(i, &best, &best_major);
 
     if (best >= 0) {
         copy_str(out, cands[best], cap);
@@ -839,8 +598,7 @@ static int pick_best_java(wchar_t *out, int cap) {
     }
     return 0;
 }
-
-// 取命令行里 exe 之后的部分，保留原始引号，交给 Java 的 main 参数
+// 取 exe 后的参数，保留引号传 main
 static void capture_args(void) {
     wchar_t *p = GetCommandLineW();
     if (!p) return;
@@ -855,7 +613,7 @@ static void capture_args(void) {
     copy_str(g_args, p, 4096);
 }
 
-// 观察 2.5 秒：0 = CreateProcess 失败，1 = 运行中，2 = 快速退出
+// 2.5s 观察：0=失败 1=运行 2=秒退
 static int java_has_builtin_fx(const wchar_t *java) {
     wchar_t home[MAX_PATH_LEN];
     wchar_t prop[MAX_PATH_LEN];
@@ -893,8 +651,8 @@ static int run(const wchar_t *java, DWORD *exit_code) {
         copy_str(check, deps, MAX_PATH_LEN);
         cat_str(check, L"\\.ready", MAX_PATH_LEN);
         if (java_has_builtin_fx(java)) {
-            // 自带 JavaFX 的 Java 17 直接用内置模块，避免 Win7 外置原生库
-            cat_str(cmd, L" --add-modules=javafx.controls,javafx.graphics,javafx.base,javafx.media,javafx.web,javafx.swing,javafx.fxml -cp \"",
+            // 自带 JavaFX 的 Java 17 直接用内置模块，Win7 不再找外置原生库
+            cat_str(cmd, L"\" --add-modules=javafx.controls,javafx.graphics,javafx.base,javafx.media,javafx.web,javafx.swing,javafx.fxml -cp \"",
                     MAX_PATH_LEN * 2);
             cat_str(cmd, jar_path, MAX_PATH_LEN * 2);
             cat_str(cmd, L"\" tcraft.Boot", MAX_PATH_LEN * 2);
@@ -918,8 +676,8 @@ static int run(const wchar_t *java, DWORD *exit_code) {
         cat_str(cmd, g_args, MAX_PATH_LEN * 2);
     }
 
-    // javaw 没有控制台，把 stdout/stderr 落到 java-error.log，否则崩溃原因丢失
-    copy_str(logp, home_dir, MAX_PATH_LEN);
+    // javaw 无控制台，输出落 java-error.log
+    copy_str(logp, log_dir[0] ? log_dir : home_dir, MAX_PATH_LEN);
     cat_str(logp, L"\\java-error.log", MAX_PATH_LEN);
     sa.nLength = sizeof(sa);
     sa.lpSecurityDescriptor = NULL;
@@ -967,7 +725,7 @@ static int run(const wchar_t *java, DWORD *exit_code) {
 #define IDC_JAVA_CANCEL  1008
 #define IDC_JAVA_STATUS  1010
 
-// 自己定义进度条/编辑框的消息号，免得依赖 commctrl.h、winuser.h 里的宏
+// 自定义控件消息号，不依赖缺失头文件宏
 #define PBM_SETPOS_X     0x0402
 #define PBM_SETRANGE32_X 0x0406
 #define EM_SETSEL_X      0x00B1
@@ -976,7 +734,7 @@ static int run(const wchar_t *java, DWORD *exit_code) {
 #define TIMER_DOWNLOAD_ID 2
 #define TIMER_ACCEPT_ID  3
 
-// OPENFILENAMEW 自己定义 + 动态取函数，避开 TCC 头文件缺失的风险
+// OPENFILENAMEW 自定义+动态取函数，避 TCC 头缺失
 typedef struct {
     unsigned long  lStructSize;
     void          *hwndOwner;
@@ -1027,14 +785,12 @@ static void copy_bytes(char *dst, int cap, const char *src) {
     dst[i] = 0;
 }
 
-// Java 17 自动安装状态
-// 下载源按顺序尝试：国内镜像优先，官方源兜底
-// 清华镜像的 Adoptium JRE（约 45MB，版本号随镜像更新，404 会自动跳到下一个源）
+// Java17 自动安装；下载源按序尝试，404 跳下一源
 #define JAVA17_URL_TUNA L"https://mirrors.tuna.tsinghua.edu.cn/Adoptium/17/jre/x64/windows/OpenJDK17U-jre_x64_windows_hotspot_17.0.21_9.zip"
-// 华为云 OpenJDK 17（186MB，国内 7MB/s，地址固定不会过期）
+// 华为云 OpenJDK 17（约 186MB，地址固定）
 #define JAVA17_URL_HUAWEI L"https://mirrors.huaweicloud.com/openjdk/17.0.2/openjdk-17.0.2_windows-x64_bin.zip"
 #define JAVA17_URL L"https://api.adoptium.net/v3/binary/latest/17/ga/windows/x64/jre/hotspot/normal/eclipse"
-// Win7/2008 R2：Liberica JRE Full 17（官方支持 Win7，内含 JavaFX）
+// Win7 用 Liberica 17（含 JavaFX）
 #define JAVA17_URL_WIN7 L"https://download.bell-sw.com/java/17.0.20.1%2B1/bellsoft-jre17.0.20.1%2B1-windows-amd64-full.zip"
 #define TCL_UA L"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36 TCraftLauncher/1.0"
 static volatile LONG java_dl_phase;
@@ -1055,8 +811,8 @@ static volatile LONG java_dl_stalled;      // 20 秒没有新数据就放弃当�
 static unsigned long java_dl_progress_bytes;
 static DWORD java_dl_progress_tick;
 static volatile LONG java_dl_retryable;    // 0 这个源没救了，直接换源
-static volatile LONG java_dl_source_idx;   // 当前第几个源
-static volatile LONG java_dl_attempt;      // 当前第几次尝试
+static volatile LONG java_dl_source_idx;
+static volatile LONG java_dl_attempt;
 static char java_dl_source[64];            // 当前源名字，给 tick 显示
 static volatile LONG java_dl_part_bytes;   // 分块下载已落盘字节（各线程累加）
 static volatile LONG java_dl_abort;        // 任一分块失败/卡死，通知其余线程退出
@@ -1088,7 +844,7 @@ static int java_sources(JavaSource *out, int max) {
         out[n].url = JAVA17_URL_HUAWEI; out[n].label = "华为云"; n++;
         out[n].url = JAVA17_URL; out[n].label = "Adoptium"; n++;
     } else {
-        // 华为云地址固定、国内 9MB/s；清华镜像体积小但会挑客户端（403），放第二
+        // 华为云地址固定；清华镜像体积小但挑客户端（403），放第二
         out[n].url = JAVA17_URL_HUAWEI; out[n].label = "华为云"; n++;
         out[n].url = JAVA17_URL_TUNA; out[n].label = "清华镜像"; n++;
         out[n].url = JAVA17_URL; out[n].label = "Adoptium"; n++;
@@ -1290,7 +1046,7 @@ static int write_ascii_file(const wchar_t *path, const char *text) {
     return (int)wrote == n;
 }
 
-// Win7 默认没有 tar.exe，PowerShell 2.0 也没有 Expand-Archive，用 Shell.Application 回退
+// Win7 无 tar/Expand-Archive，走 Shell.Application
 static int extract_java_zip_vbs(void) {
     static const char vbs_text[] =
         "Option Explicit\r\n"
@@ -1574,14 +1330,12 @@ static int download_url(const wchar_t *url, const char *source) {
     return 1;
 }
 
-// 分块并发下载：每个连接拉一个 Range 写独立分片，全部完成后拼接。
-// WinINet 单流吃不满带宽，华为云这类 CDN 四连接基本能跑满；
-// 任一分块失败就放弃整体，由外层回退单流（download_url）重试
+// 分块并发下载（4 连接拉满带宽）；任一失败外层回退单流
 #define JAVA_DL_PARTS 4
 typedef struct {
     const wchar_t *url;
     unsigned long start;
-    unsigned long end;      // 含
+    unsigned long end;      // 含端点
     int index;
 } JavaPart;
 
@@ -1665,8 +1419,7 @@ done:
     return exit_code;
 }
 
-// 先探测 Range 支持与总大小（206 + Content-Range），可行才分块；
-// 不支持就静默返回 0，外层走单流，不给用户报错
+// 先探测 Range（206+Content-Range），不支持静默回退单流
 static int download_url_parallel(const wchar_t *url, const char *source)
 {
     typedef void * (WINAPI *OpenFn)(const wchar_t *, unsigned long, const wchar_t *, const wchar_t *, unsigned long);
@@ -1764,7 +1517,6 @@ static int download_url_parallel(const wchar_t *url, const char *source)
     for (i = 0; i < JAVA_DL_PARTS; i++) {
         if (file_size_u(java_dl_part_path[i]) != parts[i].end - parts[i].start + 1) goto cleanup;
     }
-    // 拼接分片
     out = CreateFileW(java_dl_zip, GENERIC_WRITE, FILE_SHARE_READ, NULL,
                       CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (out == INVALID_HANDLE_VALUE) goto cleanup;
@@ -2045,16 +1797,13 @@ static void scan_finish(void) {
     prog_set(scan_total, scan_total);
     if (scan_best[0]) {
         SetWindowTextW(ctl_path, scan_best);
-        if (java_dlg_first) {
-            status_set("已找到 Java，点「启动」继续；也可以手动选择或自动下载。");
-        } else {
-            sprintf(scan_msg, "已找到 Java %d（64 位），正在启动…", scan_best_major);
-            status_set(scan_msg);
-            // 非首次：自己找到的就直接用，别让玩家再点一次
-            SetTimer(java_dlg, TIMER_ACCEPT_ID, 600, NULL);
-        }
+        sprintf(scan_msg, "已找到 Java %d（64 位），正在启动…", scan_best_major);
+        status_set(scan_msg);
+        // 自动扫描已经找到就直接用，不再要求点「启动」
+        SetTimer(java_dlg, TIMER_ACCEPT_ID, 600, NULL);
     } else {
-        status_set("启动器需要 Java 17 或以上版本，点「自动下载」安装。");
+        status_set("没有找到可用的 Java，正在自动下载 Java 17…");
+        java_dl_start();
     }
     EnableWindow(GetDlgItem(java_dlg, IDC_JAVA_SCAN), TRUE);
     EnableWindow(GetDlgItem(java_dlg, IDC_JAVA_DOWN), TRUE);
@@ -2069,8 +1818,9 @@ static void scan_begin(void) {
     prog_set(0, scan_total > 0 ? scan_total : 1);
 
     if (scan_total == 0) {
-        status_set("启动器需要 Java 17 或以上版本，点「自动下载」安装。");
+        status_set("没有找到可用的 Java，正在自动下载 Java 17…");
         EnableWindow(GetDlgItem(java_dlg, IDC_JAVA_SCAN), TRUE);
+        java_dl_start();
         return;
     }
 
@@ -2256,7 +2006,7 @@ static LRESULT CALLBACK java_dlg_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             KillTimer(h, TIMER_ACCEPT_ID);
             java_dlg_accept();
             if (java_dlg_result != 1) {
-                // 自动确认被路径校验拦下时恢复按钮，避免卡死
+                // 自动确认被路径校验拦下时恢复按钮，不然界面卡死
                 EnableWindow(GetDlgItem(h, IDC_JAVA_DOWN), TRUE);
                 EnableWindow(GetDlgItem(h, IDC_JAVA_SCAN), TRUE);
                 EnableWindow(GetDlgItem(h, IDC_JAVA_BROWSE), TRUE);
@@ -2312,6 +2062,10 @@ static int java_dialog(wchar_t *out, int cap, const wchar_t *preset, int first) 
 
     ShowWindow(java_dlg, SW_SHOW);
     UpdateWindow(java_dlg);
+    // 取消置顶抢前台，防压住新启动的启动器
+    SetWindowPos(java_dlg, HWND_NOTOPMOST, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    SetForegroundWindow(java_dlg);
 
     scan_begin();
 
@@ -2351,7 +2105,7 @@ static void offer_download(void) {
     open_jdk_page();
 }
 
-// 让 Windows 按真实 DPI 渲染，避免高分屏下整个启动器被位图拉伸
+// 让 Windows 按真实 DPI 渲染，不然高分屏下整个界面被位图拉伸
 static void enable_dpi_awareness(void) {
     HMODULE u = GetModuleHandleW(L"user32.dll");
     if (!u) u = LoadLibraryW(L"user32.dll");
@@ -2403,8 +2157,10 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR args, int show) {
               "不要放在 Program Files、系统盘根目录，也不要放在只读介质里。");
         return 1;
     }
-    stub_log_w("==== 启动", self_path);
-    stub_log_w("工作目录", home_dir);
+    if (acquire_instance()) {
+        activate_existing_window();
+        return 0;
+    }
     cleanup_legacy_home();
     copy_str(jar_path, home_dir, MAX_PATH_LEN);
     cat_str(jar_path, L"\\" JAR_NAME, MAX_PATH_LEN);
@@ -2424,31 +2180,28 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR args, int show) {
                   "请换个位置放 exe 后重试。");
             return 1;
         }
-        stub_log("已解包内置 jar");
     }
 
     load_cfg();
-    stub_log(first_run ? "首次运行（没有 launcher.cfg）" : "读取 launcher.cfg 成功");
 
     {
         int found = pick_best_java(java, MAX_PATH_LEN);
-        stub_log(found ? "自动选中 Java" : "没有自动找到可用 Java");
-        if (found) stub_log_w("Java 路径", java);
 
-        if (!found || first_run) {
-            const wchar_t *seed = found ? java : NULL;
-            int rc = java_dialog(java, MAX_PATH_LEN, seed, first_run ? 1 : 0);
+        if (!found) {
+            const wchar_t *seed = NULL;
+            int rc = java_dialog(java, MAX_PATH_LEN, seed, 1);
             if (rc < 0) {
                 stub_log("Java 选择窗口创建失败");
                 offer_download();
                 return 1;
             }
             if (rc == 0) {
-                stub_log("用户取消了 Java 选择窗口");
                 return 1;
             }
             save_cfg(java);
-            stub_log_w("用户选定 Java", java);
+        } else if (first_run) {
+            // 自动找到的 Java 直接记住，免多点一次启动
+            save_cfg(java);
         }
     }
 
@@ -2457,7 +2210,6 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR args, int show) {
         if (major > 0 && major < 17) {
             int rc;
             found_major = major;
-            stub_log("配置里的 Java 版本过低，重新让用户选择");
             rc = java_dialog(java, MAX_PATH_LEN, NULL, 0);
             if (rc <= 0) {
                 if (rc < 0) offer_download();
@@ -2480,14 +2232,14 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR args, int show) {
         if (r == 2) {
             // 秒退：给出退出码和 java 日志路径
             char detail[2000];
-            char home8[MAX_PATH_LEN * 3];
+            char log8[MAX_PATH_LEN * 3];
             char head[800];
             char line[128];
             wchar_t logp[MAX_PATH_LEN];
             int got;
 
-            WideCharToMultiByte(CP_UTF8, 0, home_dir, -1, home8, sizeof(home8), NULL, NULL);
-            copy_str(logp, home_dir, MAX_PATH_LEN);
+            WideCharToMultiByte(CP_UTF8, 0, log_dir[0] ? log_dir : home_dir, -1, log8, sizeof(log8), NULL, NULL);
+            copy_str(logp, log_dir[0] ? log_dir : home_dir, MAX_PATH_LEN);
             cat_str(logp, L"\\java-error.log", MAX_PATH_LEN);
             got = read_file(logp, head, sizeof(head) / 3);
             if (got > 0) {
@@ -2510,17 +2262,13 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR args, int show) {
             sprintf(detail,
                     "启动器启动后立即退出了（退出码 %lu）。\n\n"
                     "Java 自己的报错：\n%s\n\n"
-                    "如果上面写着 UnsupportedClassVersionError，说明这个 Java 版本低于 17，"
-                    "请装 JDK 17 或更高版本（推荐 64 位）。\n\n"
-                    "完整日志：\n%s\\stub.log\n%s\\java-error.log\n\n"
-                    "也可以删掉 .tcl\\launcher.cfg 后重新运行，换一个 Java 试试。",
+                    "如果上面写着 UnsupportedClassVersionError，说明这个 Java 版本低于 17；"
+                    "删掉 .tcl\\launcher.cfg 后重新运行，启动器会自动重新检测或下载 Java。",
                     (unsigned long)code,
-                    got > 0 ? head : "（java 没有输出任何内容）",
-                    home8, home8);
+                    got > 0 ? head : "（java 没有输出任何内容）");
             alert(detail);
             return 1;
         }
-        stub_log("启动成功，stub 退出");
     }
     return 0;
 }

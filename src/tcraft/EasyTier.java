@@ -104,9 +104,9 @@ public final class EasyTier {
     }
 
     private static boolean is64Bit() {
+        // os.arch 必带 64；sun.arch.data.model 不可靠
         String a = System.getProperty("os.arch", "").toLowerCase(Locale.ROOT);
-        if (a.contains("64")) return true;
-        return !"32".equals(System.getProperty("sun.arch.data.model", "64"));
+        return a.contains("64");
     }
 
     public static String coreName() {
@@ -134,7 +134,7 @@ public final class EasyTier {
     }
 
     public static String[] mirrorHosts() {
-        // 仅作下拉展示与日志（下载走 PREFIXES 原始值），兜底标签翻译不影响功能
+        // 标签仅供展示，下载走 PREFIXES 原始值
         String[] out = new String[PREFIXES.length];
         for (int i = 0; i < PREFIXES.length; i++) {
             String host = Lang.t("节点 ") + (i + 1);
@@ -198,8 +198,7 @@ public final class EasyTier {
             }));
         }
         pool.shutdown();
-        // 每个任务在任务体内自计时，get 的等待只多不少：单任务上限（连接 2.5s + 读取 3.5s）+ 排队轮数余量，
-        // 固定 6s 会把排在后面的任务误判为不可用
+        // get 等待=单任务上限（2.5s+3.5s）+排队余量，固定 6s 会误判
         long perTaskMs = 7000;
         int rounds = (PREFIXES.length + threads - 1) / threads;
         long getTimeoutMs = perTaskMs * (rounds + 1);
@@ -292,7 +291,7 @@ public final class EasyTier {
     }
 
     private static void download(String url, Path target, Progress p) throws Exception {
-        // 没有内置校验值就不下载：core/dll 会被直接执行，不能接受无法校验的二进制
+        // core/dll 会被执行，无校验值不下载
         String expected = SHA256.getOrDefault(osTag() + "-" + arch(), "");
         if (expected.isEmpty()) {
             throw new Exception(Lang.tf("当前平台（%s-%s）没有内置的联机模块校验值，出于安全考虑已取消下载",
@@ -503,7 +502,7 @@ public final class EasyTier {
         if (!Files.isRegularFile(exe)) throw new Exception(Lang.t("联机模块未安装"));
         List<String> cmd = new ArrayList<>();
         cmd.add(exe.toString());
-        cmd.addAll(splitArgs(argument));
+        cmd.addAll(Shell.splitArgs(argument));
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.directory(folder().toFile());
         pb.redirectErrorStream(true);
@@ -523,7 +522,7 @@ public final class EasyTier {
             core.descendants().forEach(ProcessHandle::destroy);
             core.destroy();
             if (!core.waitFor(3, TimeUnit.SECONDS)) {
-                // 温和请求没杀干净就强杀一轮，连子进程一起，不然端口和网卡还被占着
+                // 温和关闭失败即强杀（含子进程），防端口被占
                 core.descendants().forEach(ProcessHandle::destroyForcibly);
                 core.destroyForcibly();
             }
@@ -554,7 +553,7 @@ public final class EasyTier {
         Path exe = cliPath();
         if (!Files.isRegularFile(exe)) throw new Exception(Lang.t("联机模块 CLI 未安装"));
         ProcessBuilder pb = new ProcessBuilder(exe.toString());
-        for (String part : splitArgs(argument)) pb.command().add(part);
+        for (String part : Shell.splitArgs(argument)) pb.command().add(part);
         pb.directory(folder().toFile());
         pb.redirectErrorStream(true);
         Process p = pb.start();
@@ -575,27 +574,6 @@ public final class EasyTier {
         }
         reader.join(1000);
         return out.toString(StandardCharsets.UTF_8);
-    }
-
-    private static List<String> splitArgs(String s) {
-        List<String> list = new ArrayList<>();
-        if (s == null) return list;
-        StringBuilder cur = new StringBuilder();
-        boolean quote = false;
-        for (char ch : s.toCharArray()) {
-            if (ch == '"') {
-                quote = !quote;
-            } else if (Character.isWhitespace(ch) && !quote) {
-                if (cur.length() > 0) {
-                    list.add(cur.toString());
-                    cur.setLength(0);
-                }
-            } else {
-                cur.append(ch);
-            }
-        }
-        if (cur.length() > 0) list.add(cur.toString());
-        return list;
     }
 
     public static final int PEER_SELF = 0, PEER_CLIENT = 1, PEER_SERVER = 2, PEER_MISC = 3;
@@ -670,11 +648,12 @@ public final class EasyTier {
 
     private static String runCommand(String... cmd) throws Exception {
         Process p = new ProcessBuilder(cmd).redirectErrorStream(true).start();
+        // 先等退出再读：进程不关 stdout 时 transferTo 会永远阻塞
+        if (!p.waitFor(3, TimeUnit.SECONDS)) p.destroyForcibly();
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (InputStream in = p.getInputStream()) {
             in.transferTo(out);
         }
-        if (!p.waitFor(3, TimeUnit.SECONDS)) p.destroyForcibly();
         return out.toString(StandardCharsets.UTF_8);
     }
 

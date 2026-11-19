@@ -124,7 +124,7 @@ public final class Downloader {
                 : !inst.neoforge.isEmpty() ? inst.neoforge
                 : !inst.liteLoader.isEmpty() ? inst.liteLoader
                 : !inst.legacyFabric.isEmpty() ? inst.legacyFabric : "";
-        // 装进当前游戏目录，隔离由启动时决定（共用 libraries / assets）
+        // 装当前游戏目录，隔离在启动时决定
         startInstall(win, version, loader, (java.nio.file.Path) null, loaderVersion, inst);
     }
 
@@ -169,7 +169,7 @@ public final class Downloader {
         Files.createDirectories(versionDir);
         Path versionJson = versionDir.resolve(version.id + ".json");
         String versionUrl = Json.str(entry, "url", "");
-        // 清单里的 sha1 一并带上：版本 JSON 决定后面所有下载地址，被替换等于整条链被接管
+        // 带 sha1：版本 JSON 被换=整条下载链被接管
         String versionSha1 = Json.str(entry, "sha1", "");
         if (source == 1) downloadTo(task, versionUrl, "", versionJson, 0.03, 0.08, versionSha1);
         else if (source == 2) downloadTo(task, bmcl() + "/version/" + version.id + "/json", versionUrl, versionJson, 0.03, 0.08, versionSha1);
@@ -304,7 +304,7 @@ public final class Downloader {
             for (Object value : objects.values()) {
                 Map<String, Object> obj = Json.obj(value);
                 String hash = Json.str(obj, "hash", "");
-                // 本地路径和下载地址都由 hash 拼出来，不是 40 位十六进制的条目直接跳过
+                // 路径与地址都由 hash 拼，非 40 位十六进制跳过
                 if (!hash.matches("[0-9a-f]{40}")) continue;
                 long expectedSize = (long) parseNum(Json.str(obj, "size", "0"), 0);
                 Path target = game.resolve("assets").resolve("objects").resolve(hash.substring(0, 2)).resolve(hash);
@@ -549,7 +549,7 @@ public final class Downloader {
     // 断点续传 + 校验 + 退避重试，进度直接透传给调用方
     private static void transferWithProgress(java.util.function.DoubleConsumer progress, String url,
                                              Path part, Path target, String sha1) throws IOException {
-        // 没有哈希就没法确认旧 .part 是谁写的，续传可能拼出损坏文件，直接从头下（和 Fetch.file 同语义）
+        // 无哈希认不了旧 .part，直接重下
         if (sha1 == null) Files.deleteIfExists(part);
         java.security.MessageDigest digest = null;
         if (sha1 != null) {
@@ -559,7 +559,7 @@ public final class Downloader {
                 throw new IOException(Lang.t("SHA-1 不可用"), e);
             }
         }
-        // 和 Fetch.PART_LOCKS 共用一份：同一 .part 两处并发写会互相损坏
+        // 与 Fetch.PART_LOCKS 同锁，防 .part 双写
         String lockKey = part.toAbsolutePath().toString();
         Object lock = new Object();
         if (Fetch.PART_LOCKS.putIfAbsent(lockKey, lock) != null) {
@@ -607,7 +607,7 @@ public final class Downloader {
                     return;
                 } catch (IOException e) {
                     last = e;
-                    // 靠类型识别 416（Range 起点超出文件末尾），message 里的 "416" 会误伤其他错误文案
+                    // 按类型识别 416，message 匹配会误伤
                     if (e instanceof Http.StatusException se && se.code == 416) {
                         Files.deleteIfExists(part);
                         if (digest != null) digest.reset();
@@ -772,10 +772,10 @@ public final class Downloader {
         Path installer = game.resolve("TCL").resolve("installers")
                 .resolve(loader.toLowerCase() + "-" + mc + "-installer.jar");
         task.stage = "下载 " + loader + " 安装器";
-        // 安装器会被直接执行，拿不到 .sha1 就中止，不接受无法校验来源的安装器
+        // 安装器会被执行，无 .sha1 即中止
         String installerSha1 = fetchRemoteSha1(installerUrl);
         if (installerSha1 == null) {
-            // 镜像优先的用户连不上官方 maven，镜像侧同路径的 .sha1 再试一次
+            // 官方 maven 连不上时镜像侧再取 .sha1
             String mirrorSha1 = mirrorSha1Url(installerUrl);
             if (mirrorSha1 != null) installerSha1 = fetchRemoteSha1(mirrorSha1);
         }
@@ -803,20 +803,7 @@ public final class Downloader {
         cmd.add(javaExe);
         cmd.add("-Dfile.encoding=UTF-8");
         // 安装器自己也要联网下依赖，代理一起带过去
-        String proxyHost = data.get("SystemProxyHost", "");
-        String proxyPort = data.get("SystemProxyPort", "7890");
-        int proxyMode = data.getInt("SystemHttpProxyType", 1);
-        if (!proxyHost.isEmpty() && (proxyMode == 2 || proxyMode == 3)) {
-            if (proxyMode == 3) {
-                cmd.add("-DsocksProxyHost=" + proxyHost);
-                cmd.add("-DsocksProxyPort=" + proxyPort);
-            } else {
-                cmd.add("-Dhttp.proxyHost=" + proxyHost);
-                cmd.add("-Dhttp.proxyPort=" + proxyPort);
-                cmd.add("-Dhttps.proxyHost=" + proxyHost);
-                cmd.add("-Dhttps.proxyPort=" + proxyPort);
-            }
-        }
+        cmd.addAll(data.proxyJvmArgs());
         cmd.add("-jar");
         cmd.add(installer.toString());
         cmd.add("--installClient");
@@ -1109,14 +1096,14 @@ public final class Downloader {
         String versionName = gameVersion + "-LiteLoader";
         Path versionDir = game.resolve("versions").resolve(versionName);
         Files.createDirectories(versionDir);
-        // Jenkins 产物只是 installer，运行库在 dl.liteloader.com 的 maven 里；1.7.10 只有正式版坐标
+        // 运行库在 dl.liteloader.com 的 maven；1.7.10 仅正式版
         String liteVersion = "1.7.10".equals(gameVersion) ? gameVersion : gameVersion + "-SNAPSHOT";
         String libName = "com.mumfrey:liteloader:" + liteVersion;
         String rel = nameToPath(libName);
         String liteUrl = "https://dl.liteloader.com/versions/" + rel;
         Path liteJar = game.resolve("libraries").resolve(rel);
         Files.createDirectories(liteJar.getParent());
-        // jar 必须落在版本 JSON 引用的坐标路径上，文件名对不上启动时必崩；.sha1 拿得到就校验
+        // jar 落点须匹配坐标路径，否则启动必崩
         downloadFile(task, liteUrl, liteJar, 0.95, 0.99, "LiteLoader " + gameVersion,
                 fetchRemoteSha1(liteUrl));
         String json = "{"
@@ -1391,7 +1378,7 @@ public final class Downloader {
         }
     }
 
-    // 全局共享限速：多流并发时单流独立限速会把聚合速度放大 N 倍，所有流共用同一秒级配额
+    // 所有流共用秒级配额，防单流限速被并发放大
     private static final Object LIMIT_LOCK = new Object();
     private static long limitWindowStart;
     private static long limitWindowBytes;

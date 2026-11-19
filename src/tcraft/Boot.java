@@ -1,18 +1,25 @@
 package tcraft;
 
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+import java.nio.channels.OverlappingFileLockException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 
 public final class Boot {
 
     private static final String FX = "javafx.application.Application";
+    static final long STARTED_AT = System.nanoTime();
     static StartupWindow startupWindow;
+    private static FileChannel instanceLockChannel;
+    private static FileLock instanceLock;
 
     private Boot() {
     }
 
     public static void main(String[] args) {
-        // 语言要先于一切 UI：读 config.properties 的 SystemLanguage，让启动壳/失败弹窗按设置显示
+        // 语言先于一切 UI：按 SystemLanguage 显示启动壳
         applySystemProperties();
         if (Runtime.version().feature() < 17) {
             fail(Lang.t("TCraft Launcher 需要 Java 17 或更高版本。\n\n")
@@ -20,7 +27,14 @@ public final class Boot {
                     + Lang.t("请安装 64 位 Java 17 后重新运行。"), null);
             return;
         }
-        StartupWindow ui = StartupWindow.open();
+        // 单实例：重复启动直接退出
+        if (!acquireInstanceLock()) {
+            System.err.println("[TCL] 已有实例在运行，本次启动退出");
+            return;
+        }
+        // 首次运行：新 JVM 弹主窗，旧进程只留启动窗
+        boolean quietStart = "true".equalsIgnoreCase(System.getProperty("tcl.quietStart"));
+        StartupWindow ui = quietStart ? StartupWindow.none() : StartupWindow.open();
         startupWindow = ui;
         ui.setStatus(Lang.t("准备 TCL 启动器中…"), 5);
         try {
@@ -47,6 +61,50 @@ public final class Boot {
         }
     }
 
+    private static boolean acquireInstanceLock() {
+        // stub 互斥量已失效，长期单实例靠此文件锁
+        Path lockFile = Resources.home().resolve("launcher.lock");
+        for (int attempt = 0; attempt < 20; attempt++) {
+            try {
+                FileChannel ch = FileChannel.open(lockFile, StandardOpenOption.CREATE,
+                        StandardOpenOption.WRITE);
+                FileLock lock = ch.tryLock();
+                if (lock != null) {
+                    instanceLockChannel = ch;
+                    instanceLock = lock;
+                    return true;
+                }
+                ch.close();
+            } catch (OverlappingFileLockException e) {
+                return false;
+            } catch (Exception e) {
+                // 文件系统不支持锁时不要因此拦住启动
+                return true;
+            }
+            try {
+                // 首次运行会由当前进程拉起新 JVM，旧进程退出需要一点时间
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        }
+        return false;
+    }
+
+    static void releaseInstanceLock() {
+        try {
+            if (instanceLock != null) instanceLock.release();
+        } catch (Exception ignored) {
+        }
+        try {
+            if (instanceLockChannel != null) instanceLockChannel.close();
+        } catch (Exception ignored) {
+        }
+        instanceLock = null;
+        instanceLockChannel = null;
+    }
+
     private static void applySystemProperties() {
         try {
             java.util.Properties p = new java.util.Properties();
@@ -70,7 +128,7 @@ public final class Boot {
             if ("true".equalsIgnoreCase(p.getProperty("SystemDebugMode", "false"))) {
                 System.setProperty("prism.verbose", "true");
             }
-            // 壳窗口在 Data.get() 之前就要用语言，这里是对应读取点（0 简体 / 1 英文 / 2 繁体 / 3 跟随系统）
+            // Data.get() 前的语言读取点；0简/1英/2繁/3随系统
             Lang.setMode(parseInt(p.getProperty("SystemLanguage", "0")));
             Lang.reload();
         } catch (Throwable ignored) {
@@ -100,9 +158,18 @@ public final class Boot {
         Path crash = t == null ? null : writeCrash(t);
         String full = text + (crash == null ? "" : Lang.t("\n\n详细堆栈已写入：\n") + crash)
                 + Lang.t("\n\n请不要发送截图，点「导出错误报告」保存日志，再把文件发到 TCL 交流群（1131373915）。");
+        if (Shell.mac()) {
+            // 已带 JavaFX 勿再起 Swing：落日志并打开日志目录
+            System.err.println(full);
+            try {
+                Shell.openFolder(Resources.logDir().toString());
+            } catch (Throwable ignored) {
+            }
+            System.exit(1);
+        }
         System.err.println(full);
         try {
-            // “退出”表内是联机退出语境（Leave/離開），程序退出另用“退出程序”
+            // 「退出」是联机语境，程序退出用「退出程序」
             Object[] options = {Lang.t("导出错误报告"), Lang.t("退出程序")};
             int res = javax.swing.JOptionPane.showOptionDialog(null, full, Lang.t("TCraft Launcher 启动失败"),
                     javax.swing.JOptionPane.DEFAULT_OPTION, javax.swing.JOptionPane.ERROR_MESSAGE,
@@ -138,7 +205,7 @@ public final class Boot {
                     .append("工作目录：").append(System.getProperty("user.dir")).append('\n')
                     .append("配置目录：").append(Resources.home()).append('\n');
             sb.append("\n===== 最近日志 =====\n");
-            Path log = Resources.home().resolve("launcher.log");
+            Path log = Resources.errorLogFile();
             if (Files.isRegularFile(log)) {
                 for (String line : tailLines(log, 200)) sb.append(line).append('\n');
             } else {
@@ -147,7 +214,7 @@ public final class Boot {
             // 带 BOM，记事本/QQ 打开不乱码
             Files.writeString(file, "\uFEFF" + Redact.apply(sb.toString()), java.nio.charset.StandardCharsets.UTF_8);
             try {
-                java.awt.Desktop.getDesktop().open(dir.toFile());
+                Shell.openFolder(dir.toString());
             } catch (Throwable ignored) {
             }
         } catch (Throwable ignored) {
@@ -178,7 +245,7 @@ public final class Boot {
 
     static Path writeCrash(Throwable t) {
         try {
-            Path dir = Resources.home();
+            Path dir = Resources.logDir();
             Files.createDirectories(dir);
             Path crash = dir.resolve("crash.txt");
             java.io.StringWriter sw = new java.io.StringWriter();

@@ -1,10 +1,48 @@
 package tcraft;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 public final class Shell {
 
     private Shell() {
+    }
+
+    // 按空白切分参数，引号内的空格不切分，引号本身不保留
+    public static List<String> splitArgs(String text) {
+        List<String> out = new ArrayList<>();
+        if (text == null || text.isEmpty()) return out;
+        StringBuilder cur = new StringBuilder();
+        char quote = 0;
+        boolean quoted = false;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (quote != 0) {
+                if (c == '\\' && quote == '"' && i + 1 < text.length()
+                        && (text.charAt(i + 1) == '"' || text.charAt(i + 1) == '\\')) {
+                    cur.append(text.charAt(++i));
+                } else if (c == quote) {
+                    quote = 0;
+                } else {
+                    cur.append(c);
+                }
+            } else if (c == '"' || c == '\'') {
+                quote = c;
+                quoted = true;
+            } else if (Character.isWhitespace(c)) {
+                if (quoted || cur.length() > 0) {
+                    out.add(cur.toString());
+                    cur.setLength(0);
+                    quoted = false;
+                }
+            } else {
+                cur.append(c);
+            }
+        }
+        // 引号未闭合时把剩余内容当成一个参数，宁可少切也不要丢参数
+        if (quoted || cur.length() > 0) out.add(cur.toString());
+        return out;
     }
 
     private static boolean isMac() {
@@ -39,7 +77,10 @@ public final class Shell {
                         if (!line.startsWith("XDG_DESKTOP_DIR=")) continue;
                         String value = line.substring("XDG_DESKTOP_DIR=".length()).replace("\"", "").trim();
                         value = value.replace("$HOME", home);
-                        if (!value.isEmpty()) return java.nio.file.Paths.get(value);
+                        if (!value.isEmpty()) {
+                            java.nio.file.Path p = java.nio.file.Paths.get(value);
+                            return p.isAbsolute() ? p : java.nio.file.Paths.get(home, value);
+                        }
                     }
                 }
             } catch (Exception ignored) {
@@ -60,7 +101,7 @@ public final class Shell {
                     default -> null;
                 };
                 if (cls == null) return;
-                // wmic 在 Windows 11 24H2 已移除，改用 PowerShell；PS 冷启动可能超过 10s，放宽到 30s
+                // wmic 24H2 已移除改用 PS；超时放宽到 30s
                 runHidden(30, "powershell", "-NoProfile", "-NonInteractive", "-Command",
                         "(Get-Process -Id " + pid + " -ErrorAction Stop).PriorityClass='" + cls + "'");
                 return;
@@ -79,7 +120,7 @@ public final class Shell {
         }
     }
 
-    // 子进程要有人收尾：输出丢掉，超时强杀，不留堵着管道的僵尸；失败落一条日志方便排查
+    // 子进程：输出丢弃、超时强杀、失败落日志
     private static void runHidden(long timeoutSeconds, String... cmd) throws java.io.IOException {
         Process p;
         try {
@@ -106,25 +147,6 @@ public final class Shell {
     // 默认 10s：PowerShell 冷启动不够用，调用方用重载自己放宽
     private static void runHidden(String... cmd) throws java.io.IOException {
         runHidden(10, cmd);
-    }
-
-    public static boolean preferHighPerformanceGpu(String exe) {
-        if (!windows() || exe == null || exe.isBlank()) return false;
-        try {
-            regGpu(exe);
-            // WPF 版会同时把启动器自身设为高性能，避免启动器界面走核显
-            String self = ProcessHandle.current().info().command().orElse("");
-            if (!self.isBlank() && !self.equalsIgnoreCase(exe)) regGpu(self);
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    private static void regGpu(String exe) throws java.io.IOException {
-        runHidden(30, "reg", "add",
-                "HKCU\\Software\\Microsoft\\DirectX\\UserGpuPreferences",
-                "/v", exe, "/t", "REG_SZ", "/d", "GpuPreference=2;", "/f");
     }
 
     public static boolean openUrl(String url) {
@@ -169,7 +191,7 @@ public final class Shell {
                 return true;
             }
             if (desktopOpen(f)) return true;
-            // 不走 cmd.exe：路径里的 & | ^ 会被当命令分隔符；explorer/rundll32 都把路径当普通参数
+            // 不走 cmd.exe：&|^ 会被当命令分隔符
             if (f.isDirectory()) {
                 new ProcessBuilder("explorer.exe", f.getAbsolutePath()).start();
             } else {
@@ -189,7 +211,7 @@ public final class Shell {
             d.open(f);
             return true;
         } catch (Throwable e) {
-            // Desktop 在没有图形环境（或 AWT 初始化失败）时会直接抛错，交给调用方回退
+            // 无图形环境时 Desktop 抛错，交调用方回退
             return false;
         }
     }

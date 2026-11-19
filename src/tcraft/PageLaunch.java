@@ -100,7 +100,7 @@ public class PageLaunch implements Page {
         Data.Account account = data.account();
         String name = account == null ? "" : account.name;
         Label greet = name.isEmpty() ? Ui.semi(greeting, 19, Color.WHITE)
-                : Ui.semi(greeting + "，" + name, 19, Color.WHITE);
+                : Ui.semi(greeting + Lang.t("，") + name, 19, Color.WHITE);
         greet.setEffect(new DropShadow(4, 0.7, 0.7, Color.web("#000000", 0.65)));
         greet.setMaxWidth(330);
         greet.setAlignment(Pos.CENTER_RIGHT);
@@ -433,7 +433,7 @@ public class PageLaunch implements Page {
             aprilTimer.stop();
             aprilTimer = null;
         }
-        // handler 挂在 scene 根上且捕获了页面实例，不清会跟着整个窗口活着
+        // handler 捕获页面实例，不清会常驻窗口
         if (aprilScene != null) {
             if (aprilScene.getRoot() != null) aprilScene.getRoot().setOnMouseMoved(null);
             aprilScene = null;

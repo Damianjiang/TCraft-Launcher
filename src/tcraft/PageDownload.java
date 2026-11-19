@@ -302,7 +302,7 @@ public class PageDownload implements Page {
 
         VBox selectContent = new VBox(10);
         selectContent.getChildren().add(nameCard);
-        // 和下面的加载器卡片同一条左边缘，原来多缩进 15px 会看着「没对齐」
+        // 与加载器卡片同一条左缘对齐
         VBox.setMargin(nameCard, new Insets(0, 0, 0, 0));
         selectContent.getChildren().add(hintBox);
         for (LoaderCard lc : loaderCardList) selectContent.getChildren().add(lc.card);
@@ -331,7 +331,7 @@ public class PageDownload implements Page {
         card.header.setPrefHeight(40);
         card.header.setMaxHeight(40);
         Label t = card.titleLabel();
-        // 只保底不锁死：短标题仍按 112 对齐，Cleanroom/LabyMod 这类长标题能完整显示
+        // 短标题按 112 对齐，长标题保底不截断
         t.setMinWidth(112);
         t.setMaxWidth(Region.USE_PREF_SIZE);
         lc.statusIcon = Ui.image(blockImg, 18, 18, true);
@@ -382,7 +382,7 @@ public class PageDownload implements Page {
                     lc.versions = null;  // 下次展开时重试
                     lc.error = e.getMessage() == null ? "获取失败" : e.getMessage();
                     lc.fetched = false;
-                    lc.list.getChildren().setAll(Ui.hint(lc.title + " 版本列表获取失败：" + lc.error, 2));
+                    lc.list.getChildren().setAll(Ui.hint(lc.title + Lang.t(" 版本列表获取失败：") + lc.error, 2));
                     refreshAll();
                 });
             }
@@ -404,7 +404,7 @@ public class PageDownload implements Page {
         }
         if (lc.versions.isEmpty()) {
             if (lc.error != null) {
-                lc.list.getChildren().add(Ui.hint(lc.title + " 版本列表获取失败：" + lc.error, 2));
+                lc.list.getChildren().add(Ui.hint(lc.title + Lang.t(" 版本列表获取失败：") + lc.error, 2));
             } else {
                 lc.list.getChildren().add(Ui.hint(Lang.t("该 Minecraft 版本没有可用的 ") + lc.title, 1));
             }
@@ -802,7 +802,7 @@ public class PageDownload implements Page {
     private void downloadInstaller(LoaderCard lc, String version) {
         String url = Loaders.installerUrl(lc.loaderKey, version);
         if (url.isEmpty()) {
-            win.toast("无法下载", "未找到 " + lc.title + " 的安装器地址", 3);
+            win.toast("无法下载", Lang.tf("未找到 %s 的安装器地址", lc.title), 3);
             return;
         }
         String name = Loaders.installerName(lc.loaderKey, version);
@@ -813,7 +813,7 @@ public class PageDownload implements Page {
             try {
                 Downloader.downloadFileTo(null, url, target, lc.title + " 安装器");
                 javafx.application.Platform.runLater(() ->
-                        win.toast("安装器已下载", "已保存到 " + target.getFileName(), 1));
+                        win.toast("安装器已下载", Lang.t("已保存到 ") + target.getFileName(), 1));
             } catch (Exception e) {
                 javafx.application.Platform.runLater(() ->
                         win.toast("下载失败", e.getMessage() == null ? "网络错误" : e.getMessage(), 3));
@@ -1195,7 +1195,7 @@ public class PageDownload implements Page {
                     VBox.setMargin(hintError, new Insets(0, 0, show ? 12 : 0, 0));
                 }
                 if (fList.isEmpty()) {
-                    // fError 可能是「请求超时」等表内词，也可能是原始网络错误（Lang.t 原样回退）
+                    // fError 可能是表内词或原始错误，查表回退
                     status.setText(fError == null
                             ? Lang.t(resourcePage == 0 ? "该分类暂无资源" : "没有更多结果")
                             : Lang.tf("无法获取%s列表：", Lang.t(category)) + Lang.t(fError));
@@ -1329,7 +1329,7 @@ public class PageDownload implements Page {
             page.getChildren().add(card);
             return;
         }
-        Ui.Card card = Ui.card("资源收藏夹 · " + data.favorites.size());
+        Ui.Card card = Ui.card(Lang.t("资源收藏夹 · ") + data.favorites.size());
         card.setSpacing(0);
         card.setContentPadding(new Insets(4, 12, 10, 12));
         for (Data.Favorite f : new ArrayList<>(data.favorites)) card.add(favoriteRow(f));

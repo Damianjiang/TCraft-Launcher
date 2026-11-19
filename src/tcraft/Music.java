@@ -55,12 +55,12 @@ public final class Music {
         return Paths.get(gameDir, "TCL", "Music");
     }
 
-    // 重新扫描音乐文件夹并从头播放，供设置页「刷新背景音乐」使用
+    // 设置页「刷新背景音乐」入口
     public static synchronized void reload(String gameDir) {
         init(gameDir);
     }
 
-    // 停止播放并清空列表，供设置页「清空背景音乐」使用
+    // 设置页「清空背景音乐」入口
     public static synchronized void clear() {
         if (player != null) {
             try {

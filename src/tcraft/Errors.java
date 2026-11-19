@@ -4,14 +4,21 @@ import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Scene;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
+import javafx.scene.input.DataFormat;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
+import javafx.stage.Stage;
+import javafx.stage.StageStyle;
 import javafx.util.Duration;
 
 import java.nio.charset.StandardCharsets;
@@ -319,7 +326,7 @@ public final class Errors {
         }
         sb.append("\n===== 诊断信息 =====\n").append(systemInfo()).append('\n');
         try {
-            // 迭代器是快照，先收集成临时列表再截尾；直接按索引 get 会和 clear() 竞态越界
+            // 先收快照再截尾，防与 clear() 竞态
             List<String> logs = new ArrayList<>();
             for (String line : Data.get().log) logs.add(line);
             int from = Math.max(0, logs.size() - 200);
@@ -364,33 +371,15 @@ public final class Errors {
         }
     }
 
-         private static void fallback(Report r) {
+    private static void fallback(Report r) {
         try {
-            javax.swing.SwingUtilities.invokeLater(() -> {
+            onFx(() -> {
                 try {
-                    // Swing 降级弹窗不经 localize，各段分别查表
-                    String text = r.headline + "\n\n"
-                            + (r.detail.length() > 1600 ? r.detail.substring(0, 1600) + "…" : r.detail)
-                            + Lang.t("\n\n请不要发送截图。点「导出日志」保存错误报告，再把文件发到 TCL 交流群（1131373915）。");
-                    Object[] options = {Lang.t("导出日志"), Lang.t("关闭")};
-                    int res = javax.swing.JOptionPane.showOptionDialog(null, text, Lang.t(r.title),
-                            javax.swing.JOptionPane.DEFAULT_OPTION, javax.swing.JOptionPane.ERROR_MESSAGE,
-                            null, options, options[0]);
-                    if (res == 0) {
-                        Path file = exportReport(r);
-                        if (file == null) {
-                            try {
-                                java.awt.datatransfer.StringSelection sel =
-                                        new java.awt.datatransfer.StringSelection(sanitize(exportText(r)));
-                                java.awt.Toolkit.getDefaultToolkit().getSystemClipboard()
-                                        .setContents(sel, sel);
-                            } catch (Throwable ignored) {
-                            }
-                        }
-                    }
-                } catch (Throwable ignored) {
-                } finally {
+                    showFallbackStage(r);
+                } catch (Throwable t) {
+                    // 构建失败也要放行队列，后续错误不能被卡死
                     showing = false;
+                    logOnly("错误弹窗降级失败", t);
                     scheduleDrain();
                 }
             });
@@ -402,6 +391,65 @@ public final class Errors {
                 QUEUE.clear();
             }
         }
+    }
+
+    private static void showFallbackStage(Report r) {
+        Stage stage = new Stage(StageStyle.DECORATED);
+        stage.setTitle(Lang.t(r.title));
+
+        Label head = new Label(r.headline);
+        head.setWrapText(true);
+        head.setStyle("-fx-font-size: 13px; -fx-text-fill: #1f2430;");
+
+        String detail = r.detail.length() > 1600 ? r.detail.substring(0, 1600) + "…" : r.detail;
+        Label body = new Label(detail);
+        body.setWrapText(true);
+        body.setStyle("-fx-font-size: 11px; -fx-text-fill: #5b6472; -fx-font-family: Consolas, monospace;");
+        ScrollPane scroll = new ScrollPane(body);
+        scroll.setFitToWidth(true);
+        VBox.setVgrow(scroll, Priority.ALWAYS);
+
+        Label warn = new Label(Lang.t("请不要发送截图。点「导出日志」保存错误报告，再把文件发到 TCL 交流群（1131373915）。"));
+        warn.setWrapText(true);
+        warn.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #ce2111;");
+
+        Button export = new Button(Lang.t("导出日志"));
+        Button close = new Button(Lang.t("关闭"));
+        Runnable done = () -> {
+            showing = false;
+            scheduleDrain();
+        };
+        export.setOnAction(e -> {
+            Path file = exportReport(r);
+            if (file != null) {
+                export.setText(Lang.t("已导出：") + file.getFileName());
+            } else {
+                try {
+                    ClipboardContent c = new ClipboardContent();
+                    c.put(DataFormat.PLAIN_TEXT, sanitize(exportText(r)));
+                    Clipboard.getSystemClipboard().setContent(c);
+                } catch (Throwable ignored) {
+                }
+                export.setText(Lang.t("导出失败"));
+            }
+        });
+        close.setOnAction(e -> {
+            stage.close();
+            done.run();
+        });
+        stage.setOnCloseRequest(e -> done.run());
+
+        HBox actions = new HBox(10, export, close);
+        actions.setAlignment(Pos.CENTER_RIGHT);
+
+        VBox box = new VBox(10, head, scroll, warn, actions);
+        box.setPadding(new Insets(18, 20, 16, 20));
+        box.setStyle("-fx-background-color: #ffffff;");
+        Scene scene = new Scene(box, 560, 420);
+        stage.setScene(scene);
+        stage.centerOnScreen();
+        stage.show();
+        stage.toFront();
     }
 
     public static String briefOf(Throwable ex) {
@@ -464,8 +512,7 @@ public final class Errors {
     }
 
     private static String briefText(String brief, Throwable ex) {
-        // headline 是拼接串，localize 永远查不到表：brief 与分隔符在此分别翻译，
-        // 异常消息原文保留（英文堆栈/服务器消息不译）
+        // headline 是拼接串，brief/分隔符分别翻译；异常原文不译
         String b = brief == null ? Lang.t("发生错误") : Lang.t(brief);
         String m = briefOf(ex);
         return sanitize(b + Lang.t("：") + m);
@@ -494,27 +541,22 @@ public final class Errors {
         } catch (Throwable ignored) {
         }
         try {
-            Path dir = Resources.home();
+            Path dir = Resources.logDir();
             Files.createDirectories(dir);
             String entry = sanitize("[" + LocalDateTime.now() + "] " + title + " — " + headline
                     + "\n" + detail + "\n\n");
             Path errorsLog = dir.resolve("errors.log");
-            Path crashLog = dir.resolve("crash.txt");
-            // 超 4MB 滚动成 .1，不设上限会把磁盘写满
+            // 超 512KB 滚动成 .1；同一份内容不再往 crash.txt 抄一遍
             rotate(errorsLog);
-            rotate(crashLog);
             Files.writeString(errorsLog, entry, StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-            Files.writeString(crashLog,
-                    sanitize("[" + LocalDateTime.now() + "] " + title + " — " + headline + "\n" + detail + "\n"),
-                    StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
         } catch (Throwable ignored) {
         }
     }
 
     private static void rotate(Path file) {
         try {
-            if (Files.isRegularFile(file) && Files.size(file) > 4L * 1024 * 1024) {
+            if (Files.isRegularFile(file) && Files.size(file) > 512L * 1024) {
                 Files.move(file, file.resolveSibling(file.getFileName() + ".1"),
                         java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             }

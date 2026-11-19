@@ -339,8 +339,8 @@ public class PageInstanceSetup implements Page {
             } catch (Exception ignored) {
             }
         }
-        Path launcherLog = Resources.home().resolve("launcher.log");
-        if (Files.isRegularFile(launcherLog)) diagAddSource("启动器日志（当前）", launcherLog);
+        Path launcherLog = Resources.errorLogFile();
+        if (Files.isRegularFile(launcherLog)) diagAddSource("启动器错误日志（当前）", launcherLog);
 
         HBox controls = new HBox(10);
         controls.setAlignment(Pos.CENTER_LEFT);
@@ -544,7 +544,7 @@ public class PageInstanceSetup implements Page {
             win.toast("日志已导出（已脱敏）。", "", 1);
             openFolder(file.getParent().toString());
         } catch (Exception e) {
-            win.toast("导出失败：" + e.getMessage(), "", 3);
+            win.toast(Lang.t("导出失败：") + e.getMessage(), "", 3);
         }
     }
 
@@ -773,7 +773,7 @@ public class PageInstanceSetup implements Page {
             optionDirty = false;
             win.toast("游戏选项已保存，下次启动生效。", "", 1);
         } catch (Exception e) {
-            win.toast("保存失败：" + e.getMessage(), "", 3);
+            win.toast(Lang.t("保存失败：") + e.getMessage(), "", 3);
         }
     }
 
@@ -787,7 +787,7 @@ public class PageInstanceSetup implements Page {
     }
 
     private void saveOptionPreset() {
-        Dialogs.input(win, "存为选项预设", "保存当前这张表里的全部选项，之后可以一键套用到其他实例。", "", name -> {
+        Dialogs.input(win, "存为选项预设", "保存当前这张表里的全部选项，之后可以套用到其他实例。", "", name -> {
             if (name == null || name.trim().isEmpty()) return;
             String n = name.trim();
             if (n.matches(".*[\\\\/:*?\"<>|].*") || n.startsWith(".")) {
@@ -807,7 +807,7 @@ public class PageInstanceSetup implements Page {
                 }
                 sb.append("}");
                 Files.writeString(optionPresetDir().resolve(n + ".json"), sb.toString(), StandardCharsets.UTF_8);
-                win.toast("预设已保存：" + n, "", 1);
+                win.toast(Lang.t("预设已保存：") + n, "", 1);
             } catch (Exception e) {
                 win.toast("保存选项预设失败", e.getMessage(), 3);
             }
@@ -845,8 +845,8 @@ public class PageInstanceSetup implements Page {
                     optionDirty = true;
                     win.closeModal();
                     win.openSetup("options");
-                    // toast 只对整串查表，拼接串须按片段在创建处翻译；「项。…」键不带前导空格
-                    win.toast(Lang.t("已套用预设「") + preset.getFileName().toString().replace(".json", "") + "」",
+                    // toast 只查整串，拼接串创建时翻译
+                    win.toast(Lang.t("已套用预设「") + preset.getFileName().toString().replace(".json", "") + Lang.t("」"),
                             Lang.t("共 ") + applied + Lang.t("项。记得点「保存修改」写入 options.txt。"), 1);
                 } catch (Exception ex) {
                     win.toast("套用预设失败", ex.getMessage(), 3);
@@ -1028,7 +1028,7 @@ public class PageInstanceSetup implements Page {
         basic.add(sizeRow);
 
         Ui.Card java = addCard(page, "Java 与高级");
-        // 每个实例可以指定 Java；没缓存时不在这里起进程探测，先占位再后台扫
+        // 实例可指定 Java；无缓存先占位后台扫
         java.util.List<Data.JavaRuntime> runtimes;
         if (data.hasJavaScanCache()) {
             runtimes = data.scanJavaRuntimes();
@@ -1212,8 +1212,7 @@ public class PageInstanceSetup implements Page {
         Ui.ListItem item = new Ui.ListItem(icon, display,
                 (disabled ? "已禁用 · " : "") + (display.equals(fileDisplay) ? "" : fileDisplay + " · ") + sizeOf(mod), 40);
         if (wantLocalName && cached == null) {
-            // 名字放后台读：100+ Mod 逐个 new ZipFile 在主线程上会卡好几秒，
-            // 池子固定 2 线程，几百个 Mod 不能一次起几百条线程
+            // 名字后台读：逐个 ZipFile 卡主线程；池固定 2 线程
             MOD_NAME_POOL.execute(() -> {
                 String local = readLocalModName(mod);
                 if (local == null || local.isBlank()) return;
@@ -2107,7 +2106,7 @@ public class PageInstanceSetup implements Page {
                         javafx.scene.input.ClipboardContent c = new javafx.scene.input.ClipboardContent();
                         c.putString(entry.ip == null ? "" : entry.ip);
                         javafx.scene.input.Clipboard.getSystemClipboard().setContent(c);
-                        win.toast("已复制地址：" + entry.ip, "", 1);
+                        win.toast(Lang.t("已复制地址：") + entry.ip, "", 1);
                     }
                     case "上移" -> moveServer(entry, -1, refresh);
                     case "下移" -> moveServer(entry, 1, refresh);
@@ -2190,7 +2189,7 @@ public class PageInstanceSetup implements Page {
         });
     }
 
-    // 固定 8 线程：parallelStream 会挤占公共 ForkJoinPool，limit(64) 还会丢掉多余条目
+    // 固定 8 线程，防挤占公共池/limit 丢条目
     private static final java.util.concurrent.ExecutorService PING_POOL =
             java.util.concurrent.Executors.newFixedThreadPool(8, r -> {
                 Thread t = new Thread(r, "TCL-Ping");
@@ -2450,7 +2449,7 @@ public class PageInstanceSetup implements Page {
             String lower = url.toLowerCase(java.util.Locale.ROOT);
             if (!lower.startsWith("https://")) {
                 Dialogs.confirm(win, "不安全的下载地址",
-                        // 两个完整句各自成键，三元选整句再翻译，避免半句拼接查不到表
+                        // 两个完整句各自成键，三元选整句再翻译，半句拼接查不到表
                         Lang.t(lower.startsWith("http://")
                                 ? "这个文件的下载地址是 http 明文链接，下载内容可能被中途篡改。\n\n仍要继续下载吗？"
                                 : "这个文件的下载地址不是 https，下载内容可能被中途篡改。\n\n仍要继续下载吗？"),
@@ -2468,14 +2467,14 @@ public class PageInstanceSetup implements Page {
                 Downloader.downloadFileTo(p -> task.progress = p, url, target, target.getFileName().toString());
                 task.subs.get(0).state = Tasks.State.DONE;
                 javafx.application.Platform.runLater(() -> {
-                    win.toast("下载完成：" + target.getFileName(), "", 1);
+                    win.toast(Lang.t("下载完成：") + target.getFileName(), "", 1);
                     win.openSetup("complist");
                 });
             } catch (Exception e) {
                 task.subs.get(0).state = Tasks.State.FAILED;
                 task.error = e.getMessage();
                 javafx.application.Platform.runLater(() ->
-                        win.toast("下载失败：" + target.getFileName(), e.getMessage(), 3));
+                        win.toast(Lang.t("下载失败：") + target.getFileName(), e.getMessage(), 3));
             }
         });
     }
@@ -2652,7 +2651,7 @@ public class PageInstanceSetup implements Page {
                     win.toast("导出失败：条目已不存在。", "", 3);
                     return;
                 }
-                win.toast("已导出：" + entryName.substring(entryName.lastIndexOf('/') + 1), "", 1);
+                win.toast(Lang.t("已导出：") + entryName.substring(entryName.lastIndexOf('/') + 1), "", 1);
                 openFolder(fFolder.toString());
             });
         });
@@ -2688,7 +2687,7 @@ public class PageInstanceSetup implements Page {
                     win.toast("导出全部内嵌依赖失败", fError, 3);
                     return;
                 }
-                win.toast("已导出 " + fCount + " 个内嵌依赖！", "", 1);
+                win.toast(Lang.tf("已导出 %d 个内嵌依赖！", fCount), "", 1);
                 openFolder(fFolder.toString());
             });
         });
@@ -2718,7 +2717,7 @@ public class PageInstanceSetup implements Page {
         Path newFolder = base.resolve("versions").resolve(copyName);
         boolean isolated = Isolation.on(ins);
         if (!Files.isDirectory(srcRoot)) {
-            win.toast("复制失败", "版本目录不存在：" + srcRoot, 3);
+            win.toast("复制失败", Lang.t("版本目录不存在：") + srcRoot, 3);
             return;
         }
         Tasks.Task task = new Tasks.Task("复制实例 · " + ins.name);
@@ -2991,7 +2990,7 @@ public class PageInstanceSetup implements Page {
             rules.add("");
         }
         for (String ex : EXPORT_EXCLUDES) rules.add(ex);
-        // 覆盖配置从参数进来（2 参重载负责取字段值），这里判断字段会无限递归
+        // 字段值走 2 参重载，此处判断会无限递归
         if (ruleOverride != null) {
             rules = new ArrayList<>(ruleOverride);
         }
@@ -3008,7 +3007,7 @@ public class PageInstanceSetup implements Page {
             } catch (Exception ex) {
                 // 路径无效时提示，再手动选择
                 String msg = "指定的路径：" + exportConfiguredPackPath + "\n\n" + ex.getMessage();
-                Dialogs.confirm(win, "无法使用配置文件中指定的导出路径", msg + "\n\n仍要手动选择导出位置吗？",
+                Dialogs.confirm(win, "无法使用配置文件中指定的导出路径", msg + Lang.t("\n\n仍要手动选择导出位置吗？"),
                         () -> startExport(nameField, versionField, ruleOverride, true));
                 return;
             }
@@ -3369,7 +3368,7 @@ public class PageInstanceSetup implements Page {
                 for (String f : exportExtraFiles) sb.append(f).append(System.lineSeparator());
             }
             Files.writeString(file.toPath(), sb.toString(), StandardCharsets.UTF_8);
-            win.toast("已保存配置文件：" + file.getName(), "", 1);
+            win.toast(Lang.t("已保存配置文件：") + file.getName(), "", 1);
             openFolder(file.getParent().toString());
         } catch (Exception e) {
             win.toast("保存配置失败", e.getMessage(), 3);
@@ -3413,8 +3412,7 @@ public class PageInstanceSetup implements Page {
             if (segments.length > 2) {
                 for (String line : segments[2].split("\r?\n")) extraFiles.add(line);
             }
-            // PackPath 能指定任意写盘位置，追加文件能把本机任意文件打进压缩包；
-            // 两项都来自外部文件，先让用户确认再生效
+            // PackPath 可写任意盘位，外部输入须先确认再生效
             StringBuilder warn = new StringBuilder();
             if (!packPath.isEmpty()) {
                 warn.append(Lang.t("· 导出位置被固定为：")).append(packPath).append('\n');
@@ -3431,7 +3429,7 @@ public class PageInstanceSetup implements Page {
                 exportConfiguredPackPath = packPath.isEmpty() ? null : packPath;
                 exportRulesOverride = rules;
                 exportExtraFiles = extraFiles.isEmpty() ? null : extraFiles;
-                win.toast("已读取配置文件：" + file.getName(),
+                win.toast(Lang.t("已读取配置文件：") + file.getName(),
                         "导出内容列表已按配置文件固定，点「取消配置覆盖」恢复勾选。", 1);
                 win.openSetup("export");
             };
@@ -3485,7 +3483,10 @@ public class PageInstanceSetup implements Page {
         for (String script : new String[]{"TCraftLauncher.bat", "TCraftLauncher-debug.bat", "TCraftLauncher.sh"}) {
             Path src = base.resolve(script);
             if (Files.isRegularFile(src)) {
-                Files.copy(src, payloadRoot.resolve(script), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                Path dst = payloadRoot.resolve(script);
+                Files.copy(src, dst, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                // ZipOutputStream 不保存 unix 权限，Linux 解出来要能直接跑
+                if (script.endsWith(".sh")) dst.toFile().setExecutable(true);
             }
         }
         Path self = Resources.jar();
@@ -3545,7 +3546,7 @@ public class PageInstanceSetup implements Page {
                 boolean isFolder = p.endsWith("/") || p.endsWith("\\");
                 Path src = Paths.get(p);
                 if (!Files.exists(src)) {
-                    win.toast("未找到配置文件中指定的单个文件：" + p, "", 3);
+                    win.toast(Lang.t("未找到配置文件中指定的单个文件：") + p, "", 3);
                     continue;
                 }
                 if (isFolder) {
@@ -3555,7 +3556,7 @@ public class PageInstanceSetup implements Page {
                             java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                 }
             } catch (Exception e) {
-                win.toast("复制追加内容失败：" + p, e.getMessage(), 3);
+                win.toast(Lang.t("复制追加内容失败：") + p, e.getMessage(), 3);
             }
         }
     }

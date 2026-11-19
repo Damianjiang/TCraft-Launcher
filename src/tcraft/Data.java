@@ -81,7 +81,7 @@ public final class Data {
             return sb.toString();
         }
 
-        // 安装时写进 description 的摘要持久化为中文，显示层按模式重拼（键与 Downloader 写入端一字不差）
+        // description 摘要持久化为中文，显示层重拼（键同写入端）
         private String renderedSummary(String raw) {
             java.util.regex.Matcher m = java.util.regex.Pattern
                     .compile("^(正式版|预览版|愚人节版|远古版) (\\S+)，已安装 (.+)$").matcher(raw);
@@ -244,9 +244,8 @@ public final class Data {
     private final java.util.List<Runnable> versionWaiters = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     public void launchLog(String line) {
-        String stamped = Redact.apply("[" + LocalDateTime.now().toLocalTime().withNano(0) + "] " + line);
-        launchLog.add(stamped);
-        log(line);
+        // 只留 500 行给崩溃分析；游戏日志本就在实例目录
+        launchLog.add(Redact.apply("[" + LocalDateTime.now().toLocalTime().withNano(0) + "] " + line));
     }
 
     private final Properties props = new Properties();
@@ -272,15 +271,9 @@ public final class Data {
         pruneInstances();
         if (instances.isEmpty()) seedInstances();
         if (folders.isEmpty()) folders.add(new FolderItem("当前文件夹", gameDir));
-        if (javaPath == null || javaPath.isEmpty()) {
-            // 构造期不起进程逐盘探测（首启能卡几十秒），先取缓存扫描结果，
-            // 没有就留给 App 的 TCL-Java-Scan 后台补齐
-            javaPath = cachedJavaPath();
-            if (javaPath.isEmpty()) startJavaScanFill();
-        }
-        // exe 外壳选定的 Java 优先级最高
+        // exe 外壳选定的 Java 优先级最高，先认它，省一次启动扫描
         String forcedJava = System.getProperty("tcraft.java", "");
-        if (!forcedJava.isEmpty() && usableJava(forcedJava)) {
+        if (!forcedJava.isEmpty() && usableJavaFast(forcedJava)) {
             javaPath = forcedJava;
         } else {
             // Windows 外壳把选择结果写在 launcher.cfg
@@ -288,10 +281,15 @@ public final class Data {
                 Path cfg = configPath.getParent().resolve("launcher.cfg");
                 if (Files.isRegularFile(cfg)) {
                     String picked = Files.readString(cfg, StandardCharsets.UTF_8).trim();
-                    if (usableJava(picked)) javaPath = picked;
+                    if (usableJavaFast(picked)) javaPath = picked;
                 }
             } catch (Exception ignored) {
             }
+        }
+        if (javaPath == null || javaPath.isEmpty()) {
+            // 构造期不逐盘探测，先取缓存；缺的由 TCL-Java-Scan 补
+            javaPath = cachedJavaPath();
+            if (javaPath.isEmpty()) startJavaScanFill();
         }
         log.add("[TCL] TCraft Launcher " + Build.VERSION + " (JavaFX Edition)");
         log.add("[TCL] 当前游戏目录：" + gameDir);
@@ -345,7 +343,7 @@ public final class Data {
                 Path p = Paths.get(custom.trim()).toAbsolutePath().normalize();
                 Path base = baseDir().toAbsolutePath().normalize();
                 Path game = Paths.get(gameDir).toAbsolutePath().normalize();
-                // 缓存根不能等于/包含/落在配置或游戏目录里，双向都挡，否则清理会误删
+                // 缓存根与配置/游戏目录双向隔离，防清理误删
                 if (p.getNameCount() > 1 && !p.startsWith(base) && !p.startsWith(game)
                         && !base.startsWith(p) && !game.startsWith(p)
                         && !p.equals(base) && !p.equals(game)) {
@@ -390,24 +388,44 @@ public final class Data {
         }
     }
 
+    // 识别官方默认目录，判旧配置迁移
+    private static boolean isStockMinecraft(String path) {
+        try {
+            Path p = Paths.get(path).toAbsolutePath().normalize();
+            String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
+            Path stock;
+            if (os.contains("win") && System.getenv("APPDATA") != null) {
+                stock = Paths.get(System.getenv("APPDATA"), ".minecraft");
+            } else if (os.contains("mac")) {
+                stock = Paths.get(System.getProperty("user.home"), "Library", "Application Support", "minecraft");
+            } else {
+                stock = Paths.get(System.getProperty("user.home"), ".minecraft");
+            }
+            return p.equals(stock.toAbsolutePath().normalize());
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private String detectGameDir() {
         String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
+        Path legacy;
         if (os.contains("mac")) {
-            return Paths.get(System.getProperty("user.home"), "Library", "Application Support", "minecraft").toString();
+            legacy = Paths.get(System.getProperty("user.home"), "Library", "Application Support", "minecraft");
+        } else if (os.contains("win") && System.getenv("APPDATA") != null) {
+            legacy = Paths.get(System.getenv("APPDATA"), ".minecraft");
+        } else if (System.getenv("XDG_DATA_HOME") != null) {
+            legacy = Paths.get(System.getenv("XDG_DATA_HOME"), "minecraft");
+        } else {
+            legacy = Paths.get(System.getProperty("user.home"), ".minecraft");
         }
-        String appdata = System.getenv("APPDATA");
-        if (appdata != null && os.contains("win")) {
-            Path p = Paths.get(appdata, ".minecraft");
-            if (Files.exists(p)) return p.toString();
-            return p.toString();
+        // 默认游戏目录=启动器所在文件夹（绿色版）
+        try {
+            Path app = Resources.appDir();
+            if (app != null && Files.isDirectory(app)) return app.toString();
+        } catch (Exception ignored) {
         }
-        String xdg = System.getenv("XDG_DATA_HOME");
-        if (xdg != null) {
-            Path p = Paths.get(xdg, "minecraft");
-            if (Files.exists(p)) return p.toString();
-            return p.toString();
-        }
-        return Paths.get(System.getProperty("user.home"), ".minecraft").toString();
+        return legacy.toString();
     }
 
     public record JavaRuntime(String path, int major, String folder) {
@@ -447,7 +465,7 @@ public final class Data {
         return cached.get(0).path;
     }
 
-    // 后台扫完 javaPath 还是空就填最优的；扫结果进缓存，设置页直接用
+    // 扫完仍空填最优，结果进缓存
     private void startJavaScanFill() {
         Thread t = new Thread(() -> {
             try {
@@ -468,10 +486,21 @@ public final class Data {
         t.start();
     }
 
+    // 会起 `java -version` 子进程（走 javaMajor），只能后台线程调
     public static boolean usableJava(String path) {
         if (path == null || path.isBlank()) return false;
         try {
             return Files.isRegularFile(Paths.get(path)) && javaMajor(path) > 0;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    // 不起进程的 usableJava，无 release 判 false
+    public static boolean usableJavaFast(String path) {
+        if (path == null || path.isBlank()) return false;
+        try {
+            return Files.isRegularFile(Paths.get(path)) && javaMajorFast(path) > 0;
         } catch (Exception e) {
             return false;
         }
@@ -647,6 +676,13 @@ public final class Data {
                 addJavaRoot(out, Paths.get(root), win, mac);
             }
         }
+        String userHome = System.getProperty("user.home");
+        if (!win && userHome != null) {
+            // JetBrains / SDKMAN 装在用户目录，桌面启动的 PATH 里常常没有
+            addJavaRoot(out, Paths.get(userHome, ".jdks"), win, mac);
+            addJavaRoot(out, Paths.get(userHome, ".sdkman", "candidates", "java"), win, mac);
+            if (mac) addJavaRoot(out, Paths.get(userHome, "Library", "Java", "JavaVirtualMachines"), win, mac);
+        }
 
         String pathEnv = System.getenv("PATH");
         if (pathEnv != null) {
@@ -722,27 +758,40 @@ public final class Data {
         return UUID.nameUUIDFromBytes(("OfflinePlayer:" + name).getBytes(StandardCharsets.UTF_8)).toString();
     }
 
-    public static int javaMajor(String javaExe) {
+    public static boolean javaIs64(String javaExe) {
         try {
             Path exe = Paths.get(javaExe);
-            // javaw 没有控制台，-version 不会输出，探测统一换成同目录的 java.exe
+            Path home = exe.getParent() == null ? null : exe.getParent().getParent();
+            if (home != null) {
+                Path release = home.resolve("release");
+                if (Files.isRegularFile(release)) {
+                    for (String line : Files.readAllLines(release)) {
+                        if (line.startsWith("OS_ARCH=")) {
+                            String arch = line.substring("OS_ARCH=".length()).replace("\"", "").trim().toLowerCase();
+                            if (arch.contains("64") || arch.contains("amd64") || arch.contains("aarch64")) return true;
+                            if (arch.equals("x86") || arch.equals("i386") || arch.equals("i686")) return false;
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        // release 缺失按 64 位；32 位启动时自会报错
+        return true;
+    }
+
+    // 会起 `java -version` 子进程（最多等 5 秒），只能后台线程调
+    public static int javaMajor(String javaExe) {
+        int fast = javaMajorFast(javaExe);
+        if (fast > 0) return fast;
+        try {
+            Path exe = Paths.get(javaExe);
+            // javaw 无控制台，探测统一用同目录 java.exe
             String name = exe.getFileName() == null ? ""
                     : exe.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
             if (name.equals("javaw.exe") && exe.getParent() != null) {
                 Path console = exe.getParent().resolve("java.exe");
                 if (Files.isRegularFile(console)) exe = console;
-            }
-            Path home = exe.getParent() != null ? exe.getParent().getParent() : null;
-            if (home != null) {
-                Path release = home.resolve("release");
-                if (Files.isRegularFile(release)) {
-                    for (String line : Files.readAllLines(release)) {
-                        if (line.startsWith("JAVA_VERSION=")) {
-                            return parseJavaMajor(line.substring("JAVA_VERSION=".length())
-                                    .replace("\"", "").trim());
-                        }
-                    }
-                }
             }
             Process p = new ProcessBuilder(exe.toString(), "-version").redirectErrorStream(true).start();
             // 卡死的 Java 最多等 5 秒
@@ -755,6 +804,27 @@ public final class Data {
             java.util.regex.Matcher m = java.util.regex.Pattern
                     .compile("version \"([^\"]+)\"").matcher(text);
             if (m.find()) return parseJavaMajor(m.group(1));
+        } catch (Exception ignored) {
+        }
+        return 0;
+    }
+
+    // 只读 release 认版本，不起进程；无则 0
+    public static int javaMajorFast(String javaExe) {
+        try {
+            Path exe = Paths.get(javaExe);
+            Path home = exe.getParent() != null ? exe.getParent().getParent() : null;
+            if (home != null) {
+                Path release = home.resolve("release");
+                if (Files.isRegularFile(release)) {
+                    for (String line : Files.readAllLines(release)) {
+                        if (line.startsWith("JAVA_VERSION=")) {
+                            return parseJavaMajor(line.substring("JAVA_VERSION=".length())
+                                    .replace("\"", "").trim());
+                        }
+                    }
+                }
+            }
         } catch (Exception ignored) {
         }
         return 0;
@@ -904,7 +974,7 @@ public final class Data {
                     versions.sort((a, b) -> b.time.compareTo(a.time));
                     fallbackVersions = false;
                 }
-                log("已从官方获取 " + real.size() + " 个版本");
+                // 版本数量属于常规状态，不写盘；只有回退到离线兜底才需要留痕
             } catch (Exception e) {
                 log("获取官方版本列表失败，改用标注过的离线兜底数据：" + e.getMessage());
                 seedBuiltinVersions();
@@ -1120,6 +1190,14 @@ public final class Data {
                 if (p.length >= 2) folders.add(new FolderItem(p[0], p[1]));
             }
             String folderPath = get("folder.current", "");
+            // 迁移来的空目录回落到启动器所在文件夹
+            if (!folderPath.isEmpty() && isStockMinecraft(folderPath)
+                    && !Files.isDirectory(Paths.get(folderPath, "versions"))) {
+                try {
+                    folderPath = Resources.appDir().toString();
+                } catch (Exception ignored) {
+                }
+            }
             if (folders.isEmpty() && !folderPath.isEmpty()) folders.add(new FolderItem("当前文件夹", folderPath));
             if (!folderPath.isEmpty()) gameDir = folderPath;
             javaPath = get("java.path", javaPath);
@@ -1182,9 +1260,11 @@ public final class Data {
             props.setProperty("instance.count", String.valueOf(persisted.size()));
             for (int i = 0; i < persisted.size(); i++) {
                 Instance ins = persisted.get(i);
-                props.setProperty("instance." + i, ins.name + "|" + ins.version + "|" + ins.loader + "|"
-                        + ins.loaderVersion + "|" + ins.description + "|" + ins.icon + "|" + ins.lastPlayed + "|"
-                        + ins.favorite + "|" + ins.folder + "|" + ins.isolation + "|" + ins.addedAt);
+                // 按 | 切分，文本字段须过 esc
+                props.setProperty("instance." + i, Favorite.esc(ins.name) + "|" + Favorite.esc(ins.version) + "|"
+                        + Favorite.esc(ins.loader) + "|" + Favorite.esc(ins.loaderVersion) + "|"
+                        + Favorite.esc(ins.description) + "|" + Favorite.esc(ins.icon) + "|" + ins.lastPlayed + "|"
+                        + ins.favorite + "|" + Favorite.esc(ins.folder) + "|" + ins.isolation + "|" + ins.addedAt);
             }
             props.setProperty("instance.selected", String.valueOf(selectedInstanceSnap));
             props.setProperty("folder.current", gameDirSnap == null ? "" : gameDirSnap);
@@ -1209,7 +1289,7 @@ public final class Data {
             Errors.error("保存配置时发生异常（本次改动可能未写入）", e);
             return;
         }
-        // 磁盘 IO 不占数据监视器；saveWriteLock 只保证写 .tmp 与替换的原子性
+        // saveWriteLock 只保证 .tmp 替换原子性
         try {
             synchronized (saveWriteLock) {
                 Files.createDirectories(configPath.getParent());
@@ -1338,6 +1418,26 @@ public final class Data {
         };
     }
 
+    // 传给子进程 JVM 的代理 -D 参数；host 为空或模式不是 HTTP(2)/SOCKS5(3) 时返回空表
+    public List<String> proxyJvmArgs() {
+        List<String> args = new ArrayList<>();
+        int mode = getInt("SystemHttpProxyType", 1);
+        String host = get("SystemProxyHost", "");
+        String port = get("SystemProxyPort", "7890");
+        if (!host.isEmpty() && (mode == 2 || mode == 3)) {
+            if (mode == 3) {
+                args.add("-DsocksProxyHost=" + host);
+                args.add("-DsocksProxyPort=" + port);
+            } else {
+                args.add("-Dhttp.proxyHost=" + host);
+                args.add("-Dhttp.proxyPort=" + port);
+                args.add("-Dhttps.proxyHost=" + host);
+                args.add("-Dhttps.proxyPort=" + port);
+            }
+        }
+        return args;
+    }
+
     public boolean exportConfig(Path target) {
         try {
             save();
@@ -1355,7 +1455,7 @@ public final class Data {
             try (InputStream in = Files.newInputStream(source)) {
                 incoming.load(in);
             }
-            // 配置可能来自别人：能触发命令执行、指向可执行文件或改下载/代理链路的键都不接受
+            // 外来配置：命令/可执行/下载代理类键一律拒收
             List<String> dropped = new ArrayList<>();
             for (String key : new ArrayList<>(incoming.stringPropertyNames())) {
                 if (isImportBlockedKey(key)) {
@@ -1363,7 +1463,7 @@ public final class Data {
                     dropped.add(key);
                 }
             }
-            // 连 account/instance/folder/theme 这些键都没有的基本不是配置文件，拒掉
+            // 缺特征键（account/instance 等）即非配置文件
             if (!incoming.containsKey("account.count") && !incoming.containsKey("instance.count")
                     && !incoming.containsKey("folder.count") && !incoming.containsKey("UiThemePreset")) {
                 log("导入配置失败：文件不包含启动器配置项");
@@ -1403,7 +1503,7 @@ public final class Data {
         if (k.contains("command")) return true;
         // 指向任意可执行文件的路径
         if (k.equals("java.path")) return true;
-        // getInstance("Java") 的 legacy 键与实例级变体都会成为游戏 JVM 的 java.executable
+        // legacy 键与实例变体都落到 java.executable
         if (k.equals("instancejava") || (k.startsWith("instance.") && k.endsWith(".java"))) return true;
         // classpath 头部是 JVM 最先加载的 jar，等于任意代码执行
         if (k.equals("launchadvanceclasspathhead")) return true;
@@ -1416,59 +1516,10 @@ public final class Data {
         return k.endsWith("jvmargs") || k.endsWith("gameargs");
     }
 
-    private final java.util.concurrent.BlockingQueue<String> logQueue =
-            new java.util.concurrent.LinkedBlockingQueue<>(5000);
-    private volatile Thread logWriter;
-
+    // 调试日志只留内存；错误统一进 errors.log
     public void log(String line) {
         String stamped = Redact.apply("[" + LocalDateTime.now().toLocalTime().withNano(0) + "] " + line);
         log.add(stamped);
         if (getBool("SystemDebugMode", false)) System.out.println("[TCL] " + stamped);
-        startLogWriter();
-        if (!logQueue.offer(stamped)) {
-            logQueue.poll();
-            logQueue.offer(stamped);
-        }
-    }
-
-    private synchronized void startLogWriter() {
-        if (logWriter != null) return;
-        logWriter = new Thread(this::drainLogQueue, "TCL-LogWriter");
-        logWriter.setDaemon(true);
-        logWriter.start();
-    }
-
-    private void drainLogQueue() {
-        Path file = configPath.getParent().resolve("launcher.log");
-        while (true) {
-            try {
-                String first = logQueue.take();
-                StringBuilder batch = new StringBuilder(first);
-                long until = System.currentTimeMillis() + 400;
-                while (true) {
-                    long left = until - System.currentTimeMillis();
-                    if (left <= 0) break;
-                    String next = logQueue.poll(Math.min(left, 100),
-                            java.util.concurrent.TimeUnit.MILLISECONDS);
-                    if (next == null) break;
-                    batch.append(System.lineSeparator()).append(next);
-                }
-                Files.createDirectories(file.getParent());
-                // 单份日志超 4MB 就滚到 launcher.log.1，免得磁盘被写满
-                if (Files.isRegularFile(file) && Files.size(file) > 4L * 1024 * 1024) {
-                    try {
-                        Files.move(file, file.resolveSibling("launcher.log.1"),
-                                java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                    } catch (Exception e) {
-                        // 文件被占用滚不动就放弃本轮滚动，这批日志直接追加，下一轮再滚
-                    }
-                }
-                Files.writeString(file, batch + System.lineSeparator(), StandardCharsets.UTF_8,
-                        java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
-            } catch (InterruptedException e) {
-                return;
-            } catch (Exception ignored) {
-            }
-        }
     }
 }
