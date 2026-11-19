@@ -63,6 +63,7 @@ public class App extends Application {
                 Data.get().log("阶段：显示 " + (System.nanoTime() - tPhase) / 1_000_000 + " ms");
             }
             stage.setAlwaysOnTop(false);
+            window.playIntro();
             // 告诉首次运行留下的旧进程：主界面已经出来了，可以把启动窗收掉
             try {
                 Files.writeString(Resources.logDir().resolve(".window-ready"), "1");

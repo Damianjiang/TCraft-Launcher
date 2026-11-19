@@ -2182,6 +2182,56 @@ public final class MainWindow {
         openPage("launch", true);
     }
 
+    public void playIntro() {
+        if (isSoftwareRendering()) {
+            root.setOpacity(baseOpacity);
+            frame.setRotate(0);
+            frame.setTranslateY(0);
+            if (titleLogoNode != null) titleLogoNode.setOpacity(1);
+            return;
+        }
+        frame.setRotate(-4);
+        frame.setTranslateY(60);
+        frame.setOpacity(1);
+        root.setOpacity(0.4);
+        Timeline move = new Timeline(
+                new KeyFrame(Duration.ZERO, new KeyValue(frame.translateYProperty(), 60),
+                        new KeyValue(frame.rotateProperty(), -4)),
+                new KeyFrame(Duration.millis(460), new KeyValue(frame.rotateProperty(), 0,
+                        Interpolator.EASE_OUT)),
+                new KeyFrame(Duration.millis(480), new KeyValue(frame.translateYProperty(), 0,
+                        Interpolator.EASE_OUT)));
+        move.setDelay(Duration.millis(100));
+        move.play();
+        if (titleLogoNode != null) {
+            titleLogoNode.setOpacity(0);
+            FadeTransition logoFade = new FadeTransition(Duration.millis(420), titleLogoNode);
+            logoFade.setFromValue(0);
+            logoFade.setToValue(1);
+            logoFade.setDelay(Duration.millis(220));
+            logoFade.play();
+        }
+        FadeTransition fade = new FadeTransition(Duration.millis(260), root);
+        fade.setFromValue(0.4);
+        fade.setToValue(baseOpacity);
+        fade.setDelay(Duration.millis(100));
+        fade.setInterpolator(Interpolator.EASE_OUT);
+        fade.play();
+    }
+
+    private static boolean isSoftwareRendering() {
+        try {
+            Class<?> cls = Class.forName("com.sun.prism.GraphicsPipeline");
+            Object pipeline = cls.getMethod("getPipeline").invoke(null);
+            if (pipeline != null) {
+                String name = pipeline.getClass().getName().toLowerCase(java.util.Locale.ROOT);
+                if (name.contains(".sw.") || name.endsWith("swpipeline")) return true;
+            }
+        } catch (Throwable ignored) {
+        }
+        return "sw".equalsIgnoreCase(System.getProperty("prism.order", ""));
+    }
+
     public void toast(String title, String message) {
         toast(title, message, 0);
     }
@@ -3288,15 +3338,15 @@ public final class MainWindow {
         if (closing) return;
         closing = true;
         saveWindowBounds();
-        data.save();
-        stopVideo();
-        if (shellTimer != null) shellTimer.stop();
         FadeTransition ft = new FadeTransition(Duration.millis(180), root);
         ft.setToValue(0);
         TranslateTransition tt = new TranslateTransition(Duration.millis(180), frame);
         tt.setToY(18);
         ParallelTransition pt = new ParallelTransition(ft, tt);
         pt.setOnFinished(e -> {
+            data.save();
+            stopVideo();
+            if (shellTimer != null) shellTimer.stop();
             Platform.exit();
             // Platform.exit() 不退后台线程，延迟强退
             Thread killer = new Thread(() -> {
