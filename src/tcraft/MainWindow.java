@@ -107,6 +107,9 @@ public final class MainWindow {
     private boolean closing;
 
     private double baseOpacity = 1;
+    private boolean introPrepared;
+    private boolean introRunning;
+    private boolean pendingAccentRebuild;
     private int resizeEdge = 0;
     private double pressSceneX, pressSceneY, startW, startH, startX, startY;
     private double dragX, dragY;
@@ -188,6 +191,11 @@ public final class MainWindow {
         // 壁纸取色完成且颜色变化时重建一次，让程序化颜色同步，不用等鼠标划过
         Theme.onAccentApplied = () -> {
             if (closing || !stage.isShowing()) return;
+            // 入场动画期间重建会换掉整个 frame，动画直接断掉；等动画结束再重建
+            if (introRunning) {
+                pendingAccentRebuild = true;
+                return;
+            }
             rebuildUi();
         };
         stage.initStyle(javafx.stage.StageStyle.TRANSPARENT);
@@ -934,7 +942,7 @@ public final class MainWindow {
 
     public void applyWindowOpacity() {
         baseOpacity = Math.max(0.4, Math.min(1, data.getInt("UiLauncherTransparent", 600) / 1000.0 + 0.4));
-        if (!closing) root.setOpacity(baseOpacity);
+        if (!closing && !introRunning) root.setOpacity(baseOpacity);
     }
 
     public void applyBackground() {
@@ -2182,40 +2190,84 @@ public final class MainWindow {
         openPage("launch", true);
     }
 
-    public void playIntro() {
+    /**
+     * 首帧之前摆好入场初始姿态，避免窗口先以最终样式闪一帧再跳回起点。
+     */
+    public void prepareIntro() {
         if (isSoftwareRendering()) {
             root.setOpacity(baseOpacity);
             frame.setRotate(0);
             frame.setTranslateY(0);
+            frame.setScaleX(1);
+            frame.setScaleY(1);
             if (titleLogoNode != null) titleLogoNode.setOpacity(1);
             return;
         }
-        frame.setRotate(-4);
-        frame.setTranslateY(60);
+        introPrepared = true;
+        introRunning = true;
+        frame.setRotate(-9);
+        frame.setTranslateY(110);
+        frame.setScaleX(0.9);
+        frame.setScaleY(0.9);
         frame.setOpacity(1);
         root.setOpacity(0.4);
+        if (titleLogoNode != null) titleLogoNode.setOpacity(0);
+    }
+
+    /**
+     * 等窗口真正画出第一帧再放动画，否则动画会在界面可见之前跑掉大半。
+     */
+    public void playIntroWhenReady() {
+        if (!introPrepared) return;
+        javafx.animation.AnimationTimer timer = new javafx.animation.AnimationTimer() {
+            private int frames;
+
+            @Override
+            public void handle(long now) {
+                if (++frames < 3) return;
+                stop();
+                playIntro();
+            }
+        };
+        timer.start();
+    }
+
+    public void playIntro() {
+        if (!introPrepared) return;
         Timeline move = new Timeline(
-                new KeyFrame(Duration.ZERO, new KeyValue(frame.translateYProperty(), 60),
-                        new KeyValue(frame.rotateProperty(), -4)),
-                new KeyFrame(Duration.millis(460), new KeyValue(frame.rotateProperty(), 0,
+                new KeyFrame(Duration.ZERO, new KeyValue(frame.translateYProperty(), 110),
+                        new KeyValue(frame.rotateProperty(), -9),
+                        new KeyValue(frame.scaleXProperty(), 0.9),
+                        new KeyValue(frame.scaleYProperty(), 0.9)),
+                new KeyFrame(Duration.millis(560), new KeyValue(frame.rotateProperty(), 0,
                         Interpolator.EASE_OUT)),
-                new KeyFrame(Duration.millis(480), new KeyValue(frame.translateYProperty(), 0,
+                new KeyFrame(Duration.millis(600), new KeyValue(frame.translateYProperty(), 0,
+                        Interpolator.EASE_OUT)),
+                new KeyFrame(Duration.millis(600), new KeyValue(frame.scaleXProperty(), 1,
+                        Interpolator.EASE_OUT)),
+                new KeyFrame(Duration.millis(600), new KeyValue(frame.scaleYProperty(), 1,
                         Interpolator.EASE_OUT)));
-        move.setDelay(Duration.millis(100));
         move.play();
         if (titleLogoNode != null) {
-            titleLogoNode.setOpacity(0);
-            FadeTransition logoFade = new FadeTransition(Duration.millis(420), titleLogoNode);
+            FadeTransition logoFade = new FadeTransition(Duration.millis(460), titleLogoNode);
             logoFade.setFromValue(0);
             logoFade.setToValue(1);
-            logoFade.setDelay(Duration.millis(220));
+            logoFade.setDelay(Duration.millis(260));
             logoFade.play();
         }
-        FadeTransition fade = new FadeTransition(Duration.millis(260), root);
+        FadeTransition fade = new FadeTransition(Duration.millis(320), root);
         fade.setFromValue(0.4);
         fade.setToValue(baseOpacity);
-        fade.setDelay(Duration.millis(100));
+        fade.setDelay(Duration.millis(80));
         fade.setInterpolator(Interpolator.EASE_OUT);
+        fade.setOnFinished(e -> {
+            introRunning = false;
+            introPrepared = false;
+            if (pendingAccentRebuild) {
+                pendingAccentRebuild = false;
+                rebuildUi();
+            }
+        });
         fade.play();
     }
 
