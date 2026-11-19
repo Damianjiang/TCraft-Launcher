@@ -2247,6 +2247,14 @@ public final class MainWindow {
                         Interpolator.EASE_OUT)),
                 new KeyFrame(Duration.millis(600), new KeyValue(frame.scaleYProperty(), 1,
                         Interpolator.EASE_OUT)));
+        move.setOnFinished(e -> {
+            introRunning = false;
+            introPrepared = false;
+            if (pendingAccentRebuild && !closing) {
+                pendingAccentRebuild = false;
+                rebuildUi();
+            }
+        });
         move.play();
         if (titleLogoNode != null) {
             FadeTransition logoFade = new FadeTransition(Duration.millis(460), titleLogoNode);
@@ -2260,14 +2268,6 @@ public final class MainWindow {
         fade.setToValue(baseOpacity);
         fade.setDelay(Duration.millis(80));
         fade.setInterpolator(Interpolator.EASE_OUT);
-        fade.setOnFinished(e -> {
-            introRunning = false;
-            introPrepared = false;
-            if (pendingAccentRebuild) {
-                pendingAccentRebuild = false;
-                rebuildUi();
-            }
-        });
         fade.play();
     }
 
