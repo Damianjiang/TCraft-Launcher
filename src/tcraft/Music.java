@@ -36,15 +36,12 @@ public final class Music {
         } catch (Exception ignored) {
         }
         available = !FILES.isEmpty();
-        if (available) {
+        // 没开自动播放就不预建播放器，首次点击时再加载，省启动时间
+        if (available && Data.get().getBool("UiMusicAuto", false)) {
             try {
                 boolean random = Data.get().getBool("UiMusicRandom", false);
                 int start = random ? (int) (Math.random() * FILES.size()) : 0;
                 play(start);
-                if (!Data.get().getBool("UiMusicAuto", false)) {
-                    if (player != null) player.pause();
-                    paused = true;
-                }
             } catch (Exception ignored) {
                 available = false;
             }
@@ -114,7 +111,10 @@ public final class Music {
 
     public static synchronized void toggle() {
         if (!available()) return;
-        if (player == null) play(index);
+        if (player == null) {
+            play(index);
+            return;
+        }
         if (paused) {
             player.play();
             paused = false;

@@ -339,8 +339,10 @@ public class PageInstanceSetup implements Page {
             } catch (Exception ignored) {
             }
         }
-        Path launcherLog = Resources.errorLogFile();
-        if (Files.isRegularFile(launcherLog)) diagAddSource("启动器错误日志（当前）", launcherLog);
+        Path launcherLog = Resources.logDir().resolve("launcher.log");
+        if (Files.isRegularFile(launcherLog)) diagAddSource("启动器运行日志（当前）", launcherLog);
+        Path errorLog = Resources.errorLogFile();
+        if (Files.isRegularFile(errorLog)) diagAddSource("启动器错误日志（当前）", errorLog);
 
         HBox controls = new HBox(10);
         controls.setAlignment(Pos.CENTER_LEFT);
@@ -1691,7 +1693,7 @@ public class PageInstanceSetup implements Page {
             }
             writeOption(root, "resourcePacks", "[" + String.join(",", parts) + "]");
         } catch (Exception e) {
-            data.log("同步资源包到 options.txt 失败：" + e.getMessage());
+            data.log("同步资源包到 options.txt 失败：" + Log.describe(e));
         }
     }
 

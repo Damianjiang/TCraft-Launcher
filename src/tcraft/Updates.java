@@ -3,7 +3,6 @@ package tcraft;
 import javafx.animation.KeyFrame;
 import javafx.animation.PauseTransition;
 import javafx.animation.Timeline;
-import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
@@ -130,7 +129,7 @@ public final class Updates {
             if (!windowAlive(win)) return;
             if (release == null) {
                 String why = reason(error);
-                Data.get().log("检查更新失败：" + (error == null ? "未知错误" : error));
+                Data.get().log("检查更新失败：" + (error == null ? "未知错误" : Log.describe(error)));
                 if (hint != null) hint.setText(Lang.tf("检查失败：%s", why));
                 if (manual) {
                     win.toast("检查更新失败", why, 3);
@@ -142,7 +141,7 @@ public final class Updates {
             if (manual) win.toast("检查更新", Lang.tf("GitHub 最新版本 v%s", clean(release.tag)), 1);
             handle(win, release, manual);
         } catch (Throwable t) {
-            Data.get().log("更新提示失败：" + t);
+            Data.get().log("更新提示失败：" + Log.describe(t));
             try {
                 win.toast("检查更新", "读取成功但提示失败，请到 Releases 页面查看", 2);
             } catch (Throwable ignored) {
@@ -244,7 +243,7 @@ public final class Updates {
         logContent.setPadding(new Insets(7, 9, 7, 9));
         logContent.setBackground(Ui.fill(Theme.fieldBg, 6));
         logContent.setBorder(Ui.border(Theme.gray6, 6, 1));
-        // 小框滚轮 0.7×全局，对齐 WPF DeltaMult
+        // 小框滚轮按全局步长的 0.7 倍
         ScrollPane logScroll = Ui.scroll(logContent, 2.1);
         logScroll.setPrefViewportHeight(190);
         logScroll.setMinHeight(110);

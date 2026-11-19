@@ -98,7 +98,7 @@ public final class Downloader {
                     task.state = Tasks.State.FAILED;
                     task.error = e.getMessage();
                     task.stage = "安装失败";
-                    data.log("安装失败：" + e.getMessage());
+                    data.log("安装失败：" + Log.describe(e));
                     Errors.error(Lang.tf("安装 %s 失败", version.id), e);
                 }
             } finally {
@@ -414,7 +414,8 @@ public final class Downloader {
             Path contentDir = Isolation.on(probe) ? game.resolve("versions").resolve(actualVersion) : game;
             try {
                 Files.createDirectories(contentDir.resolve("mods"));
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                Data.get().log("创建 mods 目录失败：" + Log.describe(e));
             }
             installExtraComponents(task, version.id, contentDir, inst, "OptiFine".equals(loader), win);
         }
@@ -457,7 +458,7 @@ public final class Downloader {
             try {
                 Files.createDirectories(game.resolve("mods"));
             } catch (Exception e) {
-                Data.get().log("无法创建 mods 文件夹：" + e.getMessage());
+                Data.get().log("无法创建 mods 文件夹：" + Log.describe(e));
             }
         }
         if (!inst.fabricApi.isEmpty()) {
@@ -917,7 +918,7 @@ public final class Downloader {
                             }
                         } catch (Exception e) {
                             // 预下载失败不影响安装器，它自己会再试
-                            Data.get().log("预下载失败：" + path + " " + e.getMessage());
+                            Data.get().log("预下载失败：" + path + " " + Log.describe(e));
                         }
                         int n = done.incrementAndGet();
                         task.stage = "预下载 " + loader + " 依赖 " + n + " / " + prefetch.size();
@@ -933,7 +934,7 @@ public final class Downloader {
                 pool.shutdownNow();
             }
         } catch (Exception e) {
-            Data.get().log("读取 " + loader + " 安装器清单失败：" + e.getMessage());
+            Data.get().log("读取 " + loader + " 安装器清单失败：" + Log.describe(e));
         }
     }
 

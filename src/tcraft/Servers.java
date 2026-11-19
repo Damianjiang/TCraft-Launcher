@@ -511,7 +511,10 @@ public final class Servers {
             c.setReadTimeout(3000);
             int code = c.getResponseCode();
             if (code != 200) return null;
-            String body = new String(c.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            String body;
+            try (java.io.InputStream in = c.getInputStream()) {
+                body = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            }
             java.util.Map<String, Object> root = Json.obj(Json.parse(body));
             if (!(root.get("Answer") instanceof List<?> answers) || answers.isEmpty()) return null;
             for (Object o : answers) {

@@ -852,7 +852,7 @@ public class PageDownload implements Page {
     }
 
     private static final int RESOURCE_PAGE_SIZE = 40;
-    private static final String[] WPF_VERSIONS = {"26.2", "26.1", "1.21.11", "1.21.8", "1.21.4", "1.21.1",
+    private static final String[] RECOMMENDED_VERSIONS = {"26.2", "26.1", "1.21.11", "1.21.8", "1.21.4", "1.21.1",
             "1.20.1", "1.19.2", "1.18.2", "1.16.5", "1.12.2", "1.7.10"};
     private static final String[][] MOD_TAGS = {
             {"全部", "", ""}, {"世界元素", "406", "worldgen"}, {"生物群系", "407", ""},
@@ -902,7 +902,7 @@ public class PageDownload implements Page {
             }
             if (!vanilla.isEmpty()) versionCombo.getItems().add(vanilla);
         }
-        for (String v : WPF_VERSIONS) versionCombo.getItems().add(v);
+        for (String v : RECOMMENDED_VERSIONS) versionCombo.getItems().add(v);
         versionCombo.getSelectionModel().select(0);
         versionCombo.setMaxWidth(Double.MAX_VALUE);
         versionCombo.setMinWidth(0);

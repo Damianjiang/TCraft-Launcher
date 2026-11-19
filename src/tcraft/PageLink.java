@@ -796,6 +796,7 @@ public class PageLink implements Page {
                 else win.toast("已加入房间", clientAddress, 1);
             });
         } catch (InterruptedException e) {
+            Data.get().log("联机：等待连接过程被中断");
         } catch (Exception e) {
             if (Thread.currentThread().isInterrupted() || state == State.SELECT) return;
             EasyTier.stop();
@@ -1017,7 +1018,7 @@ public class PageLink implements Page {
             if (out.isEmpty()) throw new Exception("没有可用的发现节点");
             return out;
         } catch (Exception e) {
-            Data.get().log("联机：节点列表不可用，改用内置节点（" + e.getMessage() + "）");
+            Data.get().log("联机：节点列表不可用，改用内置节点（" + Log.describe(e) + "）");
             List<String> fallback = new ArrayList<>(java.util.Arrays.asList(EasyTier.PUBLIC_PEERS));
             for (String one : rankByLatency(fallback)) {
                 if (!out.contains(one)) out.add(one);

@@ -55,12 +55,11 @@ public final class Resources {
         return logDir().resolve("errors.log");
     }
 
-    // 清旧版流水日志，启动只留 errors.log/crash.txt
+    // 只清旧版残留的临时输出，launcher/errors 日志必须保留
     public static void cleanupNoiseLogs() {
         try {
             Path dir = logDir();
-            for (String name : new String[]{"launcher.log", "launcher.log.1", "launch.log",
-                    "stub.log", "java-error.log"}) {
+            for (String name : new String[]{"stub.log", "java-error.log", "java-version.txt"}) {
                 Files.deleteIfExists(dir.resolve(name));
             }
         } catch (Exception ignored) {
@@ -190,13 +189,13 @@ public final class Resources {
 
     public static void bootstrap(String[] args, StartupWindow ui) throws Exception {
         if (jar() == null) return; // 开发模式由 IDE 提供 JavaFX
-        ui.setStatus("正在检查运行环境…", 10);
+        ui.setStatus("检查运行环境…", 10);
         if (fxPresent()) {
-            ui.setStatus("正在启动 TCL…", 90);
+            ui.setStatus("正在启动主界面…", 90);
             return;
         }
         Path rt = ensureJavaFx(ui);
-        ui.setStatus("正在启动 TCL…", 95);
+        ui.setStatus("正在启动主界面…", 95);
         relaunch(jar(), rt, platform(), args, ui);
     }
 
@@ -237,7 +236,7 @@ public final class Resources {
     }
 
     private static Path ensureJavaFx(StartupWindow ui) throws Exception {
-        ui.setStatus("正在检查资源是否齐全…", 15);
+        ui.setStatus("检查 JavaFX 运行库…", 15);
         String plat = platform();
         String classifier = switch (plat) {
             case "win" -> "win";
@@ -276,7 +275,7 @@ public final class Resources {
             if (!marker.equals(Files.isRegularFile(ready) ? Files.readString(ready).trim() : "")) {
                 Files.writeString(ready, marker);
             }
-            ui.setStatus("资源检查完成", 70);
+            ui.setStatus("运行库检查完成", 70);
             return dir;
         }
         // 版本不符或文件残缺时清掉旧 jar，17 和 21 混用起不来
@@ -290,9 +289,10 @@ public final class Resources {
             if (Files.isRegularFile(target) && Files.size(target) > 0) continue;
             int base = 20 + i * 70 / JFX_MODULES.length;
             int span = 70 / JFX_MODULES.length;
-            downloadArtifact(module, classifier, version, target, ui, base, span);
+            downloadArtifact(module, classifier, version, target, ui, base, span,
+                    i + 1, JFX_MODULES.length);
         }
-        ui.setStatus("正在准备运行库…", 92);
+        ui.setStatus("正在解压运行库…", 92);
         extractAllNatives(dir, classifier, version);
         Files.writeString(ready, marker);
         return dir;
@@ -349,7 +349,7 @@ public final class Resources {
     }
 
     private static void downloadArtifact(String module, String classifier, String version, Path target,
-                                         StartupWindow ui, int base, int span) throws Exception {
+                                         StartupWindow ui, int base, int span, int index, int total) throws Exception {
         List<String> repos = new ArrayList<>();
         if (System.getProperty("user.country", "").equalsIgnoreCase("CN")) {
             repos.add("https://mirrors.cloud.tencent.com/nexus/repository/maven-public");
@@ -362,7 +362,8 @@ public final class Resources {
             String url = repo + "/org/openjfx/javafx-" + module + "/" + version + "/"
                     + jarName(module, classifier, version);
             try {
-                download(url, target, ui, Lang.t("正在下载 JavaFX ") + module + "…", base, span);
+                download(url, target, ui,
+                        Lang.t("正在下载 JavaFX ") + module + "（" + index + "/" + total + "）", base, span);
                 return;
             } catch (Exception e) {
                 last = e;
@@ -397,9 +398,9 @@ public final class Resources {
                         lastUi = now;
                         if (total > 0) {
                             int p = base + (int) Math.min(span, done * span / total);
-                            ui.setStatus(label + "  " + done * 100 / total + "%", p);
+                            ui.setDownload(label, done, total, p);
                         } else {
-                            ui.setDownload(done, total, label);
+                            ui.setDownload(label, done, total, -1);
                         }
                     }
                 }
@@ -513,8 +514,8 @@ public final class Resources {
         pb.redirectErrorStream(true);
         pb.redirectInput(ProcessBuilder.Redirect.from(
                 new File(os.contains("win") ? "NUL:" : "/dev/null")));
-        // 诊断输出覆盖写，防无限增长
-        pb.redirectOutput(ProcessBuilder.Redirect.to(log.toFile()));
+        // 早期诊断输出追加写，重启不覆盖
+        pb.redirectOutput(ProcessBuilder.Redirect.appendTo(log.toFile()));
         pb.start();
         // 旧进程启动窗留到主界面出现，防弹两次
         long until = System.currentTimeMillis() + 8000;

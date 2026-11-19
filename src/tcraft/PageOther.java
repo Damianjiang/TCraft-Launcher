@@ -171,10 +171,7 @@ public class PageOther implements Page {
 
     private void buildNews(VBox page) {
         header(page, "新闻", "来自 Minecraft 官方的真实新闻。");
-        if (skeletonPulse != null) {
-            skeletonPulse.stop();
-            skeletonPulse = null;
-        }
+        stopSkeletons();
         List<Node> skeletons = newsSkeletons(5);
         page.getChildren().addAll(skeletons);
         Thread thread = new Thread(() -> {
@@ -183,7 +180,7 @@ public class PageOther implements Page {
                 String body = Http.get("https://launchercontent.mojang.com/v2/news.json");
                 java.util.List<Object> entries = Json.arr(Json.obj(Json.parse(body)), "entries");
                 javafx.application.Platform.runLater(() -> {
-                    stopSkeletons(skeletons);
+                    stopSkeletons();
                     page.getChildren().removeAll(skeletons);
                     int count = 0;
                     for (Object o : entries) {
@@ -219,7 +216,7 @@ public class PageOther implements Page {
                 });
             } catch (Exception ex) {
                 javafx.application.Platform.runLater(() -> {
-                    stopSkeletons(skeletons);
+                    stopSkeletons();
                     page.getChildren().removeAll(skeletons);
                     page.getChildren().add(Ui.hint(Lang.t("获取新闻失败：")
                             + (ex.getMessage() == null ? Lang.t("网络错误") : ex.getMessage()), 2));
@@ -251,6 +248,7 @@ public class PageOther implements Page {
             Region line1 = skeletonBar(400, 11);
             Region line2 = skeletonBar(320, 11);
             card.getChildren().addAll(titleBar, img, line1, line2);
+            pulseNodes.add(card);
             out.add(card);
         }
         // 骨架条与图片底统一呼吸闪烁，离场自停
@@ -262,20 +260,27 @@ public class PageOther implements Page {
                 new javafx.animation.KeyFrame(javafx.util.Duration.millis(1500),
                         new javafx.animation.KeyValue(skeletonOpacity, 1.0, javafx.animation.Interpolator.EASE_BOTH)));
         pulse.setCycleCount(javafx.animation.Timeline.INDEFINITE);
-        for (Node n : out) n.opacityProperty().bind(skeletonOpacity);
+        for (Node n : pulseNodes) n.opacityProperty().bind(skeletonOpacity);
         skeletonPulse = pulse;
         pulse.play();
         return out;
     }
 
-    private void stopSkeletons(List<Node> skeletons) {
+    private void stopSkeletons() {
         if (skeletonPulse != null) {
             skeletonPulse.stop();
             skeletonPulse = null;
         }
-        for (Node n : skeletons) n.opacityProperty().unbind();
+        for (Node n : pulseNodes) n.opacityProperty().unbind();
+        pulseNodes.clear();
     }
 
+    @Override
+    public void onHide() {
+        stopSkeletons();
+    }
+
+    private final List<Node> pulseNodes = new ArrayList<>();
     private final javafx.beans.property.SimpleDoubleProperty skeletonOpacity =
             new javafx.beans.property.SimpleDoubleProperty(1.0);
     private javafx.animation.Timeline skeletonPulse;
@@ -289,7 +294,7 @@ public class PageOther implements Page {
         return r;
     }
 
-    // 横幅图异步加载，UniformToFill 固定高（对齐 WPF）
+    // 横幅图异步加载，UniformToFill 固定高
     private Node newsImage(String url) {
         final double h = 160;
         StackPane box = new StackPane();

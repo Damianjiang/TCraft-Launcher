@@ -28,10 +28,8 @@ public class App extends Application {
     @Override
     public void start(Stage stage) {
         Platform.setImplicitExit(false);   // 启动游戏后可能隐藏主窗，隐式退出会把整个程序带崩
-        StartupWindow splash = Boot.startupWindow;
-        if (splash == null) splash = StartupWindow.none();
-        final StartupWindow ui = splash;
-        ui.setStatus(Lang.t("正在检查资源是否齐全…"), 25);
+        Log.startSession();
+        long tPhase = System.nanoTime();
 
         try {
             // 全局异常：FX 线程弹窗，后台只记日志
@@ -43,24 +41,28 @@ public class App extends Application {
             Lang.reload();
             Theme.applyComponentOpacity();
             applyInitialTheme();
-            ui.setStatus(Lang.t("正在检查资源是否齐全…"), 45);
+            if (Boolean.getBoolean("tcl.time")) {
+                Data.get().log("阶段：主题与语言 " + (System.nanoTime() - tPhase) / 1_000_000 + " ms");
+            }
             Thread cleanup = new Thread(EasyTier::killLeftovers, "TCL-Cleanup");
             cleanup.setDaemon(true);
             cleanup.start();
         } catch (Throwable t) {
-            showFatal(splash, t);
+            showFatal(t);
             return;
         }
 
         try {
-            ui.setStatus(Lang.t("正在准备主界面…"), 62);
             window = new MainWindow(stage);
+            if (Boolean.getBoolean("tcl.time")) {
+                Data.get().log("阶段：界面构建 " + (System.nanoTime() - tPhase) / 1_000_000 + " ms");
+            }
             // 首帧优先：扫 Java/预取运行库留到空闲
-            ui.setStatus(Lang.t("正在准备主界面…"), 82);
             stage.show();
+            if (Boolean.getBoolean("tcl.time")) {
+                Data.get().log("阶段：显示 " + (System.nanoTime() - tPhase) / 1_000_000 + " ms");
+            }
             stage.setAlwaysOnTop(false);
-            window.playIntro();
-            ui.setStatus(Lang.t("准备完成"), 100);
             // 告诉首次运行留下的旧进程：主界面已经出来了，可以把启动窗收掉
             try {
                 Files.writeString(Resources.logDir().resolve(".window-ready"), "1");
@@ -79,10 +81,9 @@ public class App extends Application {
             long ms = (System.nanoTime() - Boot.STARTED_AT) / 1_000_000L;
             Data.get().log("启动完成，用时 " + ms + " ms");
         } catch (Throwable t) {
-            showFatal(splash, t);
+            showFatal(t);
             return;
         }
-        ui.close();
         stage.setAlwaysOnTop(false);
         javafx.application.Platform.runLater(() -> {
             stage.setAlwaysOnTop(false);
@@ -98,7 +99,8 @@ public class App extends Application {
             Thread javaScan = new Thread(() -> {
                 try {
                     Data.get().scanJavaRuntimes();
-                } catch (Exception ignored) {
+                } catch (Exception ex) {
+                    Data.get().log("Java 扫描失败：" + Log.describe(ex));
                 }
             }, "TCL-Java-Scan");
             javaScan.setDaemon(true);
@@ -132,14 +134,8 @@ public class App extends Application {
     }
 
     private void applyInitialTheme() {
-        int preset = Data.get().getInt("UiThemePreset", -1);
-        if (preset == 14) {
-            Theme.applyCustomTheme();
-        } else if (preset >= 0) {
-            Theme.applyPreset(preset);
-        } else {
-            Theme.applyWallpaperThemeSync();
-        }
+        // 先定主题色再建界面，避免启动闪一下默认蓝
+        Theme.prepareStartupAccent(java.nio.file.Paths.get(Data.get().gameDir, "TCL", "Pictures"));
     }
 
     private void startStartupInstance() {
@@ -199,9 +195,8 @@ public class App extends Application {
         wait.play();
     }
 
-    private void showFatal(StartupWindow splash, Throwable t) {
+    private void showFatal(Throwable t) {
         Path crash = Boot.writeCrash(t);
-        if (splash != null) splash.close();
 
         String root = String.valueOf(t);
         StringBuilder detail = new StringBuilder();

@@ -122,7 +122,7 @@ public final class Ui {
         return r;
     }
 
-    public static class Card extends StackPane {
+    public static final class Card extends StackPane {
         public final VBox content;
         public final HBox header;
         private final Label titleLabel;
@@ -620,7 +620,7 @@ public final class Ui {
         return showMenuCard(anchor, card);
     }
 
-    // 卡片给投影留的白边，和 WPF 版 MenuCard.ShadowPad 一致
+    // 卡片给投影留的白边
     private static final double MENU_SHADOW_PAD = 14;
 
     private static VBox menuCardShell(double width) {
@@ -663,7 +663,7 @@ public final class Ui {
         return screen;
     }
 
-    // 移植 WPF CalcMaxMenuHeight：取更宽敞一侧扣边距
+    // 取更宽敞一侧扣边距算最大高度
     private static double calcMaxMenuHeight(javafx.geometry.Bounds ab,
                                             javafx.geometry.Rectangle2D area) {
         double below = area.getMaxY() - ab.getMaxY() - 16;
@@ -783,7 +783,7 @@ public final class Ui {
     private static double[] placeMenu(MenuBox box, javafx.geometry.Bounds ab,
                                       javafx.geometry.Rectangle2D area) {
         double pad = MENU_SHADOW_PAD;
-        // 候选位置同 WPF：右/左 × 下/上，取第一个放得下
+        // 候选位置：右/左 × 下/上，取第一个放得下
         double xRight = ab.getMaxX() - box.w - pad;
         double xLeft = ab.getMinX() - pad;
         double yBelow = ab.getMaxY() + 2 - pad;
@@ -1078,7 +1078,7 @@ public final class Ui {
         return pane;
     }
 
-    public static class ListItem extends HBox {
+    public static final class ListItem extends HBox {
         public final Label title;
         public final Label info;
         private final Region check;
@@ -1950,7 +1950,7 @@ public final class Ui {
         return scroll(content, SmoothScroll.DEFAULT_WHEEL_SPEED);
     }
 
-    // 小框滚轮放慢，对齐 WPF DeltaMult=0.7
+    // 小框滚轮放慢，滚动更平缓
     public static ScrollPane scroll(Node content, double wheelSpeed) {
         if (content instanceof Region region) region.setMaxWidth(Double.MAX_VALUE);
         ScrollPane sp = new ScrollPane(content);
@@ -1999,7 +1999,7 @@ public final class Ui {
         return box;
     }
 
-    public static class Loading extends StackPane {
+    public static final class Loading extends StackPane {
         private static final String PICKAXE =
                 "M 963.6 858.2 410.816 305.504 C 508.116 213.304 609.204 196.8 711.104 128.6 "
                         + "837.11367 49.573762 879.34045 50.334062 751.5 49.5 611.3 52 471.8 96.2 353.3 182.4 "

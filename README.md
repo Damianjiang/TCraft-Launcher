@@ -24,8 +24,6 @@
 ---
 
 > [!NOTE]
-> 本仓库是 JavaFX 重写版，与旧版（VB.NET / WPF）没有共用代码。
-> Windows 已逐项回归；macOS 与 Linux 的界面行为按代码修正过，实机体验仍在收集反馈。
 > 遇到问题或有建议，欢迎到 [Issues](https://github.com/Damianjiang/TCraft-Launcher/issues) 反馈，
 > 或[加入 QQ 交流群](https://qm.qq.com/q/UONlv4VgwE)（群号也写在启动器「更多 → 关于」里）。
 
@@ -93,7 +91,7 @@ TCraft Launcher（简称 **TCL**）是用 JavaFX 写的 Minecraft 启动器。�
 - 首次启动弹出 Java 选择窗口，可自动扫描或手动指定；确认后记在 `.tcl/launcher.cfg`，路径失效或版本读不出时再次提示
 - 首次启动还会按当前系统下载 **JavaFX 17.0.21** 到 **`.tcl/dependencies/<平台>/openjfx`**（约 10 MB，之后复用）
 - 内置 jar 解到 **exe 同目录的 `.tcl`**（同 HMCL 的 `./.hmcl`），不会被清理工具当临时文件删；目录写不出来时弹窗提示换位置，不改写到 `%LOCALAPPDATA%`
-- 配置、日志、皮肤与实例图标在 `.tcl` 内，首次启动会从旧的 `~/.tcraft-launcher-javafx` 迁移配置
+- 配置、日志、皮肤与实例图标都在 `.tcl` 内
 - 联机首次使用会按平台下载 EasyTier 到 `.tcl/EasyTier` 并校验 SHA-256，使用 `--no-tun` 用户态组网，不需要管理员权限
 
 ## 编译与运行

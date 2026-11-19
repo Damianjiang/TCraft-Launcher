@@ -115,6 +115,11 @@ public class PageTasks implements Page {
 
         timer = new Timeline(new KeyFrame(Duration.millis(450), e -> tick()));
         timer.setCycleCount(Timeline.INDEFINITE);
+        // 快速连切页面时 onHide 可能被跳过，节点离开场景直接停表
+        page.sceneProperty().addListener((o, oldScene, newScene) -> {
+            if (newScene == null) timer.stop();
+            else timer.play();
+        });
         timer.play();
         return page;
     }

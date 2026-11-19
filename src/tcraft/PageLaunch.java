@@ -300,7 +300,6 @@ public class PageLaunch implements Page {
 
     private void startAprilEscape(StackPane btn) {
         if (aprilTimer != null) return;
-        data.log("愚人节彩蛋：启动按钮开始躲避鼠标");
         javafx.scene.Scene scene = btn.getScene();
         if (scene == null) {
             btn.sceneProperty().addListener((o, s2, sc) -> {
@@ -317,6 +316,10 @@ public class PageLaunch implements Page {
         aprilTimer = new javafx.animation.AnimationTimer() {
             @Override
             public void handle(long now) {
+                if (btn.getScene() == null) {
+                    stopAprilEscape();
+                    return;
+                }
                 if (now - aprilLastTick < 150_000_000L) return;
                 aprilLastTick = now;
                 aprilStep(btn, scene);

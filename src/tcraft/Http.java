@@ -66,7 +66,7 @@ public final class Http {
             if (selector != null) b.proxy(selector);
         } catch (Throwable t) {
             try {
-                Data.get().log("代理初始化失败：" + t);
+                Data.get().log("代理初始化失败：" + Log.describe(t));
             } catch (Exception ignored) {
             }
         }

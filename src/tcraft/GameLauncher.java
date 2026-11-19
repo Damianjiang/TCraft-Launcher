@@ -146,7 +146,8 @@ public final class GameLauncher {
                 if (m > 0 && status != null) {
                     status.accept(Lang.tf("实例指定的 Java %d 低于版本要求 %d，自动更换", m, required));
                 }
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                data.log("实例指定的 Java 探测失败，改为自动选择：" + Log.describe(e));
             }
         }
 
@@ -1046,7 +1047,7 @@ public final class GameLauncher {
             jarHash = Json.str(Json.obj(Json.parse(text)), "jarHash", "").toLowerCase();
         } catch (Exception e) {
             if (Files.isRegularFile(jar)) {
-                Data.get().log("获取统一通行证下载信息失败，使用本地 jar：" + e.getMessage());
+                Data.get().log("获取统一通行证下载信息失败，使用本地 jar：" + Log.describe(e));
                 return;
             }
             throw new Exception("获取统一通行证下载信息失败：" + e.getMessage());
@@ -1058,7 +1059,7 @@ public final class GameLauncher {
             Modrinth.downloadUrl(probe, "https://login.mc-user.com:233/index/jar", jar, jarHash);
         } catch (Exception e) {
             if (Files.isRegularFile(jar)) {
-                Data.get().log("统一通行证 jar 下载失败，使用本地旧版本：" + e.getMessage());
+                Data.get().log("统一通行证 jar 下载失败，使用本地旧版本：" + Log.describe(e));
                 return;
             }
             throw new Exception("下载统一通行证运行时失败：" + e.getMessage());

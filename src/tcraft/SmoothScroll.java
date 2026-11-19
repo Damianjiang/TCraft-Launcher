@@ -56,7 +56,7 @@ final class SmoothScroll {
         install(pane, DEFAULT_WHEEL_SPEED);
     }
 
-    // 小框传 2.1 对齐 WPF DeltaMult=0.7
+    // 小框滚轮步长放大，滚动更平缓
     static void install(ScrollPane pane, double wheelSpeed) {
         if (pane == null || pane.getProperties().get(KEY) instanceof SmoothScroll) return;
         pane.getProperties().put(WHEEL_KEY, wheelSpeed);

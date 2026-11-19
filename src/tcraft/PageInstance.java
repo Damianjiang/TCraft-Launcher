@@ -694,15 +694,17 @@ public class PageInstance implements Page {
                             "-Command", ps);
                     pb.redirectErrorStream(true);
                     Process p = pb.start();
-                    // 先等退出再读输出，防挂死拖死线程
-                    if (!p.waitFor(30, java.util.concurrent.TimeUnit.SECONDS)) {
-                        p.destroyForcibly();
-                        throw new Exception("WScript.Shell 创建快捷方式超时");
-                    }
-                    String output = new String(p.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
-                    if (p.exitValue() != 0 || !java.nio.file.Files.isRegularFile(link)) {
-                        throw new Exception("WScript.Shell 未能生成快捷方式："
-                                + (output.isBlank() ? "无输出" : output.trim()));
+                    try (java.io.InputStream in = p.getInputStream()) {
+                        // 先等退出再读输出，防挂死拖死线程
+                        if (!p.waitFor(30, java.util.concurrent.TimeUnit.SECONDS)) {
+                            p.destroyForcibly();
+                            throw new Exception("WScript.Shell 创建快捷方式超时");
+                        }
+                        String output = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                        if (p.exitValue() != 0 || !java.nio.file.Files.isRegularFile(link)) {
+                            throw new Exception("WScript.Shell 未能生成快捷方式："
+                                    + (output.isBlank() ? "无输出" : output.trim()));
+                        }
                     }
                 } else if (mac) {
                     link = uniquePath(desktop, baseName, ".command");

@@ -127,7 +127,7 @@ public final class Shell {
             p = new ProcessBuilder(cmd).redirectErrorStream(true)
                     .redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
         } catch (java.io.IOException e) {
-            Data.get().log("命令启动失败：" + cmd[0] + "（" + e.getMessage() + "）");
+            Data.get().log("命令启动失败：" + cmd[0] + "（" + Log.describe(e) + "）");
             throw e;
         }
         try {
@@ -153,11 +153,13 @@ public final class Shell {
         if (url == null || url.isBlank()) return false;
         try {
             if (isMac()) {
-                new ProcessBuilder("open", url).start();
+                new ProcessBuilder("open", url).redirectErrorStream(true)
+                        .redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
                 return true;
             }
             if (isLinux()) {
-                new ProcessBuilder("xdg-open", url).start();
+                new ProcessBuilder("xdg-open", url).redirectErrorStream(true)
+                        .redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
                 return true;
             }
             if (java.awt.Desktop.isDesktopSupported()) {
@@ -167,7 +169,8 @@ public final class Shell {
                     return true;
                 }
             }
-            new ProcessBuilder("rundll32", "url.dll,FileProtocolHandler", url).start();
+            new ProcessBuilder("rundll32", "url.dll,FileProtocolHandler", url).redirectErrorStream(true)
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
             return true;
         } catch (Exception e) {
             return false;
@@ -183,19 +186,24 @@ public final class Shell {
         File f = new File(path);
         try {
             if (isMac()) {
-                new ProcessBuilder("open", f.getAbsolutePath()).start();
+                new ProcessBuilder("open", f.getAbsolutePath()).redirectErrorStream(true)
+                        .redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
                 return true;
             }
             if (isLinux()) {
-                new ProcessBuilder("xdg-open", f.getAbsolutePath()).start();
+                new ProcessBuilder("xdg-open", f.getAbsolutePath()).redirectErrorStream(true)
+                        .redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
                 return true;
             }
             if (desktopOpen(f)) return true;
             // 不走 cmd.exe：&|^ 会被当命令分隔符
             if (f.isDirectory()) {
-                new ProcessBuilder("explorer.exe", f.getAbsolutePath()).start();
+                new ProcessBuilder("explorer.exe", f.getAbsolutePath()).redirectErrorStream(true)
+                        .redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
             } else {
-                new ProcessBuilder("rundll32.exe", "url.dll,FileProtocolHandler", f.getAbsolutePath()).start();
+                new ProcessBuilder("rundll32.exe", "url.dll,FileProtocolHandler", f.getAbsolutePath())
+                        .redirectErrorStream(true)
+                        .redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
             }
             return true;
         } catch (Exception e) {

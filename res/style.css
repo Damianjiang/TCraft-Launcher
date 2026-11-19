@@ -1,7 +1,7 @@
 .root {
     -fx-font-family: "Microsoft YaHei UI";
     -fx-font-smoothing-type: gray;
-    /* 去掉 JavaFX 默认蓝色焦点框（WPF 无此描边） */
+    /* 去掉 JavaFX 默认蓝色焦点框 */
     -fx-focus-color: transparent;
     -fx-faint-focus-color: transparent;
 }
@@ -17,7 +17,7 @@
 .scroll-pane:focused {
     -fx-background-color: transparent;
 }
-/* 对照 MyScrollBar.vb：宽 8，thumb 圆角 3、内缩 2，无箭头，轨道透明 */
+/* 细滚动条：宽 8，thumb 圆角 3、内缩 2，无箭头，轨道透明 */
 .scroll-bar:vertical, .scroll-bar:horizontal {
     -fx-background-color: transparent;
 }

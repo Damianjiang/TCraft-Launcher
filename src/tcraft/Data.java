@@ -237,7 +237,7 @@ public final class Data {
     public String otherSection = "about";
     public String setupSection = "launch";
     public String instanceSection = "overview";
-    public final List<String> log = new LogRing(500);
+    public final List<String> log = new LogRing(2000);
     public final LogRing launchLog = new LogRing(500);
     private volatile long lastVersionRefresh;
     private boolean versionRefreshRunning;
@@ -283,7 +283,8 @@ public final class Data {
                     String picked = Files.readString(cfg, StandardCharsets.UTF_8).trim();
                     if (usableJavaFast(picked)) javaPath = picked;
                 }
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                log("读取 launcher.cfg 失败：" + Log.describe(e));
             }
         }
         if (javaPath == null || javaPath.isEmpty()) {
@@ -479,14 +480,15 @@ public final class Data {
                     }
                     javaPath = list.get(0).path;
                 }
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                log("后台扫描 Java 失败：" + Log.describe(e));
             }
         }, "TCL-Java-Fill");
         t.setDaemon(true);
         t.start();
     }
 
-    // 会起 `java -version` 子进程（走 javaMajor），只能后台线程调
+    // 会起 java -version 子进程（走 javaMajor），只能后台线程调
     public static boolean usableJava(String path) {
         if (path == null || path.isBlank()) return false;
         try {
@@ -517,7 +519,8 @@ public final class Data {
         try {
             Files.createDirectories(configPath.getParent());
             Files.writeString(configPath.getParent().resolve("launcher.cfg"), path, StandardCharsets.UTF_8);
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log("写入 launcher.cfg 失败：" + Log.describe(e));
         }
     }
 
@@ -545,7 +548,8 @@ public final class Data {
                     String n = p.getFileName() == null ? "" : p.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
                     return n.equals("java.exe") || n.equals("java");
                 }).filter(Files::isRegularFile).limit(200).forEach(p -> candidates.add(p.toString()));
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                log("扫描 Java 目录失败：" + Log.describe(e));
             }
         }
         List<JavaRuntime> found = probeAll(candidates);
@@ -780,7 +784,7 @@ public final class Data {
         return true;
     }
 
-    // 会起 `java -version` 子进程（最多等 5 秒），只能后台线程调
+    // 会起 java -version 子进程（最多等 5 秒），只能后台线程调
     public static int javaMajor(String javaExe) {
         int fast = javaMajorFast(javaExe);
         if (fast > 0) return fast;
@@ -794,16 +798,18 @@ public final class Data {
                 if (Files.isRegularFile(console)) exe = console;
             }
             Process p = new ProcessBuilder(exe.toString(), "-version").redirectErrorStream(true).start();
-            // 卡死的 Java 最多等 5 秒
-            if (!p.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)) {
-                p.destroyForcibly();
-                return 0;
+            try (java.io.InputStream in = p.getInputStream()) {
+                // 卡死的 Java 最多等 5 秒
+                if (!p.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                    p.destroyForcibly();
+                    return 0;
+                }
+                String text = new String(in.readAllBytes(),
+                        java.nio.charset.StandardCharsets.UTF_8);
+                java.util.regex.Matcher m = java.util.regex.Pattern
+                        .compile("version \"([^\"]+)\"").matcher(text);
+                if (m.find()) return parseJavaMajor(m.group(1));
             }
-            String text = new String(p.getInputStream().readAllBytes(),
-                    java.nio.charset.StandardCharsets.UTF_8);
-            java.util.regex.Matcher m = java.util.regex.Pattern
-                    .compile("version \"([^\"]+)\"").matcher(text);
-            if (m.find()) return parseJavaMajor(m.group(1));
         } catch (Exception ignored) {
         }
         return 0;
@@ -895,7 +901,8 @@ public final class Data {
                         : "Forge".equals(loader) ? "CobbleStone.png" : "Grass.png";
                 instances.add(new Instance(name, name, loader, "", "已安装版本", icon, System.currentTimeMillis(), false, gameDir));
             });
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log("读取已安装版本失败：" + Log.describe(e));
         }
     }
 
@@ -976,7 +983,7 @@ public final class Data {
                 }
                 // 版本数量属于常规状态，不写盘；只有回退到离线兜底才需要留痕
             } catch (Exception e) {
-                log("获取官方版本列表失败，改用标注过的离线兜底数据：" + e.getMessage());
+                log("获取官方版本列表失败，改用标注过的离线兜底数据：" + Log.describe(e));
                 seedBuiltinVersions();
             } finally {
                 List<Runnable> waiters;
@@ -1444,7 +1451,7 @@ public final class Data {
             Files.copy(configPath, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             return true;
         } catch (Exception e) {
-            log("导出配置失败：" + e);
+            log("导出配置失败：" + Log.describe(e));
             return false;
         }
     }
@@ -1490,7 +1497,7 @@ public final class Data {
             }
             return true;
         } catch (Exception e) {
-            log("导入配置失败：" + e);
+            log("导入配置失败：" + Log.describe(e));
             return false;
         }
     }
@@ -1516,10 +1523,11 @@ public final class Data {
         return k.endsWith("jvmargs") || k.endsWith("gameargs");
     }
 
-    // 调试日志只留内存；错误统一进 errors.log
+    // 运行日志：内存留一份供界面兜底，同时异步追加到 log/launcher.log
     public void log(String line) {
         String stamped = Redact.apply("[" + LocalDateTime.now().toLocalTime().withNano(0) + "] " + line);
         log.add(stamped);
+        Log.info(stamped);
         if (getBool("SystemDebugMode", false)) System.out.println("[TCL] " + stamped);
     }
 }

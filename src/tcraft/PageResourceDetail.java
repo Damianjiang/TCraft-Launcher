@@ -316,7 +316,7 @@ public class PageResourceDetail implements Page {
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
                     } catch (Exception e) {
-                        data.log("未找到 ID " + id + " 的前置信息：" + e.getMessage());
+                        data.log("未找到 ID " + id + " 的前置信息：" + Log.describe(e));
                     } finally {
                         latch.countDown();
                     }
@@ -348,7 +348,7 @@ public class PageResourceDetail implements Page {
                     fillDependencies(list, id);
                 }
             } catch (Exception e) {
-                data.log("前置项目信息获取失败：" + e.getMessage());
+                data.log("前置项目信息获取失败：" + Log.describe(e));
             }
             for (String id : ids) {
                 if (!depProjects.containsKey(id)) data.log("未找到 ID " + id + " 的前置信息");
@@ -814,7 +814,7 @@ public class PageResourceDetail implements Page {
                                     + unresolvedNames.size() + " 个无法解析");
                         }
                     } catch (Exception e) {
-                        data.log("检查 Mod 必需前置失败，跳过检查：" + e.getMessage());
+                        data.log("检查 Mod 必需前置失败，跳过检查：" + Log.describe(e));
                     }
                 }
                 // Mod 文件名里的 ~ 会导致 Mixin 加载失败
@@ -842,7 +842,7 @@ public class PageResourceDetail implements Page {
                     }
                 });
             } catch (Exception e) {
-                data.log("保存资源文件失败：" + e.getMessage());
+                data.log("保存资源文件失败：" + Log.describe(e));
                 Platform.runLater(() -> win.toast("保存失败", e.getMessage() == null ? "未知错误" : e.getMessage(), 3));
             }
         });
@@ -1044,7 +1044,7 @@ public class PageResourceDetail implements Page {
                 if (!exists) depFiles.add(new DepDownload(depName, depVersion));
                 collectMissingDependencies(depVersion, targetFolder, visited, depFiles, unresolvedNames, depth + 1);
             } catch (Exception e) {
-                data.log("解析前置失败，已跳过：" + depId + " " + e.getMessage());
+                data.log("解析前置失败，已跳过：" + depId + " " + Log.describe(e));
             }
         }
     }
@@ -1079,7 +1079,7 @@ public class PageResourceDetail implements Page {
             }
             return false;
         } catch (Exception e) {
-            data.log("检查前置是否已安装失败：" + e.getMessage());
+            data.log("检查前置是否已安装失败：" + Log.describe(e));
             return false;
         }
     }
@@ -1259,7 +1259,7 @@ public class PageResourceDetail implements Page {
         try {
             Shell.openFolder(dir.toString());
         } catch (Exception e) {
-            data.log("打开文件夹失败：" + dir + " " + e.getMessage());
+            data.log("打开文件夹失败：" + dir + " " + Log.describe(e));
         }
     }
 

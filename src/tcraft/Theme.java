@@ -95,6 +95,8 @@ public final class Theme {
 
     // 壁纸就绪后在 FX 线程回调刷背景/主题色
     public static volatile Runnable onWallpaperReady;
+    // 壁纸取色完成且颜色确实变化时回调，用于把程序化颜色统一刷一遍
+    public static volatile Runnable onAccentApplied;
 
     private Theme() {
     }
@@ -127,7 +129,7 @@ public final class Theme {
                     }
                 }
             } catch (Exception e) {
-                Data.get().log("资源索引构建失败（jar）：" + e.getMessage());
+                Data.get().log("资源索引构建失败（jar）：" + Log.describe(e));
             }
         } else {
             Path dir = Resources.appDir().resolve("res");
@@ -137,7 +139,7 @@ public final class Theme {
                     map.put(rel.toLowerCase(java.util.Locale.ROOT), rel);
                 });
             } catch (Exception e) {
-                Data.get().log("资源索引构建失败（res 目录）：" + e.getMessage());
+                Data.get().log("资源索引构建失败（res 目录）：" + Log.describe(e));
             }
         }
         resourceIndex = map;
@@ -309,7 +311,12 @@ public final class Theme {
                 stream.filter(Files::isRegularFile).filter(Theme::isWallpaperImage).forEach(images::add);
             }
             if (images.isEmpty()) return false;
-            Path pick = images.get((int) (Math.random() * images.size()));
+            // 启动取色已经选过同一张图，保持一致；否则随机
+            Path pick = pendingWallpaper != null && Files.isRegularFile(pendingWallpaper)
+                    ? pendingWallpaper
+                    : images.get((int) (Math.random() * images.size()));
+            pendingWallpaper = null;
+            currentWallpaperFile = pick;
             // 壁纸是整屏大图，同步解码会把 FX 线程卡住，交给后台解码
             Image img = new Image(pick.toUri().toString(), true);
             if (img.isError()) return false;
@@ -467,6 +474,121 @@ public final class Theme {
         double delta = d.getInt("UiLauncherDelta", 20);
         setAccent(hsl(hue, sat, light), false);
         titleBar = hsl(hue + delta, sat, Math.max(14, light - 22));
+    }
+
+    // 上次壁纸取色结果：启动时先用它，避免先铺一层默认蓝再等取色
+    public static boolean applyCachedAccent() {
+        try {
+            Data d = Data.get();
+            int hue = d.getInt("UiAccentCacheHue", -1);
+            if (hue < 0) return false;
+            int sat = Math.max(0, Math.min(100, d.getInt("UiAccentCacheSat", 60)));
+            int light = Math.max(0, Math.min(100, d.getInt("UiAccentCacheLight", 50)));
+            setAccent(hsl(hue, sat, light), true);
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    private static void cacheAccent(Color c) {
+        try {
+            double max = Math.max(c.getRed(), Math.max(c.getGreen(), c.getBlue()));
+            double min = Math.min(c.getRed(), Math.min(c.getGreen(), c.getBlue()));
+            double light = (max + min) / 2;
+            double sat = max <= min ? 0 : (max - min) / (1 - Math.abs(2 * light - 1));
+            Data d = Data.get();
+            d.set("UiAccentCacheHue", (int) Math.round(c.getHue()));
+            d.set("UiAccentCacheSat", (int) Math.round(clamp01(sat) * 100));
+            d.set("UiAccentCacheLight", (int) Math.round(light * 100));
+            d.set("UiAccentCacheWallpaper",
+                    currentWallpaperFile == null ? "" : currentWallpaperFile.getFileName().toString());
+            d.save();
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static Path currentWallpaperFile;
+
+    private static boolean accentChanged(Color a, Color b) {
+        if (a == null || b == null) return true;
+        double diff = Math.abs(a.getRed() - b.getRed())
+                + Math.abs(a.getGreen() - b.getGreen())
+                + Math.abs(a.getBlue() - b.getBlue());
+        return diff > 0.06;
+    }
+
+    // 启动前把主题色定下来，先建界面再显示就不会闪默认蓝
+    private static Path pendingWallpaper;
+    private static boolean skipInitialAccentExtract;
+    private static boolean startupPrepared;
+
+    public static void prepareStartupAccent(Path pictures) {
+        if (startupPrepared) return;
+        startupPrepared = true;
+        try {
+            Data d = Data.get();
+            int preset = d.getInt("UiThemePreset", -1);
+            if (preset == 14) {
+                applyCustomTheme();
+                return;
+            }
+            if (preset >= 0) {
+                applyPreset(preset);
+                return;
+            }
+            if (applyCachedAccent()) {
+                // 沿用上次取色的那张壁纸，避免这次随机到另一张导致主题与背景不一致
+                try {
+                    String name = d.get("UiAccentCacheWallpaper", "");
+                    if (!name.isBlank() && pictures != null) {
+                        Path p = pictures.resolve(name);
+                        if (Files.isRegularFile(p)) pendingWallpaper = p;
+                    }
+                } catch (Throwable ignored) {
+                }
+                skipInitialAccentExtract = true;
+                return;
+            }
+            // 没有缓存：用缩小图快速取色，避免等整张大图解码
+            Image small = loadAccentPreview(pictures);
+            if (small != null) {
+                Color c = extractAccent(small);
+                setAccent(c, true);
+                cacheAccent(c);
+                skipInitialAccentExtract = true;
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static Image loadAccentPreview(Path pictures) {
+        try {
+            String uri = null;
+            if (pictures != null && Files.isDirectory(pictures)) {
+                List<Path> images = new ArrayList<>();
+                try (var stream = Files.list(pictures)) {
+                    stream.filter(Files::isRegularFile).filter(Theme::isWallpaperImage).forEach(images::add);
+                }
+                if (!images.isEmpty()) {
+                    Path pick = images.get((int) (Math.random() * images.size()));
+                    pendingWallpaper = pick;
+                    currentWallpaperFile = pick;
+                    uri = pick.toUri().toString();
+                }
+            }
+            if (uri == null) {
+                URL url = resUrl("images/wallpaper.jpg");
+                if (url == null) url = resUrl("images/TCraft.webp");
+                if (url == null) return null;
+                uri = url.toExternalForm();
+            }
+            // 同步解码缩小图，400 宽足够取色且很快
+            Image img = new Image(uri, 400, 0, true, false);
+            return img.isError() ? null : img;
+        } catch (Throwable t) {
+            return null;
+        }
     }
 
     public static boolean isHiddenTheme(int id) {
@@ -668,12 +790,12 @@ public final class Theme {
         return Color.hsb(avg.getHue(), Math.max(0.42, Math.min(0.78, avg.getSaturation() * 0.9)), 0.62);
     }
 
-    // 旧入口：统一委托 applyWallpaperTheme()（后台解码）
-    public static void applyWallpaperThemeSync() {
-        applyWallpaperTheme();
-    }
-
     public static void applyWallpaperTheme() {
+        // 启动时已用缩小图/缓存定过色，首次挂载壁纸不再重复取色
+        if (skipInitialAccentExtract) {
+            skipInitialAccentExtract = false;
+            return;
+        }
         Image img = wallpaper;
         if (img == null) return;
         // 取色上万次扫描放后台；解码未完不取色
@@ -695,7 +817,13 @@ public final class Theme {
             // PixelReader 未就绪会抛，静默跳过取色
             if (img.getProgress() < 1) return;
             Color c = extractAccent(img);
-            javafx.application.Platform.runLater(() -> setAccent(c, true));
+            cacheAccent(c);
+            javafx.application.Platform.runLater(() -> {
+                Color before = accent;
+                setAccent(c, true);
+                Runnable notify = onAccentApplied;
+                if (notify != null && accentChanged(before, accent)) notify.run();
+            });
         });
     }
 

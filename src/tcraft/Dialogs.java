@@ -394,7 +394,7 @@ public final class Dialogs {
                         retry.setDisable(false);
                         open.setDisable(true);
                     });
-                    d.log("微软登录失败：" + ex.getMessage());
+                    d.log("微软登录失败：" + Log.describe(ex));
                 }
             }, "TCL-MSA");
             t.setDaemon(true);
@@ -902,7 +902,6 @@ public final class Dialogs {
         pApi[0] = type[0] == 5 ? "https://littleskin.cn" : api;
         int t = type[0];
         int my = ++ticket[0];
-        Data.get().log("获取皮肤（type=" + t + " " + who + "）");
         Thread worker = new Thread(() -> {
             String target;
             try {
@@ -912,7 +911,7 @@ public final class Dialogs {
                     target = fetchCslSkin(t == 5 ? "https://littleskin.cn" : api, who, account.name);
                 }
             } catch (Exception e) {
-                Data.get().log("获取皮肤失败：" + e.getMessage());
+                Data.get().log("获取皮肤失败：" + Log.describe(e));
                 javafx.application.Platform.runLater(() -> {
                     if (my != ticket[0]) return;
                     Errors.error("获取皮肤失败", e, Errors.Behavior.ALERT_FEEDBACK);

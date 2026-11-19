@@ -32,11 +32,10 @@ public final class Boot {
             System.err.println("[TCL] 已有实例在运行，本次启动退出");
             return;
         }
-        // 首次运行：新 JVM 弹主窗，旧进程只留启动窗
-        boolean quietStart = "true".equalsIgnoreCase(System.getProperty("tcl.quietStart"));
-        StartupWindow ui = quietStart ? StartupWindow.none() : StartupWindow.open();
+        // 只有缺 JavaFX、需要下载或修复运行库时才显示进度窗；正常启动直接进主界面
+        StartupWindow ui = hasFx() ? StartupWindow.none() : StartupWindow.open();
         startupWindow = ui;
-        ui.setStatus(Lang.t("准备 TCL 启动器中…"), 5);
+        ui.setStatus(Lang.t("正在准备运行环境…"), 5);
         try {
             // 单文件版首次运行按平台下载 JavaFX
             Resources.bootstrap(args, ui);
@@ -53,7 +52,7 @@ public final class Boot {
                     + Lang.t("请检查网络后重试，或删除 ")
                     + Resources.home().resolve("dependencies") + Lang.t(" 再运行。"), null);
         }
-        ui.setStatus(Lang.t("正在启动 TCL…"), 90);
+        ui.setStatus(Lang.t("正在启动主界面…"), 90);
         try {
             javafx.application.Application.launch(App.class, args);
         } catch (Throwable t) {
@@ -204,13 +203,9 @@ public final class Boot {
                     .append(System.getProperty("java.vendor")).append(")\n")
                     .append("工作目录：").append(System.getProperty("user.dir")).append('\n')
                     .append("配置目录：").append(Resources.home()).append('\n');
-            sb.append("\n===== 最近日志 =====\n");
-            Path log = Resources.errorLogFile();
-            if (Files.isRegularFile(log)) {
-                for (String line : tailLines(log, 200)) sb.append(line).append('\n');
-            } else {
-                sb.append("（暂无日志）\n");
-            }
+            sb.append("\n===== 完整日志 =====\n");
+            String dump = Log.exportAll();
+            sb.append(dump.isEmpty() ? "（暂无日志）\n" : dump);
             // 带 BOM，记事本/QQ 打开不乱码
             Files.writeString(file, "\uFEFF" + Redact.apply(sb.toString()), java.nio.charset.StandardCharsets.UTF_8);
             try {
@@ -222,38 +217,7 @@ public final class Boot {
     }
 
     // 日志可能几十 MB，只从尾部读一段出来
-    private static java.util.List<String> tailLines(Path file, int max) {
-        try {
-            long size = Files.size(file);
-            long from = Math.max(0, size - 256 * 1024);
-            String[] lines;
-            try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(file.toFile(), "r")) {
-                raf.seek(from);
-                byte[] buf = new byte[(int) (size - from)];
-                raf.readFully(buf);
-                lines = new String(buf, java.nio.charset.StandardCharsets.UTF_8).split("\\R");
-            }
-            java.util.List<String> out = new java.util.ArrayList<>();
-            // 起点落在行中间时第一段是半行，丢掉
-            for (int i = from > 0 ? 1 : 0; i < lines.length; i++) out.add(lines[i]);
-            int start = Math.max(0, out.size() - max);
-            return out.subList(start, out.size());
-        } catch (Exception e) {
-            return java.util.List.of();
-        }
-    }
-
     static Path writeCrash(Throwable t) {
-        try {
-            Path dir = Resources.logDir();
-            Files.createDirectories(dir);
-            Path crash = dir.resolve("crash.txt");
-            java.io.StringWriter sw = new java.io.StringWriter();
-            t.printStackTrace(new java.io.PrintWriter(sw));
-            Files.writeString(crash, Redact.apply(sw.toString()), java.nio.charset.StandardCharsets.UTF_8);
-            return crash;
-        } catch (Exception e) {
-            return null;
-        }
+        return Log.crash(t);
     }
 }

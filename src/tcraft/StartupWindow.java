@@ -13,6 +13,7 @@ import java.io.InputStream;
 
 import javax.imageio.ImageIO;
 
+// 仅在首次运行/修复 JavaFX 运行库时显示下载进度窗；正常启动不创建
 public final class StartupWindow {
 
     private static final int W = 460;
@@ -31,9 +32,14 @@ public final class StartupWindow {
     private final long openedAt = System.currentTimeMillis();
     // AWT 文案不走 localize，创建时取当前语言
     private volatile String status = Lang.t("准备 TCL 启动器中…");
+    private volatile String detail = "";
     private volatile int percent = -1;
     private volatile boolean closed;
     private Thread animator;
+
+    private long downloadStartMs;
+    private long downloadLastMs;
+    private volatile double speedMb;
 
     private StartupWindow() {
         panel = new Panel();
@@ -72,7 +78,7 @@ public final class StartupWindow {
         panel = null;
     }
 
-    // 新 JVM 不弹启动窗，旧进程窗口留到主界面出现
+    // 正常启动不需要进度窗
     public static StartupWindow none() {
         return new StartupWindow(true);
     }
@@ -83,13 +89,42 @@ public final class StartupWindow {
 
     public void setStatus(String text, int value) {
         status = text == null ? "" : text;
+        detail = "";
         percent = value;
         repaint();
     }
 
     public void setDownload(long done, long total, String text) {
-        int value = total > 0 ? (int) Math.min(99, done * 100 / total) : -1;
-        setStatus(text + (total > 0 ? "  " + mb(done) + " / " + mb(total) : ""), value);
+        applyDownload(text, done, total, total > 0 ? (int) Math.min(99, done * 100 / total) : -1);
+    }
+
+    // 多模块下载：percent 是整体进度，卡片上另外显示当前文件百分比、大小与速度
+    public void setDownload(String text, long done, long total, int overallPercent) {
+        applyDownload(text, done, total, overallPercent);
+    }
+
+    private void applyDownload(String text, long done, long total, int overallPercent) {
+        long now = System.currentTimeMillis();
+        if (downloadStartMs == 0) downloadStartMs = now;
+        // 速度 200ms 更新一次，避免数字乱跳
+        if (now - downloadLastMs >= 200) {
+            double secs = Math.max(0.001, (now - downloadStartMs) / 1000.0);
+            double avg = done / secs / 1048576.0;
+            speedMb = speedMb <= 0 ? avg : speedMb * 0.7 + avg * 0.3;
+            downloadLastMs = now;
+        }
+        StringBuilder d = new StringBuilder();
+        if (total > 0) {
+            d.append(String.format(java.util.Locale.ROOT, "%.1f / %.1f MB", done / 1048576.0, total / 1048576.0));
+            d.append("  ").append(done * 100 / Math.max(1, total)).append('%');
+        } else {
+            d.append(String.format(java.util.Locale.ROOT, "已下载 %.1f MB", done / 1048576.0));
+        }
+        if (speedMb > 0) d.append(String.format(java.util.Locale.ROOT, "  %.1f MB/s", speedMb));
+        detail = d.toString();
+        status = text == null ? "" : text;
+        percent = overallPercent;
+        repaint();
     }
 
     public void close() {
@@ -139,11 +174,7 @@ public final class StartupWindow {
         }
     }
 
-    private static String mb(long bytes) {
-        return String.format(java.util.Locale.ROOT, "%.1f MB", bytes / 1048576.0);
-    }
-
-    static void paintCard(Graphics2D g2, String text, int value, Image logo) {
+    static void paintCard(Graphics2D g2, String text, String detail, int value, Image logo) {
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         g2.setColor(new Color(0xfb, 0xfb, 0xfb));
@@ -167,7 +198,17 @@ public final class StartupWindow {
 
         g2.setColor(GRAY);
         g2.setFont(FONT_STATUS);
-        g2.drawString(clip(text, 330, g2), 116, 75);
+        g2.drawString(clip(text, 250, g2), 116, 75);
+        if (value >= 0) {
+            g2.setFont(FONT_PCT);
+            String p = value + "%";
+            g2.drawString(p, 116 + 318 - g2.getFontMetrics().stringWidth(p), 75);
+        }
+        if (detail != null && !detail.isEmpty()) {
+            g2.setColor(new Color(0x8c, 0x8c, 0x8c));
+            g2.setFont(FONT_PCT);
+            g2.drawString(clip(detail, 330, g2), 116, 91);
+        }
 
         int x = 116, y = 101, w = 318, h = 8;
         g2.setColor(TRACK);
@@ -176,10 +217,6 @@ public final class StartupWindow {
             int fill = Math.max(0, Math.min(w, w * value / 100));
             g2.setColor(ACCENT);
             g2.fillRoundRect(x, y, fill, h, h, h);
-            g2.setColor(new Color(0x8c, 0x8c, 0x8c));
-            g2.setFont(FONT_PCT);
-            String p = value + "%";
-            g2.drawString(p, x + w - g2.getFontMetrics().stringWidth(p), y - 7);
         } else {
             int span = 96;
             int travel = w + span;
@@ -211,7 +248,7 @@ public final class StartupWindow {
 
         @Override
         public void paint(Graphics g) {
-            paintCard((Graphics2D) g, status, percent, logo);
+            paintCard((Graphics2D) g, status, detail, percent, logo);
         }
 
         private Image loadLogo() {

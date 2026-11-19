@@ -166,7 +166,6 @@ public class PageSetup implements Page {
                 data.set("UiAnimSpeed", 100);
                 data.set("UiTitleAccountBadge", true);
                 data.set("UiRememberWindowPos", false);
-                data.set("UiSkipIntroAnim", false);
                 data.set("UiBackgroundType", 0);
                 data.set("UiBackgroundSuit", 0);
                 data.set("UiBackgroundRotate", 0);
@@ -482,7 +481,7 @@ public class PageSetup implements Page {
         crash.setSelected(data.crashAnalysisEnabled());
         crash.setOnAction(() -> {
             data.set("LaunchCrashAnalysis", crash.isSelected());
-            // 同步写 WPF 的反向键，换回旧版启动器时保持一致
+            // 同步写兼容旧配置的反向键
             data.set("LaunchAdvanceDisableCrashAnalysis", !crash.isSelected());
         });
         adv.add(crash);
@@ -703,10 +702,6 @@ public class PageSetup implements Page {
         remember.setSelected(data.getBool("UiRememberWindowPos", false));
         remember.setOnAction(() -> data.set("UiRememberWindowPos", remember.isSelected()));
         detail.add(remember);
-        Ui.Check skip = Ui.checkBox("跳过启动时的窗口入场动画（下次启动生效）", false);
-        skip.setSelected(data.getBool("UiSkipIntroAnim", false));
-        skip.setOnAction(() -> data.set("UiSkipIntroAnim", skip.isSelected()));
-        detail.add(skip);
 
         comboRow(detail, "标题栏高度", new String[]{"40", "44", "48（默认）", "54", "60"},
                 Math.max(0, Math.min(4, switch (data.getInt("UiTitleBarHeight", 48)) {
@@ -884,22 +879,26 @@ public class PageSetup implements Page {
         int preset = data.getInt("UiThemePreset", -1);
         if (preset == 14) {
             Ui.Card customTheme = addCard(page, "自定义主题色");
-            sliderRowDebounced(customTheme, "色调", 0, 360, data.getInt("UiLauncherHue", 210), v -> {
+            Ui.SliderBar hueBar = sliderRowDebounced(customTheme, "色调", 0, 360, data.getInt("UiLauncherHue", 210), v -> {
                 data.set("UiLauncherHue", v.intValue());
                 Theme.applyCustomTheme();
             }, "°");
-            sliderRowDebounced(customTheme, "饱和度", 0, 100, data.getInt("UiLauncherSat", 72), v -> {
+            hueBar.setOnMouseReleased(e -> win.rebuildUi());
+            Ui.SliderBar satBar = sliderRowDebounced(customTheme, "饱和度", 0, 100, data.getInt("UiLauncherSat", 72), v -> {
                 data.set("UiLauncherSat", v.intValue());
                 Theme.applyCustomTheme();
             }, "%");
-            sliderRowDebounced(customTheme, "亮度", 0, 100, data.getInt("UiLauncherLight", 55), v -> {
+            satBar.setOnMouseReleased(e -> win.rebuildUi());
+            Ui.SliderBar lightBar = sliderRowDebounced(customTheme, "亮度", 0, 100, data.getInt("UiLauncherLight", 55), v -> {
                 data.set("UiLauncherLight", v.intValue());
                 Theme.applyCustomTheme();
             }, "%");
-            sliderRowDebounced(customTheme, "标题栏色相偏移", 0, 180, data.getInt("UiLauncherDelta", 20), v -> {
+            lightBar.setOnMouseReleased(e -> win.rebuildUi());
+            Ui.SliderBar deltaBar = sliderRowDebounced(customTheme, "标题栏色相偏移", 0, 180, data.getInt("UiLauncherDelta", 20), v -> {
                 data.set("UiLauncherDelta", v.intValue());
                 Theme.applyCustomTheme();
             }, "°");
+            deltaBar.setOnMouseReleased(e -> win.rebuildUi());
         }
 
         boolean videoMode = data.getInt("UiBackgroundType", 0) == 1;
@@ -911,7 +910,7 @@ public class PageSetup implements Page {
             } catch (Exception ignored) {
             }
         }
-        // 标题对齐 WPF：整键带计数，拼接串查不到表
+        // 标题整键带计数，拼接串查不到表
         String bgTitle = videoMode
                 ? (videoCount > 0 ? Lang.tf("背景视频（%d 个）", videoCount) : "背景视频")
                 : (imageCount > 0 ? Lang.tf("背景图片（%d 张）", imageCount) : "背景图片");
@@ -923,9 +922,9 @@ public class PageSetup implements Page {
                     win.refreshRight();
                 });
         if (!videoMode) {
-            // 有图片才显示自适应/轮播/不透明度/模糊，对齐 WPF 的显隐逻辑
+            // 有图片才显示自适应/轮播/不透明度/模糊
             if (imageCount > 0) {
-                // 下拉顺序与存储值对齐 WPF
+                // 下拉顺序与存储值一一对应
                 String[] suitNames = {"自动", "平铺", "居中", "拉伸", "左上 (保持长宽比)",
                         "左中 (保持长宽比)", "左下 (保持长宽比)", "中上 (保持长宽比)",
                         "居中 (保持长宽比)", "中下 (保持长宽比)", "右上 (保持长宽比)",
@@ -1650,13 +1649,13 @@ public class PageSetup implements Page {
     private void buildLog(VBox page) {
         header(page, "日志", "查看、导出与清理运行日志。");
         Path logDir = Resources.logDir();
-        Path logFile = Resources.errorLogFile();
+        Path logFile = logDir.resolve("launcher.log");
 
         Ui.Card ops = addCard(page, "日志操作");
         FlowPane buttons = new FlowPane(10, 10);
         buttons.getChildren().addAll(
-                Ui.button("导出当前日志", Ui.BTN_HIGHLIGHT, () -> exportLog(logFile, false)),
-                Ui.button("导出全部日志", Ui.BTN_NORMAL, () -> exportLog(logFile, true)),
+                Ui.button("导出当前日志", Ui.BTN_HIGHLIGHT, () -> exportLog(false)),
+                Ui.button("导出全部日志", Ui.BTN_NORMAL, () -> exportLog(true)),
                 Ui.button("打开日志文件夹", Ui.BTN_NORMAL, () -> {
                     try {
                         Files.createDirectories(logDir);
@@ -1666,11 +1665,8 @@ public class PageSetup implements Page {
                     }
                 }),
                 Ui.button("清理历史日志", Ui.BTN_RED, () ->
-                        Dialogs.confirm(win, "清理历史日志", Lang.tf("将删除 %s 并清空当前日志显示。是否继续？", logFile), () -> {
-                            try {
-                                Files.deleteIfExists(logFile);
-                            } catch (Exception ignored) {
-                            }
+                        Dialogs.confirm(win, "清理历史日志", Lang.tf("将删除 %s 并清空当前日志显示。是否继续？", logDir), () -> {
+                            Log.cleanup();
                             data.log.clear();
                             win.refreshRight();
                             win.toast("日志已清理", "", 1);
@@ -1698,7 +1694,7 @@ public class PageSetup implements Page {
                 + " -fx-highlight-text-fill: #ffffff;"
                 + " -fx-focus-color: transparent; -fx-faint-focus-color: transparent;");
         live.add(view);
-        Label status = Ui.label("实时监听 errors.log（只记录错误与崩溃）…", 11.5, Theme.gray3);
+        Label status = Ui.label(Lang.t("实时监听 launcher.log…"), 11.5, Theme.gray3);
         live.add(status);
         final Timeline[] tick = new Timeline[1];
         final String[] lastKey = {""};
@@ -1795,9 +1791,9 @@ public class PageSetup implements Page {
     private String[] readLogLines(Path file) {
         try {
             if (Files.isRegularFile(file)) {
-                // 只读末尾 512 KiB，整份读入会把 FX 线程拖死
+                // 只读末尾 384 KiB，整份读入会把 FX 线程拖死
                 long size = Files.size(file);
-                long start = Math.max(0, size - 512 * 1024L);
+                long start = Math.max(0, size - 384 * 1024L);
                 byte[] bytes = new byte[(int) (size - start)];
                 try (java.nio.channels.FileChannel ch = java.nio.channels.FileChannel.open(
                         file, java.nio.file.StandardOpenOption.READ)) {
@@ -1846,7 +1842,7 @@ public class PageSetup implements Page {
         return sb.toString();
     }
 
-    private void exportLog(Path source, boolean all) {
+    private void exportLog(boolean all) {
         FileChooser chooser = new FileChooser();
         chooser.setTitle(all ? Lang.t("导出全部日志") : Lang.t("导出当前日志"));
         chooser.setInitialFileName(all ? "launcher-full.log" : "launcher-current.log");
@@ -1854,13 +1850,10 @@ public class PageSetup implements Page {
         File file = chooser.showSaveDialog(win.stage);
         if (file == null) return;
         // 日志可能很大，读取、脱敏、写盘都放后台
-        final Path sourcePath = source;
-        final boolean allLog = all;
         Thread worker = new Thread(() -> {
             try {
-                String content = allLog && Files.isRegularFile(sourcePath)
-                        ? Files.readString(sourcePath, java.nio.charset.StandardCharsets.UTF_8)
-                        : String.join("\n", data.log);
+                String content = all ? Log.exportAll() : Log.exportCurrent();
+                if (content.isEmpty()) content = String.join("\n", data.log);
                 Files.writeString(file.toPath(), Redact.apply(content), java.nio.charset.StandardCharsets.UTF_8);
                 javafx.application.Platform.runLater(() -> win.toast("导出完成", file.getName(), 1));
             } catch (Exception e) {
@@ -2191,7 +2184,7 @@ public class PageSetup implements Page {
         customHint.setWrapText(true);
         speed.add(customHint);
         String[] sources = {"官方源 (piston-meta.mojang.com)", "BMCLAPI (bmclapi2.bangbang93.com)", "自定义源"};
-        int[] wpfIndex = {2, 0};
+        int[] sourceIndex = {2, 0};
         VBox results = new VBox(2);
         Label[] values = new Label[sources.length];
         Label[] names = new Label[sources.length];
@@ -2235,9 +2228,9 @@ public class PageSetup implements Page {
                 data.set("SystemVersionSource", 0);
                 win.toast("已应用", Lang.t("下载源已切换为 ") + names[2].getText(), 1);
             } else {
-                int value = FILE_SOURCES[wpfIndex[idx]];
+                int value = FILE_SOURCES[sourceIndex[idx]];
                 data.set("SystemDownloadSource", value);
-                data.set("SystemVersionSource", wpfIndex[idx]);
+                data.set("SystemVersionSource", sourceIndex[idx]);
                 win.toast("已应用", Lang.t("下载源已切换为 ") + sources[idx], 1);
             }
             data.save();

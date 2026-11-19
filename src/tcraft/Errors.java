@@ -278,16 +278,23 @@ public final class Errors {
     }
 
     private static void exportAndToast(Report r) {
-        Path file = exportReport(r);
         MainWindow w = window;
         if (w == null) return;
-        if (file == null) {
-            onFx(() -> w.toast("导出失败", "无法写入错误报告，请改用「设置 → 日志」导出。", 3));
-        } else {
-            // 文件名是动态串，后缀单独查表，整串 localize 查不到
-            onFx(() -> w.toast("错误报告已导出",
-                    file.getFileName() + Lang.t(" · 请把文件发到 TCL 交流群（1131373915）"), 2));
-        }
+        onFx(() -> w.toast(Lang.t("正在导出日志"), Lang.t("导出完成后会自动打开所在文件夹"), 1));
+        // 完整日志可能较大，读取与写盘放到后台
+        Thread worker = new Thread(() -> {
+            Path file = exportReport(r);
+            onFx(() -> {
+                if (file == null) {
+                    w.toast("导出失败", "无法写入错误报告，请改用「设置 → 日志」导出。", 3);
+                } else {
+                    w.toast("错误报告已导出",
+                            file.getFileName() + Lang.t(" · 请把文件发到 TCL 交流群（1131373915）"), 2);
+                }
+            });
+        }, "TCL-ExportReport");
+        worker.setDaemon(true);
+        worker.start();
     }
 
     private static Path exportReport(Report r) {
@@ -296,7 +303,7 @@ public final class Errors {
             Path dir = Resources.home().resolve("feedback");
             Files.createDirectories(dir);
             String stamp = LocalDateTime.now()
-                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
+                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS"));
             file = dir.resolve("TCraft-错误报告-" + stamp + ".log");
             // 带 BOM，记事本和 QQ 里直接看不会乱码
             Files.writeString(file, "\uFEFF" + exportText(r), StandardCharsets.UTF_8);
@@ -325,8 +332,23 @@ public final class Errors {
             sb.append("\n===== 详细信息 =====\n").append(detail).append('\n');
         }
         sb.append("\n===== 诊断信息 =====\n").append(systemInfo()).append('\n');
+        appendHistory(sb);
+        return sanitize(sb.toString());
+    }
+
+    // 导出完整历史：错误记录 + 运行日志，不再只给最后几百行
+    private static void appendHistory(StringBuilder sb) {
+        String errors = cap(Log.exportErrors(), "错误记录");
+        String runtime = cap(Log.exportCurrent(), "运行日志");
+        if (!errors.isEmpty()) {
+            sb.append("\n===== 错误记录（完整）=====\n").append(errors).append('\n');
+        }
+        if (!runtime.isEmpty()) {
+            sb.append("\n===== 运行日志（完整）=====\n").append(runtime).append('\n');
+        }
+        if (!errors.isEmpty() || !runtime.isEmpty()) return;
         try {
-            // 先收快照再截尾，防与 clear() 竞态
+            // 日志文件不可用时退回内存
             List<String> logs = new ArrayList<>();
             for (String line : Data.get().log) logs.add(line);
             int from = Math.max(0, logs.size() - 200);
@@ -334,16 +356,26 @@ public final class Errors {
             for (int i = from; i < logs.size(); i++) sb.append(logs.get(i)).append('\n');
         } catch (Throwable ignored) {
         }
-        return sanitize(sb.toString());
+    }
+
+    // 反馈文件不宜过大，单段超过 4MB 截断并注明
+    private static String cap(String text, String label) {
+        int max = 4 * 1024 * 1024;
+        if (text == null || text.length() <= max) return text == null ? "" : text;
+        return text.substring(0, max) + "\n… " + label + "超过 4 MB，其余部分已省略\n";
     }
 
     private static void doFeedback(Report r) {
-        feedbackInfo();
-        Path file = exportReport(r);
-        String text = file == null
-                ? "错误报告导出失败，可在 设置 → 日志 中手动导出，再把文件发到 TCL 交流群（1131373915）。"
-                : "错误报告已导出，所在文件夹已自动打开。请把 .log 文件发到 TCraft Launcher 启动器交流群（群号 1131373915），不要只发截图。";
-        enqueue(new Report("反馈", text, "", Behavior.ALERT, true, true));
+        Thread worker = new Thread(() -> {
+            feedbackInfo();
+            Path file = exportReport(r);
+            String text = file == null
+                    ? "错误报告导出失败，可在 设置 → 日志 中手动导出，再把文件发到 TCL 交流群（1131373915）。"
+                    : "错误报告已导出，所在文件夹已自动打开。请把 .log 文件发到 TCraft Launcher 启动器交流群（群号 1131373915），不要只发截图。";
+            enqueue(new Report("反馈", text, "", Behavior.ALERT, true, true));
+        }, "TCL-Feedback");
+        worker.setDaemon(true);
+        worker.start();
     }
 
     private static String systemInfo() {
@@ -536,32 +568,15 @@ public final class Errors {
     }
 
     private static void log(String title, String headline, String detail) {
+        String entry = sanitize("[" + LocalDateTime.now().withNano(0) + "] " + title + " — " + headline
+                + " @ " + Thread.currentThread().getName());
         try {
-            Data.get().log("[" + title + "] " + sanitize(headline));
+            // 内存兜底；错误进 errors.log 与 launcher.log，均带完整堆栈
+            Data.get().log.add(entry);
+            if (Data.get().getBool("SystemDebugMode", false)) System.out.println("[TCL] " + entry);
         } catch (Throwable ignored) {
         }
-        try {
-            Path dir = Resources.logDir();
-            Files.createDirectories(dir);
-            String entry = sanitize("[" + LocalDateTime.now() + "] " + title + " — " + headline
-                    + "\n" + detail + "\n\n");
-            Path errorsLog = dir.resolve("errors.log");
-            // 超 512KB 滚动成 .1；同一份内容不再往 crash.txt 抄一遍
-            rotate(errorsLog);
-            Files.writeString(errorsLog, entry, StandardCharsets.UTF_8,
-                    StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-        } catch (Throwable ignored) {
-        }
-    }
-
-    private static void rotate(Path file) {
-        try {
-            if (Files.isRegularFile(file) && Files.size(file) > 512L * 1024) {
-                Files.move(file, file.resolveSibling(file.getFileName() + ".1"),
-                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-            }
-        } catch (Throwable ignored) {
-        }
+        Log.error(detail == null || detail.isEmpty() ? entry : entry + "\n" + detail);
     }
 
     private static void onFx(Runnable r) {

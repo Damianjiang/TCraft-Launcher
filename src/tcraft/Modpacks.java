@@ -99,7 +99,7 @@ public final class Modpacks {
         } catch (Exception e) {
             // readError 经 PageInstance 弹窗展示，整串查不到表，创建处翻译
             info.readError = Lang.tf("压缩包损坏或读取失败：%s", e.getMessage() == null ? e.toString() : e.getMessage());
-            Data.get().log("预读整合包失败：" + e.getMessage());
+            Data.get().log("预读整合包失败：" + Log.describe(e));
         }
         return info;
     }
@@ -310,7 +310,7 @@ public final class Modpacks {
                 info.loaderVersion = dash > 0 ? rest.substring(0, dash) : rest;
             }
         } catch (Exception e) {
-            Data.get().log("读取 HMCL pack.json 失败：" + e.getMessage());
+            Data.get().log("读取 HMCL pack.json 失败：" + Log.describe(e));
         }
     }
 
@@ -432,7 +432,8 @@ public final class Modpacks {
                     : Math.max(0, data.selectedInstance - 1);
             data.save();
             deleteRecursive(dir);
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            data.log("清理整合包实例失败：" + Log.describe(e));
         }
     }
 
@@ -623,7 +624,7 @@ public final class Modpacks {
                     Platform.runLater(win::refreshRight);
                     data.log("整合包版本已就绪：" + instanceName + " → " + actual);
                 } catch (Exception e) {
-                    data.log("写整合包版本 json 失败：" + e.getMessage());
+                    data.log("写整合包版本 json 失败：" + Log.describe(e));
                 }
             }
             task.progress = 1;
@@ -660,7 +661,7 @@ public final class Modpacks {
                         + " 已被忽略（只允许本机手动设置）");
             }
         } catch (Exception e) {
-            Data.get().log("检查整合包实例设置失败：" + e.getMessage());
+            Data.get().log("检查整合包实例设置失败：" + Log.describe(e));
         }
     }
 

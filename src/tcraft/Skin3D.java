@@ -137,7 +137,7 @@ public final class Skin3D extends Region {
             }
             setSkin(img);
         } catch (Exception e) {
-            Data.get().log("3D 皮肤预览加载失败：" + resName + " " + e);
+            Data.get().log("3D 皮肤预览加载失败：" + resName + " " + Log.describe(e));
         }
     }
 
