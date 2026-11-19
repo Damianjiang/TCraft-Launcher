@@ -2205,18 +2205,16 @@ public final class MainWindow {
         }
         introPrepared = true;
         introRunning = true;
-        frame.setRotate(-9);
-        frame.setTranslateY(110);
-        frame.setScaleX(0.9);
-        frame.setScaleY(0.9);
+        frame.setRotate(-6);
+        frame.setTranslateY(50);
+        frame.setScaleX(0.96);
+        frame.setScaleY(0.96);
         frame.setOpacity(1);
         root.setOpacity(0.4);
         if (titleLogoNode != null) titleLogoNode.setOpacity(0);
     }
 
-    /**
-     * 等窗口真正画出第一帧再放动画，否则动画会在界面可见之前跑掉大半。
-     */
+    // 等窗口画出首帧再放动画，否则动画会在界面可见之前跑掉大半
     public void playIntroWhenReady() {
         if (!introPrepared) return;
         javafx.animation.AnimationTimer timer = new javafx.animation.AnimationTimer() {
@@ -2232,21 +2230,27 @@ public final class MainWindow {
         timer.start();
     }
 
+    // 回弹缓动：末尾轻微过冲再落回，比纯 EASE_OUT 更有落定感
+    private static final Interpolator EASE_OUT_BACK = new Interpolator() {
+        @Override
+        protected double curve(double t) {
+            double c1 = 0.9;
+            double u = t - 1;
+            return 1 + (c1 + 1) * u * u * u + c1 * u * u;
+        }
+    };
+
     public void playIntro() {
         if (!introPrepared) return;
         Timeline move = new Timeline(
-                new KeyFrame(Duration.ZERO, new KeyValue(frame.translateYProperty(), 110),
-                        new KeyValue(frame.rotateProperty(), -9),
-                        new KeyValue(frame.scaleXProperty(), 0.9),
-                        new KeyValue(frame.scaleYProperty(), 0.9)),
-                new KeyFrame(Duration.millis(560), new KeyValue(frame.rotateProperty(), 0,
-                        Interpolator.EASE_OUT)),
-                new KeyFrame(Duration.millis(600), new KeyValue(frame.translateYProperty(), 0,
-                        Interpolator.EASE_OUT)),
-                new KeyFrame(Duration.millis(600), new KeyValue(frame.scaleXProperty(), 1,
-                        Interpolator.EASE_OUT)),
-                new KeyFrame(Duration.millis(600), new KeyValue(frame.scaleYProperty(), 1,
-                        Interpolator.EASE_OUT)));
+                new KeyFrame(Duration.ZERO, new KeyValue(frame.translateYProperty(), 50),
+                        new KeyValue(frame.rotateProperty(), -6),
+                        new KeyValue(frame.scaleXProperty(), 0.96),
+                        new KeyValue(frame.scaleYProperty(), 0.96)),
+                new KeyFrame(Duration.millis(360), new KeyValue(frame.rotateProperty(), 0, EASE_OUT_BACK)),
+                new KeyFrame(Duration.millis(420), new KeyValue(frame.translateYProperty(), 0, EASE_OUT_BACK),
+                        new KeyValue(frame.scaleXProperty(), 1, EASE_OUT_BACK),
+                        new KeyValue(frame.scaleYProperty(), 1, EASE_OUT_BACK)));
         move.setOnFinished(e -> {
             introRunning = false;
             introPrepared = false;
@@ -2257,16 +2261,16 @@ public final class MainWindow {
         });
         move.play();
         if (titleLogoNode != null) {
-            FadeTransition logoFade = new FadeTransition(Duration.millis(460), titleLogoNode);
+            FadeTransition logoFade = new FadeTransition(Duration.millis(340), titleLogoNode);
             logoFade.setFromValue(0);
             logoFade.setToValue(1);
-            logoFade.setDelay(Duration.millis(260));
+            logoFade.setDelay(Duration.millis(160));
             logoFade.play();
         }
-        FadeTransition fade = new FadeTransition(Duration.millis(320), root);
+        FadeTransition fade = new FadeTransition(Duration.millis(220), root);
         fade.setFromValue(0.4);
         fade.setToValue(baseOpacity);
-        fade.setDelay(Duration.millis(80));
+        fade.setDelay(Duration.millis(40));
         fade.setInterpolator(Interpolator.EASE_OUT);
         fade.play();
     }
@@ -3389,13 +3393,23 @@ public final class MainWindow {
     public void closeWindow() {
         if (closing) return;
         closing = true;
+        data.log("关闭启动器");
         saveWindowBounds();
-        FadeTransition ft = new FadeTransition(Duration.millis(180), root);
-        ft.setToValue(0);
-        TranslateTransition tt = new TranslateTransition(Duration.millis(180), frame);
-        tt.setToY(18);
-        ParallelTransition pt = new ParallelTransition(ft, tt);
-        pt.setOnFinished(e -> {
+        Timeline exit = new Timeline(
+                new KeyFrame(Duration.ZERO,
+                        new KeyValue(root.opacityProperty(), root.getOpacity()),
+                        new KeyValue(frame.scaleXProperty(), 1),
+                        new KeyValue(frame.scaleYProperty(), 1),
+                        new KeyValue(frame.translateYProperty(), 0),
+                        new KeyValue(frame.rotateProperty(), 0)),
+                new KeyFrame(Duration.millis(140),
+                        new KeyValue(root.opacityProperty(), 0, Interpolator.EASE_OUT)),
+                new KeyFrame(Duration.millis(180),
+                        new KeyValue(frame.scaleXProperty(), 0.88, Interpolator.EASE_OUT),
+                        new KeyValue(frame.scaleYProperty(), 0.88, Interpolator.EASE_OUT),
+                        new KeyValue(frame.translateYProperty(), 20, Interpolator.EASE_OUT),
+                        new KeyValue(frame.rotateProperty(), 0.6, Interpolator.EASE_OUT)));
+        exit.setOnFinished(e -> {
             data.save();
             stopVideo();
             if (shellTimer != null) shellTimer.stop();
@@ -3411,7 +3425,7 @@ public final class MainWindow {
             killer.setDaemon(true);
             killer.start();
         });
-        pt.play();
+        exit.play();
     }
 
     private void installDropTarget(Scene scene) {
