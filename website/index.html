@@ -3,43 +3,136 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>TCraft Launcher — 简单好用的开源 Minecraft 启动器</title>
-  <meta name="description" content="TCraft Launcher是一款免费开源的 Minecraft 启动器">
-  <meta name="keywords" content="Minecraft 启动器,MC 启动器,Minecraft Java 版启动器,我的世界启动器,TCraft Launcher,TCL,开源启动器,跨平台启动器">
+  <title>TCraft Launcher - 免费开源 Minecraft 启动器｜我的世界 Java 版多实例联机整合包</title>
+  <meta name="description" content="TCraft Launcher（TCL）是一款免费开源的 Minecraft 启动器，支持 Windows、macOS、Linux。提供微软正版登录、外置皮肤站登录、EasyTier 联机房间、整合包导入、Mod 与光影下载、多实例版本隔离、Java 运行时管理、崩溃分析，绿色单文件无需安装。">
+  <meta name="keywords" content="Minecraft启动器,我的世界启动器,MC启动器,Minecraft Java版启动器,TCraft Launcher,TCL启动器,开源启动器,免费启动器,跨平台启动器,微软正版登录,离线登录,外置登录,皮肤站登录,Authlib,LittleSkin,Yggdrasil,EasyTier联机,我的世界联机,联机房间,整合包导入,CurseForge整合包,Modrinth整合包,MCBBS整合包,Forge,NeoForge,Fabric,OptiFine,光影包,资源包,3D皮肤,版本隔离,多实例管理,Java运行时,崩溃分析,绿色单文件,Windows启动器,macOS启动器,Linux启动器,Minecraft launcher,open source launcher">
   <meta name="author" content="TCraft Team">
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+  <meta name="googlebot" content="index, follow">
+  <link rel="canonical" href="https://damianjiang.github.io/TCraft-Launcher/">
+
   <meta property="og:type" content="website">
-  <meta property="og:title" content="TCraft Launcher — 简单好用的 Minecraft 启动器">
-  <meta property="og:description" content="免费开源的 Minecraft 启动器">
-  <meta property="og:image" content="assets/screenshots/01-home.jpg">
+  <meta property="og:site_name" content="TCraft Launcher">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:url" content="https://damianjiang.github.io/TCraft-Launcher/">
+  <meta property="og:title" content="TCraft Launcher - 免费开源 Minecraft 启动器">
+  <meta property="og:description" content="免费开源的 Minecraft Java 版启动器，支持微软登录、EasyTier 联机、整合包导入、多实例隔离，Windows / macOS / Linux 通用。">
+  <meta property="og:image" content="https://damianjiang.github.io/TCraft-Launcher/assets/screenshots/01-home.jpg">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="TCraft Launcher - 免费开源 Minecraft 启动器">
+  <meta name="twitter:description" content="免费开源、跨平台的 Minecraft Java 版启动器，联机、整合包、多实例一站搞定。">
+  <meta name="twitter:image" content="https://damianjiang.github.io/TCraft-Launcher/assets/screenshots/01-home.jpg">
+
   <link rel="icon" type="image/png" href="assets/icon.png">
   <link rel="stylesheet" href="style.css">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "SoftwareApplication",
+        "name": "TCraft Launcher",
+        "alternateName": "TCL",
+        "applicationCategory": "GameApplication",
+        "operatingSystem": "Windows, macOS, Linux",
+        "description": "免费开源的 Minecraft Java 版启动器，支持微软正版登录、外置皮肤站登录、EasyTier 联机房间、整合包导入、Mod 与光影下载、多实例版本隔离、Java 运行时管理与崩溃分析。",
+        "url": "https://damianjiang.github.io/TCraft-Launcher/",
+        "downloadUrl": "https://github.com/Damianjiang/TCraft-Launcher/releases/latest",
+        "softwareVersion": "1.3.28",
+        "license": "https://github.com/Damianjiang/TCraft-Launcher/blob/main/LICENSE",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" },
+        "featureList": [
+          "微软正版登录与离线登录",
+          "外置皮肤站 / Authlib 登录",
+          "EasyTier 联机房间",
+          "CurseForge / Modrinth / HMCL / MCBBS 整合包导入",
+          "Forge / NeoForge / Fabric / OptiFine 安装",
+          "多实例与版本隔离",
+          "Java 运行时自动管理与选择",
+          "崩溃自动分析与错误报告导出",
+          "壁纸 / 主题 / 背景音乐个性化",
+          "简体中文 / English / 繁體中文多语言"
+        ]
+      },
+      {
+        "@type": "WebSite",
+        "name": "TCraft Launcher",
+        "url": "https://damianjiang.github.io/TCraft-Launcher/",
+        "inLanguage": "zh-CN"
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "TCraft Launcher 是什么？",
+            "acceptedAnswer": { "@type": "Answer", "text": "TCraft Launcher（简称 TCL）是一款用 JavaFX 编写的开源 Minecraft Java 版启动器。绿色单文件，无需安装向导、没有捆绑、不上报数据，Windows、macOS、Linux 三个平台共用同一个 jar。" }
+          },
+          {
+            "@type": "Question",
+            "name": "TCraft Launcher 免费吗？开源吗？",
+            "acceptedAnswer": { "@type": "Answer", "text": "完全免费且开源，采用 MIT 许可证。所有源码、构建方式与发布包都公开在 GitHub，可自由查看、修改和贡献。" }
+          },
+          {
+            "@type": "Question",
+            "name": "支持哪些登录方式？",
+            "acceptedAnswer": { "@type": "Answer", "text": "支持微软正版登录（设备码流程）、离线登录，以及外置皮肤站 / Authlib 登录（如 LittleSkin 等 Yggdrasil 认证服务器）。登录后支持 2D 与 3D 皮肤预览，实例还可限制必须正版或禁止离线。" }
+          },
+          {
+            "@type": "Question",
+            "name": "怎么和朋友联机？",
+            "acceptedAnswer": { "@type": "Answer", "text": "内置基于 EasyTier 的联机房间功能。房主创建房间后把 Base64 联机码发给朋友，对方加入即可直连；使用 --no-tun 用户态组网，无需公网 IP 和管理员权限。" }
+          },
+          {
+            "@type": "Question",
+            "name": "能导入整合包和 Mod 吗？",
+            "acceptedAnswer": { "@type": "Answer", "text": "可以。支持 CurseForge、Modrinth、MultiMC、HMCL、MCBBS 等多种整合包格式导入，也可以把 .zip / .mrpack 或游戏目录直接拖进窗口。内置下载支持 Forge、NeoForge、Fabric、OptiFine，以及 Mod、数据包、资源包、光影与世界。" }
+          },
+          {
+            "@type": "Question",
+            "name": "支持哪些操作系统？需要安装 Java 吗？",
+            "acceptedAnswer": { "@type": "Answer", "text": "支持 Windows、macOS（Intel / Apple Silicon）和 Linux（x64 / ARM）。系统需要有 Java 17 或更高版本，没有的话启动器会引导下载；也可按需下载 Java 8 / 17 / 21 / 25 并按实例版本自动挑选。" }
+          },
+          {
+            "@type": "Question",
+            "name": "游戏崩溃了怎么办？",
+            "acceptedAnswer": { "@type": "Answer", "text": "游戏异常退出后启动器会自动分析崩溃原因，包括 Mod 重复、版本不匹配、主类缺失、NBT 错误、图形环境等；诊断页可直接查看崩溃报告与启动参数，并支持导出脱敏后的错误报告。" }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
 </head>
 <body>
 
   <header class="topbar">
     <div class="wrap topbar-inner">
       <a class="brand" href="#top">
-        <img src="assets/logo.png" alt="TCraft Launcher" class="brand-logo">
+        <img src="assets/logo.png" alt="" class="brand-logo">
         <span>TCraft Launcher</span>
       </a>
       <nav class="nav">
         <a href="#features">功能</a>
         <a href="#gallery">展示</a>
         <a href="#systems">支持系统</a>
-        <a href="https://github.com/DamianJiang/TCraft-Launcher/releases" target="_blank" rel="noopener">下载</a>
-        <a href="https://github.com/DamianJiang/TCraft-Launcher" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/Damianjiang/TCraft-Launcher/releases" target="_blank" rel="noopener">下载</a>
+        <a href="https://github.com/Damianjiang/TCraft-Launcher" target="_blank" rel="noopener">GitHub</a>
       </nav>
     </div>
   </header>
 
+  <main>
   <section class="hero" id="top">
     <div class="wrap hero-inner">
       <img class="hero-logo" src="assets/icon.png" alt="">
       <h1>TCraft Launcher</h1>
       <p class="hero-sub">简单好用的 Minecraft Java 版启动器</p>
       <div class="hero-actions">
-        <a class="btn btn-primary" href="https://github.com/DamianJiang/TCraft-Launcher/releases" target="_blank" rel="noopener">下载</a>
-        <a class="btn btn-ghost" href="https://github.com/DamianJiang/TCraft-Launcher" target="_blank" rel="noopener">GitHub</a>
+        <a class="btn btn-primary" href="https://github.com/Damianjiang/TCraft-Launcher/releases" target="_blank" rel="noopener">下载</a>
+        <a class="btn btn-ghost" href="https://github.com/Damianjiang/TCraft-Launcher" target="_blank" rel="noopener">GitHub</a>
       </div>
       <div class="hero-points">
         <span>跨平台支持</span>
@@ -53,7 +146,7 @@
     <div class="wrap notice-inner">
       <span class="notice-badge">注意</span>
       <p>启动器还在开发中，有些功能没做完，个别设置可能不生效。遇到问题或有建议，
-        <a href="https://github.com/DamianJiang/TCraft-Launcher/issues" target="_blank" rel="noopener">到 GitHub 提 Issue</a>，
+        <a href="https://github.com/Damianjiang/TCraft-Launcher/issues" target="_blank" rel="noopener">到 GitHub 提 Issue</a>，
         或者加 QQ 群
         <a href="https://qm.qq.com/q/UONIv4VgwE" target="_blank" rel="noopener">1131373915</a>。</p>
     </div>
@@ -97,7 +190,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6"/><path d="M22 11h-6"/></svg>
           </span>
           <h3>账号管理</h3>
-          <p>内置 Microsoft 登录与第三方认证服务器支持，兼容 Yggdrasil Connect 的 OAuth 登录流程规范提案，登录后支持 3D 渲染皮肤</p>
+          <p>微软正版登录与皮肤站登录，兼容 Yggdrasil Connect 的 OAuth 登录流程规范提案，登录后支持 3D 渲染皮肤。</p>
         </div>
 
         <div class="card">
@@ -139,6 +232,7 @@
       </div>
     </div>
   </section>
+  </main>
 
   <footer class="footer">
     <div class="wrap">
@@ -152,15 +246,15 @@
         <div>
           <h4>项目</h4>
           <ul>
-            <li><a href="https://github.com/DamianJiang/TCraft-Launcher" target="_blank" rel="noopener">GitHub 仓库</a></li>
-            <li><a href="https://github.com/DamianJiang/TCraft-Launcher/releases" target="_blank" rel="noopener">版本发布</a></li>
-            <li><a href="https://github.com/DamianJiang/TCraft-Launcher/issues" target="_blank" rel="noopener">问题反馈</a></li>
+            <li><a href="https://github.com/Damianjiang/TCraft-Launcher" target="_blank" rel="noopener">GitHub 仓库</a></li>
+            <li><a href="https://github.com/Damianjiang/TCraft-Launcher/releases" target="_blank" rel="noopener">版本发布</a></li>
+            <li><a href="https://github.com/Damianjiang/TCraft-Launcher/issues" target="_blank" rel="noopener">问题反馈</a></li>
           </ul>
         </div>
         <div>
           <h4>社区</h4>
           <ul>
-            <li><a href="https://github.com/DamianJiang/TCraft-Launcher/discussions" target="_blank" rel="noopener">讨论区</a></li>
+            <li><a href="https://github.com/Damianjiang/TCraft-Launcher/discussions" target="_blank" rel="noopener">讨论区</a></li>
             <li><a href="https://qm.qq.com/q/WaG64YE9uo" target="_blank" rel="noopener">QQ 交流群</a></li>
           </ul>
         </div>
