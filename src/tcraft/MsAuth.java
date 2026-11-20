@@ -268,22 +268,27 @@ public final class MsAuth {
         }
         r.uuid = formatUuid(Json.str(pm, "id", ""));
         r.name = Json.str(pm, "name", "");
-        for (Object o : Json.arr(pm.get("skins"))) {
-            Map<String, Object> skin = Json.obj(o);
-            if ("ACTIVE".equalsIgnoreCase(Json.str(skin, "state", ""))) {
-                r.skinUrl = Json.str(skin, "url", "");
-            }
-        }
+        r.skinUrl = activeSkinUrl(pm);
         for (Object o : Json.arr(pm.get("capes"))) {
             Map<String, Object> cape = Json.obj(o);
             if ("ACTIVE".equalsIgnoreCase(Json.str(cape, "state", ""))) {
                 r.capeUrl = Json.str(cape, "url", "");
             }
         }
-        if (r.skinUrl.isEmpty() && !Json.arr(pm.get("skins")).isEmpty()) {
-            r.skinUrl = Json.str(Json.obj(Json.arr(pm.get("skins")).get(0)), "url", "");
-        }
         return r;
+    }
+
+    private static String activeSkinUrl(Map<String, Object> profile) {
+        for (Object o : Json.arr(profile.get("skins"))) {
+            Map<String, Object> skin = Json.obj(o);
+            if ("ACTIVE".equalsIgnoreCase(Json.str(skin, "state", ""))) {
+                return Json.str(skin, "url", "");
+            }
+        }
+        if (!Json.arr(profile.get("skins")).isEmpty()) {
+            return Json.str(Json.obj(Json.arr(profile.get("skins")).get(0)), "url", "");
+        }
+        return "";
     }
 
     private static String missingGameMessage(String token) {
@@ -304,11 +309,7 @@ public final class MsAuth {
     public static String saveSkin(Result r) {
         if (r.skinUrl == null || r.skinUrl.isEmpty()) return "";
         try {
-            java.nio.file.Path dir = Theme.skinDir();
-            java.nio.file.Files.createDirectories(dir);
-            String file = (r.name.isEmpty() ? "skin" : r.name) + ".png";
-            java.nio.file.Files.write(dir.resolve(file), download(r.skinUrl));
-            return "Skins/" + file;
+            return Skins.download(r.name.isEmpty() ? "skin" : r.name, r.skinUrl);
         } catch (Exception e) {
             try {
                 Data.get().log("保存皮肤失败：" + e);
@@ -316,6 +317,31 @@ public final class MsAuth {
             }
             return "";
         }
+    }
+
+    // 令牌有效直接查档案，过期先续期再取皮肤
+    public static String refreshSkin(Data.Account account) throws Exception {
+        String token = account.accessToken == null ? "" : account.accessToken;
+        if (token.isEmpty() || account.expiresAt <= System.currentTimeMillis()) {
+            return refreshSkinWithToken(account);
+        }
+        Resp resp = get(MC_PROFILE_URL, token, 15000);
+        if (resp.code == 401 || resp.code == 403) return refreshSkinWithToken(account);
+        if (resp.code != 200) throw new Exception(Lang.tf("获取 Minecraft 档案失败：%s", errorText(resp)));
+        String url = activeSkinUrl(parse(resp.body));
+        if (url.isEmpty()) throw new Exception("该账户当前没有皮肤");
+        return Skins.download(account.name, url);
+    }
+
+    private static String refreshSkinWithToken(Data.Account account) throws Exception {
+        Result r = refresh(account.refreshToken);
+        account.accessToken = r.accessToken;
+        if (!r.refreshToken.isEmpty()) account.refreshToken = r.refreshToken;
+        account.expiresAt = r.expiresAt;
+        if (!r.uuid.isEmpty()) account.uuid = r.uuid;
+        if (!r.name.isEmpty()) account.name = r.name;
+        if (r.skinUrl.isEmpty()) throw new Exception("该账户当前没有皮肤");
+        return Skins.download(account.name, r.skinUrl);
     }
 
     private static boolean sleep(long ms, Cancel cancel) {
@@ -429,17 +455,6 @@ public final class MsAuth {
         c.setRequestProperty("User-Agent", AGENT);
         int code = c.getResponseCode();
         return new Resp(code, readAll(code >= 400 ? c.getErrorStream() : c.getInputStream()));
-    }
-
-    private static byte[] download(String url) throws Exception {
-        HttpURLConnection c = (HttpURLConnection) URI.create(url).toURL().openConnection();
-        c.setConnectTimeout(15000);
-        c.setReadTimeout(20000);
-        c.setRequestProperty("User-Agent", AGENT);
-        try (InputStream in = c.getInputStream(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            in.transferTo(out);
-            return out.toByteArray();
-        }
     }
 
     private static String readAll(InputStream in) throws Exception {

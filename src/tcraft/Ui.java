@@ -2050,8 +2050,7 @@ public final class Ui {
         Image skin = account == null ? null : Theme.loadImage(account.skin);
         if (skin == null) skin = Theme.loadImage("Steve.png");
         if (skin != null) {
-            ImageView head = Theme.headImage(skin, size);
-            box.getChildren().add(head);
+            box.getChildren().add(Theme.headImage(skin, size));
         }
         return box;
     }

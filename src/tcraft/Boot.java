@@ -186,7 +186,8 @@ public final class Boot {
                     .format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
             Path file = dir.resolve("TCraft-错误报告-" + stamp + ".log");
             StringBuilder sb = new StringBuilder();
-            sb.append("TCraft Launcher ").append(Build.VERSION).append(" 错误报告\n");
+            sb.append("TCraft Launcher ").append(Build.VERSION)
+                    .append("（").append(Build.EDITION).append("）错误报告\n");
             sb.append("时间：").append(java.time.LocalDateTime.now().withNano(0)).append('\n');
             sb.append("\n===== 报错 =====\n").append(text).append('\n');
             if (t != null) {

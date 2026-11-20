@@ -381,6 +381,8 @@ public final class Errors {
     private static String systemInfo() {
         StringBuilder sb = new StringBuilder("诊断信息：\n");
         try {
+            sb.append("软件：TCraft Launcher ").append(Build.VERSION)
+                    .append("（").append(Build.EDITION).append("）\n");
             sb.append("操作系统：").append(System.getProperty("os.name")).append(' ')
                     .append(System.getProperty("os.version")).append(" (")
                     .append(System.getProperty("os.arch")).append(")\n");

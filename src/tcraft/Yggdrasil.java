@@ -30,6 +30,8 @@ public final class Yggdrasil {
     public static final class Profile {
         public final String id;
         public final String name;
+        // textures 为签名后的 base64 皮肤数据
+        public final Map<String, String> properties = new java.util.LinkedHashMap<>();
 
         Profile(String id, String name) {
             this.id = id == null ? "" : id;
@@ -171,7 +173,62 @@ public final class Yggdrasil {
     }
 
     private static Profile profile(Map<String, Object> m) {
-        return new Profile(Json.str(m, "id", ""), Json.str(m, "name", ""));
+        Profile p = new Profile(Json.str(m, "id", ""), Json.str(m, "name", ""));
+        for (Object o : Json.arr(m.get("properties"))) {
+            Map<String, Object> prop = Json.obj(o);
+            String key = Json.str(prop, "name", "");
+            if (!key.isEmpty()) p.properties.put(key, Json.str(prop, "value", ""));
+        }
+        return p;
+    }
+
+    // 先读认证响应里的 textures，没有再查 sessionserver 档案
+    public static String skinUrlOf(Server server, Profile profile) throws IOException {
+        String direct = textureUrl(profile.properties.get("textures"));
+        if (direct != null) return direct;
+        if (profile.id.isEmpty()) return null;
+        String url = server.apiRoot + "sessionserver/session/minecraft/profile/"
+                + compact(profile.id).toLowerCase(java.util.Locale.ROOT);
+        String body = Http.get(url);
+        Map<String, Object> m = Json.obj(Json.parse(body));
+        for (Object o : Json.arr(m.get("properties"))) {
+            Map<String, Object> prop = Json.obj(o);
+            if (!"textures".equals(Json.str(prop, "name", ""))) continue;
+            String skin = textureUrl(Json.str(prop, "value", ""));
+            if (skin != null) return skin;
+        }
+        return null;
+    }
+
+    private static String textureUrl(String base64) {
+        if (base64 == null || base64.isEmpty()) return null;
+        try {
+            String json = new String(java.util.Base64.getDecoder().decode(base64),
+                    StandardCharsets.UTF_8);
+            Map<String, Object> textures = Json.obj(Json.parse(json), "textures");
+            Map<String, Object> skin = Json.obj(textures, "SKIN");
+            if (skin.isEmpty()) skin = Json.obj(textures, "skin");
+            String url = Json.str(skin, "url", "");
+            return url.isEmpty() ? null : url;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    // 统一通行证只存服务器码，还原完整 API 地址
+    public static Server accountServer(Data.Account account) {
+        if (account == null) return null;
+        if ("nide".equals(account.userType)) {
+            String code = account.server == null ? "" : account.server.trim();
+            if (code.isEmpty()) return null;
+            return new Server("https://auth.mc-user.com:233/" + code + "/", "统一通行证");
+        }
+        if ("legacy".equals(account.userType)) {
+            String root = account.server == null ? "" : account.server.trim();
+            if (root.isEmpty()) return null;
+            return new Server(root.endsWith("/") ? root : root + "/", "");
+        }
+        return null;
     }
 
     private static void requireSecure(Server server) throws AuthException {

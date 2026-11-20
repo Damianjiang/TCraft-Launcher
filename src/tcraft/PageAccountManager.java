@@ -27,6 +27,25 @@ public class PageAccountManager implements Page {
     private Ui.Card skinBox;
     private Data.Account skinCardFor;
 
+    private final java.util.Set<Data.Account> refreshing =
+            java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+    // 每次启动只自动补拉一次
+    private static final java.util.Set<String> autoChecked =
+            java.util.concurrent.ConcurrentHashMap.newKeySet();
+    // 限两个并发，空闲线程自动回收
+    private static final java.util.concurrent.ThreadPoolExecutor skinPool =
+            new java.util.concurrent.ThreadPoolExecutor(2, 2, 30,
+                    java.util.concurrent.TimeUnit.SECONDS,
+                    new java.util.concurrent.LinkedBlockingQueue<>(), r -> {
+                Thread t = new Thread(r, "TCL-SkinRefresh");
+                t.setDaemon(true);
+                return t;
+            });
+
+    static {
+        skinPool.allowCoreThreadTimeOut(true);
+    }
+
     private static final class RowRef {
         StackPane row;
         Ui.RadioBox radio;
@@ -57,6 +76,7 @@ public class PageAccountManager implements Page {
 
         rebuildRows();
         syncSkinCard();
+        autoLoadSkins();
 
         StackPane holder = new StackPane(content);
         holder.setAlignment(Pos.TOP_LEFT);
@@ -81,8 +101,67 @@ public class PageAccountManager implements Page {
     }
 
     private void refreshManually() {
-        refreshSilently();
-        win.toast("已刷新", "账户列表与头像已重新读取。", 1);
+        Data.Account current = data.account();
+        if (current != null && current.online) {
+            refreshAccount(current, false);
+        } else {
+            refreshSilently();
+            win.toast("已刷新", "账户列表与头像已重新读取。", 1);
+        }
+    }
+
+    // 仍是默认皮肤的在线账户自动补拉一次
+    private void autoLoadSkins() {
+        for (Data.Account a : data.accounts) {
+            if (!a.online || "msa".equals(a.userType)) continue;
+            if (hasLocalSkin(a.skin)) continue;
+            String key = a.userType + "|" + a.uuid + "|" + a.server;
+            if (!autoChecked.add(key)) continue;
+            refreshAccount(a, true);
+        }
+    }
+
+    private static boolean hasLocalSkin(String skin) {
+        if (skin == null || !skin.startsWith("Skins/")) return false;
+        return java.nio.file.Files.isRegularFile(Theme.skinDir().resolve(skin.substring(6)));
+    }
+
+    // 在线账户从认证服务器重取皮肤
+    private void refreshAccount(Data.Account a, boolean silent) {
+        if (a == null || !a.online || !refreshing.add(a)) return;
+        final String who = a.name;
+        skinPool.execute(() -> {
+            String skin = null;
+            String error = null;
+            try {
+                if ("msa".equals(a.userType)) {
+                    skin = MsAuth.refreshSkin(a);
+                } else {
+                    Yggdrasil.Server server = Yggdrasil.accountServer(a);
+                    if (server == null) throw new Exception("缺少认证服务器地址，请重新登录该账户");
+                    Yggdrasil.Profile profile = new Yggdrasil.Profile(a.uuid, who);
+                    String url = Yggdrasil.skinUrlOf(server, profile);
+                    if (url == null) throw new Exception("服务器没有返回该账户的皮肤");
+                    skin = Skins.download(who, url);
+                }
+            } catch (Exception e) {
+                error = e.getMessage() == null ? "未知错误" : e.getMessage();
+                Data.get().log("刷新皮肤失败：" + Log.describe(e));
+            }
+            final String loaded = skin;
+            final String reason = error;
+            javafx.application.Platform.runLater(() -> {
+                refreshing.remove(a);
+                if (loaded != null) {
+                    a.skin = loaded;
+                    data.save();
+                    refreshSilently();
+                    if (!silent) win.toast("已刷新皮肤！", who, 1);
+                } else if (!silent && reason != null) {
+                    win.toast("刷新皮肤失败", reason, 2);
+                }
+            });
+        });
     }
 
     private void refreshSilently() {
@@ -180,10 +259,7 @@ public class PageAccountManager implements Page {
                 actions.add(Ui.iconButton("shirt", 28, 15, "在官网管理该账户的皮肤",
                         () -> openWebsite("https://www.minecraft.net/profile")));
             }
-            actions.add(Ui.iconButton("refresh-cw", 28, 15, "刷新该账户的登录状态", () -> {
-                refreshSilently();
-                win.toast("已刷新。", a.name, 1);
-            }));
+            actions.add(Ui.iconButton("refresh-cw", 28, 15, "刷新该账户的皮肤", () -> refreshAccount(a, false)));
         } else {
             actions.add(Ui.iconButton("refresh-cw", 28, 15, "刷新该账户的皮肤与头像缓存", () -> {
                 refreshSilently();
@@ -304,10 +380,7 @@ public class PageAccountManager implements Page {
             openWebsite("https://www.minecraft.net/profile");
         });
         StackPane save = skinButton("保存皮肤文件", false, () -> saveSkinFile(a));
-        StackPane refresh = skinButton("刷新皮肤", false, () -> {
-            refreshSilently();
-            win.toast("已刷新。", a.name, 1);
-        });
+        StackPane refresh = skinButton("刷新皮肤", false, () -> refreshAccount(a, false));
         StackPane redeem = skinButton("兑换 CDKEY", false, () -> openWebsite("https://www.minecraft.net/zh-hans/redeem"));
         StackPane profile = skinButton("官网管理", false, () -> openWebsite("https://www.minecraft.net/profile"));
         buttons.getChildren().addAll(change, cape, save, refresh, redeem, profile);

@@ -1976,6 +1976,11 @@ $登录用时太长啦，重新试试吧！	$Sign-in took too long — please tr
 未知错误！	Unknown error!	未知錯誤！	
 在官网管理该账户的皮肤	Manage this account's skin on the official site	在官網管理該帳戶的皮膚	
 刷新该账户的皮肤与头像缓存	Refresh this account's skin and face cache	重新整理該帳戶的皮膚與頭像快取	
+刷新该账户的皮肤	Refresh this account's skin	重新整理該帳戶的皮膚	
+刷新皮肤失败	Failed to refresh skin	重新整理皮膚失敗	
+缺少认证服务器地址，请重新登录该账户	Missing authentication server address. Sign in to this account again.	缺少認證伺服器位址，請重新登入該帳戶	
+服务器没有返回该账户的皮肤	The server did not return a skin for this account.	伺服器沒有回傳該帳戶的皮膚	
+该账户当前没有皮肤	This account currently has no skin.	該帳戶目前沒有皮膚	
 已刷新。	Refreshed.	已重新整理。	
 编辑皮肤	Edit Skin	編輯皮膚	
 选择皮肤来源，选择后立即生效。	Pick a skin source; it applies immediately.	選擇皮膚來源，選擇後立即生效。	
@@ -1990,6 +1995,7 @@ Blessing Skin 服务器	Blessing Skin server	Blessing Skin 伺服器
 从自定义 Blessing Skin 服务器获取皮肤	Fetch the skin from a custom Blessing Skin server	從自訂的 Blessing Skin 伺服器取得皮膚	
 选择皮肤图片	Choose a skin image	選擇皮膚圖片	
 皮肤图片尺寸无效（应为 64×32 或 64×64）。	Invalid skin image size (should be 64×32 or 64×64).	皮膚圖片尺寸無效（應為 64×32 或 64×64）。	
+皮肤文件不是有效的 PNG 图片	The skin file is not a valid PNG image	皮膚檔案不是有效的 PNG 圖片	
 皮肤无效	Invalid Skin	皮膚無效	
 请输入正版玩家的名字	Enter the name of a paid (Minecraft) player	請輸入正版玩家的名字	
 将获取该正版玩家的皮肤	The skin of that paid player will be fetched	將取得該正版玩家的皮膚	
@@ -3053,7 +3059,7 @@ Modrinth 整合包文件	Modrinth modpack file	Modrinth 整合包檔案
 搜索帮助	Search help	搜尋說明	
 来自 Minecraft 官方的真实新闻。	Real news from the official Minecraft site.	來自 Minecraft 官方的真實新聞。	
 正在获取 Minecraft 官方新闻…	Fetching official Minecraft news…	正在取得 Minecraft 官方新聞…	
-查看原文 →	Read the original →	檢視原文 →	
+查看原文	Read the original	檢視原文	
 暂时没有可显示的新闻。	No news available right now.	暫時沒有可顯示的新聞。	
 获取新闻失败：	Failed to fetch news:	取得新聞失敗：	
 联机、清理、下载与皮肤相关的辅助功能。	Utilities for multiplayer, cleanup, downloads and skins.	多人連線、清理、下載與面板相關的輔助功能。	
@@ -4184,8 +4190,6 @@ Java 21（1.20.5+）	Java 21 (1.20.5+)	Java 21（1.20.5+）
 更换图片失败	Failed to change image	更換圖片失敗	
 已清空标题栏图片	Title bar image cleared	已清空標題列圖片	
 
-背景图片（%d 张）	Background images (%d)	背景圖片（%d 張）	
-背景视频（%d 个）	Background videos (%d)	背景視頻（%d 個）	
 TCL/Videos 里没有可用视频，请放入 mp4/m4v/mov。	No usable video in TCL/Videos. Put mp4/m4v/mov files there.	TCL/Videos 中沒有可用視頻，請放入 mp4/m4v/mov。	
 实例指定的 Java %d 低于版本要求 %d，自动更换	Instance Java %d is below required Java %d; switching automatically	實例指定的 Java %d 低於版本要求 %d，自動更換	
 未找到 Java %d，正在自动下载	Java %d not found; downloading automatically	未找到 Java %d，正在自動下載	

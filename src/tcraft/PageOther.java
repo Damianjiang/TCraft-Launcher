@@ -62,12 +62,24 @@ public class PageOther implements Page {
         Ui.ListItem item = new Ui.ListItem(Theme.icon(icon, 17, Theme.text), title, null, 36);
         item.setUserData(key);
         item.setSelected(key.equals(data.otherSection));
+        if ("news".equals(key)) {
+            StackPane refresh = Ui.iconButton("refresh-cw", 22, 13, "刷新新闻", this::refreshNews);
+            refresh.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED, e -> e.consume());
+            item.addAction(refresh);
+        }
         item.setOnMouseClicked(e -> {
             if (key.equals(data.otherSection)) return;
             data.otherSection = key;
             win.refreshRight(true);
         });
         return item;
+    }
+
+    private void refreshNews() {
+        newsCache = null;
+        newsCacheAt = 0;
+        data.otherSection = "news";
+        win.refreshRight(false);
     }
 
     @Override
@@ -77,6 +89,7 @@ public class PageOther implements Page {
         page.setPadding(new Insets(25, 28, 28, 28));
         page.setFillWidth(true);
         page.setMaxWidth(Double.MAX_VALUE);
+        page.setMinWidth(0);
         scroll.setContent(page);
         switch (data.otherSection) {
             case "news" -> buildNews(page);
@@ -87,12 +100,21 @@ public class PageOther implements Page {
     }
 
     private void header(VBox page, String title, String subtitle) {
+        page.getChildren().add(headerRow(title, subtitle, null));
+    }
+
+    private HBox headerRow(String title, String subtitle, Node action) {
         VBox head = new VBox(5);
         head.setAlignment(Pos.TOP_LEFT);
-        head.getChildren().addAll(Ui.bold(title, 30, Theme.text), Ui.label(subtitle, 13, Theme.text));
-        ((Label) head.getChildren().get(1)).setOpacity(0.55);
-        VBox.setMargin(head, new Insets(0, 0, 20, 0));
-        page.getChildren().add(head);
+        Label sub = Ui.label(subtitle, 13, Theme.text);
+        sub.setOpacity(0.55);
+        head.getChildren().addAll(Ui.bold(title, 30, Theme.text), sub);
+        HBox row = new HBox(12, head);
+        row.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(head, Priority.ALWAYS);
+        if (action != null) row.getChildren().add(action);
+        VBox.setMargin(row, new Insets(0, 0, 20, 0));
+        return row;
     }
 
     private void buildAbout(VBox page) {
@@ -174,7 +196,10 @@ public class PageOther implements Page {
     private static long newsCacheAt;
 
     private void buildNews(VBox page) {
-        header(page, "新闻", "来自 Minecraft 官方的真实新闻。");
+        StackPane refresh = Ui.button("刷新新闻", Ui.BTN_HIGHLIGHT, this::refreshNews);
+        refresh.setMinWidth(110);
+        refresh.setMaxWidth(Region.USE_PREF_SIZE);
+        page.getChildren().add(headerRow("新闻", "来自 Minecraft 官方的真实新闻。", refresh));
         stopSkeletons();
         final int gen = ++newsGen;
         java.util.List<Object> cached = newsCache;
@@ -235,7 +260,7 @@ public class PageOther implements Page {
             desc.setWrapText(true);
             card.add(desc);
             if (!link.isEmpty()) {
-                Label open = Ui.label("查看原文 →", 12, Theme.accent);
+                Label open = Ui.label("查看原文", 12, Theme.accent);
                 open.setCursor(javafx.scene.Cursor.HAND);
                 open.setOnMouseClicked(e -> openUrl(link));
                 card.add(open);
@@ -319,7 +344,7 @@ public class PageOther implements Page {
         final double h = 160;
         StackPane box = new StackPane();
         box.setPrefHeight(h);
-        box.setMinHeight(h);
+        box.setMinSize(0, h);
         box.setMaxHeight(h);
         box.setBackground(new Background(new BackgroundFill(Theme.gray6, new CornerRadii(6), Insets.EMPTY)));
 

@@ -1028,16 +1028,29 @@ public final class Theme {
         return ds;
     }
 
-    public static ImageView headImage(Image skin, double size) {
-        ImageView iv = new ImageView(skin);
-        iv.setViewport(new javafx.geometry.Rectangle2D(8, 8, 8, 8));
-        iv.setFitWidth(size);
-        iv.setFitHeight(size);
-        iv.setSmooth(false);
+    public static Node headImage(Image skin, double size) {
+        int scale = Math.max(1, (int) Math.floor(skin.getWidth() / 64.0));
+        javafx.scene.layout.StackPane head = new javafx.scene.layout.StackPane();
+        head.setMinSize(size, size);
+        head.setPrefSize(size, size);
+        head.setMaxSize(size, size);
+        head.getChildren().addAll(
+                skinLayer(skin, 8 * scale, 8 * scale, 8 * scale, size),
+                skinLayer(skin, 40 * scale, 8 * scale, 8 * scale, size));
         Rectangle clip = new Rectangle(size, size);
         clip.setArcWidth(3);
         clip.setArcHeight(3);
-        iv.setClip(clip);
+        head.setClip(clip);
+        return head;
+    }
+
+    // 面部与帽子两层叠加
+    private static ImageView skinLayer(Image skin, int x, int y, int texels, double size) {
+        ImageView iv = new ImageView(skin);
+        iv.setViewport(new javafx.geometry.Rectangle2D(x, y, texels, texels));
+        iv.setFitWidth(size);
+        iv.setFitHeight(size);
+        iv.setSmooth(false);
         return iv;
     }
 

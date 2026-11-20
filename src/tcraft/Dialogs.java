@@ -516,8 +516,9 @@ public final class Dialogs {
                     final String fclient = session.clientToken;
                     final String fserver = auth.apiRoot;
                     final String fsite = auth.display();
+                    final String fskin = fetchYggdrasilSkin(auth, profile);
                     javafx.application.Platform.runLater(() -> {
-                        Data.Account a = new Data.Account(fname, fuuid, selectedSkin, true);
+                        Data.Account a = new Data.Account(fname, fuuid, fskin, true);
                         a.accessToken = ftoken;
                         a.clientToken = fclient;
                         a.userType = "legacy";
@@ -648,8 +649,9 @@ public final class Dialogs {
                     final String fuuid = uuid.isEmpty() ? Data.offlineUuid(fname) : uuid;
                     final String ftoken = session.accessToken;
                     final String fclient = session.clientToken;
+                    final String fskin = fetchYggdrasilSkin(auth, profile);
                     javafx.application.Platform.runLater(() -> {
-                        Data.Account a = new Data.Account(fname, fuuid, selectedSkin, true);
+                        Data.Account a = new Data.Account(fname, fuuid, fskin, true);
                         a.accessToken = ftoken;
                         a.clientToken = fclient;
                         a.userType = "nide";
@@ -706,18 +708,13 @@ public final class Dialogs {
 
     private static String importLocalSkin(String playerName, java.nio.file.Path source) throws Exception {
         if (!java.nio.file.Files.isRegularFile(source)) throw new Exception("皮肤文件不存在");
-        javafx.scene.image.Image img = new javafx.scene.image.Image(source.toUri().toString());
-        int w = (int) img.getWidth(), h = (int) img.getHeight();
-        if (img.isError() || w == 0 || w % 64 != 0 || (h != w / 2 && h != w)) {
-            throw new Exception("皮肤图片尺寸无效（" + w + "×" + h + "，应为 64×32、64×64 或它们的整数倍）");
-        }
-        String safe = playerName == null || playerName.isEmpty() ? "skin" : playerName;
-        for (char c : "\\/:*?\"<>|".toCharArray()) safe = safe.replace(String.valueOf(c), "_");
-        java.nio.file.Path dir = Theme.skinDir();
-        java.nio.file.Files.createDirectories(dir);
-        java.nio.file.Path target = dir.resolve(safe + ".png");
-        java.nio.file.Files.copy(source, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-        return "Skins/" + safe + ".png";
+        // 复用在线下载的 PNG 校验
+        return Skins.save(playerName, java.nio.file.Files.readAllBytes(source));
+    }
+
+    private static Node headPreview(String skinName) {
+        javafx.scene.image.Image img = Theme.loadImage(skinName + ".png");
+        return img == null ? Theme.icon("user", 17, Theme.text) : Theme.headImage(img, 20);
     }
 
     public static void skinPicker(MainWindow win, Data.Account account) {
@@ -755,7 +752,10 @@ public final class Dialogs {
         inputArea.getChildren().addAll(nameField, apiField, fetchBtn);
         hide(inputArea);
 
-        String[] srcIcon = {"user", "user", "user", "globe", "image", "cloud-download", "server"};
+        Node[] srcIcon = {
+                headPreview(defaultGender(account.uuid)), headPreview("Steve"), headPreview("Alex"),
+                Theme.icon("globe", 17, Theme.text), Theme.icon("image", 17, Theme.text),
+                Theme.icon("cloud-download", 17, Theme.text), Theme.icon("server", 17, Theme.text)};
         String[] srcTitle = {"默认", "Steve", "Alex", "正版玩家皮肤", "本地皮肤图片文件", "LittleSkin 皮肤站", "自定义皮肤站"};
         String[] srcInfo = {
                 "根据玩家名自动选择默认皮肤", "经典 Steve 皮肤", "细手臂 Alex 皮肤",
@@ -766,7 +766,7 @@ public final class Dialogs {
         list.setMinWidth(300);
         for (int i = 0; i < items.length; i++) {
             final int t = i;
-            items[i] = new Ui.ListItem(Theme.icon(srcIcon[t], 17, Theme.text), srcTitle[t], srcInfo[t], 36);
+            items[i] = new Ui.ListItem(srcIcon[t], srcTitle[t], srcInfo[t], 36);
             items[i].setOnMouseClicked(e ->
                     selectSource(t, type, items, inputArea, nameField, apiField, skinRes, viewer, account, readonly, win.stage));
             list.getChildren().add(items[i]);
@@ -964,7 +964,7 @@ public final class Dialogs {
         String skinUrl = parseMojangSkinUrl(profile);
         if (skinUrl.isEmpty()) throw new Exception("没取到皮肤地址，该玩家可能用的是默认皮肤");
         if (skinUrl.contains("http://")) skinUrl = skinUrl.replace("http://", "https://");
-        return saveFetchedSkin(skinUrl, accountName);
+        return Skins.download(accountName, skinUrl);
     }
 
     private static String mojangUuidFromName(String name) throws Exception {
@@ -1030,21 +1030,19 @@ public final class Dialogs {
         }
         if (url.isEmpty() && !hash.isEmpty()) url = cslBase + "/textures/" + hash;
         if (url.isEmpty()) throw new Exception("皮肤站返回里没有皮肤地址，这个角色可能还没上传皮肤");
-        return saveFetchedSkin(url, accountName);
+        return Skins.download(accountName, url);
     }
 
-    private static String saveFetchedSkin(String skinUrl, String accountName) throws Exception {
-        byte[] data = httpGetBytes(skinUrl);
-        if (data == null || data.length < 8 || data[0] != (byte) 0x89 || data[1] != 0x50) {
-            throw new Exception("皮肤地址返回的不是 PNG 图片");
+    // 从 Yggdrasil properties 取皮肤，失败回退默认
+    private static String fetchYggdrasilSkin(Yggdrasil.Server server, Yggdrasil.Profile profile) {
+        if (server == null || profile == null) return "Steve.png";
+        try {
+            String url = Yggdrasil.skinUrlOf(server, profile);
+            if (url != null) return Skins.download(profile.name, url);
+        } catch (Exception e) {
+            Data.get().log("获取 Yggdrasil 皮肤失败：" + Log.describe(e));
         }
-        String safe = accountName == null || accountName.isEmpty() ? "skin" : accountName;
-        for (char c : "\\/:*?\"<>|".toCharArray()) safe = safe.replace(String.valueOf(c), "_");
-        java.nio.file.Path dir = Theme.skinDir();
-        java.nio.file.Files.createDirectories(dir);
-        java.nio.file.Path target = dir.resolve(safe + ".png");
-        java.nio.file.Files.write(target, data);
-        return "Skins/" + safe + ".png";
+        return "Steve.png";
     }
 
     private static byte[] httpGetBytes(String url) throws Exception {

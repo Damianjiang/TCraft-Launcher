@@ -902,141 +902,149 @@ public class PageSetup implements Page {
         }
 
         boolean videoMode = data.getInt("UiBackgroundType", 0) == 1;
-        int videoCount = videoMode ? win.scanVideos().size() : 0;
-        int imageCount = 0;
-        if (!videoMode) {
-            try (var s = Files.list(Paths.get(data.gameDir, "TCL", "Pictures"))) {
-                imageCount = (int) s.filter(Files::isRegularFile).filter(Theme::isWallpaperImage).count();
-            } catch (Exception ignored) {
-            }
-        }
-        // 标题整键带计数，拼接串查不到表
-        String bgTitle = videoMode
-                ? (videoCount > 0 ? Lang.tf("背景视频（%d 个）", videoCount) : "背景视频")
-                : (imageCount > 0 ? Lang.tf("背景图片（%d 张）", imageCount) : "背景图片");
-        Ui.Card bg = addCard(page, bgTitle);
+        int videoCount = win.scanVideos().size();
+        int imageCount = countPictures();
+
+        Ui.Card bg = addCard(page, "背景");
+        VBox imageBox = new VBox(2);
+        VBox videoBox = new VBox(2);
+        // 两套设置预先建好，切换只做显隐
+        Runnable applyMode = () -> {
+            boolean video = data.getInt("UiBackgroundType", 0) == 1;
+            imageBox.setVisible(!video);
+            imageBox.setManaged(!video);
+            videoBox.setVisible(video);
+            videoBox.setManaged(video);
+        };
         comboRow(bg, "背景类型", new String[]{"图片（静态背景）", "视频（动态背景）"},
-                data.getInt("UiBackgroundType", 0), i -> {
+                videoMode ? 1 : 0, i -> {
                     data.set("UiBackgroundType", i);
-                    win.refreshVideoBackground(true);
-                    win.refreshRight();
+                    applyMode.run();
+                    win.refreshVideoBackground(false);
+                    if (i == 0) win.applyBackground();
                 });
-        if (!videoMode) {
-            // 有图片才显示自适应/轮播/不透明度/模糊
-            if (imageCount > 0) {
-                // 下拉顺序与存储值一一对应
-                String[] suitNames = {"自动", "平铺", "居中", "拉伸", "左上 (保持长宽比)",
-                        "左中 (保持长宽比)", "左下 (保持长宽比)", "中上 (保持长宽比)",
-                        "居中 (保持长宽比)", "中下 (保持长宽比)", "右上 (保持长宽比)",
-                        "右中 (保持长宽比)", "右下 (保持长宽比)"};
-                int[] suitVals = {0, 4, 1, 3, 5, 9, 7, 11, 2, 12, 6, 10, 8};
-                int suitStored = data.getInt("UiBackgroundSuit", 0);
-                int suitIndex = 0;
-                for (int i = 0; i < suitVals.length; i++) if (suitVals[i] == suitStored) suitIndex = i;
-                ComboBox<String> suitCombo = Ui.combo(suitNames, suitIndex);
-                suitCombo.setPrefWidth(220);
-                suitCombo.setOnAction(e -> {
-                    int i = suitCombo.getSelectionModel().getSelectedIndex();
-                    data.set("UiBackgroundSuit", suitVals[Math.max(0, i)]);
-                    win.applyBackground();
-                });
-                bg.add(Ui.settingRow("自适应方式", suitCombo));
 
-                String[] rotateNames = {"关闭", "每 1 分钟", "每 5 分钟", "每 15 分钟", "每 30 分钟", "每 60 分钟"};
-                int[] rotateVals = {0, 1, 5, 15, 30, 60};
-                int rotStored = data.getInt("UiBackgroundRotate", 0);
-                int rotIndex = 0;
-                for (int i = 0; i < rotateVals.length; i++) if (rotateVals[i] == rotStored) rotIndex = i;
-                ComboBox<String> rotateCombo = Ui.combo(rotateNames, rotIndex);
-                rotateCombo.setPrefWidth(220);
-                rotateCombo.setOnAction(e -> {
-                    int i = rotateCombo.getSelectionModel().getSelectedIndex();
-                    data.set("UiBackgroundRotate", rotateVals[Math.max(0, i)]);
-                    win.startWallpaperRotation();
-                });
-                bg.add(Ui.settingRow("自动轮播", rotateCombo));
+        int mark = bg.content.getChildren().size();
+        // 有图片才显示自适应/轮播/不透明度/模糊
+        if (imageCount > 0) {
+            // 下拉顺序与存储值一一对应
+            String[] suitNames = {"自动", "平铺", "居中", "拉伸", "左上 (保持长宽比)",
+                    "左中 (保持长宽比)", "左下 (保持长宽比)", "中上 (保持长宽比)",
+                    "居中 (保持长宽比)", "中下 (保持长宽比)", "右上 (保持长宽比)",
+                    "右中 (保持长宽比)", "右下 (保持长宽比)"};
+            int[] suitVals = {0, 4, 1, 3, 5, 9, 7, 11, 2, 12, 6, 10, 8};
+            int suitStored = data.getInt("UiBackgroundSuit", 0);
+            int suitIndex = 0;
+            for (int i = 0; i < suitVals.length; i++) if (suitVals[i] == suitStored) suitIndex = i;
+            ComboBox<String> suitCombo = Ui.combo(suitNames, suitIndex);
+            suitCombo.setPrefWidth(220);
+            suitCombo.setOnAction(e -> {
+                int i = suitCombo.getSelectionModel().getSelectedIndex();
+                data.set("UiBackgroundSuit", suitVals[Math.max(0, i)]);
+                win.applyBackground();
+            });
+            bg.add(Ui.settingRow("自适应方式", suitCombo));
 
-                sliderRow(bg, "不透明度", 0, 100, data.getInt("UiBackgroundOpacity", 1000) / 10, v -> {
-                    data.set("UiBackgroundOpacity", (int) (v * 10));
-                    win.applyBackground();
-                }, "%");
-                sliderRow(bg, "背景模糊", 0, 40, data.getInt("UiBackgroundBlur", 0), v -> {
-                    data.set("UiBackgroundBlur", v.intValue());
-                    win.applyBackground();
-                }, " px");
-            }
-            Ui.Check colorful = Ui.checkBox("叠加彩色背景", false);
-            colorful.setSelected(data.getBool("UiBackgroundColorful", true));
-            colorful.setOnAction(() -> data.set("UiBackgroundColorful", colorful.isSelected()));
-            bg.add(colorful);
-            Ui.Check autoTheme = Ui.checkBox("根据背景图自动调整主题色", false);
-            autoTheme.setSelected(data.getBool("UiAutoThemeFromBackground", true));
-            autoTheme.setOnAction(() -> {
-                data.set("UiAutoThemeFromBackground", autoTheme.isSelected());
-                if (autoTheme.isSelected()) {
-                    data.set("UiThemePreset", -1);
-                    Theme.applyWallpaperTheme();
-                } else {
-                    // 关掉跟随壁纸：把此刻的取色固化成自定义主题，别掉回默认蓝
-                    Theme.saveCurrentAsCustom(data);
-                    data.set("UiThemePreset", 14);
-                }
-                win.rebuildUi();
+            String[] rotateNames = {"关闭", "每 1 分钟", "每 5 分钟", "每 15 分钟", "每 30 分钟", "每 60 分钟"};
+            int[] rotateVals = {0, 1, 5, 15, 30, 60};
+            int rotStored = data.getInt("UiBackgroundRotate", 0);
+            int rotIndex = 0;
+            for (int i = 0; i < rotateVals.length; i++) if (rotateVals[i] == rotStored) rotIndex = i;
+            ComboBox<String> rotateCombo = Ui.combo(rotateNames, rotIndex);
+            rotateCombo.setPrefWidth(220);
+            rotateCombo.setOnAction(e -> {
+                int i = rotateCombo.getSelectionModel().getSelectedIndex();
+                data.set("UiBackgroundRotate", rotateVals[Math.max(0, i)]);
+                win.startWallpaperRotation();
             });
-            bg.add(autoTheme);
-            FlowPane bgButtons = new FlowPane(10, 10);
-            bgButtons.getChildren().addAll(
-                    Ui.button("打开文件夹", Ui.BTN_NORMAL, this::openBackgroundFolder),
-                    Ui.button("刷新背景图片", Ui.BTN_NORMAL, () -> {
-                        win.refreshWallpaper(false);
-                        win.toast("背景图片已刷新", "", 1);
-                    }),
-                    Ui.button("清空背景图片", Ui.BTN_RED, () -> Dialogs.confirm(win,
-                            "清空背景图片", Lang.t("即将删除背景图片文件夹中的所有文件。\n此操作不可撤销，是否确定？"), () -> {
-                                clearBackgroundFolder();
-                                win.refreshWallpaper(true);
-                                win.refreshRight();
-                            }, true)));
-            bg.add(bgButtons);
-        } else {
-            if (videoCount > 0) {
-                sliderRow(bg, "音量", 0, 100, data.getInt("UiVideoVolume", 500) / 10, v -> {
-                    data.set("UiVideoVolume", (int) Math.round(v * 10));
-                    win.updateVideoAudio();
-                }, "%");
-            }
-            Ui.Check vidRandom = Ui.checkBox("随机播放", false);
-            vidRandom.setSelected(data.getBool("UiVideoRandom", true));
-            vidRandom.setOnAction(() -> {
-                data.set("UiVideoRandom", vidRandom.isSelected());
-                win.refreshVideoBackground(false);
-            });
-            bg.add(vidRandom);
-            Ui.Check vidMute = Ui.checkBox("静音（仅作为背景画面）", false);
-            vidMute.setSelected(data.getBool("UiVideoMute", true));
-            vidMute.setOnAction(() -> {
-                data.set("UiVideoMute", vidMute.isSelected());
-                win.updateVideoAudio();
-            });
-            bg.add(vidMute);
-            Ui.Check vidPause = Ui.checkBox("启动器失去焦点时暂停（省 CPU）", false);
-            vidPause.setSelected(data.getBool("UiVideoPauseOnBlur", true));
-            vidPause.setOnAction(() -> data.set("UiVideoPauseOnBlur", vidPause.isSelected()));
-            bg.add(vidPause);
-            FlowPane vidButtons = new FlowPane(10, 10);
-            vidButtons.getChildren().addAll(
-                    Ui.button("打开文件夹", Ui.BTN_NORMAL, this::openVideoFolder),
-                    Ui.button("刷新背景视频", Ui.BTN_NORMAL, () -> win.refreshVideoBackground(true)),
-                    Ui.button("清空背景视频", Ui.BTN_RED, () -> Dialogs.confirm(win,
-                            "清空背景视频", "即将删除背景视频文件夹中的所有文件。\n此操作不可撤销，是否确定？", () -> {
-                                clearVideoFolder();
-                                win.refreshVideoBackground(false);
-                                win.refreshRight();
-                            }, true)));
-            bg.add(vidButtons);
-            bg.add(Ui.hint("支持 mp4 / m4v / mov（H.264）。mkv、avi、wmv、webm 等 JavaFX 无法解码，需要先转成 mp4；"
-                    + "多个视频循环播放。建议使用 720p 以内的素材，分辨率越高 CPU 占用越大。", 0));
+            bg.add(Ui.settingRow("自动轮播", rotateCombo));
+
+            sliderRow(bg, "不透明度", 0, 100, data.getInt("UiBackgroundOpacity", 1000) / 10, v -> {
+                data.set("UiBackgroundOpacity", (int) (v * 10));
+                win.applyBackground();
+            }, "%");
+            sliderRow(bg, "背景模糊", 0, 40, data.getInt("UiBackgroundBlur", 0), v -> {
+                data.set("UiBackgroundBlur", v.intValue());
+                win.applyBackground();
+            }, " px");
         }
+        Ui.Check colorful = Ui.checkBox("叠加彩色背景", false);
+        colorful.setSelected(data.getBool("UiBackgroundColorful", true));
+        colorful.setOnAction(() -> data.set("UiBackgroundColorful", colorful.isSelected()));
+        bg.add(colorful);
+        Ui.Check autoTheme = Ui.checkBox("根据背景图自动调整主题色", false);
+        autoTheme.setSelected(data.getBool("UiAutoThemeFromBackground", true));
+        autoTheme.setOnAction(() -> {
+            data.set("UiAutoThemeFromBackground", autoTheme.isSelected());
+            if (autoTheme.isSelected()) {
+                data.set("UiThemePreset", -1);
+                Theme.applyWallpaperTheme();
+            } else {
+                // 关掉跟随壁纸：把此刻的取色固化成自定义主题，别掉回默认蓝
+                Theme.saveCurrentAsCustom(data);
+                data.set("UiThemePreset", 14);
+            }
+            win.rebuildUi();
+        });
+        bg.add(autoTheme);
+        FlowPane bgButtons = new FlowPane(10, 10);
+        bgButtons.getChildren().addAll(
+                Ui.button("打开文件夹", Ui.BTN_NORMAL, this::openBackgroundFolder),
+                Ui.button("刷新背景图片", Ui.BTN_NORMAL, () -> {
+                    win.refreshWallpaper(false);
+                    win.toast("背景图片已刷新", "", 1);
+                }),
+                Ui.button("清空背景图片", Ui.BTN_RED, () -> Dialogs.confirm(win,
+                        "清空背景图片", Lang.t("即将删除背景图片文件夹中的所有文件。\n此操作不可撤销，是否确定？"), () -> {
+                            clearBackgroundFolder();
+                            win.refreshWallpaper(true);
+                            win.refreshRight();
+                        }, true)));
+        bg.add(bgButtons);
+        moveRows(bg, mark, imageBox);
+
+        mark = bg.content.getChildren().size();
+        if (videoCount > 0) {
+            sliderRow(bg, "音量", 0, 100, data.getInt("UiVideoVolume", 500) / 10, v -> {
+                data.set("UiVideoVolume", (int) Math.round(v * 10));
+                win.updateVideoAudio();
+            }, "%");
+        }
+        Ui.Check vidRandom = Ui.checkBox("随机播放", false);
+        vidRandom.setSelected(data.getBool("UiVideoRandom", true));
+        vidRandom.setOnAction(() -> {
+            data.set("UiVideoRandom", vidRandom.isSelected());
+            win.refreshVideoBackground(false);
+        });
+        bg.add(vidRandom);
+        Ui.Check vidMute = Ui.checkBox("静音（仅作为背景画面）", false);
+        vidMute.setSelected(data.getBool("UiVideoMute", true));
+        vidMute.setOnAction(() -> {
+            data.set("UiVideoMute", vidMute.isSelected());
+            win.updateVideoAudio();
+        });
+        bg.add(vidMute);
+        Ui.Check vidPause = Ui.checkBox("启动器失去焦点时暂停（省 CPU）", false);
+        vidPause.setSelected(data.getBool("UiVideoPauseOnBlur", true));
+        vidPause.setOnAction(() -> data.set("UiVideoPauseOnBlur", vidPause.isSelected()));
+        bg.add(vidPause);
+        FlowPane vidButtons = new FlowPane(10, 10);
+        vidButtons.getChildren().addAll(
+                Ui.button("打开文件夹", Ui.BTN_NORMAL, this::openVideoFolder),
+                Ui.button("刷新背景视频", Ui.BTN_NORMAL, () -> win.refreshVideoBackground(true)),
+                Ui.button("清空背景视频", Ui.BTN_RED, () -> Dialogs.confirm(win,
+                        "清空背景视频", "即将删除背景视频文件夹中的所有文件。\n此操作不可撤销，是否确定？", () -> {
+                            clearVideoFolder();
+                            win.refreshVideoBackground(false);
+                            win.refreshRight();
+                        }, true)));
+        bg.add(vidButtons);
+        bg.add(Ui.hint("支持 mp4 / m4v / mov（H.264）。mkv、avi、wmv、webm 等 JavaFX 无法解码，需要先转成 mp4；"
+                + "多个视频循环播放。建议使用 720p 以内的素材，分辨率越高 CPU 占用越大。", 0));
+        moveRows(bg, mark, videoBox);
+
+        bg.add(imageBox, videoBox);
+        applyMode.run();
 
         Ui.Card sound = addCard(page, "背景音乐");
         sliderRow(sound, "音量", 0, 100, Music.volumePercent(), v -> {
@@ -1176,6 +1184,22 @@ public class PageSetup implements Page {
         } catch (Exception e) {
             win.toast("无法打开文件夹", e.getMessage(), 3);
         }
+    }
+
+    private int countPictures() {
+        try (var s = Files.list(Paths.get(data.gameDir, "TCL", "Pictures"))) {
+            return (int) s.filter(Files::isRegularFile).filter(Theme::isWallpaperImage).count();
+        } catch (Exception ignored) {
+            return 0;
+        }
+    }
+
+    // 挪到独立容器，便于整组显隐
+    private static void moveRows(Ui.Card card, int mark, VBox target) {
+        var children = card.content.getChildren();
+        List<Node> rows = new ArrayList<>(children.subList(mark, children.size()));
+        children.removeAll(rows);
+        target.getChildren().addAll(rows);
     }
 
     private void openVideoFolder() {

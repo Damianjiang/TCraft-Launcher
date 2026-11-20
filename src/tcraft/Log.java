@@ -53,7 +53,21 @@ public final class Log {
         if (text != null) enqueue(text, true);
     }
 
-    // 每次启动写一条分隔，重启不覆盖旧内容
+    // 日志与报错共用的环境信息
+    public static String environment() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("软件：TCraft Launcher ").append(Build.VERSION)
+                .append("（").append(Build.EDITION).append("）\n");
+        sb.append("系统：").append(System.getProperty("os.name", ""))
+                .append(' ').append(System.getProperty("os.version", ""))
+                .append(" (").append(System.getProperty("os.arch", "")).append(")\n");
+        sb.append("Java：").append(System.getProperty("java.version", ""))
+                .append(" (").append(System.getProperty("java.vendor", "")).append(")\n");
+        sb.append("目录：").append(Resources.home());
+        return sb.toString();
+    }
+
+    // 启动分隔，两个日志都写环境信息
     public static void startSession() {
         if (!SESSION.compareAndSet(false, true)) return;
         try {
@@ -61,10 +75,7 @@ public final class Log {
             rotateIfBig(Resources.logDir().resolve("launch.log"), 1024 * 1024, "launch");
         } catch (Throwable ignored) {
         }
-        info("===== 启动 " + Build.VERSION + "（" + Build.EDITION + "） "
-                + LocalDateTime.now().withNano(0)
-                + " | Java " + System.getProperty("java.version")
-                + " | " + System.getProperty("os.name") + " =====");
+        enqueue("===== 启动 " + LocalDateTime.now().withNano(0) + " =====\n" + environment(), true);
     }
 
     // 异常描述：类名 + message + 首个堆栈帧，message 为空也能看出异常类型
@@ -92,7 +103,8 @@ public final class Log {
             rotateIfBig(file, 512 * 1024, "crash");
             java.io.StringWriter sw = new java.io.StringWriter();
             t.printStackTrace(new java.io.PrintWriter(sw));
-            String entry = "===== " + LocalDateTime.now().withNano(0) + " =====\n" + sw;
+            String entry = "===== " + LocalDateTime.now().withNano(0) + " =====\n"
+                    + environment() + "\n" + sw;
             Files.writeString(file, Redact.apply(entry), StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE, StandardOpenOption.APPEND);
             return file;

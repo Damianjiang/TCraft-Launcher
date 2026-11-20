@@ -42,6 +42,7 @@ public final class Skin3D extends Region {
     private int skinW, skinH;
 
     private double texScale = 1;
+    private boolean legacySkin;
 
     private List<Face> faces = new ArrayList<>();
 
@@ -144,15 +145,56 @@ public final class Skin3D extends Region {
             clearSkin();
             return;
         }
+        // 旧版 64x32 皮肤先镜像补成 64x64 再建模
+        legacySkin = ih < iw;
+        if (legacySkin) image = upgradeLegacy(image, (int) iw, (int) ih);
         this.skin = image;
         readPixels();
         rebuild();
+    }
+
+    // 镜像复制右肢贴图补全左肢
+    private static Image upgradeLegacy(Image src, int w, int h) {
+        javafx.scene.image.WritableImage out = new javafx.scene.image.WritableImage(w, w);
+        javafx.scene.image.PixelReader in = src.getPixelReader();
+        javafx.scene.image.PixelWriter dst = out.getPixelWriter();
+        int u = w / 64;
+        copyPixels(in, dst, 0, 0, w, h / 2, 0, 0, false);
+        copyPixels(in, dst, 0, 16 * u, 16 * u, 16 * u, 0, 16 * u, false);
+        copyPixels(in, dst, 16 * u, 16 * u, 24 * u, 16 * u, 16 * u, 16 * u, false);
+        copyPixels(in, dst, 40 * u, 16 * u, 16 * u, 16 * u, 40 * u, 16 * u, false);
+        mirrorLimb(in, dst, u, 0, 16 * u, 16 * u, 48 * u);
+        mirrorLimb(in, dst, u, 40 * u, 16 * u, 32 * u, 48 * u);
+        return out;
+    }
+
+    private static void mirrorLimb(javafx.scene.image.PixelReader in,
+                                   javafx.scene.image.PixelWriter dst, int u,
+                                   int sx, int sy, int tx, int ty) {
+        int w = 4 * u, h = 12 * u, d = 4 * u;
+        copyPixels(in, dst, sx + d, sy, w, d, tx + d, ty, true);
+        copyPixels(in, dst, sx + d + w, sy, w, d, tx + d + w, ty, true);
+        copyPixels(in, dst, sx, sy + d, d, h, tx + w + d, ty + d, true);
+        copyPixels(in, dst, sx + w + d, sy + d, d, h, tx, ty + d, true);
+        copyPixels(in, dst, sx + d, sy + d, w, h, tx + d, ty + d, true);
+        copyPixels(in, dst, sx + w + 2 * d, sy + d, w, h, tx + w + 2 * d, ty + d, true);
+    }
+
+    private static void copyPixels(javafx.scene.image.PixelReader in,
+                                   javafx.scene.image.PixelWriter dst, int sx, int sy,
+                                   int w, int h, int tx, int ty, boolean mirrorX) {
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                dst.setArgb(tx + x, ty + y, in.getArgb(sx + (mirrorX ? w - 1 - x : x), sy + y));
+            }
+        }
     }
 
     public void clearSkin() {
         skin = null;
         pixels = null;
         palette = null;
+        legacySkin = false;
         faces = new ArrayList<>();
         GraphicsContext g = canvas.getGraphicsContext2D();
         g.clearRect(0, 0, canvas.getWidth(), canvas.getHeight());
@@ -208,26 +250,23 @@ public final class Skin3D extends Region {
             Data.get().log("3D 皮肤预览：贴图宽度 " + skinW + " 不足 64，无法建模");
             return;
         }
-        boolean legacy = skinH < skinW;
         texScale = skinW / 64.0;
-        boolean slim = !legacy && isSlimPixel();
+        boolean slim = !legacySkin && isSlimPixel();
         int armW = slim ? 3 : 4;
         double armX = (8 + armW) / 2.0;
 
         addBox(8, 8, 8, 0, 0, 0, -10, 0, 0);
         addBox(8, 12, 4, 16, 16, 0, 0, 0, 0);
         addBox(armW, 12, 4, 40, 16, -armX, 0, 0, 0);
-        addBox(armW, 12, 4, legacy ? 40 : 32, legacy ? 16 : 48, armX, 0, 0, 0);
+        addBox(armW, 12, 4, 32, 48, armX, 0, 0, 0);
         addBox(4, 12, 4, 0, 16, -2, 12, 0, 0);
-        addBox(4, 12, 4, legacy ? 0 : 16, legacy ? 16 : 48, 2, 12, 0, 0);
-        if (!legacy) {
-            addBox(8, 8, 8, 32, 0, 0, -10, 0, 0.5);
-            addBox(8, 12, 4, 16, 32, 0, 0, 0, 0.5);
-            addBox(armW, 12, 4, 40, 32, -armX, 0, 0, 0.5);
-            addBox(armW, 12, 4, 48, 48, armX, 0, 0, 0.5);
-            addBox(4, 12, 4, 0, 32, -2, 12, 0, 0.5);
-            addBox(4, 12, 4, 0, 48, 2, 12, 0, 0.5);
-        }
+        addBox(4, 12, 4, 16, 48, 2, 12, 0, 0);
+        addBox(8, 8, 8, 32, 0, 0, -10, 0, 0.5);
+        addBox(8, 12, 4, 16, 32, 0, 0, 0, 0.5);
+        addBox(armW, 12, 4, 40, 32, -armX, 0, 0, 0.5);
+        addBox(armW, 12, 4, 48, 48, armX, 0, 0, 0.5);
+        addBox(4, 12, 4, 0, 32, -2, 12, 0, 0.5);
+        addBox(4, 12, 4, 0, 48, 2, 12, 0, 0.5);
         render();
     }
 

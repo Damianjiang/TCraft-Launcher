@@ -8,8 +8,10 @@ import javafx.animation.ParallelTransition;
 import javafx.animation.PauseTransition;
 import javafx.animation.ScaleTransition;
 import javafx.animation.Timeline;
+import javafx.animation.Transition;
 import javafx.animation.TranslateTransition;
 import javafx.application.Platform;
+import javafx.beans.binding.Bindings;
 import javafx.beans.value.ChangeListener;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -38,6 +40,7 @@ import javafx.scene.paint.Stop;
 import javafx.scene.shape.Arc;
 import javafx.scene.shape.ArcType;
 import javafx.scene.shape.Rectangle;
+import javafx.scene.transform.Rotate;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
@@ -85,9 +88,10 @@ public final class MainWindow {
     private StackPane modalHost;
     private boolean modalDismissable = true;
     private Node modalContent;
-    private FadeTransition maskFade;
+    private Transition maskFade;
     private Timeline modalExit;
     private Timeline modalEnter;
+    private Rotate modalRotate;
     private PauseTransition rightCacheCleanup;
     private Timeline rightRefreshAnim;
     private int rightRefreshToken;
@@ -887,7 +891,7 @@ public final class MainWindow {
 
         modalLayer = new StackPane();
         modalLayer.setVisible(false);
-        modalLayer.setBackground(Ui.fill(Color.web("#000000", 0.02), 0));
+        modalLayer.setBackground(Ui.fill(Color.TRANSPARENT, 0));
         modalHost = new StackPane();
         modalHost.setPickOnBounds(false);
         modalLayer.getChildren().add(modalHost);
@@ -1643,6 +1647,7 @@ public final class MainWindow {
             return;
         }
 
+        constrainRight(right);
         syncLeftSelection(page.sectionKey());
         if (rightHost.getChildren().size() > 1) {
             rightHost.getChildren().removeIf(n -> n != curRight);
@@ -1726,12 +1731,23 @@ public final class MainWindow {
         }
     }
 
+    // 清掉内容最小尺寸，避免长文本撑宽页面
+    private void constrainRight(Node right) {
+        rightHost.setMinWidth(0);
+        rightHost.setMinHeight(0);
+        if (right instanceof javafx.scene.layout.Region rr) {
+            rr.setMinWidth(0);
+            rr.setMinHeight(0);
+        }
+    }
+
     private void applyRight(Page oldPage, Page page, Node right) {
         switchToken++;
         hidePage(oldPage);
         rightPendingHide = null;
         currentPage = page;
         lastHiddenPage = null;
+        constrainRight(right);
         rightHost.getChildren().setAll(right);
         curRight = right;
         rightHost.setOpacity(1);
@@ -1892,12 +1908,7 @@ public final class MainWindow {
         Lang.localize(right);
         curLeft = left;
         curRight = right;
-        rightHost.setMinWidth(0);
-        rightHost.setMinHeight(0);
-        if (right instanceof javafx.scene.layout.Region rr) {
-            rr.setMinWidth(0);
-            rr.setMinHeight(0);
-        }
+        constrainRight(right);
         if (left instanceof javafx.scene.layout.Region lr) {
             lr.setMinWidth(0);
         }
@@ -2601,10 +2612,12 @@ public final class MainWindow {
     }
 
     public void showModal(Node card, boolean dismissable, Color mask) {
-        // 连锁弹窗先停旧退场动画，退场收尾会把新卡片清掉
+        // 连锁弹窗先停旧动画，退场收尾会把新卡片清掉
         if (maskFade != null) maskFade.stop();
         if (modalExit != null) modalExit.stop();
-        modalLayer.setBackground(Ui.fill(mask == null ? Theme.modalMask : mask, 0));
+        if (modalEnter != null) modalEnter.stop();
+        Color target = mask == null ? Theme.modalMask : mask;
+        Color from = maskColor(modalLayer);
         // 被顶掉的旧弹窗不是用户关的，它的等待方（latch/hook）也要放行
         Runnable staleHook = modalCloseHook;
         modalCloseHook = null;
@@ -2633,25 +2646,69 @@ public final class MainWindow {
         Lang.localize(card);
         StackPane.setAlignment(card, Pos.CENTER);
         modalLayer.setVisible(true);
-        modalLayer.setOpacity(0);
-        maskFade = new FadeTransition(Duration.millis(200), modalLayer);
-        maskFade.setToValue(1);
-        maskFade.play();
+        modalLayer.setOpacity(1);
+        // 只渐变遮罩底色，整层淡入会把卡片一起带淡
+        int maskMs = Ui.aniMs(200);
+        if (maskMs > 0) {
+            maskFade = maskTransition(modalLayer, from, target, maskMs, 0, null);
+            maskFade.play();
+        } else {
+            modalLayer.setBackground(Ui.fill(target, 0));
+        }
+        // 初始左倾 4°、下移 40px，60ms 后同时回正、淡入
+        modalRotate = new Rotate(-4, 0, 0);
+        modalRotate.pivotYProperty().bind(Bindings.createDoubleBinding(
+                () -> card.getLayoutBounds().getHeight() / 2, card.layoutBoundsProperty()));
+        card.getTransforms().add(modalRotate);
         card.setOpacity(0);
-        card.setScaleX(0.92);
-        card.setScaleY(0.92);
-        card.setTranslateY(18);
-        modalEnter = new Timeline(
-                new KeyFrame(Duration.ZERO, new KeyValue(card.opacityProperty(), 0),
-                        new KeyValue(card.scaleXProperty(), 0.92), new KeyValue(card.scaleYProperty(), 0.92),
-                        new KeyValue(card.translateYProperty(), 18)),
-                new KeyFrame(Duration.millis(140 + 40), new KeyValue(card.opacityProperty(), 1)),
-                new KeyFrame(Duration.millis(300 + 50),
-                        new KeyValue(card.translateYProperty(), 0, Ui.EASE_OUT_FLUENT)),
-                new KeyFrame(Duration.millis(340 + 50),
-                        new KeyValue(card.scaleXProperty(), 1, Ui.EASE_OUT_BACK_MIDDLE),
-                        new KeyValue(card.scaleYProperty(), 1, Ui.EASE_OUT_BACK_MIDDLE)));
-        modalEnter.play();
+        card.setTranslateY(40);
+        card.setScaleX(1);
+        card.setScaleY(1);
+        int delay = Ui.aniMs(60);
+        int moveMs = Ui.aniMs(300);
+        if (moveMs <= 0) {
+            card.setOpacity(1);
+            card.setTranslateY(0);
+            modalRotate.setAngle(0);
+        } else {
+            modalEnter = new Timeline(
+                    new KeyFrame(Duration.ZERO,
+                            new KeyValue(card.opacityProperty(), 0),
+                            new KeyValue(card.translateYProperty(), 40),
+                            new KeyValue(modalRotate.angleProperty(), -4)),
+                    new KeyFrame(Duration.millis(delay),
+                            new KeyValue(card.opacityProperty(), 0),
+                            new KeyValue(card.translateYProperty(), 40),
+                            new KeyValue(modalRotate.angleProperty(), -4)),
+                    new KeyFrame(Duration.millis(delay + Ui.aniMs(120)),
+                            new KeyValue(card.opacityProperty(), 1)),
+                    new KeyFrame(Duration.millis(delay + moveMs),
+                            new KeyValue(card.translateYProperty(), 0, Ui.EASE_OUT_BACK),
+                            new KeyValue(modalRotate.angleProperty(), 0, Ui.EASE_OUT_FLUENT_WEAK)));
+            modalEnter.play();
+        }
+    }
+
+    private static Color maskColor(Region layer) {
+        Background bg = layer.getBackground();
+        if (bg == null || bg.getFills().isEmpty()) return Color.TRANSPARENT;
+        return bg.getFills().get(0).getFill() instanceof Color c ? c : Color.TRANSPARENT;
+    }
+
+    private static Transition maskTransition(Region layer, Color from, Color to, int ms, int delayMs,
+                                             Interpolator ease) {
+        return new Transition() {
+            {
+                setDelay(Duration.millis(Math.max(0, delayMs)));
+                setCycleDuration(Duration.millis(Math.max(1, ms)));
+                if (ease != null) setInterpolator(ease);
+            }
+
+            @Override
+            protected void interpolate(double frac) {
+                layer.setBackground(Ui.fill(from.interpolate(to, frac), 0));
+            }
+        };
     }
 
     static void solidifyModal(Node card) {
@@ -2680,9 +2737,12 @@ public final class MainWindow {
     }
 
     public void closeModal() {
-        if (modalLayer == null || !modalLayer.isVisible()) return;
-        // 入场动画还在跑就先停，两个动画同时写 opacity/scale 会打架
+        // 退场动画期间再点遮罩不算新一次关闭
+        if (modalLayer == null || !modalLayer.isVisible() || modalContent == null) return;
+        // 入场动画还在跑就先停，两个动画同时写 opacity/rotate 会打架
         if (modalEnter != null) modalEnter.stop();
+        if (maskFade != null) maskFade.stop();
+        if (modalExit != null) modalExit.stop();
         // 外部关闭也要推进错误弹窗队列
         Errors.onModalDismissed();
         Runnable hook = modalCloseHook;
@@ -2694,38 +2754,56 @@ public final class MainWindow {
             }
         }
         final Node card = modalContent;
+        final Rotate rot = modalRotate;
         modalContent = null;
-        if (card != null) {
+        modalRotate = null;
+        // 退场 20ms 后开始淡出，位移回落到 20px、倾斜 6°，150ms 收束
+        int moveMs = Ui.aniMs(150);
+        if (card != null && moveMs > 0) {
             Timeline out = new Timeline(
                     new KeyFrame(Duration.ZERO,
                             new KeyValue(card.opacityProperty(), card.getOpacity()),
                             new KeyValue(card.translateYProperty(), card.getTranslateY()),
-                            new KeyValue(card.scaleXProperty(), card.getScaleX()),
-                            new KeyValue(card.scaleYProperty(), card.getScaleY())),
-                    new KeyFrame(Duration.millis(10 + 90), new KeyValue(card.opacityProperty(), 0)),
-                    new KeyFrame(Duration.millis(130),
-                            new KeyValue(card.translateYProperty(), 12, Ui.EASE_OUT_FLUENT)),
-                    new KeyFrame(Duration.millis(130),
-                            new KeyValue(card.scaleXProperty(), 1.04, Ui.fluentIn(2)),
-                            new KeyValue(card.scaleYProperty(), 1.04, Ui.fluentIn(2))));
+                            new KeyValue(rot == null ? card.rotateProperty() : rot.angleProperty(),
+                                    rot == null ? card.getRotate() : rot.getAngle())),
+                    new KeyFrame(Duration.millis(Ui.aniMs(20)),
+                            new KeyValue(card.opacityProperty(), card.getOpacity())),
+                    new KeyFrame(Duration.millis(Ui.aniMs(20) + Ui.aniMs(80)),
+                            new KeyValue(card.opacityProperty(), 0)),
+                    new KeyFrame(Duration.millis(moveMs),
+                            new KeyValue(card.translateYProperty(), 20, Ui.EASE_OUT_FLUENT),
+                            new KeyValue(rot == null ? card.rotateProperty() : rot.angleProperty(),
+                                    6, Ui.fluentIn(2))));
             out.setOnFinished(e -> {
                 if (modalContent != null) return;
                 modalHost.getChildren().clear();
-                modalLayer.setVisible(false);
+                finishModalHide();
             });
             modalExit = out;
             out.play();
-        } else {
-            if (modalContent == null) {
-                modalHost.getChildren().clear();
-                modalLayer.setVisible(false);
-            }
+        } else if (card != null) {
+            modalHost.getChildren().clear();
         }
         if (modalContent == null) {
-            maskFade = new FadeTransition(Duration.millis(200), modalLayer);
-            maskFade.setToValue(0);
-            maskFade.play();
+            int maskMs = Ui.aniMs(200);
+            if (maskMs <= 0) {
+                modalLayer.setBackground(Ui.fill(Color.TRANSPARENT, 0));
+                finishModalHide();
+            } else {
+                // 遮罩延迟 30ms 再淡出，比卡片收束（150ms）略慢
+                maskFade = maskTransition(modalLayer, maskColor(modalLayer), Color.TRANSPARENT,
+                        maskMs, Ui.aniMs(30), Ui.EASE_OUT_FLUENT_WEAK);
+                maskFade.setOnFinished(e -> finishModalHide());
+                maskFade.play();
+            }
         }
+    }
+
+    private void finishModalHide() {
+        if (modalContent != null) return;
+        if (modalExit != null && modalExit.getStatus() == javafx.animation.Animation.Status.RUNNING) return;
+        if (maskFade != null && maskFade.getStatus() == javafx.animation.Animation.Status.RUNNING) return;
+        modalLayer.setVisible(false);
     }
 
     private void showGlobalSearch() {
@@ -3106,26 +3184,7 @@ public final class MainWindow {
         launchPercent = valueLabel("0 %");
         info.add(launchPercent, 3, 2);
 
-        VBox hintBox = new VBox(0);
-        hintBox.setAlignment(Pos.TOP_CENTER);
-        hintBox.setMaxWidth(300);
-        hintBox.setVisible(false);
-        hintBox.setManaged(false);
-        Border hintBorder = new Border(new BorderStroke(
-                new Color(Theme.gray1.getRed(), Theme.gray1.getGreen(), Theme.gray1.getBlue(), 0.5),
-                BorderStrokeStyle.SOLID, new CornerRadii(3), new BorderWidths(1)));
-        Region hintFrame = new Region();
-        hintFrame.setBorder(hintBorder);
-        hintFrame.setPrefHeight(56);
-        Label hintTitle = Ui.label("你知道吗", 12.5, Theme.gray1);
-        hintTitle.setOpacity(0.5);
-        StackPane hintStack = new StackPane(hintFrame, hintTitle);
-        Label hintText = Ui.label(randomHint(), 12.5, Theme.text);
-        hintText.setWrapText(true);
-        hintText.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
-        hintText.setPadding(new Insets(21, 11, 10, 11));
-        hintStack.setMaxWidth(Double.MAX_VALUE);
-        hintBox.getChildren().addAll(hintStack, hintText);
+        VBox hintBox = createHintBox();
         VBox.setMargin(hintBox, new Insets(14, 0, 2, 0));
         launchHintBox = hintBox;
         launchInfoBox = info;
@@ -3142,16 +3201,60 @@ public final class MainWindow {
         launchPanel.setCenter(launchInner);
         launchLayer.getChildren().addAll(launchMask, launchPanel);
 
-        Timeline open = new Timeline(
-                new KeyFrame(Duration.ZERO, new KeyValue(launchPanel.maxWidthProperty(), 0),
-                        new KeyValue(launchPanel.minWidthProperty(), 0.0),
-                        new KeyValue(launchInner.opacityProperty(), 0.0)),
-                new KeyFrame(Duration.millis(190), new KeyValue(launchPanel.maxWidthProperty(), 364,
-                        Interpolator.EASE_OUT), new KeyValue(launchPanel.minWidthProperty(), 0.0)),
-                new KeyFrame(Duration.millis(320), new KeyValue(launchInner.opacityProperty(), 1,
+        // 延迟 100ms 淡入 150ms，0.8 → 1 回弹
+        launchInner.setScaleX(0.8);
+        launchInner.setScaleY(0.8);
+        Timeline slide = new Timeline(new KeyFrame(Duration.millis(190),
+                new KeyValue(launchPanel.maxWidthProperty(), 364, Interpolator.EASE_OUT)));
+        slide.play();
+        Timeline fade = new Timeline(
+                new KeyFrame(Duration.ZERO, new KeyValue(launchInner.opacityProperty(), 0.0)),
+                new KeyFrame(Duration.millis(150), new KeyValue(launchInner.opacityProperty(), 1,
                         Interpolator.EASE_OUT)));
-        open.setOnFinished(e -> runLaunchProgress(ins));
-        open.play();
+        fade.setDelay(Duration.millis(100));
+        fade.play();
+        Timeline grow = new Timeline(new KeyFrame(Duration.millis(500),
+                new KeyValue(launchInner.scaleXProperty(), 1, Ui.EASE_OUT_BACK_MIDDLE),
+                new KeyValue(launchInner.scaleYProperty(), 1, Ui.EASE_OUT_BACK_MIDDLE)));
+        grow.setDelay(Duration.millis(100));
+        grow.play();
+        PauseTransition startProgress = new PauseTransition(Duration.millis(350));
+        startProgress.setOnFinished(e -> {
+            if (launching) runLaunchProgress(ins);
+        });
+        startProgress.play();
+    }
+
+    static VBox createHintBox() {
+        VBox hintBox = new VBox(0);
+        hintBox.setAlignment(Pos.TOP_CENTER);
+        hintBox.setMaxWidth(300);
+        hintBox.setVisible(false);
+        hintBox.setManaged(false);
+        Border border = new Border(new BorderStroke(
+                new Color(Theme.gray1.getRed(), Theme.gray1.getGreen(), Theme.gray1.getBlue(), 0.5),
+                BorderStrokeStyle.SOLID, new CornerRadii(3), new BorderWidths(1)));
+        Region frame = new Region();
+        frame.setBorder(border);
+        frame.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        Label title = Ui.label("你知道吗", 12.5, Theme.gray1);
+        title.setOpacity(0.5);
+        title.setPadding(new Insets(0, 8, 0, 8));
+        // 标题底色盖住边框，形成缺口
+        title.setBackground(Ui.fill(Color.web("#FBFBFB"), 0));
+        title.setTranslateY(-8);
+        StackPane.setAlignment(title, Pos.TOP_CENTER);
+        Label text = Ui.label(randomHint(), 12.5, Theme.text);
+        text.setWrapText(true);
+        text.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
+        text.setMinWidth(0);
+        text.setMaxWidth(278);
+        VBox body = new VBox(text);
+        body.setPadding(new Insets(21, 11, 10, 11));
+        StackPane stack = new StackPane(frame, body, title);
+        stack.setMaxWidth(Double.MAX_VALUE);
+        hintBox.getChildren().add(stack);
+        return hintBox;
     }
 
     private Region spacerBox() {
@@ -3395,8 +3498,14 @@ public final class MainWindow {
         maskOut.setToValue(0);
         maskOut.play();
         Timeline close = new Timeline(
-                new KeyFrame(Duration.ZERO, new KeyValue(launchInner.opacityProperty(), launchInner.getOpacity())),
+                new KeyFrame(Duration.ZERO,
+                        new KeyValue(launchInner.opacityProperty(), launchInner.getOpacity()),
+                        new KeyValue(launchInner.scaleXProperty(), launchInner.getScaleX()),
+                        new KeyValue(launchInner.scaleYProperty(), launchInner.getScaleY())),
                 new KeyFrame(Duration.millis(80), new KeyValue(launchInner.opacityProperty(), 0)),
+                new KeyFrame(Duration.millis(150),
+                        new KeyValue(launchInner.scaleXProperty(), 0.8, Ui.EASE_OUT_FLUENT_WEAK),
+                        new KeyValue(launchInner.scaleYProperty(), 0.8, Ui.EASE_OUT_FLUENT_WEAK)),
                 new KeyFrame(Duration.millis(240), new KeyValue(launchPanel.maxWidthProperty(), 0,
                         Interpolator.EASE_IN)));
         close.setOnFinished(e -> {
