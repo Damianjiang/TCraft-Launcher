@@ -114,10 +114,33 @@ public final class Skin3D extends Region {
     }
 
     public void setSkin(Image image) {
+        if (image == null) {
+            clearSkin();
+            return;
+        }
+        // 图片可能还在后台解码，此时读像素只会得到整片白色
+        if (image.getProgress() < 1) {
+            javafx.beans.value.ChangeListener<Number> wait = new javafx.beans.value.ChangeListener<>() {
+                @Override
+                public void changed(javafx.beans.value.ObservableValue<? extends Number> o,
+                                    Number before, Number after) {
+                    if (after.doubleValue() < 1) return;
+                    image.progressProperty().removeListener(this);
+                    applySkin(image);
+                }
+            };
+            image.progressProperty().addListener(wait);
+            return;
+        }
+        applySkin(image);
+    }
+
+    private void applySkin(Image image) {
+        double iw = image.getWidth(), ih = image.getHeight();
+        boolean valid = !image.isError() && iw >= 64 && iw % 64 == 0 && (ih == iw || ih == iw / 2);
         // palette 每像素一个 Color，贴图上限 512x512
-        if (image != null && (long) image.getWidth() * (long) image.getHeight() > 512 * 512) {
-            Data.get().log("3D 皮肤预览：贴图 " + (int) image.getWidth() + "x" + (int) image.getHeight()
-                    + " 超出上限，已跳过");
+        if (!valid || (long) iw * (long) ih > 512 * 512) {
+            Data.get().log("3D 皮肤预览：贴图 " + (int) iw + "x" + (int) ih + " 不是有效皮肤，已跳过");
             clearSkin();
             return;
         }
@@ -293,6 +316,7 @@ public final class Skin3D extends Region {
         double[] sx = new double[4];
         double[] sy = new double[4];
         double z;
+        double nx, ny, nz;
     }
 
     private void render() {
@@ -341,6 +365,9 @@ public final class Skin3D extends Region {
                 ny = y1;
                 nz = -f.nx * syw + z1 * cyw;
             }
+            pr.nx = nx;
+            pr.ny = ny;
+            pr.nz = nz;
             double facing = -nx * mx - ny * my + nz * (dist - mz);
             boolean near = true;
             for (int i = 0; i < 4; i++) {
@@ -378,6 +405,17 @@ public final class Skin3D extends Region {
         int step = (int) Math.ceil(1.0 / Math.max(0.2, pxPerTexel));
         step = Math.max(1, Math.min(4, step));
 
+        // 固定左上前方光源，白色皮肤也能看出各面
+        double lx = -0.35, ly = -0.55, lz = 0.78;
+        double ln = Math.sqrt(lx * lx + ly * ly + lz * lz);
+        double lambert = Math.max(0, (pr.nx * lx + pr.ny * ly + pr.nz * lz) / ln);
+        double shade = 0.52 + 0.48 * lambert;
+
+        // 极淡的面轮廓，纯色皮肤也能分清各部位
+        g.setStroke(Color.color(0, 0, 0, 0.18));
+        g.setLineWidth(1.0);
+        g.strokePolygon(pr.sx, pr.sy, 4);
+
         double[] cam = pr.cx;
         double[] q = new double[12];
         double[] qx = new double[4], qy = new double[4];
@@ -406,7 +444,9 @@ public final class Skin3D extends Region {
                 }
                 if (!ok) continue;
                 outset(qx, qy, 0.5);
-                g.setFill(palette[texel]);
+                Color base = palette[texel];
+                g.setFill(Color.color(base.getRed() * shade, base.getGreen() * shade,
+                        base.getBlue() * shade, base.getOpacity()));
                 g.fillPolygon(qx, qy, 4);
             }
         }

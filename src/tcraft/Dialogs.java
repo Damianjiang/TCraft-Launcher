@@ -1004,34 +1004,33 @@ public final class Dialogs {
     private static String fetchCslSkin(String base, String who, String accountName) throws Exception {
         String site = base == null ? "" : base.trim();
         if (site.isEmpty()) site = "https://littleskin.cn";
+        if (!site.startsWith("http://") && !site.startsWith("https://")) site = "https://" + site;
         while (site.endsWith("/")) site = site.substring(0, site.length() - 1);
         String cslBase = site.toLowerCase().endsWith("/csl") ? site : site + "/csl";
-        String root = cslBase.substring(0, cslBase.length() - 4);
-        String csl = httpGetString(cslBase + "/" + java.net.URLEncoder.encode(who, "UTF-8") + ".json");
-        Map<String, Object> json = Json.obj(Json.parse(csl));
-        if (json.isEmpty()) throw new Exception("皮肤站上没有这个角色：" + who);
-        String url = Json.str(cslSkinNode(json), "url", "");
-        if (url.isEmpty()) {
-            // 新版只给 hash，地址是 站点根/textures/hash
-            String hash = Json.str(Json.obj(json, "skins"), "default", "");
-            if (hash.isEmpty()) hash = Json.str(cslSkinNode(json), "hash", "");
-            if (!hash.isEmpty()) url = root + "/textures/" + hash;
+        String body = httpGetString(cslBase + "/" + java.net.URLEncoder.encode(who, "UTF-8") + ".json");
+        Map<String, Object> json = Json.obj(Json.parse(body));
+        if (Json.str(json, "username", "").isEmpty()) {
+            throw new Exception("皮肤站上没有这个角色：" + who);
         }
+        Map<String, Object> textures = Json.obj(json, "textures");
+        if (textures.isEmpty()) textures = Json.obj(json, "skins");
+        String hash = Json.str(textures, "slim", "");
+        if (hash.isEmpty()) hash = Json.str(textures, "default", "");
+        String url = "";
+        for (String key : new String[]{"SKIN", "skin"}) {
+            Map<String, Object> node = Json.obj(textures, key);
+            if (node.isEmpty()) continue;
+            url = Json.str(node, "url", "");
+            if (!url.isEmpty()) break;
+        }
+        if (url.isEmpty()) {
+            Object raw = json.get("skin");
+            if (raw instanceof String str) url = str;
+            else if (raw != null) url = Json.str(Json.obj(raw), "url", "");
+        }
+        if (url.isEmpty() && !hash.isEmpty()) url = cslBase + "/textures/" + hash;
         if (url.isEmpty()) throw new Exception("皮肤站返回里没有皮肤地址，这个角色可能还没上传皮肤");
         return saveFetchedSkin(url, accountName);
-    }
-
-    private static Map<String, Object> cslSkinNode(Map<String, Object> root) {
-        Map<String, Object> textures = Json.obj(root, "textures");
-        for (String k : new String[]{"SKIN", "skin"}) {
-            Map<String, Object> node = Json.obj(textures, k);
-            if (!node.isEmpty()) return node;
-        }
-        for (String k : new String[]{"skin", "SKIN"}) {
-            Map<String, Object> node = Json.obj(root, k);
-            if (!node.isEmpty()) return node;
-        }
-        return new java.util.HashMap<>();
     }
 
     private static String saveFetchedSkin(String skinUrl, String accountName) throws Exception {
