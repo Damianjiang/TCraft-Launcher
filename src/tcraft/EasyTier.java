@@ -93,8 +93,7 @@ public final class EasyTier {
         if (a.contains("mipsel")) return "mipsel";
         if (a.contains("mips")) return "mips";
         if (a.contains("aarch64") || a.contains("arm64")) {
-            // Windows 用 arm64，其他平台用 aarch64
-            return isWindows() ? "arm64" : "aarch64";
+                return isWindows() ? "arm64" : "aarch64";
         }
         if (a.contains("arm")) return "armv7";
         if (a.contains("x86") || a.contains("i386") || a.contains("i686")) {

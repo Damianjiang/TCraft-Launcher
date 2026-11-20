@@ -82,9 +82,11 @@ public final class Data {
         }
 
         // description 摘要持久化为中文，显示层重拼（键同写入端）
+        private static final java.util.regex.Pattern SUMMARY_P =
+                java.util.regex.Pattern.compile("^(正式版|预览版|愚人节版|远古版) (\\S+)，已安装 (.+)$");
+
         private String renderedSummary(String raw) {
-            java.util.regex.Matcher m = java.util.regex.Pattern
-                    .compile("^(正式版|预览版|愚人节版|远古版) (\\S+)，已安装 (.+)$").matcher(raw);
+            java.util.regex.Matcher m = SUMMARY_P.matcher(raw);
             if (!m.matches()) return raw;
             return Lang.t(m.group(1)) + " " + m.group(2) + Lang.t("，已安装 ") + m.group(3);
         }
@@ -349,7 +351,7 @@ public final class Data {
                         && !base.startsWith(p) && !game.startsWith(p)
                         && !p.equals(base) && !p.equals(game)) {
                     Files.createDirectories(p);
-                    // 已有内容但没标记的目录可能是用户自己的，不能替它认领
+                    // 无标记的已有内容目录可能是用户的，不自动认领
                     ensureCacheMarker(p, false);
                     return p;
                 }
@@ -389,7 +391,7 @@ public final class Data {
         }
     }
 
-    // 识别官方默认目录，判旧配置迁移
+    // 用于旧配置迁移判断
     private static boolean isStockMinecraft(String path) {
         try {
             Path p = Paths.get(path).toAbsolutePath().normalize();
@@ -624,7 +626,7 @@ public final class Data {
 
         addJavaExes(out, System.getProperty("java.home"), win, mac);
         addJavaExes(out, System.getenv("JAVA_HOME"), win, mac);
-        // 启动器自己下载的 Java（含 macOS 的 Contents/Home 布局）
+        // 启动器下载的 Java（含 macOS 的 Contents/Home 布局）
         try {
             addJavaRoot(out, Resources.home().resolve("java").resolve(JavaInstaller.platformKey()), win, mac);
         } catch (Throwable ignored) {
@@ -654,7 +656,7 @@ public final class Data {
                 addJavaRoot(out, Paths.get(programData, "chocolatey", "lib"), win, mac);
             }
             if (appData != null && !appData.isBlank()) {
-                // 官方启动器自己下载的运行时
+                // 官方启动器下载的运行时
                 addJavaRoot(out, Paths.get(appData, ".minecraft", "runtime"), win, mac);
             }
             String user = System.getProperty("user.home");
@@ -771,7 +773,7 @@ public final class Data {
                 if (Files.isRegularFile(release)) {
                     for (String line : Files.readAllLines(release)) {
                         if (line.startsWith("OS_ARCH=")) {
-                            String arch = line.substring("OS_ARCH=".length()).replace("\"", "").trim().toLowerCase();
+                            String arch = line.substring("OS_ARCH=".length()).replace("\"", "").trim().toLowerCase(java.util.Locale.ROOT);
                             if (arch.contains("64") || arch.contains("amd64") || arch.contains("aarch64")) return true;
                             if (arch.equals("x86") || arch.equals("i386") || arch.equals("i686")) return false;
                         }
@@ -785,6 +787,9 @@ public final class Data {
     }
 
     // 会起 java -version 子进程（最多等 5 秒），只能后台线程调
+    private static final java.util.regex.Pattern JAVA_VERSION_P =
+            java.util.regex.Pattern.compile("version \"([^\"]+)\"");
+
     public static int javaMajor(String javaExe) {
         int fast = javaMajorFast(javaExe);
         if (fast > 0) return fast;
@@ -806,8 +811,7 @@ public final class Data {
                 }
                 String text = new String(in.readAllBytes(),
                         java.nio.charset.StandardCharsets.UTF_8);
-                java.util.regex.Matcher m = java.util.regex.Pattern
-                        .compile("version \"([^\"]+)\"").matcher(text);
+                java.util.regex.Matcher m = JAVA_VERSION_P.matcher(text);
                 if (m.find()) return parseJavaMajor(m.group(1));
             }
         } catch (Exception ignored) {
@@ -889,12 +893,12 @@ public final class Data {
                 if (!Files.isRegularFile(dir.resolve(name + ".json"))) return;
                 boolean exists = false;
                 for (Instance i : instances) {
-                    // 已登记实例用的就是这个版本目录，不再重复生成「已导入的版本」
+                    // 已登记实例用的就是这个版本目录，不重复生成「已导入的版本」
                     if (i.folder != null && i.folder.equals(gameDir)
                             && (i.name.equals(name) || name.equals(i.version))) exists = true;
                 }
                 if (exists) return;
-                String lower = name.toLowerCase();
+                String lower = name.toLowerCase(java.util.Locale.ROOT);
                 String loader = lower.contains("fabric") ? "Fabric" : lower.contains("neoforge") ? "NeoForge"
                         : lower.contains("forge") ? "Forge" : lower.contains("optifine") ? "OptiFine" : "原版";
                 String icon = "Fabric".equals(loader) ? "Fabric.png" : "NeoForge".equals(loader) ? "NeoForge.png"
@@ -1425,7 +1429,7 @@ public final class Data {
         };
     }
 
-    // 传给子进程 JVM 的代理 -D 参数；host 为空或模式不是 HTTP(2)/SOCKS5(3) 时返回空表
+    // 子进程 JVM 的代理 -D 参数；host 空或模式非 2/3 时返回空表
     public List<String> proxyJvmArgs() {
         List<String> args = new ArrayList<>();
         int mode = getInt("SystemHttpProxyType", 1);
@@ -1513,7 +1517,8 @@ public final class Data {
         // legacy 键与实例变体都落到 java.executable
         if (k.equals("instancejava") || (k.startsWith("instance.") && k.endsWith(".java"))) return true;
         // classpath 头部是 JVM 最先加载的 jar，等于任意代码执行
-        if (k.equals("launchadvanceclasspathhead")) return true;
+        // 全局/legacy/实例三种 classpathhead 键都算
+        if (k.endsWith("classpathhead")) return true;
         // 缓存根重定向配合清理功能可以删任意目录
         if (k.equals("systemsystemcache")) return true;
         // 下载源与代理可以把后续所有下载导向第三方

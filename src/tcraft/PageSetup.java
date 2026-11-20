@@ -632,7 +632,7 @@ public class PageSetup implements Page {
         FlowPane swatches = new FlowPane(18, 10);
         swatches.setPadding(new Insets(6, 0, 4, 0));
         int current = data.getInt("UiThemePreset", -1);
-        // 先排可选主题，未解锁的垫底置灰——混在中间整片看着乱
+        // 先排可选主题，未解锁的垫底置灰
         for (int pass = 0; pass < 2; pass++) {
             for (int i0 = 0; i0 < Theme.THEME_NAMES.length; i0++) {
                 final int i = i0;
@@ -761,7 +761,7 @@ public class PageSetup implements Page {
                 });
 
         Ui.Card fontCard = addCard(page, "字体");
-        Theme.loadUserFonts();
+        Theme.ensureUserFonts();
         java.util.List<String> fontOpts = new ArrayList<>();
         fontOpts.add(Lang.tf("跟随系统默认（%s）", Theme.fontFamily()));
         for (String family : Theme.userFonts()) fontOpts.add(family);
@@ -1062,8 +1062,9 @@ public class PageSetup implements Page {
                 }),
                 Ui.button("清空背景音乐", Ui.BTN_RED, () -> Dialogs.confirm(win,
                         "清空背景音乐", Lang.t("即将删除背景音乐文件夹中的所有文件。\n此操作不可撤销，是否确定？"), () -> {
-                            clearMusicFolder();
+                            // 先释放播放器；Windows 下播放中的文件无法删除
                             Music.clear();
+                            clearMusicFolder();
                             win.refreshExtraButtons();
                             win.refreshRight();
                         }, true)));
@@ -1210,7 +1211,7 @@ public class PageSetup implements Page {
         header(page, "系统", "下载、网络、语言与启动器行为。");
         Ui.Card download = addCard(page, "下载");
         // 0 和 2 只是首选顺序，下载时还会按速度择优
-        String[] sourceNames = {"镜像优先（下载时按实测速度择优）", "官方优先（下载时按实测速度择优）", "仅使用官方源"};
+        String[] sourceNames = {"镜像优先（下载时按测速结果择优）", "官方优先（下载时按测速结果择优）", "仅使用官方源"};
         int fileCur = data.getInt("SystemDownloadSource", 0);
         int fileIndex = 1;
         for (int i = 0; i < FILE_SOURCES.length; i++) if (FILE_SOURCES[i] == fileCur) fileIndex = i;
@@ -1704,7 +1705,7 @@ public class PageSetup implements Page {
                 tick[0].stop();
                 return;
             }
-            // 上一轮还在读盘就跳过这一拍，省得任务排队堆积
+            // 上一拍未完成则跳过本次读盘，任务不排队
             if (busy.get()) return;
             long size;
             try {
@@ -2081,7 +2082,7 @@ public class PageSetup implements Page {
 
     private static java.util.List<String> deleteDirCollect(Path dir, java.util.List<String> failedSink) {
         if (!Files.isDirectory(dir)) return failedSink;
-        Path running = Resources.jar(); // 正在用的 jar 被 JVM 锁着，删不掉，跳过它别当失败
+        Path running = Resources.jar(); // 运行中的 jar 被 JVM 锁定，跳过且不计为失败
         try (var stream = Files.walk(dir)) {
             for (Path p : stream.sorted(Comparator.reverseOrder()).toList()) {
                 try {

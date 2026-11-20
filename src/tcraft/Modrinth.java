@@ -20,6 +20,16 @@ public final class Modrinth {
         return search(query, projectType, limit, null, null, null, 0, null);
     }
 
+    // 搜索结果短缓存（90s）：切分类/翻页来回点不重复打 API
+    private static final Map<String, Object[]> SEARCH_CACHE = Collections.synchronizedMap(
+            new LinkedHashMap<>(32, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, Object[]> eldest) {
+                    return size() > 32;
+                }
+            });
+    private static final long SEARCH_TTL_MS = 90_000L;
+
     public static List<Object> search(String query, String projectType, int limit,
                                       List<String> versions, List<String> loaders,
                                       String category, int offset, String index) throws IOException {
@@ -52,8 +62,17 @@ public final class Modrinth {
                 .append("&index=").append(index != null && !index.isEmpty() ? index : (hasQuery ? "relevance" : "downloads"))
                 .append("&facets=").append(URLEncoder.encode(facets.toString(), StandardCharsets.UTF_8));
         if (hasQuery) url.append("&query=").append(URLEncoder.encode(query, StandardCharsets.UTF_8));
+        String cacheKey = url.toString();
+        Object[] hit = SEARCH_CACHE.get(cacheKey);
+        if (hit != null && System.currentTimeMillis() - (Long) hit[1] < SEARCH_TTL_MS) {
+            @SuppressWarnings("unchecked")
+            List<Object> cachedList = (List<Object>) hit[0];
+            return cachedList;
+        }
         String text = get(url.toString());
-        return Json.arr(Json.obj(Json.parse(text)).get("hits"));
+        List<Object> hits = Json.arr(Json.obj(Json.parse(text)).get("hits"));
+        SEARCH_CACHE.put(cacheKey, new Object[]{hits, System.currentTimeMillis()});
+        return hits;
     }
 
     private static final int CACHE_LIMIT = 200;
@@ -140,7 +159,7 @@ public final class Modrinth {
     }
 
     public static void downloadUrl(Tasks.Task task, String url, Path target, String sha1) throws IOException {
-        // 走 Fetch，边下边校验
+        // sha1 边下边校验交给 Fetch
         Fetch.file(task, url, target, sha1, 0, 0.98);
         if (task != null) task.remainingFiles = 1;
     }

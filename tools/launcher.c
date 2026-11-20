@@ -214,7 +214,7 @@ static void cleanup_legacy_home(void) {
     if (!GetEnvironmentVariableW(L"LOCALAPPDATA", alt, MAX_PATH_LEN) || !alt[0]) return;
     copy_str(old, alt, MAX_PATH_LEN);
     cat_str(old, L"\\TCraftLauncher", MAX_PATH_LEN);
-    if (wcscmp(old, home_dir) == 0) return; /* 路径相同则跳过，不删自己 */
+    if (wcscmp(old, home_dir) == 0) return; /* 路径相同则跳过 */
     if (GetFileAttributesW(old) == INVALID_FILE_ATTRIBUTES) return;
     remove_tree(old, 0);
 }
@@ -373,7 +373,7 @@ static int parse_major(const char *s) {
     return atoi(s);
 }
 
-// 读 release 认版本，不起进程
+// 读 release 判定位数，不起进程
 static int java_is64(const wchar_t *java) {
     wchar_t home[MAX_PATH_LEN];
     wchar_t rel[MAX_PATH_LEN];
@@ -392,7 +392,7 @@ static int java_is64(const wchar_t *java) {
         if (strstr(buf, "OS_ARCH=\"x86_64\"") || strstr(buf, "OS_ARCH=\"amd64\"")
                 || strstr(buf, "OS_ARCH=\"aarch64\"")) return 1;
     }
-    return 1; // 读不到就按 64 位处理，32 位 JRE 在启动时会自己报错
+    return 1; // 读不到按 64 位处理，32 位 JRE 启动时会报错
 }
 
 static int java_feature(const wchar_t *java) {
@@ -516,7 +516,7 @@ static void scan_path(void) {
     }
 }
 
-// 常规安装位置只看一层子目录
+// 常规安装位置：厂商目录下再往下两层找 JDK
 static void scan_common_dirs(void) {
     static const wchar_t *bases[] = {
         L"ProgramW6432", L"ProgramFiles", L"ProgramFiles(x86)", NULL
@@ -613,7 +613,6 @@ static void capture_args(void) {
     copy_str(g_args, p, 4096);
 }
 
-// 2.5s 观察：0=失败 1=运行 2=秒退
 static int java_has_builtin_fx(const wchar_t *java) {
     wchar_t home[MAX_PATH_LEN];
     wchar_t prop[MAX_PATH_LEN];
@@ -626,6 +625,7 @@ static int java_has_builtin_fx(const wchar_t *java) {
     return file_exists(prop);
 }
 
+// 2.5s 内观察进程：0=没起来 1=正常退出 2=秒退（退出码非 0）
 static int run(const wchar_t *java, DWORD *exit_code) {
     wchar_t cmd[MAX_PATH_LEN * 2];
     wchar_t logp[MAX_PATH_LEN];
@@ -639,7 +639,7 @@ static int run(const wchar_t *java, DWORD *exit_code) {
 
     copy_str(cmd, L"\"", MAX_PATH_LEN * 2);
     cat_str(cmd, java, MAX_PATH_LEN * 2);
-    // 告诉 Java 侧启动器目录，省得它猜 user.home
+    // 向 Java 侧传入启动器目录
     cat_str(cmd, L"\" -Dfile.encoding=UTF-8 -Dtcraft.dir=\"", MAX_PATH_LEN * 2);
     cat_str(cmd, home_dir, MAX_PATH_LEN * 2);
     {
@@ -651,7 +651,7 @@ static int run(const wchar_t *java, DWORD *exit_code) {
         copy_str(check, deps, MAX_PATH_LEN);
         cat_str(check, L"\\.ready", MAX_PATH_LEN);
         if (java_has_builtin_fx(java)) {
-            // 自带 JavaFX 的 Java 17 直接用内置模块，Win7 不再找外置原生库
+            // 自带 JavaFX 的 Java 17 直接用内置模块，Win7 不找外置原生库
             cat_str(cmd, L"\" --add-modules=javafx.controls,javafx.graphics,javafx.base,javafx.media,javafx.web,javafx.swing,javafx.fxml -cp \"",
                     MAX_PATH_LEN * 2);
             cat_str(cmd, jar_path, MAX_PATH_LEN * 2);
@@ -1179,7 +1179,7 @@ static int extract_java_zip(void) {
         return 0;
     }
 
-    // 替换掉旧的 jre17（只动启动器自己的目录）
+    // 替换旧的 jre17（仅限启动器目录）
     remove_tree(java_dl_dest, 0);
     if (!MoveFileW(java_dl_tmp, java_dl_dest)) {
         sprintf(java_dl_error, "移动 Java 目录失败（错误 %lu）", GetLastError());
@@ -1363,6 +1363,7 @@ static DWORD WINAPI java_part_thread(void *arg)
     void *inet = NULL, *req = NULL;
     HANDLE out = INVALID_HANDLE_VALUE;
     wchar_t hdr[128];
+    wchar_t range_w[128];
     char range_a[96];
     char buf[65536];
     unsigned long got = 0, status = 0, status_len = sizeof(status), status_idx = 0;
@@ -1391,7 +1392,9 @@ static DWORD WINAPI java_part_thread(void *arg)
                       0x80000000UL | 0x04000000UL | 0x00800000UL | 0x00400000UL);
     if (!req) goto done;
     sprintf(range_a, "Range: bytes=%lu-%lu\r\n", p->start, p->end);
-    add_hdr_fn(req, w(range_a), (unsigned long)-1, 0xA0000000UL);
+    /* w() 的共享池非线程安全，分块线程在栈上转换 */
+    if (!MultiByteToWideChar(CP_UTF8, 0, range_a, -1, range_w, 128)) goto done;
+    add_hdr_fn(req, range_w, (unsigned long)-1, 0xA0000000UL);
     if (!query_fn(req, 0x20000013UL, &status, &status_len, &status_idx) || status != 206UL) goto done;
 
     out = CreateFileW(java_dl_part_path[p->index], GENERIC_WRITE, FILE_SHARE_READ,
@@ -1527,7 +1530,8 @@ static int download_url_parallel(const wchar_t *url, const char *source)
         if (in == INVALID_HANDLE_VALUE) { ok = 0; break; }
         for (;;) {
             unsigned long got = 0, wrote = 0;
-            if (!ReadFile(in, merge_buf, sizeof(merge_buf), &got, NULL) || got == 0) break;
+            if (!ReadFile(in, merge_buf, sizeof(merge_buf), &got, NULL)) { ok = 0; break; }
+            if (got == 0) break;
             if (!WriteFile(out, merge_buf, got, &wrote, NULL) || wrote != got) { ok = 0; break; }
         }
         CloseHandle(in);
@@ -1536,7 +1540,10 @@ static int download_url_parallel(const wchar_t *url, const char *source)
     CloseHandle(out);
     out = INVALID_HANDLE_VALUE;
     if (!ok) goto cleanup;
-    if (file_size_u(java_dl_zip) != total) goto cleanup;
+    if (file_size_u(java_dl_zip) != total) {
+        ok = 0;
+        goto cleanup;
+    }
     for (i = 0; i < JAVA_DL_PARTS; i++) DeleteFileW(java_dl_part_path[i]);
 
 cleanup:
@@ -1747,7 +1754,7 @@ static void java_dl_start(void) {
     java_dl_attempt = 0;
     java_dl_source[0] = 0;
     prog_set(0, 1);
-    // 立即给反馈，别让玩家以为没点上
+    // 立即给点击反馈
     status_set("正在连接下载服务器…");
 
     EnableWindow(GetDlgItem(java_dlg, IDC_JAVA_DOWN), FALSE);
@@ -1799,7 +1806,7 @@ static void scan_finish(void) {
         SetWindowTextW(ctl_path, scan_best);
         sprintf(scan_msg, "已找到 Java %d（64 位），正在启动…", scan_best_major);
         status_set(scan_msg);
-        // 自动扫描已经找到就直接用，不再要求点「启动」
+        // 自动扫描已经找到就直接用，无需再点「启动」
         SetTimer(java_dlg, TIMER_ACCEPT_ID, 600, NULL);
     } else {
         status_set("没有找到可用的 Java，正在自动下载 Java 17…");
@@ -2243,9 +2250,11 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR args, int show) {
             cat_str(logp, L"\\java-error.log", MAX_PATH_LEN);
             got = read_file(logp, head, sizeof(head) / 3);
             if (got > 0) {
-                // java 的 stderr 是 ACP（中文为 GBK），转 UTF-8 免得弹窗乱码
+                /* JDK 17/18 的 stderr 随 -Dfile.encoding 走 UTF-8，19+ 默认 ACP，
+                   先 UTF-8 严格解码（0x8=MB_ERR_INVALID_CHARS），失败再按 ACP */
                 wchar_t wtmp[400];
-                int n = MultiByteToWideChar(GetACP(), 0, head, got, wtmp, 400);
+                int n = MultiByteToWideChar(CP_UTF8, 0x8, head, got, wtmp, 400);
+                if (n <= 0) n = MultiByteToWideChar(GetACP(), 0, head, got, wtmp, 400);
                 if (n > 0) {
                     wtmp[n] = 0;
                     head[0] = 0;

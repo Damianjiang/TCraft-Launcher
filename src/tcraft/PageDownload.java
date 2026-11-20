@@ -370,6 +370,9 @@ public class PageDownload implements Page {
             try {
                 java.util.List<String> v = Loaders.versions(lc.loaderKey, mc);
                 javafx.application.Platform.runLater(() -> {
+                    // 用户已切走 MC 版本时丢弃旧结果
+                    String now = selectVersion == null ? "" : selectVersion.id;
+                    if (!now.equals(mc)) return;
                     lc.versions = v;
                     lc.error = null;
                     lc.fetched = true;
@@ -379,6 +382,8 @@ public class PageDownload implements Page {
                 });
             } catch (Exception e) {
                 javafx.application.Platform.runLater(() -> {
+                    String now = selectVersion == null ? "" : selectVersion.id;
+                    if (!now.equals(mc)) return;
                     lc.versions = null;  // 下次展开时重试
                     lc.error = e.getMessage() == null ? "获取失败" : e.getMessage();
                     lc.fetched = false;
@@ -897,7 +902,7 @@ public class PageDownload implements Page {
         if (cur != null) {
             String vanilla = cur.version;
             for (String sfx : new String[]{"-forge", "-fabric", "-neoforge", "-quilt", "-optifine"}) {
-                int i = vanilla.toLowerCase().indexOf(sfx);
+                int i = vanilla.toLowerCase(java.util.Locale.ROOT).indexOf(sfx);
                 if (i > 0) vanilla = vanilla.substring(0, i);
             }
             if (!vanilla.isEmpty()) versionCombo.getItems().add(vanilla);
@@ -1094,7 +1099,7 @@ public class PageDownload implements Page {
             host.getChildren().remove(resourceLoadingHost);
         }
         final int gen = ++resourceRequestGen;
-        // loadingCard 节点是异步替换的，localize 不再经过，创建处翻译
+        // loadingCard 节点是异步替换的，localize 不经过，创建处翻译
         rows.getChildren().setAll(Ui.loadingCard(resourcePage == 0 ? Lang.t("正在搜索…")
                 : Lang.tf("正在加载第 %d 页…", resourcePage + 1)));
         // 请求期间禁用翻页，连点会发出多个请求，旧结果还会盖掉新页面
@@ -1139,6 +1144,7 @@ public class PageDownload implements Page {
                             r.icon = p.icon;
                             r.desc = p.summary;
                             r.projectType = projectType;
+                            r.platform = "curseforge";
                             r.website = p.website;
                             r.cfId = p.id;
                             r.downloads = (int) Math.min(Integer.MAX_VALUE, p.downloads);
@@ -1163,8 +1169,12 @@ public class PageDownload implements Page {
             }
             String mrError = err[0];
             String cfError = err[1];
-            list.sort((a, b) -> Long.compare(b.downloads, a.downloads));
-            List<Resource> fList = list;
+            // 超时后迟到的 addAll 不受 synchronizedList 迭代保护，先落快照再排序
+            List<Resource> fList;
+            synchronized (list) {
+                fList = new ArrayList<>(list);
+            }
+            fList.sort((a, b) -> Long.compare(b.downloads, a.downloads));
             String fMrError = mrError;
             String fCfError = cfError;
             String fError = mrError != null ? mrError : cfError;
@@ -1243,7 +1253,7 @@ public class PageDownload implements Page {
     private Node resourceRow(Resource r) {
         Node icon = iconNode(r, 30);
         Ui.ListItem row = new Ui.ListItem(icon, r.name, r.desc.isEmpty() ? Lang.tf("下载量 %s", r.downloads) : r.desc, 46);
-        row.setOnMouseClicked(e -> openDetail(r, "world".equals(r.projectType) ? "curseforge" : "modrinth"));
+        row.setOnMouseClicked(e -> openDetail(r, r.platform));
         return row;
     }
 
@@ -1279,7 +1289,7 @@ public class PageDownload implements Page {
         if (!url.startsWith("http")) {
             return Ui.image(url.isEmpty() ? "NoIcon.png" : url, size, size, true);
         }
-        // 远程图统一走 RemoteImages，别每张图开一条连接
+        // 远程图统一走 RemoteImages 单一通道
         StackPane box = new StackPane();
         box.setPrefSize(size, size);
         box.setMinSize(size, size);
@@ -1409,6 +1419,7 @@ public class PageDownload implements Page {
         String slug = "";
         String website = "";
         String projectType = "mod";
+        String platform = "modrinth";
         java.util.List<String> loaders = new ArrayList<>();
         long cfId;
         int downloads;

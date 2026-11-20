@@ -85,8 +85,7 @@ public final class Downloader {
                     final String realVersion = actual;
                     javafx.application.Platform.runLater(() -> onInstalled.accept(realVersion));
                 }
-                // 回 FX 线程刷新当前页
-                javafx.application.Platform.runLater(() -> {
+                        javafx.application.Platform.runLater(() -> {
                     String key = win.currentKey;
                     if ("download".equals(key) || "instance".equals(key)) win.openPage(key, false);
                 });
@@ -305,7 +304,7 @@ public final class Downloader {
                 Map<String, Object> obj = Json.obj(value);
                 String hash = Json.str(obj, "hash", "");
                 // 路径与地址都由 hash 拼，非 40 位十六进制跳过
-                if (!hash.matches("[0-9a-f]{40}")) continue;
+                if (!HASH_40.matcher(hash).matches()) continue;
                 long expectedSize = (long) parseNum(Json.str(obj, "size", "0"), 0);
                 Path target = game.resolve("assets").resolve("objects").resolve(hash.substring(0, 2)).resolve(hash);
                 futures.add(pool.submit(() -> {
@@ -550,8 +549,6 @@ public final class Downloader {
     // 断点续传 + 校验 + 退避重试，进度直接透传给调用方
     private static void transferWithProgress(java.util.function.DoubleConsumer progress, String url,
                                              Path part, Path target, String sha1) throws IOException {
-        // 无哈希认不了旧 .part，直接重下
-        if (sha1 == null) Files.deleteIfExists(part);
         java.security.MessageDigest digest = null;
         if (sha1 != null) {
             try {
@@ -566,6 +563,8 @@ public final class Downloader {
         if (Fetch.PART_LOCKS.putIfAbsent(lockKey, lock) != null) {
             throw new IOException(Lang.t("该文件已在下载中：") + target.getFileName());
         }
+        // 无哈希无法校验旧 .part，取锁后删除重下
+        if (sha1 == null) Files.deleteIfExists(part);
         IOException last = null;
         try {
             long done = 0;
@@ -803,7 +802,7 @@ public final class Downloader {
         List<String> cmd = new ArrayList<>();
         cmd.add(javaExe);
         cmd.add("-Dfile.encoding=UTF-8");
-        // 安装器自己也要联网下依赖，代理一起带过去
+        // 安装器需联网下载依赖，代理一并传入
         cmd.addAll(data.proxyJvmArgs());
         cmd.add("-jar");
         cmd.add(installer.toString());
@@ -917,7 +916,7 @@ public final class Downloader {
                                 downloadFile(task, (String) p[0], target, 0.97, 0.99, label, sha1);
                             }
                         } catch (Exception e) {
-                            // 预下载失败不影响安装器，它自己会再试
+                            // 预下载失败不影响安装器，安装器会重试
                             Data.get().log("预下载失败：" + path + " " + Log.describe(e));
                         }
                         int n = done.incrementAndGet();
@@ -1182,7 +1181,7 @@ public final class Downloader {
         if (task.canceled) throw new IOException("已取消");
     }
 
-    // 会话内缓存已校验文件，免得同一次安装反复哈希整个 assets
+    // 会话内缓存已校验文件，同一次安装不重复哈希 assets
     private static final java.util.Map<String, Boolean> VERIFIED = new java.util.concurrent.ConcurrentHashMap<>();
 
     private static boolean assetReady(Path file, long expectedSize, String sha1) {
@@ -1207,11 +1206,16 @@ public final class Downloader {
         }
     }
 
+    private static final java.util.regex.Pattern HASH_40 =
+            java.util.regex.Pattern.compile("[0-9a-f]{40}");
+    private static final java.util.regex.Pattern SHA1_40 =
+            java.util.regex.Pattern.compile("[0-9a-fA-F]{40}");
+
     // 只接受 40 位十六进制，其余（label、空串）视为没有哈希可校验
     private static String normalizeSha1(String value) {
         if (value == null) return null;
         String v = value.trim();
-        return v.matches("[0-9a-fA-F]{40}") ? v.toLowerCase(java.util.Locale.ROOT) : null;
+        return SHA1_40.matcher(v).matches() ? v.toLowerCase(java.util.Locale.ROOT) : null;
     }
 
     private static double parseNum(String s, double def) {

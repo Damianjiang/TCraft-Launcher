@@ -14,6 +14,7 @@ public final class Music {
     private static final List<Path> FILES = new ArrayList<>();
     private static MediaPlayer player;
     private static int index;
+    private static int errorStreak;
     private static boolean paused;
     private static boolean available;
     private static javafx.util.Duration totalTime;
@@ -36,15 +37,21 @@ public final class Music {
         } catch (Exception ignored) {
         }
         available = !FILES.isEmpty();
-        // 没开自动播放就不预建播放器，首次点击时再加载，省启动时间
-        if (available && Data.get().getBool("UiMusicAuto", false)) {
-            try {
-                boolean random = Data.get().getBool("UiMusicRandom", false);
-                int start = random ? (int) (Math.random() * FILES.size()) : 0;
-                play(start);
-            } catch (Exception ignored) {
-                available = false;
-            }
+        // 刷新后列表可能变短，index 不归位 currentName() 会越界
+        if (index >= FILES.size()) index = 0;
+    }
+
+    // UiMusicAuto 开着就起播；MediaPlayer 只能 FX 线程建，调用方保证
+    public static synchronized void autoStart() {
+        if (!available() || !Data.get().getBool("UiMusicAuto", false)) return;
+        // 刷新时已在播，换到新列表的第一首
+        stopPlayer();
+        try {
+            boolean random = Data.get().getBool("UiMusicRandom", false);
+            int start = random ? (int) (Math.random() * FILES.size()) : 0;
+            play(start);
+        } catch (Exception ignored) {
+            available = false;
         }
     }
 
@@ -55,6 +62,7 @@ public final class Music {
     // 设置页「刷新背景音乐」入口
     public static synchronized void reload(String gameDir) {
         init(gameDir);
+        autoStart();
     }
 
     // 设置页「清空背景音乐」入口
@@ -69,6 +77,7 @@ public final class Music {
         }
         FILES.clear();
         index = 0;
+        errorStreak = 0;
         paused = true;
         available = false;
         totalTime = null;
@@ -104,9 +113,21 @@ public final class Music {
         return paused || player == null;
     }
 
+    private static synchronized void stopPlayer() {
+        if (player != null) {
+            try {
+                player.stop();
+                player.dispose();
+            } catch (Throwable ignored) {
+            }
+            player = null;
+        }
+        totalTime = null;
+    }
+
     public static String currentName() {
         if (!available()) return "";
-        return FILES.get(index).getFileName().toString();
+        return FILES.get(index % FILES.size()).getFileName().toString();
     }
 
     public static synchronized void toggle() {
@@ -161,17 +182,43 @@ public final class Music {
         index = i;
         try {
             Media media = new Media(FILES.get(i).toUri().toString());
-            totalTime = media.getDuration();
             player = new MediaPlayer(media);
+            // 时长是异步解析的，构造后立刻 getDuration() 恒为 UNKNOWN
+            totalTime = null;
+            player.totalDurationProperty().addListener((o, was, now) -> totalTime = now);
             boolean multiple = FILES.size() > 1;
             player.setCycleCount(multiple ? 1 : MediaPlayer.INDEFINITE);
             player.setVolume(volumePercent() / 100.0);
             player.play();
             paused = false;
-            if (multiple) player.setOnEndOfMedia(Music::next);
+            // 真正播起来才清零连败计数，坏曲目在 onReady 前不能重置它
+            player.currentTimeProperty().addListener((o, was, now) -> {
+                if (now != null && now.toMillis() > 1500) errorStreak = 0;
+            });
+            // 坏曲目异步报错，不挂 onError 连播会在这里静默停住
+            final MediaPlayer mp = player;
+            player.setOnError(() -> javafx.application.Platform.runLater(() -> {
+                // 已被切走的旧播放器的迟到回调不计数
+                if (player != mp) return;
+                errorStreak++;
+                if (errorStreak >= FILES.size()) {
+                    // 全部曲目连败即停止播放
+                    stopPlayer();
+                    paused = true;
+                    return;
+                }
+                Music.next();
+            }));
+            // 回调栈里直接 dispose 旧播放器有重入风险，挪到下一帧
+            if (multiple) player.setOnEndOfMedia(() -> javafx.application.Platform.runLater(Music::next));
         } catch (Exception e) {
             player = null;
             paused = true;
+            // 构造期同步失败（URI 非法等）也是坏曲目，走同一熔断
+            errorStreak++;
+            if (errorStreak < FILES.size()) {
+                javafx.application.Platform.runLater(Music::next);
+            }
         }
     }
 

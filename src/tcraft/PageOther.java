@@ -169,53 +169,36 @@ public class PageOther implements Page {
         return l;
     }
 
+    // 30 分钟内的解析结果直接复用，来回切页不重拉 1MB+
+    private static java.util.List<Object> newsCache;
+    private static long newsCacheAt;
+
     private void buildNews(VBox page) {
         header(page, "新闻", "来自 Minecraft 官方的真实新闻。");
         stopSkeletons();
+        final int gen = ++newsGen;
+        java.util.List<Object> cached = newsCache;
+        if (cached != null && System.currentTimeMillis() - newsCacheAt < 1800_000L) {
+            renderNews(page, java.util.Collections.emptyList(), cached);
+            return;
+        }
         List<Node> skeletons = newsSkeletons(5);
         page.getChildren().addAll(skeletons);
         Thread thread = new Thread(() -> {
             try {
-                // news.json 有 1MB+，靠 gzip 压
+                // news.json 有 1MB+，靠 gzip 压；解析也留在后台
                 String body = Http.get("https://launchercontent.mojang.com/v2/news.json");
                 java.util.List<Object> entries = Json.arr(Json.obj(Json.parse(body)), "entries");
                 javafx.application.Platform.runLater(() -> {
-                    stopSkeletons();
-                    page.getChildren().removeAll(skeletons);
-                    int count = 0;
-                    for (Object o : entries) {
-                        if (count++ >= 20) break;
-                        java.util.Map<String, Object> n = Json.obj(o);
-                        String title = Json.str(n, "title", "Minecraft 新闻");
-                        String date = Json.str(n, "date", "");
-                        String text = Json.str(n, "text", Json.str(n, "shortText", ""));
-                        String link = Json.str(n, "readMoreLink", "");
-                        Ui.Card card = Ui.card(title);
-                        // 配图为相对路径，拼域名异步加载
-                        String imgPath = Json.str(Json.obj(n, "newsPageImage"), "url", "");
-                        if (imgPath.isEmpty()) imgPath = Json.str(Json.obj(n, "playPageImage"), "url", "");
-                        if (!imgPath.isEmpty()) {
-                            String imgUrl = imgPath.startsWith("http") ? imgPath
-                                    : "https://launchercontent.mojang.com" + imgPath;
-                            card.add(newsImage(imgUrl));
-                        }
-                        if (!date.isEmpty()) card.add(Ui.label(date, 11.5, Theme.gray3));
-                        Label desc = Ui.label(text, 12.5, Theme.gray1);
-                        desc.setWrapText(true);
-                        card.add(desc);
-                        if (!link.isEmpty()) {
-                            Label open = Ui.label("查看原文 →", 12, Theme.accent);
-                            open.setCursor(javafx.scene.Cursor.HAND);
-                            open.setOnMouseClicked(e -> openUrl(link));
-                            card.add(open);
-                        }
-                        VBox.setMargin(card, new Insets(0, 0, 14, 0));
-                        page.getChildren().add(card);
-                    }
-                    if (count == 0) page.getChildren().add(Ui.label("暂时没有可显示的新闻。", 12, Theme.gray3));
+                    // 页面重进过后旧请求收尾直接丢弃，不影响新一轮动画
+                    if (gen != newsGen) return;
+                    newsCache = entries;
+                    newsCacheAt = System.currentTimeMillis();
+                    renderNews(page, skeletons, entries);
                 });
             } catch (Exception ex) {
                 javafx.application.Platform.runLater(() -> {
+                    if (gen != newsGen) return;
                     stopSkeletons();
                     page.getChildren().removeAll(skeletons);
                     page.getChildren().add(Ui.hint(Lang.t("获取新闻失败：")
@@ -225,6 +208,42 @@ public class PageOther implements Page {
         }, "TCL-News");
         thread.setDaemon(true);
         thread.start();
+    }
+
+    private void renderNews(VBox page, List<Node> skeletons, java.util.List<Object> entries) {
+        stopSkeletons();
+        page.getChildren().removeAll(skeletons);
+        int count = 0;
+        for (Object o : entries) {
+            if (count++ >= 20) break;
+            java.util.Map<String, Object> n = Json.obj(o);
+            String title = Json.str(n, "title", "Minecraft 新闻");
+            String date = Json.str(n, "date", "");
+            String text = Json.str(n, "text", Json.str(n, "shortText", ""));
+            String link = Json.str(n, "readMoreLink", "");
+            Ui.Card card = Ui.card(title);
+            // 配图为相对路径，拼域名异步加载
+            String imgPath = Json.str(Json.obj(n, "newsPageImage"), "url", "");
+            if (imgPath.isEmpty()) imgPath = Json.str(Json.obj(n, "playPageImage"), "url", "");
+            if (!imgPath.isEmpty()) {
+                String imgUrl = imgPath.startsWith("http") ? imgPath
+                        : "https://launchercontent.mojang.com" + imgPath;
+                card.add(newsImage(imgUrl));
+            }
+            if (!date.isEmpty()) card.add(Ui.label(date, 11.5, Theme.gray3));
+            Label desc = Ui.label(text, 12.5, Theme.gray1);
+            desc.setWrapText(true);
+            card.add(desc);
+            if (!link.isEmpty()) {
+                Label open = Ui.label("查看原文 →", 12, Theme.accent);
+                open.setCursor(javafx.scene.Cursor.HAND);
+                open.setOnMouseClicked(e -> openUrl(link));
+                card.add(open);
+            }
+            VBox.setMargin(card, new Insets(0, 0, 14, 0));
+            page.getChildren().add(card);
+        }
+        if (count == 0) page.getChildren().add(Ui.label("暂时没有可显示的新闻。", 12, Theme.gray3));
     }
 
     // 骨架屏：标题条+镐子动画+文字条呼吸闪烁
@@ -284,6 +303,7 @@ public class PageOther implements Page {
     private final javafx.beans.property.SimpleDoubleProperty skeletonOpacity =
             new javafx.beans.property.SimpleDoubleProperty(1.0);
     private javafx.animation.Timeline skeletonPulse;
+    private int newsGen;
 
     private Region skeletonBar(double w, double h) {
         Region r = new Region();
@@ -329,7 +349,7 @@ public class PageOther implements Page {
             double cw = box.getWidth();
             double iw = img.getWidth(), ih = img.getHeight();
             if (cw <= 0 || iw <= 0 || ih <= 0) return;
-            // 取能同时覆盖宽和高的缩放，溢出部分由 clip 裁掉
+            // 溢出部分由 clip 裁掉（UniformToFill）
             double scale = Math.max(cw / iw, h / ih);
             iv.setFitWidth(iw * scale);
             iv.setFitHeight(ih * scale);

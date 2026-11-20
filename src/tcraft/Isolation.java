@@ -40,6 +40,9 @@ public final class Isolation {
         };
     }
 
+    private static final java.util.regex.Pattern VANILLA_P =
+            java.util.regex.Pattern.compile("\\d+\\.\\d+(\\.\\d+)?");
+
     public static boolean isRelease(String version) {
         if (version == null || version.isEmpty()) return true;
         for (Data.McVersion v : Data.get().versions) {
@@ -49,14 +52,14 @@ public final class Isolation {
         for (Data.McVersion v : Data.get().versions) {
             if (v.id.equals(vanilla)) return "正式版".equals(v.group());
         }
-        return vanilla.matches("\\d+\\.\\d+(\\.\\d+)?");
+        return VANILLA_P.matcher(vanilla).matches();
     }
 
     public static String vanillaOf(String version) {
         if (version == null) return "";
         String v = version.trim();
         int dash = v.indexOf('-');
-        if (dash > 0 && v.substring(0, dash).matches("\\d+\\.\\d+(\\.\\d+)?")) {
+        if (dash > 0 && VANILLA_P.matcher(v.substring(0, dash)).matches()) {
             return v.substring(0, dash);
         }
         return v;

@@ -336,7 +336,7 @@ public final class Errors {
         return sanitize(sb.toString());
     }
 
-    // 导出完整历史：错误记录 + 运行日志，不再只给最后几百行
+    // 导出错误记录与完整运行日志
     private static void appendHistory(StringBuilder sb) {
         String errors = cap(Log.exportErrors(), "错误记录");
         String runtime = cap(Log.exportCurrent(), "运行日志");

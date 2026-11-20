@@ -168,7 +168,7 @@ public class PageTasks implements Page {
     private void updateStats() {
         if (progressLabel == null) return;
         double overall = Tasks.INSTANCE.overall();
-        progressLabel.setText(String.format("%.2f %%", overall * 100));
+        progressLabel.setText(String.format(java.util.Locale.ROOT, "%.2f %%", overall * 100));
         String speed = "0 B/s";
         int files = 0;
         int threads = 0;
@@ -261,7 +261,7 @@ public class PageTasks implements Page {
             stageLabel.setText(taskText(task.state == Tasks.State.FAILED && task.error != null ? task.error : task.stage));
             speedLabel.setText(task.speed == null ? "" : task.speed);
             cancel.setVisible(task.state == Tasks.State.RUNNING);
-            // 子任务状态没变就不重建节点，450ms 一次清空重加太浪费
+            // 子任务状态未变时跳过重建
             StringBuilder sig = new StringBuilder();
             for (Tasks.SubTask sub : task.subs) sig.append(sub.state).append(':').append(sub.name).append('|');
             if (sig.toString().equals(subSig)) return;

@@ -25,6 +25,12 @@ public final class Dialogs {
     }
 
     public static void confirm(MainWindow win, String title, String message, Runnable onOk, boolean warn) {
+        confirm(win, title, message, onOk, warn, null);
+    }
+
+    // onCancel 非空时弹窗不能用遮罩关闭，取消一定走回调
+    public static void confirm(MainWindow win, String title, String message, Runnable onOk,
+                               boolean warn, Runnable onCancel) {
         VBox card = new VBox(0);
         card.setPadding(new Insets(22, 22, 23, 22));
         card.setPrefWidth(400);
@@ -43,14 +49,26 @@ public final class Dialogs {
         VBox.setMargin(body, new Insets(13, 0, 17, 0));
         HBox actions = new HBox(12);
         actions.setAlignment(Pos.CENTER_RIGHT);
-        actions.getChildren().addAll(
-                Ui.button("确定", warn ? Ui.BTN_RED : Ui.BTN_HIGHLIGHT, () -> {
+        Runnable ok = onCancel == null
+                ? () -> {
                     win.closeModal();
                     onOk.run();
-                }),
-                Ui.button("取消", Ui.BTN_NORMAL, win::closeModal));
+                }
+                : () -> {
+                    // 先置结果再关窗：关闭钩子会触发 onCancel，顺序反了会被当成取消
+                    onOk.run();
+                    win.closeModal();
+                };
+        actions.getChildren().addAll(
+                Ui.button("确定", warn ? Ui.BTN_RED : Ui.BTN_HIGHLIGHT, ok),
+                Ui.button("取消", Ui.BTN_NORMAL, () -> {
+                    win.closeModal();
+                    if (onCancel != null) onCancel.run();
+                }));
         card.getChildren().addAll(t, line, body, actions);
-        win.showModal(card, true, warn ? Theme.warnMask : null);
+        win.showModal(card, onCancel == null, warn ? Theme.warnMask : null);
+        // 被别的弹窗顶掉时也要放行等待方
+        if (onCancel != null) win.setModalCloseHook(onCancel);
     }
 
     public static void message(MainWindow win, String title, String message) {
@@ -285,8 +303,8 @@ public final class Dialogs {
             VBox form = new VBox(10);
             form.setPadding(new Insets(15, 7, 0, 7));
             // Ui.hint 内部对整串做 Lang.t，拼接串必须先按片段译好
-            form.getChildren().add(Ui.hint(Lang.t("这个版本没有内置微软登录凭据，开源版去掉了正版登录。")
-                    + Lang.t("要用正版登录，请自行构建完整版并注入自己的 client id，构建说明见 docs/构建与发布.md。"), 0));
+            form.getChildren().add(Ui.hint(Lang.t("这个版本没有内置微软登录凭据，开源版不含正版登录。")
+                    + Lang.t("要用正版登录，请自行构建完整版并注入自己的 client id，构建说明见 README。"), 0));
             HBox actions = new HBox(12);
             actions.setAlignment(Pos.CENTER_RIGHT);
             actions.getChildren().add(Ui.button("知道了", Ui.BTN_NORMAL, win::closeModal));

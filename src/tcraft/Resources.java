@@ -40,7 +40,7 @@ public final class Resources {
         return dir;
     }
 
-    // 日志统一放 .tcl/log，不再散落在 .tcl 根目录
+    // 日志统一放 .tcl/log
     public static Path logDir() {
         Path dir = home().resolve("log");
         try {
@@ -140,8 +140,8 @@ public final class Resources {
     }
 
     public static String platform() {
-        String os = System.getProperty("os.name", "").toLowerCase();
-        String arch = System.getProperty("os.arch", "").toLowerCase();
+        String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
+        String arch = System.getProperty("os.arch", "").toLowerCase(java.util.Locale.ROOT);
         boolean arm = arch.contains("aarch64") || arch.contains("arm64");
         boolean x86 = arch.equals("x86") || arch.equals("i386") || arch.equals("ia32");
         if (os.contains("win")) return arm ? "win-arm64" : x86 ? "win-x86" : "win";
@@ -215,7 +215,7 @@ public final class Resources {
 
     public static Path launchTarget() {
         Path dir = appDir();
-        String os = System.getProperty("os.name", "").toLowerCase();
+        String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
         String[] names = os.contains("win")
                 ? new String[]{"TCraftLauncher.exe", "TCraftLauncher.bat"}
                 : new String[]{"TCraftLauncher.sh", "TCraftLauncher.command"};
@@ -486,7 +486,7 @@ public final class Resources {
 
     private static void relaunch(Path jar, Path rt, String plat, String[] args, StartupWindow ui)
             throws IOException {
-        String os = System.getProperty("os.name", "").toLowerCase();
+        String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
         String exe = os.contains("win") ? "javaw.exe" : "java";
         List<String> cmd = new ArrayList<>();
         cmd.add(Paths.get(System.getProperty("java.home"), "bin", exe).toString());
@@ -508,7 +508,7 @@ public final class Resources {
         Path log = logDir().resolve("launch.log");
         Path ready = logDir().resolve(".window-ready");
         Files.deleteIfExists(ready);
-        // 新 JVM 需要拿实例锁，旧进程先放手，否则它会自己退出
+        // 新 JVM 要取实例锁，旧进程须先释放，否则新进程启动即退出
         Boot.releaseInstanceLock();
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.redirectErrorStream(true);

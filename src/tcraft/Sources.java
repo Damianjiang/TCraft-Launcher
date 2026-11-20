@@ -40,7 +40,7 @@ public final class Sources {
                 jobs.put(h, INFLIGHT.computeIfAbsent(h, k -> Http.pool().submit(() -> {
                     try {
                         double kbps = probe(url);
-                        // 失败也记下来，省得每个文件都重新探测
+                        // 失败结果同样入缓存，同一文件不重复探测
                         SPEED.put(h, new double[]{kbps, System.currentTimeMillis()});
                         return kbps;
                     } finally {
@@ -62,7 +62,10 @@ public final class Sources {
         }
 
         List<String> out = new ArrayList<>(urls);
-        out.sort((a, b) -> Double.compare(speedOf(b), speedOf(a)));
+        // TTL 到期使比较器前后不一致，TimSort 会抛异常；先取快照
+        java.util.Map<String, Double> speeds = new java.util.HashMap<>();
+        for (String u : out) speeds.putIfAbsent(host(u), speedOf(u));
+        out.sort((a, b) -> Double.compare(speeds.get(host(b)), speeds.get(host(a))));
         return out;
     }
 

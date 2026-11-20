@@ -413,29 +413,37 @@ public final class Servers {
         return String.valueOf(desc);
     }
 
-    public static PingResult ping(String address, int timeout) {
-        PingResult result = new PingResult();
-        String host = address.trim();
-        int port = 25565;
-        if (host.contains(":") && !host.contains("]")) {
+    // [v6]:port、[v6]、v4:port、裸 v6 统一拆开；port 为空串表示默认端口
+    public static String[] splitAddress(String address) {
+        String host = address == null ? "" : address.trim();
+        String port = "";
+        if (host.startsWith("[")) {
+            int close = host.indexOf(']');
+            if (close > 0) {
+                String rest = host.substring(close + 1);
+                host = host.substring(1, close);
+                if (rest.startsWith(":")) port = rest.substring(1);
+            }
+        } else if (host.indexOf(':') == host.lastIndexOf(':')) {
             String[] parts = host.split(":");
             if (parts.length == 2) {
-                try {
-                    port = Integer.parseInt(parts[1]);
-                    host = parts[0];
-                } catch (NumberFormatException ignored) {
-                }
+                port = parts[1];
+                host = parts[0];
             }
-        } else if (host.contains("]") && host.contains("[:")) {
-            int i = host.indexOf("[:");
-            try {
-                port = Integer.parseInt(host.substring(i + 2, host.length() - 1));
-                host = host.substring(0, i);
-            } catch (Exception ignored) {
-            }
-        } else if (host.endsWith("]")) {
-            host = host.substring(1, host.length() - 1);
         }
+        return new String[]{host, port};
+    }
+
+    public static PingResult ping(String address, int timeout) {
+        PingResult result = new PingResult();
+        String[] hp = splitAddress(address);
+        String host = hp[0];
+        int port = 25565;
+        try {
+            if (!hp[1].isEmpty()) port = Integer.parseInt(hp[1]);
+        } catch (NumberFormatException ignored) {
+        }
+        if (port <= 0 || port > 65535) port = 25565;
         if (port == 25565 && !host.matches("^(\\d{1,3}\\.){3}\\d{1,3}$") && !host.startsWith("localhost")) {
             String[] srv = srvResolve(host);
             if (srv != null) {
@@ -501,7 +509,22 @@ public final class Servers {
         return result;
     }
 
+    // SRV 记录极少变，结果缓存 10 分钟（含失败）
+    private static final Map<String, Object[]> SRV_CACHE =
+            java.util.Collections.synchronizedMap(new java.util.LinkedHashMap<>());
+    private static final long SRV_TTL_MS = 600_000L;
+
     private static String[] srvResolve(String host) {
+        Object[] cached = SRV_CACHE.get(host);
+        if (cached != null && System.currentTimeMillis() - (Long) cached[0] < SRV_TTL_MS) {
+            return (String[]) cached[1];
+        }
+        String[] result = srvResolveRemote(host);
+        SRV_CACHE.put(host, new Object[]{System.currentTimeMillis(), result});
+        return result;
+    }
+
+    private static String[] srvResolveRemote(String host) {
         java.net.HttpURLConnection c = null;
         try {
             String name = java.net.URLEncoder.encode("_minecraft._tcp." + host, StandardCharsets.UTF_8);

@@ -1,5 +1,4 @@
 .root {
-    -fx-font-family: "Microsoft YaHei UI";
     -fx-font-smoothing-type: gray;
     /* 去掉 JavaFX 默认蓝色焦点框 */
     -fx-focus-color: transparent;
@@ -17,7 +16,7 @@
 .scroll-pane:focused {
     -fx-background-color: transparent;
 }
-/* 细滚动条：宽 8，thumb 圆角 3、内缩 2，无箭头，轨道透明 */
+/* 细滚动条 */
 .scroll-bar:vertical, .scroll-bar:horizontal {
     -fx-background-color: transparent;
 }
@@ -68,7 +67,7 @@
     -fx-font-size: 13;
 }
 .text-field:focused {
-    /* 搜索框等透明输入框不再出现 JavaFX 蓝色焦点条/描边 */
+    /* 透明输入框禁用 JavaFX 蓝色焦点条/描边 */
     -fx-border-color: transparent;
     -fx-background-color: rgba(255, 255, 255, 0.94);
     -fx-focus-color: transparent;

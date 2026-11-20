@@ -225,6 +225,10 @@ public class PageResourceDetail implements Page {
             try {
                 List<ResourceVersion> list = new ArrayList<>();
                 if (info.isCurseForge()) {
+                    // 旧版收藏可能只存了 slug 没存数字 id，给可操作的提示而不是原始异常
+                    if (!pid.matches("\\d+")) {
+                        throw new Exception("该收藏缺少 CurseForge 的数字 id，请取消收藏后重新收藏");
+                    }
                     for (Object o : CurseForge.projectFiles(Long.parseLong(pid))) {
                         ResourceVersion v = ResourceVersion.fromCurseForgeJson(Json.obj(o), expectedType());
                         if (!v.downloadUrls.isEmpty()) list.add(v);
@@ -523,7 +527,12 @@ public class PageResourceDetail implements Page {
             card.setContentPadding(new Insets(4, 18, 10, 18));
             VBox stack = new VBox();
             stack.setSpacing(2);
-            buildCardContent(stack, pair.getValue());
+            if (pair.getKey().equals(targetCardName)) {
+                buildCardContent(stack, pair.getValue());
+            } else {
+                // 折叠卡先不建几百行节点，展开时经 Ui.Card 的懒构建钩子再建
+                card.setLazyContent(() -> buildCardContent(stack, pair.getValue()));
+            }
             card.add(stack);
             if (pair.getKey().equals(targetCardName)) card.setCollapsed(false);
             else card.setCollapsed(true);
@@ -903,7 +912,9 @@ public class PageResourceDetail implements Page {
         if (hasDeps) task.subs.add(new Tasks.SubTask("下载前置文件"));
         String ext = extOf(file).toLowerCase();
         boolean worldZip = file.resourceType.equals("world") && (ext.equals("zip") || ext.equals("mca"));
-        if (worldZip) task.subs.add(new Tasks.SubTask("安装世界存档"));
+        // 世界下载通常没有前置，子任务下标不固定，用引用不用下标
+        Tasks.SubTask worldSub = worldZip ? new Tasks.SubTask("安装世界存档") : null;
+        if (worldSub != null) task.subs.add(worldSub);
         Tasks.INSTANCE.add(task);
         win.openPage("tasks", true);
         Threads.start("TCL-ResourceSave-" + file.fileName, () -> {
@@ -932,13 +943,13 @@ public class PageResourceDetail implements Page {
                     }
                     task.subs.get(1).state = Tasks.State.DONE;
                 }
-                if (worldZip) {
+                if (worldZip && worldSub != null) {
                     // 解到 saves 后删压缩包，MC 只认解开的目录
-                    task.subs.get(2).state = Tasks.State.RUNNING;
+                    worldSub.state = Tasks.State.RUNNING;
                     task.stage = "解压世界存档";
                     unzipTo(target, target.getParent());
                     Files.deleteIfExists(target);
-                    task.subs.get(2).state = Tasks.State.DONE;
+                    worldSub.state = Tasks.State.DONE;
                 }
                 task.state = Tasks.State.DONE;
                 task.progress = 1;
@@ -949,6 +960,9 @@ public class PageResourceDetail implements Page {
                     if (openAfterDone) openFolderQuiet(target.getParent());
                 });
             } catch (Exception e) {
+                task.subs.forEach(sub -> {
+                    if (sub.state == Tasks.State.RUNNING) sub.state = Tasks.State.FAILED;
+                });
                 if (task.canceled) {
                     task.state = Tasks.State.CANCELED;
                     task.stage = "已取消";

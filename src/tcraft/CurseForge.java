@@ -36,6 +36,34 @@ public final class CurseForge {
         public long downloads;
     }
 
+    private static final int CACHE_LIMIT = 200;
+
+    // 与 Modrinth 侧同款访问序 LRU；files 全量清单可达数 MB
+    private static final Map<Long, List<Object>> FILES_CACHE = java.util.Collections.synchronizedMap(
+            new java.util.LinkedHashMap<>(64, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<Long, List<Object>> eldest) {
+                    return size() > CACHE_LIMIT;
+                }
+            });
+    private static final Map<Long, Project> INFO_CACHE = java.util.Collections.synchronizedMap(
+            new java.util.LinkedHashMap<>(64, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<Long, Project> eldest) {
+                    return size() > CACHE_LIMIT;
+                }
+            });
+
+    // 搜索结果短缓存（90s）：切分类/翻页来回点不重复打 API
+    private static final Map<String, Object[]> SEARCH_CACHE = java.util.Collections.synchronizedMap(
+            new java.util.LinkedHashMap<>(32, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, Object[]> eldest) {
+                    return size() > 32;
+                }
+            });
+    private static final long SEARCH_TTL_MS = 90_000L;
+
     public static List<Project> search(String query, int classId, int limit) throws IOException {
         return search(query, classId, limit, 0, 0);
     }
@@ -49,6 +77,13 @@ public final class CurseForge {
         if (categoryId > 0) url.append("&categoryId=").append(categoryId);
         if (query != null && !query.isEmpty()) {
             url.append("&searchFilter=").append(URLEncoder.encode(query, StandardCharsets.UTF_8));
+        }
+        String cacheKey = url.toString();
+        Object[] hit = SEARCH_CACHE.get(cacheKey);
+        if (hit != null && System.currentTimeMillis() - (Long) hit[1] < SEARCH_TTL_MS) {
+            @SuppressWarnings("unchecked")
+            List<Project> cachedList = (List<Project>) hit[0];
+            return cachedList;
         }
         Map<String, Object> root = Json.obj(Json.parse(get(url.toString(), key)));
         List<Project> out = new ArrayList<>();
@@ -70,17 +105,24 @@ public final class CurseForge {
             }
             out.add(p);
         }
+        SEARCH_CACHE.put(cacheKey, new Object[]{out, System.currentTimeMillis()});
         return out;
     }
 
     public static List<Object> projectFiles(long id) throws IOException {
+        List<Object> cached = FILES_CACHE.get(id);
+        if (cached != null) return cached;
         String key = apiKey();
         if (key.isEmpty()) throw new IOException("尚未填写 CurseForge API Key");
         Map<String, Object> root = Json.obj(Json.parse(get(API + "/mods/" + id + "/files?pageSize=10000", key)));
-        return Json.arr(root.get("data"));
+        List<Object> data = Json.arr(root.get("data"));
+        FILES_CACHE.put(id, data);
+        return data;
     }
 
     public static Project projectInfo(long id) throws IOException {
+        Project cached = INFO_CACHE.get(id);
+        if (cached != null) return cached;
         String key = apiKey();
         if (key.isEmpty()) throw new IOException("尚未填写 CurseForge API Key");
         Map<String, Object> root = Json.obj(Json.parse(get(API + "/mods/" + id, key)));
@@ -99,11 +141,12 @@ public final class CurseForge {
         if (p.website.isEmpty() && !p.slug.isEmpty()) {
             p.website = "https://www.curseforge.com/minecraft/mods/" + p.slug;
         }
+        INFO_CACHE.put(id, p);
         return p;
     }
 
     private static void downloadFile(Tasks.Task task, String url, Path target) throws IOException {
-        // 走 Fetch，支持续传和重试
+        // 续传与重试交给 Fetch
         Fetch.file(task, url, target, null, 0, 0.99);
     }
 

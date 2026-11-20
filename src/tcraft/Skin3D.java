@@ -62,7 +62,7 @@ public final class Skin3D extends Region {
             }
         }));
         autoTimer.setCycleCount(Timeline.INDEFINITE);
-        // scene 变 null 即停表，防模型空转
+        // scene 变 null 即停表
         sceneProperty().addListener((o, oldScene, newScene) -> applyRunState());
         autoTimer.play();
     }
@@ -114,6 +114,13 @@ public final class Skin3D extends Region {
     }
 
     public void setSkin(Image image) {
+        // palette 每像素一个 Color，贴图上限 512x512
+        if (image != null && (long) image.getWidth() * (long) image.getHeight() > 512 * 512) {
+            Data.get().log("3D 皮肤预览：贴图 " + (int) image.getWidth() + "x" + (int) image.getHeight()
+                    + " 超出上限，已跳过");
+            clearSkin();
+            return;
+        }
         this.skin = image;
         readPixels();
         rebuild();

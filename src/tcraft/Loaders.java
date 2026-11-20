@@ -157,8 +157,8 @@ public final class Loaders {
             Map<String, Object> m = Json.obj(o);
             Map<String, Object> download = Json.obj(m, "download");
             String fileName = Json.str(download, "filename", "");
-            if (fileName.toLowerCase().contains("optifabric") && fileName.endsWith(".jar")) {
-                out.add(fileName.toLowerCase().replace("optifabric-", "").replace(".jar", "").trim());
+            if (fileName.toLowerCase(java.util.Locale.ROOT).contains("optifabric") && fileName.endsWith(".jar")) {
+                out.add(fileName.toLowerCase(java.util.Locale.ROOT).replace("optifabric-", "").replace(".jar", "").trim());
             }
         }
         if (out.isEmpty()) throw new Exception("OptiFabric 没有可下载的版本（需填写 CurseForge Key）");
@@ -211,7 +211,7 @@ public final class Loaders {
                 Map<String, Object> m = Json.obj(o);
                 Map<String, Object> dl = Json.obj(m, "download");
                 String fn = Json.str(dl, "filename", "");
-                String derived = fn.toLowerCase().replace("optifabric-", "").replace(".jar", "").trim();
+                String derived = fn.toLowerCase(java.util.Locale.ROOT).replace("optifabric-", "").replace(".jar", "").trim();
                 if (!version.equals(derived)) continue;
                 String url = Json.str(dl, "url", "");
                 return url.isEmpty() ? null : new String[]{url, fn};

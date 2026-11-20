@@ -156,8 +156,7 @@ public class PageLaunch implements Page {
         Ui.animateBg(btn, Theme.accentDark, Theme.accentDark, 1);
         btn.addEventHandler(MouseEvent.MOUSE_ENTERED, e -> Ui.animateBg(btn, Theme.accentDark, Theme.accent, 100));
         btn.addEventHandler(MouseEvent.MOUSE_EXITED, e -> Ui.animateBg(btn, Theme.accent, Theme.accentDark, 100));
-        btn.addEventHandler(MouseEvent.MOUSE_PRESSED, e -> Ui.scale(btn, 0.96));
-        btn.addEventHandler(MouseEvent.MOUSE_RELEASED, e -> Ui.scale(btn, 1));
+        Ui.pressFeedback(btn, 0.96);
 
         btn.setOnMouseClicked(e -> {
             if (isAprilEnabled() && !aprilGiveup()) {

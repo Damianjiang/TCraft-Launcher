@@ -216,7 +216,15 @@ public final class Theme {
         return java.util.Collections.unmodifiableList(USER_FONTS);
     }
 
+    private static boolean fontsLoaded;
+
+    // 已扫过就直接用缓存列表；重新扫描+loadFont 别挂在进设置页的路径上
+    public static synchronized void ensureUserFonts() {
+        if (!fontsLoaded) loadUserFonts();
+    }
+
     public static synchronized void loadUserFonts() {
+        fontsLoaded = true;
         USER_FONTS.clear();
         try {
             Path dir = fontDir();
@@ -330,6 +338,11 @@ public final class Theme {
             }));
             javafx.application.Platform.runLater(() -> {
                 if (wallpaperGen.get() != gen) return;
+                // 极快的解码失败可能抢在监听挂上之前，落壁纸前再判一次
+                if (loaded.isError()) {
+                    resetWallpaper();
+                    return;
+                }
                 wallpaper = loaded;
                 if (onWallpaperReady != null) onWallpaperReady.run();
             });
@@ -508,7 +521,7 @@ public final class Theme {
         }
     }
 
-    private static Path currentWallpaperFile;
+    private static volatile Path currentWallpaperFile;
 
     private static boolean accentChanged(Color a, Color b) {
         if (a == null || b == null) return true;
@@ -518,8 +531,8 @@ public final class Theme {
         return diff > 0.06;
     }
 
-    // 启动前把主题色定下来，先建界面再显示就不会闪默认蓝
-    private static Path pendingWallpaper;
+    // 启动前先定主题色：先建界面后显示，否则闪一帧默认蓝
+    private static volatile Path pendingWallpaper;
     private static boolean skipInitialAccentExtract;
     private static boolean startupPrepared;
 
@@ -730,9 +743,9 @@ public final class Theme {
             css = css.replace("#4890f5", hex(accentLight))
                     .replace("#1370f3", hex(accent))
                     .replace("#eaf2fe", hex(accentPale3));
-            // 文件名带代次，StyleManager 按 URL 缓存
+            // 文件名带代次，StyleManager 按 URL 缓存；带进程号，多开实例互不干扰
             Path out = Paths.get(System.getProperty("java.io.tmpdir"),
-                    "tcraft-theme-" + Long.toHexString(System.currentTimeMillis()) + "-" + cssGen++ + ".css");
+                    cssOwnPrefix() + Long.toHexString(System.currentTimeMillis()) + "-" + cssGen++ + ".css");
             Files.writeString(out, css, StandardCharsets.UTF_8);
             cssUrl = out.toUri().toURL();
             sweepThemeCss(out);
@@ -742,14 +755,24 @@ public final class Theme {
         return cssUrl;
     }
 
-    // 临时目录只留当前代，旧文件下次生成时删
+    private static String cssOwnPrefix() {
+        return "tcraft-theme-" + ProcessHandle.current().pid() + "-";
+    }
+
+    // 本进程只留当前代；别的实例（老版本或已退出的）的文件放一天再扫
     private static void sweepThemeCss(Path keep) {
+        String own = cssOwnPrefix();
         try (var stream = Files.list(Paths.get(System.getProperty("java.io.tmpdir")))) {
             stream.filter(p -> {
                 String n = p.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
-                return n.startsWith("tcraft-theme-") && n.endsWith(".css");
+                if (!n.startsWith("tcraft-theme-") || !n.endsWith(".css")) return false;
+                if (n.startsWith(own)) return !p.equals(keep);
+                try {
+                    return System.currentTimeMillis() - Files.getLastModifiedTime(p).toMillis() > 86400_000L;
+                } catch (Exception e) {
+                    return false;
+                }
             }).forEach(p -> {
-                if (p.equals(keep)) return;
                 try {
                     Files.deleteIfExists(p);
                 } catch (Exception ignored) {
@@ -791,7 +814,7 @@ public final class Theme {
     }
 
     public static void applyWallpaperTheme() {
-        // 启动时已用缩小图/缓存定过色，首次挂载壁纸不再重复取色
+        // 启动时已用缩小图/缓存定过色，首次挂载壁纸不重复取色
         if (skipInitialAccentExtract) {
             skipInitialAccentExtract = false;
             return;

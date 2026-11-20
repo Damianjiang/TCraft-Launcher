@@ -62,7 +62,7 @@ public class PageInstance implements Page {
 
         Ui.SearchBox search = Ui.searchBox("搜索实例");
         search.textProperty().addListener((o, a, b) -> {
-            query = b == null ? "" : b.toLowerCase();
+            query = b == null ? "" : b.toLowerCase(java.util.Locale.ROOT);
             // 连续输入时只重建一次列表，不必每个按键都重排
             if (searchDebounce == null) {
                 searchDebounce = new PauseTransition(Duration.millis(180));
@@ -299,14 +299,14 @@ public class PageInstance implements Page {
         List<Data.Instance> list = new ArrayList<>();
         for (Data.Instance ins : data.instances) {
             if (!belongsTo(ins.folder, data.gameDir)) continue;
-            if (query.isEmpty() || ins.name.toLowerCase().contains(query)) {
+            if (query.isEmpty() || ins.name.toLowerCase(java.util.Locale.ROOT).contains(query)) {
                 if (collectionFilter.isEmpty() || InstanceMeta.collections(ins).contains(collectionFilter)) {
                     list.add(ins);
                 }
             }
         }
         switch (sortMode) {
-            case 1 -> list.sort(Comparator.comparing(a -> a.name.toLowerCase()));
+            case 1 -> list.sort(Comparator.comparing(a -> a.name.toLowerCase(java.util.Locale.ROOT)));
             case 2 -> list.sort((a, b) -> b.version.compareTo(a.version));
             case 3 -> list.sort((a, b) -> Long.compare(addedAtOf(b), addedAtOf(a)));
             default -> list.sort((a, b) -> Long.compare(b.lastPlayed, a.lastPlayed));
@@ -871,6 +871,7 @@ public class PageInstance implements Page {
         java.nio.file.Path versions = gameDir.resolve("versions");
         if (!java.nio.file.Files.isDirectory(versions)) return "";
         String folderKey = gameDir.toAbsolutePath().normalize().toString();
+        boolean windows = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win");
         try (var stream = java.nio.file.Files.list(versions)) {
             stream.filter(java.nio.file.Files::isDirectory).forEach(dir -> {
                 String name = dir.getFileName().toString();
@@ -879,11 +880,12 @@ public class PageInstance implements Page {
                 for (Data.Instance i : data.instances) {
                     String folder = i.folder == null || i.folder.isEmpty() ? "" : java.nio.file.Paths.get(i.folder)
                             .toAbsolutePath().normalize().toString();
-                    if (folder.equalsIgnoreCase(folderKey)
+                    // 与 addGameFolder 一致：Windows 大小写不敏感，其他平台精确相等
+                    if ((windows ? folder.equalsIgnoreCase(folderKey) : folder.equals(folderKey))
                             && (i.name.equals(name) || name.equals(i.version))) exists = true;
                 }
                 if (exists) return;
-                String lower = name.toLowerCase();
+                String lower = name.toLowerCase(java.util.Locale.ROOT);
                 String loader = lower.contains("fabric") ? "Fabric" : lower.contains("forge") ? "Forge"
                         : lower.contains("neoforge") ? "NeoForge" : lower.contains("optifine") ? "OptiFine" : "原版";
                 String icon = "Fabric".equals(loader) ? "Fabric.png" : "Forge".equals(loader) ? "CobbleStone.png"

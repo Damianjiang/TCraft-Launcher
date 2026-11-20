@@ -397,7 +397,6 @@ public final class Ui {
         pane.setMinHeight(34);
         pane.setCursor(Cursor.HAND);
         pane.setAlignment(Pos.CENTER);
-        pane.setEffect(Theme.shadow(9, 2, 0.22, Color.BLACK));
         final Color baseBg;
         final Color baseBorder;
         final Color hoverBg;
@@ -447,24 +446,23 @@ public final class Ui {
             }
         }
         lab.setTextFill(textColor);
-        pane.setBackground(fill(baseBg, 8));
-        pane.setBorder(type == BTN_THEME ? null : border(baseBorder, 8, 1));
+        pane.setBackground(fill(baseBg, 4));
+        pane.setBorder(type == BTN_THEME ? null : border(baseBorder, 4, 1));
         int inMs = 100;
         int outMs = type == BTN_THEME ? 100 : 200;
         pane.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_ENTERED, e -> {
             if (pane.isDisabled()) return;
             animateBg(pane, baseBg, hoverBg, inMs, EASE_OUT_FLUENT);
             if (type != BTN_THEME) animateBorder(pane, baseBorder, hoverBorder, inMs);
-            lab.setTextFill(hoverText);
+            tweenTextFill(pane, lab, textColor, hoverText, inMs);
         });
         pane.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_EXITED, e -> {
             if (pane.isDisabled()) return;
             animateBg(pane, hoverBg, baseBg, outMs, EASE_OUT_FLUENT);
             if (type != BTN_THEME) animateBorder(pane, hoverBorder, baseBorder, outMs);
-            lab.setTextFill(textColor);
+            tweenTextFill(pane, lab, hoverText, textColor, outMs);
         });
-        pane.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_PRESSED, e -> scale(pane, 0.96));
-        pane.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_RELEASED, e -> scale(pane, 1));
+        pressFeedback(pane, 0.955);
         pane.disabledProperty().addListener((o, was, now) -> {
             if (now) {
                 if (type == BTN_THEME) {
@@ -555,6 +553,41 @@ public final class Ui {
         st.play();
     }
 
+    public static void pressFeedback(Node node, double pressed) {
+        node.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_PRESSED, e -> {
+            if (node.isDisabled()) return;
+            ScaleTransition st = new ScaleTransition(Duration.millis(80), node);
+            st.setToX(pressed);
+            st.setToY(pressed);
+            st.setInterpolator(EASE_OUT_FLUENT_STRONG);
+            st.play();
+        });
+        node.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_RELEASED, e -> {
+            if (node.isDisabled()) return;
+            ScaleTransition st = new ScaleTransition(Duration.millis(300), node);
+            st.setToX(1);
+            st.setToY(1);
+            st.setDelay(Duration.millis(10));
+            st.setInterpolator(EASE_OUT_BACK);
+            st.play();
+        });
+    }
+
+    static void tweenTextFill(Node owner, Label lab, Color from, Color to, int ms) {
+        javafx.animation.Transition t = new javafx.animation.Transition() {
+            {
+                setCycleDuration(Duration.millis(Math.max(1, ms)));
+            }
+
+            @Override
+            protected void interpolate(double f) {
+                lab.setTextFill(from.interpolate(to, f));
+            }
+        };
+        startExclusive(owner, "uiTextFill", t);
+        t.play();
+    }
+
     public static final class MenuRow {
         final String title;
         final String icon;
@@ -604,7 +637,8 @@ public final class Ui {
                 box.getChildren().add(sep);
                 continue;
             }
-            ListItem item = new ListItem(Theme.icon(row.icon, 16, Theme.text), row.title, null, 34);
+            // 弹层在页面树外，localize 够不到，创建处直接查表
+            ListItem item = new ListItem(Theme.icon(row.icon, 16, Theme.text), Lang.t(row.title), null, 34);
             item.setOnMouseClicked(e -> {
                 if (!row.keepOpen) closeMenuCard(activeMenu);
                 if (row.action != null) row.action.run();
@@ -973,16 +1007,17 @@ public final class Ui {
         pane.setMinSize(size, size);
         pane.setMaxSize(size, size);
         pane.setCursor(Cursor.HAND);
-        pane.setBackground(fill(Color.TRANSPARENT, 6));
+        pane.setBackground(fill(Color.TRANSPARENT, 1000));
         if (tooltip != null) tooltip(pane, tooltip);
         pane.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_ENTERED, e -> {
-            pane.setBackground(fill(Color.web("#ffffff", 50 / 255.0), 6));
-            tint(glyph, Theme.accent);
+            pane.setBackground(fill(Color.web("#ffffff", 50 / 255.0), 1000));
+            tweenTint(pane, glyph, Color.web("#808080"), Theme.accent, 120);
         });
         pane.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_EXITED, e -> {
-            pane.setBackground(fill(Color.TRANSPARENT, 6));
-            tint(glyph, Color.web("#808080"));
+            pane.setBackground(fill(Color.TRANSPARENT, 1000));
+            tweenTint(pane, glyph, Theme.accent, Color.web("#808080"), 150);
         });
+        pressFeedback(pane, 0.9);
         if (action != null) pane.setOnMouseClicked(e -> action.run());
         return pane;
     }
@@ -994,7 +1029,7 @@ public final class Ui {
         pane.setPrefHeight(27);
         pane.setMaxHeight(27);
         pane.setPadding(new Insets(0, 12, 0, 12));
-        pane.setBackground(fill(Theme.semiTransparent, 13.5));
+        pane.setBackground(fill(Theme.semiTransparent, 4));
         pane.setCursor(Cursor.HAND);
         Node glyph = Theme.icon(icon, 16, highlight ? Theme.accent : Theme.text);
         Label lab = label(text, 13, highlight ? Theme.accent : Theme.text);
@@ -1026,6 +1061,7 @@ public final class Ui {
             if (isDisabledNode(pane)) return;
             if (action != null) action.run();
         });
+        pressFeedback(pane, 0.97);
         pane.disabledProperty().addListener((o, was, now) -> {
             Color c = now ? Theme.gray5 : baseFg;
             tint(glyph, c);
@@ -1039,13 +1075,16 @@ public final class Ui {
     }
 
     public static StackPane iconButtonWhite(String icon, double size, double iconSize, String tooltip, Runnable action) {
-        StackPane pane = new StackPane(Theme.icon(icon, iconSize, Theme.accentPale3));
+        Node glyph = Theme.icon(icon, iconSize, Theme.accentPale3);
+        StackPane pane = new StackPane(glyph);
         pane.setPrefSize(size, size);
         pane.setMinSize(size, size);
         pane.setMaxSize(size, size);
         pane.setCursor(Cursor.HAND);
-        pane.setBackground(fill(Color.TRANSPARENT, 6));
+        pane.setBackground(fill(Color.TRANSPARENT, 1000));
         if (tooltip != null) tooltip(pane, tooltip);
+        boolean danger = "x".equals(icon);
+        Color hoverFg = danger ? Theme.red : Theme.accent;
         pane.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_ENTERED, e -> {
             javafx.animation.Transition t = new javafx.animation.Transition() {
                 {
@@ -1054,10 +1093,11 @@ public final class Ui {
 
                 @Override
                 protected void interpolate(double f) {
-                    pane.setBackground(fill(Color.color(1, 1, 1, f * 50 / 255.0), 6));
+                    pane.setBackground(fill(Color.color(1, 1, 1, f * 50 / 255.0), 1000));
                 }
             };
             t.play();
+            tweenTint(pane, glyph, Theme.accentPale3, hoverFg, aniMs(120));
         });
         pane.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_EXITED, e -> {
             Color from = pane.getBackground() != null && !pane.getBackground().getFills().isEmpty()
@@ -1069,13 +1109,30 @@ public final class Ui {
 
                 @Override
                 protected void interpolate(double f) {
-                    pane.setBackground(fill(Color.color(1, 1, 1, from.getOpacity() * (1 - f)), 6));
+                    pane.setBackground(fill(Color.color(1, 1, 1, from.getOpacity() * (1 - f)), 1000));
                 }
             };
             t.play();
+            tweenTint(pane, glyph, hoverFg, Theme.accentPale3, aniMs(150));
         });
+        pressFeedback(pane, 0.84);
         if (action != null) pane.setOnMouseClicked(e -> action.run());
         return pane;
+    }
+
+    static void tweenTint(Node owner, Node glyph, Color from, Color to, int ms) {
+        javafx.animation.Transition t = new javafx.animation.Transition() {
+            {
+                setCycleDuration(Duration.millis(Math.max(1, ms)));
+            }
+
+            @Override
+            protected void interpolate(double f) {
+                tint(glyph, from.interpolate(to, f));
+            }
+        };
+        startExclusive(owner, "uiIconTint", t);
+        t.play();
     }
 
     public static final class ListItem extends HBox {
@@ -2124,7 +2181,7 @@ public final class Ui {
         private boolean wantRun;
 
         {
-            // 离开场景就停表，被换下来的 Loading 不停会一直空转烧 CPU
+            // 离开场景即停表
             sceneProperty().addListener((o, oldScene, newScene) -> applyRunState());
         }
 
@@ -2173,8 +2230,7 @@ public final class Ui {
 
         pill.setOnMouseEntered(e -> pill.setBackground(fill(Theme.accentLight, 21)));
         pill.setOnMouseExited(e -> pill.setBackground(fill(Theme.accent, 21)));
-        pill.setOnMousePressed(e -> pill.setScaleX(0.96));
-        pill.setOnMouseReleased(e -> pill.setScaleX(1));
+        pressFeedback(pill, 0.94);
         if (action != null) pill.setOnMouseClicked(e -> action.run());
         pill.setMaxWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
         return pill;

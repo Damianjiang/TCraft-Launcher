@@ -27,6 +27,9 @@ hs_err_pid*
 # 系统杂项
 .DS_Store
 Thumbs.db
+.idea/
+.vscode/
+*.iml
 
 # 本地构建脚本与工具
 build.ps1

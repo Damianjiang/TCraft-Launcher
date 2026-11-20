@@ -101,7 +101,7 @@ public final class Shell {
                     default -> null;
                 };
                 if (cls == null) return;
-                // wmic 24H2 已移除改用 PS；超时放宽到 30s
+                // wmic 24H2 已移除，故用 PS；超时放宽到 30s
                 runHidden(30, "powershell", "-NoProfile", "-NonInteractive", "-Command",
                         "(Get-Process -Id " + pid + " -ErrorAction Stop).PriorityClass='" + cls + "'");
                 return;
@@ -144,7 +144,7 @@ public final class Shell {
         }
     }
 
-    // 默认 10s：PowerShell 冷启动不够用，调用方用重载自己放宽
+    // 默认 10s：PowerShell 冷启动偏慢，需要更久时用重载传入
     private static void runHidden(String... cmd) throws java.io.IOException {
         runHidden(10, cmd);
     }
@@ -165,8 +165,12 @@ public final class Shell {
             if (java.awt.Desktop.isDesktopSupported()) {
                 java.awt.Desktop d = java.awt.Desktop.getDesktop();
                 if (d.isSupported(java.awt.Desktop.Action.BROWSE)) {
-                    d.browse(java.net.URI.create(url));
-                    return true;
+                    try {
+                        d.browse(java.net.URI.create(url));
+                        return true;
+                    } catch (Exception ignored) {
+                        // URL 含未转义字符时 URI.create 直接抛，得落到 rundll32
+                    }
                 }
             }
             new ProcessBuilder("rundll32", "url.dll,FileProtocolHandler", url).redirectErrorStream(true)

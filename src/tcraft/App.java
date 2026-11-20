@@ -38,7 +38,6 @@ public class App extends Application {
             Thread.currentThread().setUncaughtExceptionHandler((thread, throwable) ->
                     Errors.uncaught(thread, throwable, true));
             Theme.init();
-            Lang.reload();
             Theme.applyComponentOpacity();
             applyInitialTheme();
             if (Boolean.getBoolean("tcl.time")) {

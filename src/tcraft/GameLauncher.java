@@ -302,7 +302,7 @@ public final class GameLauncher {
             }
             boolean canceled = false;
             for (java.util.concurrent.Future<?> future : futures) {
-                // 取消就立刻掐掉线程池：已排队的任务不许再启动，正在跑的被中断后按取消收尾
+                // 取消即关闭线程池：已排队任务不再启动，运行中的中断后按取消收尾
                 if (!canceled && cancelled.getAsBoolean()) {
                     canceled = true;
                     pool.shutdownNow();
@@ -338,12 +338,37 @@ public final class GameLauncher {
         return launch(instance, serverIp, resolveJava(instance, null, null, null));
     }
 
+    // 旧版 MC（≤1.12）按系统 ANSI 写 options.txt，UTF-8 硬读会乱码
+    static java.nio.charset.Charset optionsCharset(Path options) {
+        try {
+            byte[] raw = Files.readAllBytes(options);
+            try {
+                java.nio.charset.StandardCharsets.UTF_8.newDecoder()
+                        .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+                        .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
+                        .decode(java.nio.ByteBuffer.wrap(raw));
+                return java.nio.charset.StandardCharsets.UTF_8;
+            } catch (java.nio.charset.CharacterCodingException e) {
+                // native.encoding 是系统 ANSI 代码页，和旧版游戏 JVM 的默认编码一致
+                try {
+                    return java.nio.charset.Charset.forName(System.getProperty("native.encoding",
+                            System.getProperty("sun.jnu.encoding", "UTF-8")));
+                } catch (Exception e2) {
+                    return java.nio.charset.Charset.defaultCharset();
+                }
+            }
+        } catch (Exception e) {
+            return java.nio.charset.StandardCharsets.UTF_8;
+        }
+    }
+
     private static void applyGameLanguage(Path run) {
         if (!Data.get().getBool("ToolHelpChinese", true)) return;
         Path options = run.resolve("options.txt");
         if (!Files.isRegularFile(options)) return;
         try {
-            List<String> lines = Files.readAllLines(options, java.nio.charset.StandardCharsets.UTF_8);
+            java.nio.charset.Charset cs = optionsCharset(options);
+            List<String> lines = Files.readAllLines(options, cs);
             boolean changed = false;
             boolean hasLang = false;
             for (int i = 0; i < lines.size(); i++) {
@@ -361,7 +386,7 @@ public final class GameLauncher {
                 lines.add("lang:zh_cn");
                 changed = true;
             }
-            if (changed) Files.write(options, lines, java.nio.charset.StandardCharsets.UTF_8);
+            if (changed) Files.write(options, lines, cs);
         } catch (Exception ignored) {
         }
     }
@@ -759,12 +784,22 @@ public final class GameLauncher {
             for (String a : Shell.splitArgs(extraGame)) cmd.add(subst(a, vars));
         }
         if (serverIp != null && !serverIp.trim().isEmpty()) {
-            String[] parts = serverIp.trim().split(":");
+            // IPv6 拆解统一在 Servers.splitAddress
+            String[] hp = Servers.splitAddress(serverIp);
+            String host = hp[0];
+            String port = hp[1].matches("\\d+") ? hp[1] : "";
+            if (!port.isEmpty()) {
+                try {
+                    if (Long.parseLong(port) > 65535) port = "";
+                } catch (NumberFormatException ignored) {
+                    port = "";
+                }
+            }
             cmd.add("--server");
-            cmd.add(parts[0]);
-            if (parts.length == 2) {
+            cmd.add(host);
+            if (!port.isEmpty()) {
                 cmd.add("--port");
-                cmd.add(parts[1]);
+                cmd.add(port);
             }
             data.launchLog("直连服务器：" + serverIp);
         }
@@ -772,7 +807,7 @@ public final class GameLauncher {
         String pre = data.getInstance("PreCommand", data.get("LaunchPreCommand", ""));
         if (!pre.isEmpty()) {
             try {
-                boolean win = System.getProperty("os.name", "").toLowerCase().contains("win");
+                boolean win = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win");
                 String shell = win ? "cmd.exe" : "/bin/sh";
                 String arg = win ? "/c" : "-c";
                 Process preProcess = new ProcessBuilder(shell, arg, pre).directory(run.toFile())
@@ -794,20 +829,8 @@ public final class GameLauncher {
                         preProcess.destroyForcibly();
                         data.launchLog("启动前命令超过 5 分钟未结束，已强制结束：" + pre);
                     }
-                } else {
-                    // 兜底强杀防挂死；销毁避开排水线程竞态
-                    Thread reaper = new Thread(() -> {
-                        try {
-                            if (!preProcess.waitFor(10, java.util.concurrent.TimeUnit.SECONDS)) {
-                                preProcess.descendants().forEach(ProcessHandle::destroyForcibly);
-                                preProcess.destroyForcibly();
-                            }
-                        } catch (Exception ignored) {
-                        }
-                    }, "TCL-PreCommand-Reap");
-                    reaper.setDaemon(true);
-                    reaper.start();
                 }
+                // 不等待模式：命令留在后台常驻（如隧道、代理），输出已排水，不能定时杀掉
                 data.launchLog("已执行启动前命令：" + pre);
             } catch (Exception e) {
                 data.launchLog("启动前命令执行失败：" + e.getMessage());
@@ -836,7 +859,7 @@ public final class GameLauncher {
             try (BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
                 String line;
                 while ((line = br.readLine()) != null) {
-                    // 只进内存环形缓冲，供异常退出时分析；不再逐行写盘
+                    // 日志只进内存环形缓冲，供异常退出时分析
                     data.launchLog(line);
                 }
             } catch (Exception ignored) {
@@ -961,6 +984,9 @@ public final class GameLauncher {
         }
     }
 
+    private static final java.util.regex.Pattern ASSET_HASH_40 =
+            java.util.regex.Pattern.compile("[0-9a-f]{40}");
+
     private static Path prepareAssetsRoot(Path game, String assetId) {
         Path assets = game.resolve("assets");
         Path indexFile = assets.resolve("indexes").resolve(assetId + ".json");
@@ -976,7 +1002,7 @@ public final class GameLauncher {
             for (Map.Entry<String, Object> e : objects.entrySet()) {
                 Map<String, Object> obj = Json.obj(e.getValue());
                 String hash = Json.str(obj, "hash", "");
-                if (!hash.matches("[0-9a-f]{40}")) {
+                if (!ASSET_HASH_40.matcher(hash).matches()) {
                     Data.get().log("资源索引条目哈希不合法，已跳过：" + e.getKey());
                     continue;
                 }

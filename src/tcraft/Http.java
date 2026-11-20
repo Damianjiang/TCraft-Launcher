@@ -279,7 +279,7 @@ public final class Http {
                     hdrs = stripCredentials(hdrs);
                 }
                 if ("POST".equals(m) && code <= 303) {
-                    // 301/302/303 按 RFC 惯例转 GET，body 不再重放
+                    // 301/302/303 按 RFC 惯例转 GET，body 不重放
                     m = "GET";
                     b = null;
                 }

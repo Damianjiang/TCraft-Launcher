@@ -155,7 +155,7 @@ public final class MainWindow {
         this.stage = stage;
         long tPhase = System.nanoTime();
         root = new StackPane();
-        root.setStyle("-fx-background-color: transparent;");
+        applyRootFont();
         root.setPadding(new Insets(10));
         root.setAlignment(Pos.CENTER);
 
@@ -172,12 +172,18 @@ public final class MainWindow {
         loadThemeFromSettings();
         buildFrame();
         long tFrame = System.nanoTime();
-        try {
-            Music.init(data.gameDir);
-            musicAvailable = Music.available();
-        } catch (Throwable ignored) {
-            musicAvailable = false;
-        }
+        // 音乐目录扫描挪后台；MediaPlayer 只能 FX 线程建，回主线程再起播
+        Threads.start("TCL-Music-Init", () -> {
+            try {
+                Music.init(data.gameDir);
+            } catch (Throwable ignored) {
+            }
+            javafx.application.Platform.runLater(() -> {
+                musicAvailable = Music.available();
+                updateExtras();
+                Music.autoStart();
+            });
+        });
         long tMusic = System.nanoTime();
         Scene scene = new Scene(root, 850, 500, Color.TRANSPARENT);
         if (Theme.css() != null) scene.getStylesheets().add(Theme.css().toExternalForm());
@@ -376,7 +382,7 @@ public final class MainWindow {
             st.setToY(0);
             node.getProperties().put("tclExtraHide", st);
             st.setOnFinished(e -> {
-                // 只有仍是这次隐藏才落 setVisible，别把刚触发的显示盖掉
+                // 仅当仍是本次隐藏才 setVisible，新的显示请求优先
                 if (node.getProperties().remove("tclExtraHide", st)) {
                     node.setVisible(false);
                     node.setManaged(false);
@@ -426,7 +432,7 @@ public final class MainWindow {
         }
         // 存储值就是分钟数：0 关闭 / 1 / 5 / 15 / 30 / 60
         int stored = data.getInt("UiBackgroundRotate", 0);
-        // 兼容旧的档位索引（1/2/3/4/5 曾表示 1/5/15/30/60 分钟）
+        // 兼容旧的档位索引：1/2/3/4/5 对应 1/5/15/30/60 分钟
         int[] legacy = {0, 1, 5, 15, 30, 60};
         int minutes = (stored == 0 || stored == 1 || stored == 5 || stored == 15
                 || stored == 30 || stored == 60) ? stored : (stored >= 1 && stored <= 5 ? legacy[stored] : 0);
@@ -708,7 +714,7 @@ public final class MainWindow {
         double mw = media.getWidth(), mh = media.getHeight();
         double vw = body.getWidth(), vh = body.getHeight();
         if (mw <= 0 || mh <= 0 || vw <= 0 || vh <= 0) return;
-        // 按窗口比例裁一块再拉满，等价于 UniformToFill
+        // 即 UniformToFill：取大缩放居中裁切
         double scale = Math.max(vw / mw, vh / mh);
         double cw = Math.min(mw, vw / scale);
         double ch = Math.min(mh, vh / scale);
@@ -735,7 +741,7 @@ public final class MainWindow {
             } catch (Exception ignored) {
             }
         });
-        // 切到别的窗口时暂停，别在后台一直解码
+        // 切出前台即暂停解码
         stage.focusedProperty().addListener((o, a, focused) -> {
             if (vidPlayer == null) return;
             try {
@@ -963,7 +969,7 @@ public final class MainWindow {
         int op = data.getInt("UiBackgroundOpacity", 1000);
         int blur = data.getInt("UiBackgroundBlur", 0);
         double alpha = Math.max(0, Math.min(1, op / 1000.0));
-        // 视频在播时不再合成静态壁纸，少一次全屏绘制
+        // 视频在播时不合成静态壁纸，少一次全屏绘制
         boolean show = img != null && w > 0 && h > 0 && alpha > 0 && vidPlayer == null;
         bgRect.setVisible(show);
         bgRect.setOpacity(alpha);
@@ -2190,9 +2196,7 @@ public final class MainWindow {
         openPage("launch", true);
     }
 
-    /**
-     * 首帧之前摆好入场初始姿态，避免窗口先以最终样式闪一帧再跳回起点。
-     */
+    // 首帧前摆好入场初始姿态，直接显示终态会先闪一帧
     public void prepareIntro() {
         if (isSoftwareRendering()) {
             root.setOpacity(baseOpacity);
@@ -2601,7 +2605,15 @@ public final class MainWindow {
         if (maskFade != null) maskFade.stop();
         if (modalExit != null) modalExit.stop();
         modalLayer.setBackground(Ui.fill(mask == null ? Theme.modalMask : mask, 0));
+        // 被顶掉的旧弹窗不是用户关的，它的等待方（latch/hook）也要放行
+        Runnable staleHook = modalCloseHook;
         modalCloseHook = null;
+        if (staleHook != null) {
+            try {
+                staleHook.run();
+            } catch (Throwable ignored) {
+            }
+        }
         modalContent = card;
         modalDismissable = dismissable;
         solidifyModal(card); // 兜底：弹窗一律不透明
@@ -2895,7 +2907,7 @@ public final class MainWindow {
         Ui.MenuRow[] rows = new Ui.MenuRow[names.length];
         for (int i = 0; i < names.length; i++) {
             final int mode = i;
-            rows[i] = Ui.MenuRow.of((Lang.mode == i ? "✓  " : "") + names[i], "languages", () -> {
+            rows[i] = Ui.MenuRow.of((Lang.mode == i ? "✓  " : "") + Lang.t(names[i]), "languages", () -> {
                 if (Lang.mode == mode) return;
                 Lang.setMode(mode);
                 data.set("SystemLanguage", mode);
@@ -2904,6 +2916,11 @@ public final class MainWindow {
             });
         }
         langPopup = Ui.menuCard(anchor, rows);
+    }
+
+    // 字体族在代码里按系统选（Theme.fontFamily），CSS 里写死只对 Windows 有效
+    private void applyRootFont() {
+        root.setStyle("-fx-background-color: transparent; -fx-font-family: '" + Theme.fontFamily() + "';");
     }
 
     public void rebuildUi() {
@@ -2915,6 +2932,7 @@ public final class MainWindow {
         detachVideoView();
         root.getChildren().clear();
         loadThemeFromSettings();
+        applyRootFont();
         buildFrame();
         currentPage = null;
         switchToken++;

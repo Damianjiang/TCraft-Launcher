@@ -15,7 +15,6 @@ LANG_ZH = 0x409
 
 
 def parse_ico(data):
-    """返回 [(w, h, colors, planes, bpp, payload_bytes), ...]"""
     _res, typ, count = struct.unpack_from("<HHH", data, 0)
     if typ != 1:
         raise ValueError("不是 ico 文件")
@@ -31,7 +30,6 @@ def align(v, a):
 
 
 def build_icons(images, first_id=1):
-    """构造 RT_ICON 数据 与 RT_GROUP_ICON 数据"""
     icons = []
     entries = []
     for i, (w, h, colors, planes, bpp, payload) in enumerate(images):
@@ -46,7 +44,6 @@ def build_icons(images, first_id=1):
 
 
 def build_rsrc_section(images):
-    """返回 (rsrc_bytes, 资源目录大小)"""
     icons, grp = build_icons(images)
 
     tree = {
@@ -57,6 +54,7 @@ def build_rsrc_section(images):
     # 先排目录，再排数据项，最后放数据本身
     dirs = []
     datas = []
+
 
     def walk(node, base):
         ids = sorted(node.keys())
@@ -77,7 +75,6 @@ def build_rsrc_section(images):
 
     tree_end = walk(tree, 0)
 
-    # 目录 -> 数据项 -> 数据
     de_base = align(tree_end, 4)
     de_end = de_base + 16 * len(datas)
     blob_base = align(de_end, 4)

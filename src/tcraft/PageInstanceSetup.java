@@ -432,7 +432,7 @@ public class PageInstanceSetup implements Page {
         diagDisplay.clear();
         int index = diagSourceCombo == null ? -1 : diagSourceCombo.getSelectionModel().getSelectedIndex();
         if (index < 0 || index >= diagSourcePaths.size()) {
-            // runLater/异步回调后 localize 不再经过，状态文本创建处翻译
+            // runLater/异步回调后 localize 不经过，状态文本创建处翻译
             diagStatus.setText(Lang.t("没有可用的日志来源。"));
             diagPath.setText("");
             diagApplyFilter();
@@ -441,7 +441,7 @@ public class PageInstanceSetup implements Page {
         Path target = diagSourcePaths.get(index);
         diagPath.setText(target.toString());
         diagStatus.setText(Lang.t("正在读取…"));
-        // 代次计数：快速切换来源时，旧结果不许盖掉新日志
+        // 代次计数：快速切换来源时旧结果不覆盖新日志
         final int gen = ++diagLoadGen;
         Thread t = new Thread(() -> {
             java.util.List<String[]> result = new ArrayList<>();
@@ -634,7 +634,8 @@ public class PageInstanceSetup implements Page {
             return;
         }
         try {
-            for (String line : Files.readAllLines(options, StandardCharsets.UTF_8)) {
+            java.nio.charset.Charset cs = GameLauncher.optionsCharset(options);
+            for (String line : Files.readAllLines(options, cs)) {
                 int idx = line.indexOf(':');
                 if (idx <= 0) continue;
                 optionValues.put(line.substring(0, idx), line.substring(idx + 1));
@@ -771,7 +772,7 @@ public class PageInstanceSetup implements Page {
             for (java.util.Map.Entry<String, String> e : optionValues.entrySet()) {
                 sb.append(e.getKey()).append(':').append(e.getValue()).append(System.lineSeparator());
             }
-            Files.writeString(options, sb.toString(), StandardCharsets.UTF_8);
+            Files.writeString(options, sb.toString(), GameLauncher.optionsCharset(options));
             optionDirty = false;
             win.toast("游戏选项已保存，下次启动生效。", "", 1);
         } catch (Exception e) {
@@ -1240,7 +1241,7 @@ public class PageInstanceSetup implements Page {
         return item;
     }
 
-    // 只解析 Mod 内的名称，不碰缓存；读盘操作，别在 FX 线程调
+    // 只解析 Mod 内的名称，不读缓存；读盘操作，须在后台线程调用
     private static String readLocalModName(Path mod) {
         String found = "";
         try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(mod.toFile())) {
@@ -1307,7 +1308,7 @@ public class PageInstanceSetup implements Page {
             Files.createDirectories(modsDir);
             for (File f : files) {
                 String enabledName = f.getName();
-                if (enabledName.toLowerCase().endsWith(".disabled")) {
+                if (enabledName.toLowerCase(java.util.Locale.ROOT).endsWith(".disabled")) {
                     enabledName = enabledName.substring(0, enabledName.length() - ".disabled".length());
                 }
                 if (!enabledName.contains(".")) enabledName += ".jar";
@@ -1342,31 +1343,40 @@ public class PageInstanceSetup implements Page {
     }
 
     private void modDetail(Path mod, String display, boolean disabled) {
-        String[] meta = null;
-        try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(mod.toFile())) {
-            java.util.zip.ZipEntry mcmod = zip.getEntry("mcmod.info");
-            if (mcmod != null) {
-                var root = Json.obj(Json.parse(new String(zip.getInputStream(mcmod).readAllBytes(), StandardCharsets.UTF_8)));
-                var first = Json.obj(Json.arr(root.get("modList")).isEmpty() ? null : Json.arr(root.get("modList")).get(0));
-                meta = new String[]{Json.str(first, "name", display), Json.str(first, "version", ""),
-                        Json.str(first, "description", "")};
-            }
-            if (meta == null) {
-                java.util.zip.ZipEntry fabric = zip.getEntry("fabric.mod.json");
-                if (fabric != null) {
-                    var root = Json.obj(Json.parse(new String(zip.getInputStream(fabric).readAllBytes(), StandardCharsets.UTF_8)));
-                    meta = new String[]{Json.str(root, "name", Json.str(root, "id", display)),
-                            Json.str(root, "version", ""), Json.str(root, "description", "")};
+        // 大 jar 的 ZipFile 解析是磁盘 IO，跟读 Mod 名一样放后台，弹卡回 FX
+        MOD_NAME_POOL.execute(() -> {
+            String[] meta = null;
+            try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(mod.toFile())) {
+                java.util.zip.ZipEntry mcmod = zip.getEntry("mcmod.info");
+                if (mcmod != null) {
+                    var root = Json.obj(Json.parse(new String(zip.getInputStream(mcmod).readAllBytes(), StandardCharsets.UTF_8)));
+                    var first = Json.obj(Json.arr(root.get("modList")).isEmpty() ? null : Json.arr(root.get("modList")).get(0));
+                    meta = new String[]{Json.str(first, "name", display), Json.str(first, "version", ""),
+                            Json.str(first, "description", "")};
                 }
+                if (meta == null) {
+                    java.util.zip.ZipEntry fabric = zip.getEntry("fabric.mod.json");
+                    if (fabric != null) {
+                        var root = Json.obj(Json.parse(new String(zip.getInputStream(fabric).readAllBytes(), StandardCharsets.UTF_8)));
+                        meta = new String[]{Json.str(root, "name", Json.str(root, "id", display)),
+                                Json.str(root, "version", ""), Json.str(root, "description", "")};
+                    }
+                }
+            } catch (Exception ignored) {
             }
-        } catch (Exception ignored) {
-        }
-        String time = "";
-        try {
-            time = Files.getLastModifiedTime(mod).toInstant().atZone(ZoneId.systemDefault())
-                    .format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm"));
-        } catch (Exception ignored) {
-        }
+            String time = "";
+            try {
+                time = Files.getLastModifiedTime(mod).toInstant().atZone(ZoneId.systemDefault())
+                        .format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm"));
+            } catch (Exception ignored) {
+            }
+            String[] fMeta = meta;
+            String fTime = time;
+            javafx.application.Platform.runLater(() -> showModDetail(mod, display, disabled, fMeta, fTime));
+        });
+    }
+
+    private void showModDetail(Path mod, String display, boolean disabled, String[] meta, String time) {
         VBox card = new VBox(10);
         card.setPadding(new Insets(18, 20, 16, 20));
         card.setPrefWidth(430);
@@ -1576,7 +1586,7 @@ public class PageInstanceSetup implements Page {
             if (Files.isDirectory(dir)) {
                 try (var stream = Files.list(dir)) {
                     stream.forEach(p -> {
-                        String n = p.getFileName().toString().toLowerCase();
+                        String n = p.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
                         if (Files.isDirectory(p) || n.endsWith(".zip") || n.endsWith(".zip.disabled")) out.add(p);
                     });
                 }
@@ -1605,7 +1615,7 @@ public class PageInstanceSetup implements Page {
     }
 
     private boolean isDisabledPack(Path p) {
-        return p.getFileName().toString().toLowerCase().endsWith(".disabled");
+        return p.getFileName().toString().toLowerCase(java.util.Locale.ROOT).endsWith(".disabled");
     }
 
     private String currentShader(Path root) {
@@ -1622,7 +1632,7 @@ public class PageInstanceSetup implements Page {
             if (Files.isDirectory(mods)) {
                 try (var stream = Files.list(mods)) {
                     for (Path p : stream.toList()) {
-                        String n = p.getFileName().toString().toLowerCase();
+                        String n = p.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
                         if (n.endsWith(".jar") && (n.contains("iris") || n.contains("oculus") || n.contains("optifine"))) {
                             return true;
                         }
@@ -1638,7 +1648,7 @@ public class PageInstanceSetup implements Page {
         Path options = root.resolve("options.txt");
         if (!Files.isRegularFile(options)) return "";
         try {
-            for (String line : Files.readAllLines(options, StandardCharsets.UTF_8)) {
+            for (String line : Files.readAllLines(options, GameLauncher.optionsCharset(options))) {
                 int idx = line.indexOf(':');
                 if (idx > 0 && line.substring(0, idx).equals(key)) return line.substring(idx + 1);
             }
@@ -1650,8 +1660,10 @@ public class PageInstanceSetup implements Page {
     private void writeOption(Path root, String key, String value) {
         Path options = root.resolve("options.txt");
         try {
+            java.nio.charset.Charset cs = Files.exists(options)
+                    ? GameLauncher.optionsCharset(options) : StandardCharsets.UTF_8;
             List<String> lines = Files.exists(options)
-                    ? Files.readAllLines(options, StandardCharsets.UTF_8) : new ArrayList<>();
+                    ? Files.readAllLines(options, cs) : new ArrayList<>();
             boolean replaced = false;
             List<String> out = new ArrayList<>();
             for (String line : lines) {
@@ -1664,7 +1676,7 @@ public class PageInstanceSetup implements Page {
                 }
             }
             if (!replaced) out.add(key + ":" + value);
-            Files.write(options, out, StandardCharsets.UTF_8);
+            Files.write(options, out, cs);
         } catch (Exception e) {
             javafx.application.Platform.runLater(() -> win.toast("写入 options.txt 失败", e.getMessage(), 3));
         }
@@ -1780,6 +1792,9 @@ public class PageInstanceSetup implements Page {
                 task.stage = "导出完成";
                 javafx.application.Platform.runLater(() -> win.toast("导出完成", file.getName(), 1));
             } catch (Exception e) {
+                task.subs.forEach(sub -> {
+                    if (sub.state == Tasks.State.RUNNING) sub.state = Tasks.State.FAILED;
+                });
                 task.state = task.canceled ? Tasks.State.CANCELED : Tasks.State.FAILED;
                 task.stage = e.getMessage() == null ? "导出失败" : e.getMessage();
                 javafx.application.Platform.runLater(() -> win.toast("导出失败", task.stage, 3));
@@ -2468,15 +2483,20 @@ public class PageInstanceSetup implements Page {
                 Files.createDirectories(target.getParent());
                 Downloader.downloadFileTo(p -> task.progress = p, url, target, target.getFileName().toString());
                 task.subs.get(0).state = Tasks.State.DONE;
+                task.state = Tasks.State.DONE;
+                task.progress = 1;
                 javafx.application.Platform.runLater(() -> {
                     win.toast(Lang.t("下载完成：") + target.getFileName(), "", 1);
                     win.openSetup("complist");
                 });
             } catch (Exception e) {
                 task.subs.get(0).state = Tasks.State.FAILED;
-                task.error = e.getMessage();
+                task.error = e.getMessage() == null ? "下载失败" : e.getMessage();
+                task.state = task.canceled ? Tasks.State.CANCELED : Tasks.State.FAILED;
                 javafx.application.Platform.runLater(() ->
                         win.toast(Lang.t("下载失败：") + target.getFileName(), e.getMessage(), 3));
+            } finally {
+                Tasks.INSTANCE.changed();
             }
         });
     }
@@ -2512,6 +2532,8 @@ public class PageInstanceSetup implements Page {
         jijCombo = new ComboBox<>();
         for (Path p : modJars) jijCombo.getItems().add(p.getFileName().toString());
         jijCombo.setPrefWidth(340);
+        // 程序化 select 也会触发 onAction，先 select 再挂监听，避免双重加载
+        jijCombo.getSelectionModel().select(0);
         jijCombo.setOnAction(e -> {
             int idx = jijCombo.getSelectionModel().getSelectedIndex();
             jijCurrentMod = idx >= 0 && idx < modJars.size() ? modJars.get(idx) : null;
@@ -2525,11 +2547,8 @@ public class PageInstanceSetup implements Page {
         jijExportAll = Ui.button("导出全部内嵌依赖", Ui.BTN_HIGHLIGHT, this::jijExportAll);
         jijExportAll.setVisible(false);
         page.getChildren().add(jijExportAll);
-        jijCombo.getSelectionModel().select(0);
-        if (!modJars.isEmpty()) {
-            jijCurrentMod = modJars.get(0);
-            jijLoadJars();
-        }
+        jijCurrentMod = modJars.get(0);
+        jijLoadJars();
     }
 
     private void jijLoadJars() {
@@ -2915,12 +2934,12 @@ public class PageInstanceSetup implements Page {
     }
 
     private boolean hasModLoader(Data.Instance ins) {
-        String v = ins.version.toLowerCase();
+        String v = ins.version.toLowerCase(java.util.Locale.ROOT);
         return v.contains("-forge") || v.contains("-fabric") || v.contains("-neoforge") || v.contains("-quilt");
     }
 
     private boolean hasOptiFine(Data.Instance ins) {
-        return ins.version.toLowerCase().contains("optifine");
+        return ins.version.toLowerCase(java.util.Locale.ROOT).contains("optifine");
     }
 
     private static String globToRegex(String pattern) {
@@ -2942,13 +2961,16 @@ public class PageInstanceSetup implements Page {
 
     private static boolean matchesRules(java.util.List<String> rules, String relativePath) {
         boolean keep = false;
-        String lower = relativePath.toLowerCase();
+        String lower = relativePath.toLowerCase(java.util.Locale.ROOT);
         for (String rule : rules) {
-            String r = rule.trim().toLowerCase();
-            if (r.isEmpty()) continue;
+            String r = rule.trim().toLowerCase(java.util.Locale.ROOT);
+            // # 是注释行，导出模板里给用户看的
+            if (r.isEmpty() || r.startsWith("#")) continue;
             boolean revert = r.startsWith("!");
             if (revert) r = r.substring(1);
-            if (lower.matches(globToRegex(r))) keep = !revert;
+            // 目录规则（mods/ 这类）按前缀匹配整个目录，全串匹配永远落空
+            String pattern = r.endsWith("/") ? globToRegex(r) + ".*" : globToRegex(r);
+            if (lower.matches(pattern)) keep = !revert;
         }
         return keep;
     }
@@ -3037,8 +3059,9 @@ public class PageInstanceSetup implements Page {
         final String fPackVersion = packVersion;
         final java.io.File fTarget = target;
         Threads.start("TCL-Export", () -> {
+            Path cache = null;
             try {
-                Path cache = Files.createTempDirectory("tcl-export-");
+                cache = Files.createTempDirectory("tcl-export-");
                 Path overrides = cache.resolve("modpack").resolve("overrides");
                 Files.createDirectories(overrides);
                 task.subs.get(0).state = Tasks.State.RUNNING;
@@ -3048,6 +3071,7 @@ public class PageInstanceSetup implements Page {
                 final int[] copied = {0};
                 try (var walk = Files.walk(game, 20)) {
                     walk.filter(Files::isRegularFile).forEach(file -> {
+                        if (task.canceled) throw new java.io.UncheckedIOException(new java.io.IOException("导出已取消"));
                         String relative = game.relativize(file).toString().replace('\\', '/');
                         for (String skip : new String[]{"assets/", "versions/", "libraries/",
                                 "structureCacheV1/", ".fabric/", ".git/", "avatar-cache/", "cosmetic-cache/"}) {
@@ -3060,7 +3084,7 @@ public class PageInstanceSetup implements Page {
                             Files.copy(file, dest, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                             copied[0]++;
                             task.remainingFiles = copied[0];
-                            String lower = relative.toLowerCase();
+                            String lower = relative.toLowerCase(java.util.Locale.ROOT);
                             boolean hostedFolder = lower.contains("mods") || lower.contains("packs")
                                     || lower.contains("openloader") || lower.contains("resource");
                             if (!exportIncludeLauncher && hostedFolder
@@ -3107,7 +3131,7 @@ public class PageInstanceSetup implements Page {
                             if (!url.isEmpty()) downloadUrls.put(e.getValue(), url);
                         }
                     } catch (Exception e) {
-                        // 联网失败时询问是否继续
+                        // 联网失败时询问是否继续；取消必须放行等待线程，不能挂满 5 分钟
                         final Exception fe = e;
                         final boolean[] proceed = {false};
                         CountDownLatch latch = new CountDownLatch(1);
@@ -3119,7 +3143,8 @@ public class PageInstanceSetup implements Page {
                                     () -> {
                                         proceed[0] = true;
                                         latch.countDown();
-                                    });
+                                    },
+                                    false, latch::countDown);
                         });
                         boolean confirmed;
                         try {
@@ -3160,8 +3185,8 @@ public class PageInstanceSetup implements Page {
                     StringBuilder deps = new StringBuilder("{\"minecraft\":").append(Json.quote(vanillaName(ins)));
                     String loaderVer = loaderVersion(ins);
                     if (loaderVer != null) {
-                        if (ins.version.toLowerCase().contains("-forge")) deps.append(",\"forge\":").append(Json.quote(loaderVer));
-                        else if (ins.version.toLowerCase().contains("-neoforge")) deps.append(",\"neoforge\":").append(Json.quote(loaderVer));
+                        if (ins.version.toLowerCase(java.util.Locale.ROOT).contains("-forge")) deps.append(",\"forge\":").append(Json.quote(loaderVer));
+                        else if (ins.version.toLowerCase(java.util.Locale.ROOT).contains("-neoforge")) deps.append(",\"neoforge\":").append(Json.quote(loaderVer));
                         else deps.append(",\"fabric-loader\":").append(Json.quote(loaderVer));
                     }
                     deps.append("}");
@@ -3178,12 +3203,13 @@ public class PageInstanceSetup implements Page {
                     Files.writeString(cache.resolve("modpack").resolve("TCraft-Export-Config.txt"), conf.toString(), StandardCharsets.UTF_8);
                 }
 
+                Path packRoot = cache.resolve("modpack");
                 task.threads = 1;
                 try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(fTarget.toPath()))) {
-                    try (var walk = Files.walk(cache.resolve("modpack"))) {
+                    try (var walk = Files.walk(packRoot)) {
                         walk.filter(Files::isRegularFile).forEach(file -> {
                             try {
-                                String entryName = cache.resolve("modpack").relativize(file).toString().replace('\\', '/');
+                                String entryName = packRoot.relativize(file).toString().replace('\\', '/');
                                 zip.putNextEntry(new ZipEntry(entryName));
                                 Files.copy(file, zip);
                                 zip.closeEntry();
@@ -3192,10 +3218,9 @@ public class PageInstanceSetup implements Page {
                         });
                     }
                 }
-                try (var walk = Files.walk(cache)) {
-                    walk.sorted(java.util.Comparator.reverseOrder()).forEach(p -> p.toFile().delete());
-                }
                 task.subs.get(2).state = Tasks.State.DONE;
+                task.state = Tasks.State.DONE;
+                task.progress = 1;
                 javafx.application.Platform.runLater(() -> {
                     win.toast("导出完成", fTarget.getName(), 1);
                     Shell.openFolder(fTarget.getParent().toString());
@@ -3205,8 +3230,18 @@ public class PageInstanceSetup implements Page {
                     if (sub.state == Tasks.State.RUNNING) sub.state = Tasks.State.FAILED;
                 });
                 task.error = e.getMessage() == null ? "未知错误" : e.getMessage();
+                task.state = task.canceled ? Tasks.State.CANCELED : Tasks.State.FAILED;
                 javafx.application.Platform.runLater(() ->
-                        win.toast("导出失败", task.error, 3));
+                        win.toast(task.canceled ? "导出已取消" : "导出失败", task.error, 3));
+            } finally {
+                // 成功失败都要清临时目录，失败残留能把临时盘吃满
+                if (cache != null) {
+                    try (var walk = Files.walk(cache)) {
+                        walk.sorted(java.util.Comparator.reverseOrder()).forEach(p -> p.toFile().delete());
+                    } catch (Exception ignored) {
+                    }
+                }
+                Tasks.INSTANCE.changed();
             }
         });
     }
@@ -3214,7 +3249,7 @@ public class PageInstanceSetup implements Page {
     private static String vanillaName(Data.Instance ins) {
         String v = ins.version;
         for (String sfx : new String[]{"-forge", "-fabric", "-neoforge", "-quilt"}) {
-            int i = v.toLowerCase().indexOf(sfx);
+            int i = v.toLowerCase(java.util.Locale.ROOT).indexOf(sfx);
             if (i > 0) v = v.substring(0, i);
         }
         return v;
@@ -3223,7 +3258,7 @@ public class PageInstanceSetup implements Page {
     private static String loaderVersion(Data.Instance ins) {
         String v = ins.version;
         for (String sfx : new String[]{"-forge-", "-fabric-", "-neoforge-", "-quilt-"}) {
-            int i = v.toLowerCase().indexOf(sfx);
+            int i = v.toLowerCase(java.util.Locale.ROOT).indexOf(sfx);
             if (i > 0) return v.substring(i + sfx.length());
         }
         return null;
@@ -3307,6 +3342,9 @@ public class PageInstanceSetup implements Page {
                 task.stage = "备份完成";
                 javafx.application.Platform.runLater(() -> win.toast("备份完成", file.getName(), 1));
             } catch (Exception e) {
+                task.subs.forEach(sub -> {
+                    if (sub.state == Tasks.State.RUNNING) sub.state = Tasks.State.FAILED;
+                });
                 task.state = task.canceled ? Tasks.State.CANCELED : Tasks.State.FAILED;
                 task.stage = e.getMessage() == null ? "备份失败" : e.getMessage();
                 javafx.application.Platform.runLater(() -> win.toast("备份失败", task.stage, 3));
@@ -3485,10 +3523,8 @@ public class PageInstanceSetup implements Page {
         for (String script : new String[]{"TCraftLauncher.bat", "TCraftLauncher-debug.bat", "TCraftLauncher.sh"}) {
             Path src = base.resolve(script);
             if (Files.isRegularFile(src)) {
-                Path dst = payloadRoot.resolve(script);
-                Files.copy(src, dst, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                // ZipOutputStream 不保存 unix 权限，Linux 解出来要能直接跑
-                if (script.endsWith(".sh")) dst.toFile().setExecutable(true);
+                Files.copy(src, payloadRoot.resolve(script),
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             }
         }
         Path self = Resources.jar();
@@ -3503,6 +3539,7 @@ public class PageInstanceSetup implements Page {
                 + System.lineSeparator()
                 + "本压缩包已包含启动器程序、启动脚本与资源文件。" + System.lineSeparator()
                 + "运行需要 Java 17 或更高版本；首次启动会自动下载 JavaFX 运行库。" + System.lineSeparator()
+                + "zip 不保存可执行位：Linux/macOS 下若 .sh 无法直接运行，请用 sh TCraftLauncher.sh 启动。" + System.lineSeparator()
                 + System.lineSeparator()
                 + "整合包游戏文件位于 overrides 目录（Modrinth 格式请先导入 .mrpack）。" + System.lineSeparator();
         Files.writeString(payloadRoot.resolve("启动器文件说明.txt"), readme, StandardCharsets.UTF_8);

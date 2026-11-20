@@ -252,8 +252,9 @@ public class PageLink implements Page {
         actions.getChildren().addAll(
                 Ui.button("返回", Ui.BTN_NORMAL, this::cancelLoading),
                 Ui.button("重试", Ui.BTN_THEME, () -> {
+                    // worker 已随错误退出，重试必须真重开一轮
                     loadingError = null;
-                    win.reloadPage();
+                    startLoading();
                 }));
         card.getChildren().addAll(title, body, actions);
         StackPane holder = new StackPane(card);
@@ -746,6 +747,8 @@ public class PageLink implements Page {
     }
 
     private void runLink() {
+        // 取消后立刻重开会 ++peerGeneration，旧 worker 的错误回调不能污染新一轮
+        final int gen = peerGeneration;
         try {
             EasyTier.ensureInstalled(false, (stage, v) -> setStage(stage));
             if (Thread.currentThread().isInterrupted()) return;
@@ -784,25 +787,44 @@ public class PageLink implements Page {
 
             setStage("正在启动联机模块…");
             EasyTier.start(a.toString());
+            // core 起来之后，取消和报错两条路都得回收它
+            try {
+                waitUntilConnected(port);
+                if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
+                if (!serverSide) waitStable(port);
 
-            waitUntilConnected(port);
-            if (Thread.currentThread().isInterrupted()) return;
-            if (!serverSide) waitStable(port);
-
-            state = State.FINISH;
-            javafx.application.Platform.runLater(() -> {
-                win.reloadPage();
-                if (serverSide) copyCode();
-                else win.toast("已加入房间", clientAddress, 1);
-            });
+                // 取消落在等待窗口时中断标志可能被吞，落 FINISH 前再核一次状态
+                if (state != State.LOADING) return;
+                state = State.FINISH;
+                javafx.application.Platform.runLater(() -> {
+                    win.reloadPage();
+                    if (serverSide) copyCode();
+                    else win.toast("已加入房间", clientAddress, 1);
+                });
+            } catch (InterruptedException e) {
+                Data.get().log("联机：等待连接过程被中断");
+                EasyTier.stop();
+            } catch (Exception e) {
+                EasyTier.stop();
+                if (Thread.currentThread().isInterrupted() || gen != peerGeneration || state == State.SELECT) return;
+                String msg = e.getMessage() == null ? "未知错误" : e.getMessage();
+                javafx.application.Platform.runLater(() -> {
+                    if (gen != peerGeneration || state == State.SELECT) return;
+                    loadingError = msg;
+                    state = State.LOADING;
+                    win.reloadPage();
+                });
+                // 页内错误态只说状态，真实原因交给弹窗
+                Errors.panic("无法建立联机", e);
+            }
         } catch (InterruptedException e) {
             Data.get().log("联机：等待连接过程被中断");
         } catch (Exception e) {
-            if (Thread.currentThread().isInterrupted() || state == State.SELECT) return;
             EasyTier.stop();
+            if (Thread.currentThread().isInterrupted() || gen != peerGeneration || state == State.SELECT) return;
             String msg = e.getMessage() == null ? "未知错误" : e.getMessage();
             javafx.application.Platform.runLater(() -> {
-                if (state == State.SELECT) return;
+                if (gen != peerGeneration || state == State.SELECT) return;
                 loadingError = msg;
                 state = State.LOADING;
                 win.reloadPage();
@@ -839,14 +861,17 @@ public class PageLink implements Page {
                 : Lang.t("无法连接到房主：可能的原因是网络环境不佳、房主已关闭房间或联机码输错。"));
     }
 
-    private void waitStable(int port) {
+    private void waitStable(int port) throws InterruptedException {
         setStage("连接优化中……");
-        for (int i = 0; i < 50; i++) {
-            if (Thread.currentThread().isInterrupted()) return;
+        // 每轮 fork 一次 easytier-cli，250ms 间隔足够
+        for (int i = 0; i < 20; i++) {
+            if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
             if (targetPeer != null && !targetPeer.relay && targetPeer.ping < 100) return;
             try {
                 applyPeers(EasyTier.peers(port));
-                Thread.sleep(100);
+                Thread.sleep(250);
+            } catch (InterruptedException e) {
+                throw e;
             } catch (Exception e) {
                 return;
             }
@@ -1093,10 +1118,22 @@ public class PageLink implements Page {
     }
 
     private String localAddress() {
+        // getLocalHost 可能做 DNS 反查把 FX 线程卡住，改枚举网卡
         try {
-            return java.net.InetAddress.getLocalHost().getHostAddress();
-        } catch (Exception e) {
-            return "127.0.0.1";
+            java.util.Enumeration<java.net.NetworkInterface> nis = java.net.NetworkInterface.getNetworkInterfaces();
+            while (nis.hasMoreElements()) {
+                java.net.NetworkInterface ni = nis.nextElement();
+                if (!ni.isUp() || ni.isLoopback()) continue;
+                java.util.Enumeration<java.net.InetAddress> addrs = ni.getInetAddresses();
+                while (addrs.hasMoreElements()) {
+                    java.net.InetAddress a = addrs.nextElement();
+                    if (a instanceof java.net.Inet4Address && !a.isLoopbackAddress()) {
+                        return a.getHostAddress();
+                    }
+                }
+            }
+        } catch (Exception ignored) {
         }
+        return "127.0.0.1";
     }
 }

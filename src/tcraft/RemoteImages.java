@@ -101,7 +101,7 @@ public final class RemoteImages {
                     }
                     if (img == null) {
                         if (fromDisk) {
-                            // 磁盘缓存里的坏图不会自己恢复，删掉下轮回源重下
+                            // 坏图留在缓存不会恢复，删除后下轮重新下载
                             try {
                                 Files.deleteIfExists(fileOf(url));
                             } catch (Exception ignored) {
@@ -206,7 +206,7 @@ public final class RemoteImages {
         try {
             Http.pool().execute(() -> {
                 try {
-                    // 缓存根没有标记文件就不是本启动器建立的目录，一个文件都不能删
+                    // 缓存根无标记文件即非本启动器目录，整目录拒绝删除
                     if (!Data.hasCacheMarker(d.getParent())) return;
                     try (Stream<Path> s = Files.list(d)) {
                         List<Path> files = s.filter(Files::isRegularFile)

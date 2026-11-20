@@ -118,7 +118,7 @@ public final class StartupWindow {
             d.append(String.format(java.util.Locale.ROOT, "%.1f / %.1f MB", done / 1048576.0, total / 1048576.0));
             d.append("  ").append(done * 100 / Math.max(1, total)).append('%');
         } else {
-            d.append(String.format(java.util.Locale.ROOT, "已下载 %.1f MB", done / 1048576.0));
+            d.append(String.format(java.util.Locale.ROOT, Lang.t("已下载 %.1f MB"), done / 1048576.0));
         }
         if (speedMb > 0) d.append(String.format(java.util.Locale.ROOT, "  %.1f MB/s", speedMb));
         detail = d.toString();
@@ -131,19 +131,20 @@ public final class StartupWindow {
         if (closed) return;
         closed = true;
         if (window == null) return;
-        // 主窗口一显示就立刻让出置顶，别让启动卡继续压在主界面上
+        // 主窗口显示后立即取消置顶
         try {
             window.setAlwaysOnTop(false);
         } catch (Exception ignored) {
         }
         long wait = 300 - (System.currentTimeMillis() - openedAt);
-        Runnable dispose = () -> {
+        Runnable dispose = () -> java.awt.EventQueue.invokeLater(() -> {
+            // AWT 组件的显隐与销毁按规范只能在 EDT 做
             try {
                 window.setVisible(false);
                 window.dispose();
             } catch (Exception ignored) {
             }
-        };
+        });
         if (wait <= 0) {
             dispose.run();
         } else {

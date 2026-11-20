@@ -32,8 +32,9 @@ final class Redact {
         if (!lower.contains("token") && !lower.contains("password")
                 && !lower.contains("bearer") && !lower.contains("proxypass")
                 && !lower.contains("session") && !lower.contains("secret")
+                // 兜底正则覆盖 api 键的三种分隔形态，预过滤须一致
                 && !lower.contains("api_key") && !lower.contains("apikey")
-                && !lower.contains("cursekey")) {
+                && !lower.contains("api-key") && !lower.contains("cursekey")) {
             return text;
         }
         String out = text;

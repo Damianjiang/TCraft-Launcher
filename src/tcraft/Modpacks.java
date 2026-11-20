@@ -130,7 +130,7 @@ public final class Modpacks {
         java.util.Map<String, Object> deps = Json.obj(json.get("dependencies"));
         for (java.util.Map.Entry<String, Object> e : deps.entrySet()) {
             String value = e.getValue() == null ? "" : String.valueOf(e.getValue()).trim();
-            switch (e.getKey().toLowerCase()) {
+            switch (e.getKey().toLowerCase(java.util.Locale.ROOT)) {
                 case "minecraft" -> info.mcVersion = value;
                 case "forge" -> {
                     info.loader = "Forge";
@@ -636,7 +636,7 @@ public final class Modpacks {
         }
     }
 
-    // 清掉包内自带实例设置里的命令与附加参数，这些只能本机自己填
+    // 清除包内实例设置的命令与附加参数，这两类只允许本机填写
     private static void sanitizeImportedInstanceSettings(Path versionFolder) {
         try {
             Path ini = versionFolder.resolve("TCL").resolve("Setup.ini");

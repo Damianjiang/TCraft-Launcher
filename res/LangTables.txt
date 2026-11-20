@@ -11,7 +11,7 @@
 联机\n基于 EasyTier 的 P2P 联机，不用公网 IP 也能开房间。可以创建房间、把单人存档分享给朋友，也可以输入收到的邀请码加入。还带服务器列表与在线状态查询。	Multiplayer\nP2P multiplayer over EasyTier, so you can host without a public IP. Create a room to share a single-player save with friends, or join via an invite code. Includes a server list with online status checks.	聯機\n基於 EasyTier 的 P2P 聯機，不用公眾 IP 也能開房間。可以建立房間、把單人存檔分享給朋友，也可以輸入收到的邀請碼加入。還帶伺服器清單與線上狀態查詢。	
 版本管理\n每个实例可以单独管理 Mod、查看 Jar-in-Jar 内嵌依赖、管理存档与数据包、看游戏截图，还能把整个整合包导出给别人装。	Version Management\nEach instance manages its own Mods, shows Jar-in-Jar embedded dependencies, manages saves and datapacks, lists screenshots, and can export the whole modpack for others to install.	版本管理\n每個實例可以單獨管理 Mod、查看 Jar-in-Jar 內嵌依賴、管理存檔與資料包、看遊戲截圖，還能把整個整合包導出給別人裝。	
 实用工具\n清理垃圾与今日人品等小工具，都在「更多」里。	Utilities\nJunk cleanup and Daily Luck are under More.	實用工具\n清理垃圾與今日人品等小工具，都在「更多」裡。	
-设置\n分启动、联机、Java、个性化、系统几类，覆盖下载目录、内存分配、代理、界面主题与语言。界面语言支持简体中文、English、繁體中文、文言文，也可以自动跟随系统语言。	Settings\nOrganized into Launch, Multiplayer, Java, Personalization and System, covering download folder, memory allocation, proxy, UI theme and language. The UI language supports Simplified Chinese, English, Traditional Chinese and Classical Chinese, or auto-follows the system language.	設定\n分啟動、聯機、Java、個性化、系統幾類，涵蓋下載目錄、記憶體分配、代理、介面主題與語言。介面語言支援簡體中文、English、繁體中文、文言文，也可以自動跟隨系統語言。	
+设置\n分启动、联机、Java、个性化、系统几类，覆盖下载目录、内存分配、代理、界面主题与语言。界面语言支持简体中文、English、繁體中文，也可以自动跟随系统语言。	Settings\nOrganized into Launch, Multiplayer, Java, Personalization and System, covering download folder, memory allocation, proxy, UI theme and language. The UI language supports Simplified Chinese, English and Traditional Chinese, or auto-follows the system language.	設定\n分啟動、聯機、Java、個性化、系統幾類，涵蓋下載目錄、記憶體分配、代理、介面主題與語言。介面語言支援簡體中文、English、繁體中文，也可以自動跟隨系統語言。	
 确认网络通畅，并且用的是国际区账号。国内区账号请改用登录页里的「国内区」方式。	Confirm the network is stable and that you're using an international account. For a China-region account, use the Unified Pass option on the login page instead.	確認網路通暢，並且用的是國際區帳號。國內區帳號請改用登入頁裡的「國內區」方式。	
 上面这些都没解决的话，可以进 TCL 官方 QQ 群求助：\n\n  群号：1131373915\n\n入群后请说明你的系统（Windows 版本、Java 版本、Minecraft 版本）以及具体遇到了什么问题。	If none of the above helped, join the official TCL QQ group for help:\n\n  Group: 1131373915\n\nAfter joining, state your system (Windows version, Java version, Minecraft version) and exactly what went wrong.	上面這些都沒解決的話，可以進 TCL 官方 QQ 群求助：\n\n  群號：1131373915\n\n入群後請說明你的系統（Windows 版本、Java 版本、Minecraft 版本）以及具體遇到了什麼問題。	
 TCL 由 TCraft 团队开发与维护。\n提供游戏与模组、整合包、资源包、光影的下载与管理，支持原版、Forge / NeoForge / Fabric / OptiFine / LiteLoader。\n同时提供登录、启动、联机、实例与整合包导出等功能。\n加入 TCraft Launcher 启动器交流群（群号 1131373915）：https://qm.qq.com/q/UONlv4VgwE，获取更新、反馈问题。	TCL is developed and maintained by the TCraft team.\nProvides download and management for games, mods, modpacks, resource packs and shaders. Supports vanilla, Forge / NeoForge / Fabric / OptiFine / LiteLoader.\nAlso offers login, launching, multiplayer, instances and modpack export.\nJoin TCraft Launcher group (QQ 1131373915): https://qm.qq.com/q/UONlv4VgwE for updates and bug reports.	TCL 由 TCraft 團隊開發與維護。\n提供遊戲與模組、整合包、資源包、光影的下載與管理，支援原版、Forge / NeoForge / Fabric / OptiFine / LiteLoader。\n同時提供登入、啟動、聯機、執行個體與整合包匯出等功能。\n加入 TCraft Launcher 啟動器交流群（群號 1131373915）：https://qm.qq.com/q/UONlv4VgwE，獲取更新、回饋問題。	
@@ -35,7 +35,6 @@ TCL 由 TCraft 团队开发与维护。	TCL is developed and maintained by the T
 按内置顺序尝试所有可用节点，最稳妥。	Try all available nodes in the built-in order; the safest option.	按內建順序嘗試所有可用節點，最穩妥。	
 首次下载时并行测速各节点，记录最快的一条，之后直接沿用，不再反复测速。	On the first download, all nodes are speed-tested in parallel; the fastest is remembered and reused without re-testing.	首次下載時並行測速各節點，記錄最快的一條，之後直接沿用，不再反覆測速。	
 手动指定一个下载节点，不自动测速。	Manually pick a download node; no automatic speed test.	手動指定一個下載節點，不自動測速。	
-「指定节点」模式使用。列出常用的 GitHub 加速镜像，节点来自 github.qqday.com 的实测速度榜。	Used in the Specify Node mode. Lists common GitHub mirror accelerators; the nodes come from the github.qqday.com measured speed board.	「指定節點」模式使用。列出常用的 GitHub 加速鏡像，節點來自 github.qqday.com 的實測速度榜。	
 「自动选择最快节点」会在首次下载联机核心时并行测速各节点，记下最快的一条，之后直接沿用。无论哪种方式，下载都是多线程进行，并且保留其余节点作为备用，因此单个节点失效也不会中断下载。	Auto (fastest node) speed-tests all nodes in parallel on the first multiplayer-core download, remembers the winner and reuses it. Either way, downloads are multithreaded with the other nodes kept as fallbacks, so a single node going down won't stop a download.	「自動選擇最快節點」會在首次下載聯機核心時並行測速各節點，記下最快的一條，之後直接沿用。無論哪種方式，下載都是多執行緒進行，並保留其餘節點作為備用，因此單一節點失效也不會中斷下載。	
 Java	Java	Java	
 个性化	Personalization	個性化	
@@ -288,7 +287,6 @@ Mod 文件夹	Mod Folder	Mod 資料夾
 主题化	Themed	主題化	
 文本	Text	文字	
 选择	Select	選擇	
-联机基于 EasyTier 虚拟局域网（与陶瓦联机同一方案），房间内只有 Minecraft 的流量会被转发。\n需要以管理员身份运行 TCL 才能创建虚拟网卡；房主在单人游戏中「对局域网开放」后即可创建房间。	Multiplayer uses an EasyTier virtual LAN (same scheme as Taowa LAN). Only Minecraft traffic is forwarded within a room.\nRun TCL as administrator to create the virtual NIC; the host opens "For LAN Play" in single-player, then creates a room.	聯機基於 EasyTier 虛擬區域網路（與陶瓦聯機同一方案），房間內只有 Minecraft 的流量會被轉發。\n需要以管理員身份運行 TCL 才能建立虛擬網卡；房主在單人遊戲中「對區域網路開放」後即可建立房間。	
 鸡蛋	Egg	雞蛋	
 基于地图	Map-based	基於地圖	
 曜光彩	Prism Color	曜光彩	
@@ -507,7 +505,7 @@ Yggdrasil API 认证服务器的完整地址	Full address of the Yggdrasil API a
 服主后台	Server Admin Panel	服主後台	
 刷新披风列表	Refresh Cape List	重新整理披風清單	
 打开存档文件夹	Open Save Folder	開啟存檔資料夾	
-分启动、联机、Java、个性化、系统几类，覆盖下载目录、内存分配、代理、界面主题与语言。界面语言支持简体中文、English、繁體中文、文言文，也可以自动跟随系统语言。	Settings are organized into Launch, Multiplayer, Java, Personalization, and System categories, covering download directory, memory allocation, proxy, theme, and language. The UI language supports Simplified Chinese, English, Traditional Chinese, and Classical Chinese, and can also follow the system language.	設定分為啟動、聯機、Java、個人化、系統幾類，涵蓋下載目錄、記憶體分配、代理、介面主題與語言。介面語言支援簡體中文、English、繁體中文、文言文，也可以自動跟隨系統語言。	
+分启动、联机、Java、个性化、系统几类，覆盖下载目录、内存分配、代理、界面主题与语言。界面语言支持简体中文、English、繁體中文，也可以自动跟随系统语言。	Settings are organized into Launch, Multiplayer, Java, Personalization, and System categories, covering download directory, memory allocation, proxy, theme, and language. The UI language supports Simplified Chinese, English, and Traditional Chinese, and can also follow the system language.	設定分為啟動、聯機、Java、個人化、系統幾類，涵蓋下載目錄、記憶體分配、代理、介面主題與語言。介面語言支援簡體中文、English、繁體中文，也可以自動跟隨系統語言。	
 录像回放	Replay	錄影回放	
 Minecraft 芝士站（作者：awaEric233）	Minecraft Cheese Site (by awaEric233)	Minecraft 芝士站（作者：awaEric233）	
 Minecraft 新闻（作者：最亮的信标）	Minecraft News (by 最亮的信标)	Minecraft 新聞（作者：最亮的信標）	
@@ -831,7 +829,7 @@ LegacyFix 用于修复 2013 年 6 月 25 日以前的远古版本（Beta / 早�
 皮肤与披风	Skin & cape	皮膚與披風	
 修改信息	Edit info	修改資訊	
 更改密码	Change password	更改密碼	
-描述文本。	Description.	描述文本。	
+描述文本。	Description.	描述文字。	
 服务器 IP（点击复制）	Server IP (click to copy)	伺服器 IP（點擊複製）	
 当安装新版本时，据此自动设置新版本的隔离选项。\n若想调整已有版本的隔离策略，请前往它的版本设置。	When a new version is installed, its isolation option is set automatically based on this.\nTo adjust an existing version's isolation, go to its version settings.	當安裝新版本時，據此自動設定新版本的隔離選項。\n若想調整已有版本的隔離策略，請前往它的版本設定。	
 所有版本均使用同一档案，存档、Mod、资源包等均为公用。\n若存在多个安装了 Mod 的版本，可能会导致 Mod 冲突。	All versions share one set of files; saves, Mods, resource packs etc. are all shared.\nIf several versions have Mods installed, conflicts may occur.	所有版本均使用同一檔案，存檔、Mod、資源包等均為公用。\n若存在多個安裝了 Mod 的版本，可能會導致 Mod 衝突。	
@@ -879,7 +877,7 @@ TCL 的所有网络请求（下载、登录、API）均不经过代理	All of TC
 在 Minecraft 正式版更新时弹窗提示	Pop up a notice when a Minecraft release version updates	在 Minecraft 正式版更新時彈窗提示	
 在 Minecraft 测试版（快照、预发布版）更新时弹窗提示	Pop up a notice when a Minecraft test version (snapshot, pre-release) updates	在 Minecraft 測試版（快照、預發布版）更新時彈窗提示	
 取消勾选后，启动游戏达到一定次数时会弹窗建议你支持正版。\n勾选后不再提示（登录一次正版账号也会自动停止提示）。	Untick and a prompt to support premium appears after a certain number of launches.\nTicking stops the prompts (logging in once with a premium account also stops them automatically).	取消勾選後，啟動遊戲達到一定次數時會彈窗建議你支援正版。\n勾選後不再提示（登入一次正版帳號也會自動停止提示）。	
-设置界面语言与部分日期、数字等文化相关显示。\n「自动识别」按系统当前语言就近选择简中 / 繁中 / 英文。\n「文言文」为一种文风选项，采用半文半白、雅致工整的表达。	Sets the interface language and some culture-dependent displays (dates, numbers, etc.).\n“自动识别” picks 简中 / 繁中 / English closest to the current system language.\n“文言文” is a style option using refined, elegant semi-classical expression.	設定介面語言與部分日期、數字等文化相關顯示。\n「自動識別」按系統當前語言就近選擇簡中 / 繁中 / 英文。\n「文言文」為一種文風選項，採用半文半白、雅致工整的表達。	
+设置界面语言与部分日期、数字等文化相关显示。\n「自动识别」按系统当前语言就近选择简中 / 繁中 / 英文。	Sets the interface language and some culture-dependent displays (dates, numbers, etc.).\n“自动识别” picks 简中 / 繁中 / English closest to the current system language.	設定介面語言與部分日期、數字等文化相關顯示。\n「自動識別」按系統當前語言就近選擇簡中 / 繁中 / 英文。	
 显示包括启动器功能调查、活动等在内的全部公告	Show all announcements, including launcher feature surveys, events, etc.	顯示包括啟動器功能調查、活動等在內的全部公告	
 TCL 的下载、皮肤等缓存文件的存储位置。\n不推荐路径中带有空格。\n留空即为默认值，重启 TCL 后生效。	Where TCL stores its cache files for downloads, skins, etc.\nPaths with spaces are not recommended.\nLeave blank for the default; takes effect after restarting TCL.	TCL 的下載、皮膚等快取檔案的儲存位置。\n不推薦路徑中帶有空間。\n留空即為預設值，重啟 TCL 後生效。	
 在下载时不直接复制其他 MC 文件夹中已经存在的相同文件，而是重新下载文件。\n只建议在测试下载速度时开启。	During downloads, don't copy identical files that already exist in other MC folders — re-download them instead.\nOnly recommended when testing download speed.	在下載時不直接複製其他 MC 資料夾中已經存在的相同檔案，而是重新下載檔案。\n只建議在測試下載速度時開啟。	
@@ -982,7 +980,6 @@ ZGC / 分代 ZGC 内存占用更高但回收时不卡顿；G1GC 占用更低但�
 翻译文件	Translation file	翻譯檔案	
 重载	Reload	重新整理	
 打开文件	Open file	開啟檔案	
-CurseForge 的 API 需要密钥才能查询世界 / 模组 / 整合包列表，缺失时这些列表会为空。\n在 https://console.curseforge.com/ 的 API 标签页生成后填入，保存后重启 TCL 生效。\n留空则回退到环境变量 TCL_CURSEFORGE_API_KEY。	The CurseForge API needs a key to query the Worlds / Mods / Modpacks lists; without one these lists stay empty.\nGenerate it on the API tab at https://console.curseforge.com/, paste it here, and restart TCL after saving.\nLeave it blank to fall back to the TCL_CURSEFORGE_API_KEY environment variable.	CurseForge 的 API 需要金鑰才能查詢世界／模組／整合包清單，缺失時這些清單會為空。\n在 https://console.curseforge.com/ 的 API 標籤頁產生後填入，儲存後重啟 TCL 生效。\n留空則回退到環境變數 TCL_CURSEFORGE_API_KEY。	
 仅在 自定义代理 模式下使用。\n支持 127.0.0.1:1080 或 http://127.0.0.1:1080 两种格式。	Used only in the Custom proxy mode.\nAccepts either 127.0.0.1:1080 or http://127.0.0.1:1080.	僅在 自訂代理 模式下使用。\n支援 127.0.0.1:1080 或 http://127.0.0.1:1080 兩種格式。	
 把当前全部译文（内置 + 已自定义）写入 i18n.json。	Write all current translations (built-in + your custom ones) to i18n.json.	把目前全部譯文（內建 + 已自訂）寫入 i18n.json。	
 重新读取 i18n.json 并即时套用到界面（无需重启）。	Re-read i18n.json and apply it to the UI immediately (no restart needed).	重新讀取 i18n.json 並即時套用到介面（無需重啟）。	
@@ -1298,9 +1295,9 @@ UI 的示例下载任务	Sample download task for the UI	UI 的示例下載任�
 正在尝试更换，请稍候！	Switching, please wait!	正在嘗試更換，請稍候！	
 登录失败，无法更改披风！	Login failed; cannot change cape!	登入失敗，無法變更披風！	
 没有可以播放的音乐！	No music available to play!	沒有可以播放的音樂！	
-正在刷新……	Refreshing…	正在刷新……	
+正在刷新……	Refreshing…	正在重新整理……	
 正在重新登录，将在登录后自动更改皮肤……	Re-logging in; the skin will change automatically after login…	正在重新登入，登入後將自動變更皮膚……	
-已刷新！	Refreshed!	已刷新！	
+已刷新！	Refreshed!	已重新整理！	
 存档导入成功！	Save imported!	存檔匯入成功！	
 已存在同名存档！	A save with the same name already exists!	已存在同名存檔！	
 该 Java 存在异常，无法使用	This Java has an issue and cannot be used	該 Java 存在異常，無法使用	
@@ -1427,7 +1424,6 @@ TCL 无法访问缓存文件夹，可能导致程序出错或无法正常使用�
 即将把第三方登录设置覆盖为 LittleSkin 登录。	About to overwrite the third-party login setting with LittleSkin login. 	即將把第三方登入設定覆蓋為 LittleSkin 登入。	
 检测到错误的日志编码：	Detected a wrong log encoding: 	偵測到錯誤的日誌編碼：	
 可能由于浏览器未正确配置，TCL 无法为你打开网页。	TCL may be unable to open the web page because the browser is not configured correctly. 	可能由於瀏覽器未正確配置，TCL 無法為你開啟網頁。	
-联机需要用 EasyTier 创建虚拟网卡，这需要管理员权限。	Multiplayer uses EasyTier to create a virtual network card, which needs administrator rights. 	聯機需要用 EasyTier 建立虛擬網卡，這需要管理員權限。	
 联网获取部分文件信息失败，是否继续导出？	Fetching some file info online failed; continue exporting? 	聯網取得部分檔案資訊失敗，是否繼續匯出？	
 联网获取文件信息失败，是否继续导出？	Fetching file info online failed; continue exporting? 	聯網取得檔案資訊失敗，是否繼續匯出？	
 某项 Mod 缺少必要信息，已跳过：	A Mod is missing required information and was skipped: 	某項 Mod 缺少必要資訊，已略過：	
@@ -1713,7 +1709,6 @@ $微软登录未配置 ClientId，无法完成登录。	$Microsoft login has no 
 $登录失败，以下为可能的原因：	$Sign-in failed. Possible reasons:	$登入失敗，以下為可能的原因：	
 $登录失败：	$Sign-in failed: 	$登入失敗：	
 $登录失败：你的网络环境不佳，导致难以连接到海外服务器。	$Sign-in failed: your network is poor, making it hard to reach overseas servers.	$登入失敗：你的網路環境不佳，導致難以連線到海外伺服器。	
-$联机需要管理员权限来创建虚拟网卡。	$Multiplayer needs administrator rights to create a virtual network adapter.	$連線需要管理員權限來建立虛擬網路卡。	
 %）	%)	%）	
 Cleanroom 官方源版本列表解析失败（	Failed to parse the Cleanroom official version list (	Cleanroom 官方源版本清單解析失敗（	
 DPI：	DPI: 	DPI：	
@@ -1806,7 +1801,6 @@ versions）	versions)	versions）
 无法连接到第三方登录服务器（	Cannot reach the third-party login server (	無法連線到第三方登入伺服器（	
 是受保护位置的上级目录：	 is the parent of a protected location: 	是受保護位置的上級目錄：	
 是受保护的系统或用户位置：	 is a protected system or user location: 	是受保護的系統或使用者位置：	
-是否以管理员身份重新启动 TCL？	Restart TCL as administrator?	是否以管理員身份重新啟動 TCL？	
 是否要初始化 Java 页面的所有设置？该操作不可撤销。	Reset all settings on the Java page? This cannot be undone.	是否要初始化 Java 頁面的所有設定？該操作不可復原。	
 是否要初始化 个性化 页面的所有设置？该操作不可撤销。	Reset all settings on the Personalization page? This cannot be undone.	是否要初始化 個人化 頁面的所有設定？該操作不可復原。	
 更新于：	Updated: 	更新於：	
@@ -1892,13 +1886,6 @@ TCL 没有对当前文件夹的权限（	TCL does not have permission for the cu
 TCL 所在路径：	TCL is located at: 	TCL 所在路徑：	
 获取失败	(unavailable)	（取得失敗）	
 TCL 初始化错误	TCL Initialization Error	TCL 初始化錯誤	
-检测到电脑缺少 .NET Framework 4.8 运行库！	The .NET Framework 4.8 runtime is missing on this computer!	偵測到電腦缺少 .NET Framework 4.8 執行庫！	
-TCL 急救版可以自动下载并安装 .NET Framework 4.8。	TCL Rescue can automatically download and install .NET Framework 4.8.	TCL 急救版可以自動下載並安裝 .NET Framework 4.8。	
-点击 [是] 将自动下载官方安装包并启动安装，期间可能弹出 UAC 确认框。	Click [Yes] to download the official installer and start the installation; a UAC prompt may appear.	點擊 [是] 將自動下載官方安裝包並啟動安裝，期間可能彈出 UAC 確認框。	
-点击 [否] 则改为打开下载页，由你手动下载安装。	Click [No] to open the download page and install it manually instead.	點擊 [否] 則改為開啟下載頁，由你手動下載安裝。	
-缺少 .NET Framework 4.8	.NET Framework 4.8 is missing	缺少 .NET Framework 4.8	
-你的 .NET Framework 版本过低或损坏，请下载并重新安装 .NET Framework 4.8！	Your .NET Framework is outdated or corrupted. Please download and reinstall .NET Framework 4.8!	你的 .NET Framework 版本過低或損壞，請下載並重新安裝 .NET Framework 4.8！	
-若安装失败，可以先卸载高版本的 .NET Framework 然后再试。	If installation fails, uninstall the newer .NET Framework first and try again.	若安裝失敗，可以先解除安裝高版本的 .NET Framework 然後再試。	
 缓存文件夹不可用	Cache folder unavailable	快取資料夾不可用	
 需要解压！	Extraction required!	需要解壓縮！	
 环境警告	Environment Warning	環境警告	
@@ -2172,14 +2159,14 @@ ZGC / 分代 ZGC 内存占用更高但回收时不卡顿；G1GC 占用更低但�
 安装加载器	Install loader	安裝加載器	
 搜索光影包	Search shader packs	搜尋光影包	
 正版皮肤与披风	Premium skin & cape	正版皮膚與披風	
-这里是当前正版账户的皮肤预览。修改后会自动刷新头像与标题栏徽章。	Preview of the current premium account's skin. Changes refresh the avatar and title-bar badge automatically.	這裏是當前正版賬戶的皮膚預覽。修改後會自動刷新頭像與標題欄徽章。	
+这里是当前正版账户的皮肤预览。修改后会自动刷新头像与标题栏徽章。	Preview of the current premium account's skin. Changes refresh the avatar and title-bar badge automatically.	這裡是當前正版賬戶的皮膚預覽。修改後會自動刷新頭像與標題欄徽章。	
 兑换 CDKEY	Redeem CDKEY	兌換 CDKEY	
 官网管理	Manage on website	官網管理	
 TCraft Launcher 1.2 由 TCraft 团队开发与维护，并已在 GitHub 开源。\n提供游戏与模组、整合包、资源包、光影的下载与管理，支持原版、Forge / NeoForge / Fabric / OptiFine / LiteLoader。\n同时提供登录、启动、联机、实例与整合包导出等功能。\n加入 TCraft Launcher 启动器交流群（群号 1131373915）：https://qm.qq.com/q/UONlv4VgwE，获取更新、反馈问题。	TCraft Launcher 1.2 is developed and maintained by the TCraft team, open-sourced on GitHub.\nIt downloads and manages games, mods, modpacks, resource packs and shaders, supporting vanilla, Forge / NeoForge / Fabric / OptiFine / LiteLoader.\nLogin, launching, multiplayer, instance and modpack export are all on board.\nJoin TCraft Launcher group (QQ 1131373915): https://qm.qq.com/q/UONlv4VgwE for updates and feedback.	TCraft Launcher 1.2 由 TCraft 團隊開發與維護，並已在 GitHub 開源。\n提供遊戲與模組、整合包、資源包、光影的下載與管理，支持原版、Forge / NeoForge / Fabric / OptiFine / LiteLoader。\n同時提供登錄、啟動、聯機、實例與整合包導出等功能。\n加入 TCraft Launcher 啟動器交流群（群號 1131373915），獲取更新、反饋問題。	
 参考与致谢	Credits & acknowledgements	參考與致謝	
 开源地址	Source code	開源地址	
 https://github.com/Damianjiang/TCraft-Launcher\n欢迎提交 Issue 与 Pull Request，也欢迎 Star 支持。	https://github.com/Damianjiang/TCraft-Launcher\nIssues and pull requests are welcome — stars help too.	https://github.com/Damianjiang/TCraft-Launcher\n歡迎提交 Issue 與 Pull Request，也歡迎 Star 支持。	
-控制不同版本的存档 / Mod / 资源包是否互通。关闭＝全部共用同一档案（多个装了 Mod 的版本可能互相冲突）；隔离可装 Mod 的版本＝Mod 版独立、原版共用（最常用）；隔离所有版本＝完全独立（连原版存档都不能共用，一般不推荐）。它只影响之后新装的版本，已装版本请到顶部「实例」页 → 选中该实例 → 左侧「设置」里单独调整。	Controls whether saves / mods / resource packs are shared across versions. Off = everything shared (modded versions may conflict); isolate moddable = modded isolated, vanilla shared (most common); isolate all = fully independent (even vanilla saves are not shared — usually not recommended). Only affects newly installed versions; adjust existing ones via the top "Instances" page → select the instance → "Settings" on the left.	控制不同版本的存檔 / Mod / 資源包是否互通。關閉＝全部共用同一檔案（多個裝了 Mod 的版本可能互相沖突）；隔離可裝 Mod 的版本＝Mod 版獨立、原版共用（最常用）；隔離所有版本＝完全獨立（連原版存檔都不能共用，一般不推薦）。它隻影響之後新裝的版本，已裝版本請到頂部「實例」頁 → 選中該實例 → 左側「設置」裏單獨調整。	
+控制不同版本的存档 / Mod / 资源包是否互通。关闭＝全部共用同一档案（多个装了 Mod 的版本可能互相冲突）；隔离可装 Mod 的版本＝Mod 版独立、原版共用（最常用）；隔离所有版本＝完全独立（连原版存档都不能共用，一般不推荐）。它只影响之后新装的版本，已装版本请到顶部「实例」页 → 选中该实例 → 左侧「设置」里单独调整。	Controls whether saves / mods / resource packs are shared across versions. Off = everything shared (modded versions may conflict); isolate moddable = modded isolated, vanilla shared (most common); isolate all = fully independent (even vanilla saves are not shared — usually not recommended). Only affects newly installed versions; adjust existing ones via the top "Instances" page → select the instance → "Settings" on the left.	控制不同版本的存檔 / Mod / 資源包是否互通。關閉＝全部共用同一檔案（多個裝了 Mod 的版本可能互相衝突）；隔離可裝 Mod 的版本＝Mod 版獨立、原版共用（最常用）；隔離所有版本＝完全獨立（連原版存檔都不能共用，一般不推薦）。它只影響之後新裝的版本，已裝版本請到頂部「實例」頁 → 選中該實例 → 左側「設置」裏單獨調整。	
 启动时 TCL 自动选列表里第一个兼容当前版本的 Java；点右侧箭头可排序控制优先级。要强制无视兼容性用某个 Java，请到顶部「实例」页 → 选中该实例 → 左侧「设置」里改。	On launch TCL picks the first Java compatible with the version; use the arrows to change priority. To force a specific Java regardless of compatibility, go to the top "Instances" page → select the instance → "Settings" on the left.	啟動時 TCL 自動選列表裏第一個兼容當前版本的 Java；點右側箭頭可排序控制優先級。要強制無視兼容性用某個 Java，請到頂部「實例」頁 → 選中該實例 → 左側「設置」裏改。	
 进顶部「实例」页选该实例，点左侧「导出」，把生成的文件发给对方，对方在「下载 → 整合包」里导入即可还原全套。	Open the top "Instances" page, select the instance, click "Export" on the left and send the generated file; the other side imports it in "Downloads → Modpacks" to restore everything.	進頂部「實例」頁選該實例，點左側「導出」，把生成的文件發給對方，對方在「下載 → 整合包」裏導入即可還原全套。	
 存储与清理	Storage & cleanup	存儲與清理	
@@ -2226,13 +2213,10 @@ SOCKS5 代理	SOCKS5 proxy	SOCKS5 代理
 弹出菜单	Popup menus	彈出菜單	
 启用弹出菜单动画效果	Enable popup menu animation	啟用彈出菜單動畫效果	
 弹出菜单不透明度	Popup menu opacity	彈出菜單不透明度	
-说明：弹出菜单卡片独立于「组件半透明」——组件半透明作用于全局卡片，这里只调右键菜单与弹卡。	Note: popup menu opacity is separate from "component opacity" — the latter affects all cards, this one only right-click menus and pop-ups.	說明：彈出菜單卡片獨立於「組件半透明」——組件半透明作用於全局卡片，這裏只調右鍵菜單與彈卡。	
+说明：弹出菜单卡片独立于「组件半透明」——组件半透明作用于全局卡片，这里只调右键菜单与弹卡。	Note: popup menu opacity is separate from "component opacity" — the latter affects all cards, this one only right-click menus and pop-ups.	說明：彈出菜單卡片獨立於「組件半透明」——組件半透明作用於全局卡片，這裡只調右鍵菜單與彈卡。	
 列表按钮	List buttons	列表按鈕	
 所有列表的操作按钮常驻显示	Always show action buttons in lists	所有列表的操作按鈕常駐顯示	
 说明：开启后按钮会一直占住右侧空间，列表标题可显示的宽度会略微变窄。	When on, buttons permanently occupy the right side, slightly narrowing the title area.	說明：開啟後按鈕會一直佔住右側空間，列表標題可顯示的寬度會略微變窄。	
-检测到 Windows 7 尚未安装 Service Pack 1！	Service Pack 1 is missing on this Windows 7!	檢測到 Windows 7 尚未安裝 Service Pack 1！	
-TCraft Launcher 需要 Windows 7 SP1 及更高版本（同时要求 64 位系统与 .NET Framework 4.8）。	TCraft Launcher requires Windows 7 SP1 or later (64-bit and .NET Framework 4.8 as well).	TCraft Launcher 需要 Windows 7 SP1 及更高版本（同時要求 64 位系統與 .NET Framework 4.8）。	
-请先通过 Windows Update 或微软官网安装 SP1，然后再运行本程序。	Install SP1 via Windows Update or microsoft.com, then run this program again.	請先通過 Windows Update 或微軟官網安裝 SP1，然後再運行本程序。	
 上次启动器可能异常退出（如断电、强制结束进程或崩溃）。	The launcher may have exited abnormally last time (power loss, forced kill or crash).	上次啟動器可能異常退出（如斷電、強制結束進程或崩潰）。	
 如果游戏或启动器出现问题，可以打开日志查看原因。	If the game or launcher misbehaves, open the logs to find out why.	如果遊戲或啟動器出現問題，可以打開日誌查看原因。	
 异常退出提示	Abnormal exit notice	異常退出提示	
@@ -2388,7 +2372,7 @@ Mojang 官方	Mojang official	Mojang 官方
 证据（日志原文）：	Evidence (log excerpts): 	證據（日誌原文）：	
 全部内容	Full content	全部內容	
 世界：	World: 	世界：	
-还没有记录。启动一次游戏后，这里会显示本次会话的开始时间、时长与退出结果。	No records yet. After a launch, this shows the session's start time, duration and exit result.	還沒有記錄。啟動一次遊戲後，這裏會顯示本次會話的開始時間、時長與退出結果。	
+还没有记录。启动一次游戏后，这里会显示本次会话的开始时间、时长与退出结果。	No records yet. After a launch, this shows the session's start time, duration and exit result.	還沒有記錄。啟動一次遊戲後，這裡會顯示本次會話的開始時間、時長與退出結果。	
 次会话，累计	 sessions, totaling 	次會話，累計	
 ；最近 50 次显示在下方，点一行查看对应日志。	; the last 50 are listed below — click a row to open its log.	；最近 50 次顯示在下方，點一行查看對應日誌。	
 · 时长	· Duration 	· 時長	
@@ -2485,7 +2469,7 @@ options.txt 存在，但没有包含可编辑的常用选项。可以在游戏�
 已套用预设「	Applied preset "	已套用預設「	
 」，共	", 	」，共	
 项。记得点「保存修改」写入 options.txt。	 items in total. Remember to click "Save changes" to write options.txt.	項。記得點「保存修改」寫入 options.txt。	
-还没有游玩记录。启动一次游戏后，这里会显示最近三次的开始时间与时长。	No play records yet. After a launch, the three most recent sessions with start time and duration show here.	還沒有遊玩記錄。啟動一次遊戲後，這裏會顯示最近三次的開始時間與時長。	
+还没有游玩记录。启动一次游戏后，这里会显示最近三次的开始时间与时长。	No play records yet. After a launch, the three most recent sessions with start time and duration show here.	還沒有遊玩記錄。啟動一次遊戲後，這裡會顯示最近三次的開始時間與時長。	
 占用空间：	Disk usage: 	佔用空間：	
 当前没有由本启动器启动的游戏进程。	No game process launched by this launcher is running.	當前沒有由本啟動器啟動的遊戲進程。	
 确定要结束正在运行的游戏吗？未保存的游戏进度会丢失。	End the running game? Unsaved progress will be lost.	確定要結束正在運行的遊戲嗎？未保存的遊戲進度會丟失。	
@@ -2509,7 +2493,7 @@ options.txt 存在，但没有包含可编辑的常用选项。可以在游戏�
 批量修改失败：	Bulk change failed: 	批量修改失敗：	
 已禁用：	Disabled: 	已禁用：	
 已批量启用	Enabled 	已批量啟用	
-已批量禁用	Disabled 	已批量禁用	
+已批量禁用	Disabled 	已批次禁用	
 个 Mod！	 mods!	個 Mod！	
 已安装	Installed 	已安裝	
 已成功更新	Updated 	已成功更新	
@@ -2617,7 +2601,7 @@ options.txt 存在，但没有包含可编辑的常用选项。可以在游戏�
 无法识别该实例的原版版本，请直接从 下载 → 安装 页安装。	Cannot detect this instance's vanilla version — install from Downloads → Install instead.	無法識別該實例的原版版本，請直接從 下載 → 安裝 頁安裝。	
 已在安装页预选版本	Version preselected on the install page	已在安裝頁預選版本	
 ，请选择要安装的加载器。	 — choose the loader to install.	，請選擇要安裝的加載器。	
-当前实例没有检测到光影加载器。光影需要 Iris 或 OptiFine，先安装其中一个再来这里。	No shader loader detected in this instance. Shaders need Iris or OptiFine — install one first.	當前實例沒有檢測到光影加載器。光影需要 Iris 或 OptiFine，先安裝其中一個再來這裏。	
+当前实例没有检测到光影加载器。光影需要 Iris 或 OptiFine，先安装其中一个再来这里。	No shader loader detected in this instance. Shaders need Iris or OptiFine — install one first.	當前實例沒有檢測到光影加載器。光影需要 Iris 或 OptiFine，先安裝其中一個再來這裡。	
 去下载光影加载器	Get a shader loader	去下載光影加載器	
 重新检测	Re-detect	重新檢測	
 取消当前光影	Clear current shader	取消當前光影	
@@ -2672,7 +2656,6 @@ options.txt 存在，但没有包含可编辑的常用选项。可以在游戏�
 64 位（x64）	64-bit (x64)	64 位元（x64）	
 搜索初始化失败，请查看日志	Search initialization failed — see the logs	搜尋初始化失敗，請查看日誌	
 行 · 实时监听中	 lines · watching live	行 · 實時監聽中	
-当前 .NET Framework 版本对 SOCKS5 支持有限，建议使用 HTTP 代理或系统代理（可用 Clash / v2rayN 的 HTTP 端口）。	.NET Framework has limited SOCKS5 support; prefer an HTTP proxy or the system proxy (e.g. the HTTP port of Clash / v2rayN).	當前 .NET Framework 版本對 SOCKS5 支持有限，建議使用 HTTP 代理或系統代理（可用 Clash / v2rayN 的 HTTP 端口）。	
 请填写代理工具的 HTTP 端口，例如 Clash 默认的 7890。	Enter your proxy tool's HTTP port, e.g. Clash's default 7890.	請填寫代理工具的 HTTP 端口，例如 Clash 默認的 7890。	
 请先选择代理模式	Select a proxy mode first	請先選擇代理模式	
 请填写代理主机地址	Enter the proxy host address	請填寫代理主機地址	
@@ -3441,7 +3424,7 @@ Mixin 注入失败	Mixin injection failed	Mixin 注入失敗
 安装厂商驱动，不要用系统自带的基础驱动。	Install the vendor driver, not the generic one Windows ships.	安裝廠商驅動，不要用系統內建的基礎驅動。	
 安装游戏版本 	Install game version 	安裝遊戲版本 	
 完整堆栈已写入：\n	Full stack trace written to:\n	完整堆疊已寫入：\n	
-官方优先（下载时按实测速度择优）	Official first (fastest measured source wins)	官方優先（下載時按實測速度擇優）	
+官方优先（下载时按测速结果择优）	Official first (fastest measured source wins)	官方優先（下載時按測速結果擇優）	
 官方源 (piston-meta.mojang.com)	Official source (piston-meta.mojang.com)	官方來源 (piston-meta.mojang.com)	
 实例名称（必填）	Instance name (required)	實例名稱（必填）	
 导入完成后会在实例列表中生成一个新的实例。	The import adds a new instance to the list.	匯入完成後會在實例清單中產生一個新的實例。	
@@ -3582,7 +3565,7 @@ Mixin 注入失败	Mixin injection failed	Mixin 注入失敗
 连接超时	Connection timed out	連線逾時	
 选项预设	Options presets	選項預設	
 错误信息已复制到剪贴板，可直接粘贴到群内。\n	Error copied to the clipboard; paste it straight into the group.\n	錯誤資訊已複製到剪貼簿，可直接貼到群內。\n	
-镜像优先（下载时按实测速度择优）	Mirror first (fastest measured source wins)	鏡像優先（下載時按實測速度擇優）	
+镜像优先（下载时按测速结果择优）	Mirror first (fastest measured source wins)	鏡像優先（下載時按測速結果擇優）	
 隐藏主题已全部解锁。	All hidden themes unlocked.	隱藏主題已全部解鎖。	
 隐藏主题每累计启动 	Hidden theme every 	隱藏主題每累計啟動 	
 青色	Cyan	青色	
@@ -3601,12 +3584,10 @@ Mixin 注入失败	Mixin injection failed	Mixin 注入失敗
 ，请在「设置 → 启动设置」中切换 Java	"; switch Java in Settings → Launch settings	，請在「設定 → 啟動設定」中切換 Java	
 ：可能的原因是网络环境不佳、房主已关闭房间或邀请码输错。	: bad network, a closed room, or a wrong invite code.	：可能的原因是網路環境不佳、房主已關閉房間或邀請碼輸入錯誤。	
 ；另有以下前置无法自动解析，需要手动下载：	"; these prerequisites can't be resolved automatically and need manual downloads:	；另有以下前置無法自動解析，需要手動下載：	
-这个版本没有内置微软登录凭据，开源版去掉了正版登录。要用正版登录，请自行构建完整版并注入自己的 client id，构建说明见 BUILD.md。	This build ships without a Microsoft client ID - the open-source edition removes Microsoft sign-in. To use it, build the full edition with your own client ID; see BUILD.md.	這個版本沒有內建微軟登入憑據，開源版去掉了正版登入。要用正版登入，請自行建置完整版並注入自己的 client id，建置說明見 BUILD.md。	
 TCraft Launcher 是用 JavaFX 写的开源 Minecraft 启动器，支持微软正版登录、EasyTier 联机，以及游戏、Mod、整合包与资源包的下载管理。	TCraft Launcher is an open-source Minecraft launcher written in JavaFX, with Microsoft account login, EasyTier multiplayer, and downloads for games, mods, modpacks and resource packs.	TCraft Launcher 是用 JavaFX 寫的開源 Minecraft 啟動器，支援微軟正版登入、EasyTier 聯機，以及遊戲、Mod、整合包與資源包的下載管理。	
 欢迎提交 Issue 与 Pull Request，也欢迎 Star 支持。	Issues and pull requests are welcome — stars help too.	歡迎提交 Issue 與 Pull Request，也歡迎 Star 支持。	
 打开 GitHub 仓库	Open GitHub repository	開啟 GitHub 倉庫	
 群号 1131373915 · 获取更新、反馈问题	Group 1131373915 · updates and feedback	群號 1131373915 · 獲取更新、回饋問題	
-这个版本没有内置微软登录凭据，开源版去掉了正版登录。要用正版登录，请自行构建完整版并注入自己的 client id，构建说明见 docs/构建与发布.md。	This build has no bundled Microsoft login credentials; the open-source edition drops premium login. To use premium login, build the full edition yourself and inject your own client id — see docs/构建与发布.md.	這個版本沒有內建微軟登入憑證，開源版去掉了正版登入。要用正版登入，請自行建置完整版並注入自己的 client id，建置說明見 docs/构建与发布.md。	
 点「打开登录页」在浏览器里登录。登录完浏览器会停在 login.live.com 的一个空白页，把地址栏整条链接复制到下面，点「完成登录」。	Click "Open login page" to sign in with your browser. When you are done, the browser stops on a blank login.live.com page — copy the whole address bar URL below and click "Finish login".	點「開啟登入頁」在瀏覽器裡登入。登入完瀏覽器會停在 login.live.com 的一個空白頁，把網址列整條連結複製到下面，點「完成登入」。	
 开启后每个版本用 versions/版本号 当游戏目录，mods、saves、config 各自独立；libraries 与 assets 仍然共用，不会重复占空间。	Each version then uses versions/<version> as its game directory, with its own mods, saves and config; libraries and assets stay shared, so nothing is duplicated.	開啟後每個版本用 versions/版本號 當遊戲目錄，mods、saves、config 各自獨立；libraries 與 assets 仍然共用，不會重複佔空間。	
 填自建或内网的 BMCLAPI 兼容镜像根（如 http://192.168.1.10:8080），版本清单 / 文件 / 资源 / 安装器会全部走这个根；适合 Win7 老电脑或公司内网环境。留空则用官方 + 内置 BMCLAPI。	Root of a self-hosted or intranet BMCLAPI-compatible mirror (e.g. http://192.168.1.10:8080). Version manifests, files, assets and installers all go through this root — handy for old Windows 7 machines or a company intranet. Leave empty to use the official source plus the built-in BMCLAPI.	填自建或內網的 BMCLAPI 相容鏡像根（如 http://192.168.1.10:8080），版本清單 / 檔案 / 資源 / 安裝器會全部走這個根；適合 Win7 舊電腦或公司內網環境。留空則用官方 + 內建 BMCLAPI。	
@@ -3923,7 +3904,7 @@ Java 已安装	Java installed	Java 已安裝
 禁用硬件加速（下次启动生效，远程桌面/老显卡可用）	Disable hardware acceleration (takes effect next launch; for remote desktop/old GPUs)	停用硬體加速（下次啟動生效，遠端桌面/舊顯卡可用）
 至少保留一个页面	Keep at least one page visible	至少保留一個頁面
 还原为默认	Restore defaults	還原為預設
-这个版本没有内置微软登录凭据，开源版去掉了正版登录。	This build has no embedded Microsoft credentials; the open-source edition removed official login.	這個版本沒有內建微軟登入憑據，開源版去掉了正版登入。
+这个版本没有内置微软登录凭据，开源版不含正版登录。	This build has no embedded Microsoft credentials; the open-source edition does not include official login.	這個版本沒有內建微軟登入憑據，開源版不含正版登入。
 重新加载字体	Reload fonts	重新載入字型
 准备中	Preparing	準備中
 智能	Smart	智慧
@@ -4083,7 +4064,7 @@ TCL/Videos 里没有可用视频，已切回图片背景。	No usable videos in 
 该实例要求第三方登录，请先切换为第三方账户。	This instance requires third-party login. Switch to a third-party account first.	該實例要求第三方登入，請先切換為第三方帳戶。	
 该实例不允许离线登录，请先切换为在线账户。	This instance does not allow offline login. Switch to an online account first.	該實例不允許離線登入，請先切換為線上帳戶。	
 且长度不超过 16 个字符。确定要继续吗？	and be at most 16 characters. Continue?	且長度不超過 16 個字元。確定要繼續嗎？	
-要用正版登录，请自行构建完整版并注入自己的 client id，构建说明见 docs/构建与发布.md。	To use premium login, build the full version yourself and inject your own client id. Build instructions: docs/构建与发布.md.	要用正版登入，請自行建置完整版並注入自己的 client id，建置說明見 docs/构建与发布.md。	
+要用正版登录，请自行构建完整版并注入自己的 client id，构建说明见 README。	To use premium login, build the full version yourself and inject your own client id. Build instructions: README.	要用正版登入，請自行建置完整版並注入自己的 client id，建置說明見 README。	
 授权后启动器会自动继续。	The launcher continues automatically after you authorize.	授權後啟動器會自動繼續。	
 NBT 嵌套过深	NBT nesting too deep	NBT 巢狀過深	
 NBT 字节数组长度异常：	Invalid NBT byte array length: 	NBT 位元組陣列長度異常：	
@@ -4243,3 +4224,6 @@ Mod文件	Mod file	Mod 檔案
 检查 JavaFX 运行库…	Checking the JavaFX runtime…	檢查 JavaFX 執行環境…	
 运行库检查完成	Runtime check complete	執行環境檢查完成	
 正在解压运行库…	Extracting the runtime…	正在解壓縮執行環境…	
+该收藏缺少 CurseForge 的数字 id，请取消收藏后重新收藏	This favorite is missing the numeric CurseForge ID. Remove it and favorite it again.	該收藏缺少 CurseForge 的數字 id，請取消收藏後重新收藏	
+已下载 %.1f MB	%.1f MB downloaded	已下載 %.1f MB	
+页面退出处理失败	Page exit handling failed	頁面退出處理失敗	

@@ -30,8 +30,6 @@ public final class Fetch {
         Files.createDirectories(target.toAbsolutePath().getParent());
 
         final String expect = sha1 == null || sha1.isEmpty() ? null : sha1.toLowerCase();
-        // 无哈希认不了旧 .part，直接重下
-        if (expect == null) Files.deleteIfExists(part);
         MessageDigest digest = expect == null ? null : sha1();
 
         String lockKey = part.toAbsolutePath().toString();
@@ -39,6 +37,8 @@ public final class Fetch {
         if (PART_LOCKS.putIfAbsent(lockKey, lock) != null) {
             throw new IOException(Lang.t("该文件已在下载中：") + target.getFileName());
         }
+        // 无哈希无法校验旧 .part，取锁后删除重下
+        if (expect == null) Files.deleteIfExists(part);
         IOException last = null;
         try {
             long done = 0;

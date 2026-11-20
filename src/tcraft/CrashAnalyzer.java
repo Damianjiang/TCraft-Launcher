@@ -50,17 +50,23 @@ public final class CrashAnalyzer {
         List<Hit> hits = new ArrayList<>();
         List<String> fallback = new ArrayList<>();
         if (lines == null) return new Result(hits, fallback);
-        for (String[] rule : RULES) {
-            String found = null;
-            for (String line : lines) {
-                if (line == null) continue;
-                if (line.toLowerCase(java.util.Locale.ROOT)
-                        .contains(rule[0].toLowerCase(java.util.Locale.ROOT))) {
-                    found = line.trim();
-                    break;
+        // 规则与行各只小写一次；命中按规则表顺序输出
+        String[] ruleLows = new String[RULES.length];
+        String[] ruleFound = new String[RULES.length];
+        for (int i = 0; i < RULES.length; i++) {
+            ruleLows[i] = RULES[i][0].toLowerCase(java.util.Locale.ROOT);
+        }
+        for (String line : lines) {
+            if (line == null) continue;
+            String low = line.toLowerCase(java.util.Locale.ROOT);
+            for (int i = 0; i < ruleLows.length; i++) {
+                if (ruleFound[i] == null && low.contains(ruleLows[i])) {
+                    ruleFound[i] = line.trim();
                 }
             }
-            if (found != null) hits.add(new Hit(rule[1], rule[2], found));
+        }
+        for (int i = 0; i < RULES.length; i++) {
+            if (ruleFound[i] != null) hits.add(new Hit(RULES[i][1], RULES[i][2], ruleFound[i]));
         }
         int count = 0;
         for (String line : lines) {
@@ -92,8 +98,9 @@ public final class CrashAnalyzer {
             Path latest = runDir.resolve("logs").resolve("latest.log");
             if (Files.isRegularFile(latest)) {
                 List<String> tail = tail(latest, maxLines);
+                java.util.Set<String> seen = new java.util.HashSet<>(lines);
                 for (String l : tail) {
-                    if (!lines.contains(l)) lines.add(l);
+                    if (seen.add(l)) lines.add(l);
                 }
             }
         }

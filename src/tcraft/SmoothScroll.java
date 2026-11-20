@@ -317,7 +317,7 @@ final class SmoothScroll {
         restartRestore();
     }
 
-    // 缓存里的节点特效被外部换掉/清掉就整批重扫，别拿旧集合挂起
+    // 节点特效被外部替换或清除时整批重扫
     private boolean staleCache() {
         for (EffectNode node : effectCache) {
             if (holdsNode(node.node)) continue; // 挂起中被我们置空的，不算失效
