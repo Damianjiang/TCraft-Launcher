@@ -117,6 +117,7 @@ public final class MainWindow {
     private int resizeEdge = 0;
     private double pressSceneX, pressSceneY, startW, startH, startX, startY;
     private double dragX, dragY;
+    private boolean titleDrag;
     // 缓存背景绘制，ImagePattern / GaussianBlur 新建起来都不便宜
     private Image bgPaintImage;
     private int bgPaintSuit = -1;
@@ -760,6 +761,7 @@ public final class MainWindow {
     }
 
     private boolean stageWasHidden;
+    private volatile boolean gameStopRequested;
 
     private Data.Instance insForCrash;
 
@@ -780,6 +782,7 @@ public final class MainWindow {
 
     public void onGameStarted(Process process) {
         gameProcess = process;
+        gameStopRequested = false;
         final Data.Instance crashIns = data.instance();
         insForCrash = crashIns;
         data.log("游戏进程已启动，PID " + process.pid());
@@ -825,10 +828,12 @@ public final class MainWindow {
                 if (stage.isIconified() && visibility == 4) stage.setIconified(false);
                 if (data.getBool("UiMusicStop", false)) Music.resumeAfterGame();
                 else if (data.getBool("UiMusicStart", false)) Music.pauseForGame();
+                boolean normalExit = exit == 0 || gameStopRequested;
+                gameStopRequested = false;
                 data.log("游戏进程已退出，返回码 " + exit);
                 // 数字拼进消息会让整串查表失败，前缀单独 Lang.t
-                toast(exit == 0 ? "游戏已退出" : "游戏异常退出", Lang.t("返回码 ") + exit, exit == 0 ? 0 : 2);
-                if (exit != 0 && data.crashAnalysisEnabled()) {
+                toast(normalExit ? "游戏已退出" : "游戏异常退出", Lang.t("返回码 ") + exit, normalExit ? 0 : 2);
+                if (!normalExit && data.crashAnalysisEnabled()) {
                     analyzeCrashAsync(crashIns);
                 }
             });
@@ -841,6 +846,7 @@ public final class MainWindow {
         if (gameProcess == null) return;
         Dialogs.confirm(this, "关闭 Minecraft", "确定要强制关闭正在运行的 Minecraft 吗？\n未保存的游戏进度可能会丢失。", () -> {
             try {
+                gameStopRequested = true;
                 gameProcess.destroy();
                 data.log("已请求关闭 Minecraft 进程");
                 toast("已关闭", "运行中的 Minecraft！", 1);
@@ -1186,14 +1192,18 @@ public final class MainWindow {
         });
 
         bar.addEventHandler(MouseEvent.MOUSE_PRESSED, e -> {
-            dragX = e.getScreenX() - stage.getX();
-            dragY = e.getScreenY() - stage.getY();
+            titleDrag = !isInteractive(e.getTarget(), bar);
+            if (titleDrag) {
+                dragX = e.getScreenX() - stage.getX();
+                dragY = e.getScreenY() - stage.getY();
+            }
         });
         bar.addEventHandler(MouseEvent.MOUSE_DRAGGED, e -> {
-            if (e.getButton() == MouseButton.PRIMARY && !closing) {
+            if (titleDrag && e.getButton() == MouseButton.PRIMARY && !closing) {
                 moveWindowTo(e.getScreenX() - dragX, e.getScreenY() - dragY);
             }
         });
+        bar.addEventHandler(MouseEvent.MOUSE_RELEASED, e -> titleDrag = false);
         return bar;
 
     }
@@ -1305,6 +1315,7 @@ public final class MainWindow {
 
     // 功能隐藏开关后局部刷新：不重建整窗，只更新导航和当前右栏
     public void refreshAfterHide(String key) {
+        java.util.List<double[]> scrolls = captureScrolls();
         refreshNav();
         String nav = switch (key) {
             case "UiHiddenLaunch" -> "launch";
@@ -1319,6 +1330,7 @@ public final class MainWindow {
             openPage(firstVisiblePage(), false);
         } else {
             refreshRight(false);
+            restoreScrolls(scrolls);
         }
     }
 
@@ -3002,6 +3014,8 @@ public final class MainWindow {
     }
 
     public void rebuildUi() {
+        java.util.List<double[]> scrolls = captureScrolls();
+        javafx.scene.image.WritableImage snap = snapshotRoot();
         String keep = currentKey;
         hidePage(currentPage);
         rightPendingHide = null;
@@ -3024,6 +3038,82 @@ public final class MainWindow {
         if (videoMode() && vidPlayer != null) attachVideoView();
         else refreshVideoBackground(false);
         startWallpaperRotation();
+        restoreScrolls(scrolls);
+        fadeSnapshot(snap);
+    }
+
+    private javafx.scene.image.WritableImage snapshotRoot() {
+        try {
+            if (root.getScene() == null || root.getWidth() < 2 || root.getHeight() < 2) return null;
+            javafx.scene.SnapshotParameters sp = new javafx.scene.SnapshotParameters();
+            sp.setFill(javafx.scene.paint.Color.TRANSPARENT);
+            return root.snapshot(sp, null);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    // 重建后用旧界面快照淡出，避免整页闪一下
+    private void fadeSnapshot(javafx.scene.image.WritableImage snap) {
+        if (snap == null || animationsOff()) return;
+        javafx.scene.image.ImageView cover = new javafx.scene.image.ImageView(snap);
+        cover.setMouseTransparent(true);
+        cover.setManaged(false);
+        cover.resize(snap.getWidth(), snap.getHeight());
+        root.getChildren().add(cover);
+        javafx.animation.FadeTransition fade = new javafx.animation.FadeTransition(
+                javafx.util.Duration.millis(160), cover);
+        fade.setFromValue(1);
+        fade.setToValue(0);
+        fade.setInterpolator(Ui.EASE_OUT_FLUENT);
+        fade.setOnFinished(e -> root.getChildren().remove(cover));
+        fade.play();
+    }
+
+    private boolean animationsOff() {
+        return data.getInt("UiAnimSpeed", 100) <= 0;
+    }
+
+    private java.util.List<double[]> captureScrolls() {
+        java.util.List<javafx.scene.control.ScrollPane> panes = new java.util.ArrayList<>();
+        collectScrollPanes(root, panes);
+        java.util.List<double[]> out = new java.util.ArrayList<>();
+        for (javafx.scene.control.ScrollPane sp : panes) {
+            out.add(new double[]{sp.getVvalue(), sp.getHvalue()});
+        }
+        return out;
+    }
+
+    private static void collectScrollPanes(javafx.scene.Node node,
+                                           java.util.List<javafx.scene.control.ScrollPane> out) {
+        if (node instanceof javafx.scene.control.ScrollPane sp) out.add(sp);
+        if (node instanceof javafx.scene.Parent parent) {
+            for (javafx.scene.Node child : parent.getChildrenUnmodifiable()) collectScrollPanes(child, out);
+        }
+    }
+
+    private void restoreScrolls(java.util.List<double[]> scrolls) {
+        if (scrolls.isEmpty()) return;
+        javafx.application.Platform.runLater(() -> {
+            java.util.List<javafx.scene.control.ScrollPane> panes = new java.util.ArrayList<>();
+            collectScrollPanes(root, panes);
+            int n = Math.min(scrolls.size(), panes.size());
+            for (int i = 0; i < n; i++) {
+                panes.get(i).setVvalue(scrolls.get(i)[0]);
+                panes.get(i).setHvalue(scrolls.get(i)[1]);
+            }
+        });
+    }
+
+    private static boolean isInteractive(Object target, javafx.scene.Node stop) {
+        javafx.scene.Node node = target instanceof javafx.scene.Node n ? n : null;
+        while (node != null && node != stop) {
+            if (node instanceof javafx.scene.control.Control) return true;
+            if (node.getCursor() == javafx.scene.Cursor.HAND) return true;
+            if (node.getOnMouseClicked() != null) return true;
+            node = node.getParent();
+        }
+        return false;
     }
 
     public void applyThemeFrom(double sceneX, double sceneY) {

@@ -76,10 +76,39 @@ public class PageOther implements Page {
     }
 
     private void refreshNews() {
+        if (newsPage == null) {
+            newsCache = null;
+            newsCacheAt = 0;
+            data.otherSection = "news";
+            win.refreshRight(false);
+            return;
+        }
+        if (newsLoading) return;
+        newsLoading = true;
         newsCache = null;
         newsCacheAt = 0;
-        data.otherSection = "news";
-        win.refreshRight(false);
+        final int gen = ++newsGen;
+        Thread thread = new Thread(() -> {
+            try {
+                String body = Http.get("https://launchercontent.mojang.com/v2/news.json");
+                java.util.List<Object> entries = Json.arr(Json.obj(Json.parse(body)), "entries");
+                javafx.application.Platform.runLater(() -> {
+                    if (gen != newsGen) return;
+                    newsLoading = false;
+                    newsCache = entries;
+                    newsCacheAt = System.currentTimeMillis();
+                    renderNews(newsPage, java.util.Collections.emptyList(), entries);
+                });
+            } catch (Exception ex) {
+                javafx.application.Platform.runLater(() -> {
+                    if (gen != newsGen) return;
+                    newsLoading = false;
+                    win.toast("刷新新闻失败", ex.getMessage() == null ? Lang.t("网络错误") : ex.getMessage(), 2);
+                });
+            }
+        }, "TCL-NewsRefresh");
+        thread.setDaemon(true);
+        thread.start();
     }
 
     @Override
@@ -91,6 +120,8 @@ public class PageOther implements Page {
         page.setMaxWidth(Double.MAX_VALUE);
         page.setMinWidth(0);
         scroll.setContent(page);
+        newsPage = null;
+        newsNodes.clear();
         switch (data.otherSection) {
             case "news" -> buildNews(page);
             case "tools" -> buildTools(page);
@@ -192,10 +223,17 @@ public class PageOther implements Page {
     }
 
     // 30 分钟内的解析结果直接复用，来回切页不重拉 1MB+
+    private VBox newsPage;
+    private final java.util.List<Node> newsNodes = new java.util.ArrayList<>();
+    private boolean newsLoading;
+
     private static java.util.List<Object> newsCache;
     private static long newsCacheAt;
 
     private void buildNews(VBox page) {
+        newsPage = page;
+        newsLoading = false;
+        newsNodes.clear();
         StackPane refresh = Ui.button("刷新新闻", Ui.BTN_HIGHLIGHT, this::refreshNews);
         refresh.setMinWidth(110);
         refresh.setMaxWidth(Region.USE_PREF_SIZE);
@@ -238,6 +276,10 @@ public class PageOther implements Page {
     private void renderNews(VBox page, List<Node> skeletons, java.util.List<Object> entries) {
         stopSkeletons();
         page.getChildren().removeAll(skeletons);
+        if (!newsNodes.isEmpty()) {
+            page.getChildren().removeAll(newsNodes);
+            newsNodes.clear();
+        }
         int count = 0;
         for (Object o : entries) {
             if (count++ >= 20) break;
@@ -267,8 +309,23 @@ public class PageOther implements Page {
             }
             VBox.setMargin(card, new Insets(0, 0, 14, 0));
             page.getChildren().add(card);
+            newsNodes.add(card);
         }
-        if (count == 0) page.getChildren().add(Ui.label("暂时没有可显示的新闻。", 12, Theme.gray3));
+        if (count == 0) {
+            Label empty = Ui.label("暂时没有可显示的新闻。", 12, Theme.gray3);
+            page.getChildren().add(empty);
+            newsNodes.add(empty);
+        }
+        // 新卡片单独淡入，页面本身不整体变暗
+        int ms = Ui.aniMs(130);
+        for (Node n : newsNodes) {
+            if (ms <= 0) break;
+            n.setOpacity(0);
+            javafx.animation.FadeTransition fade = new javafx.animation.FadeTransition(
+                    javafx.util.Duration.millis(ms), n);
+            fade.setToValue(1);
+            fade.play();
+        }
     }
 
     // 骨架屏：标题条+镐子动画+文字条呼吸闪烁

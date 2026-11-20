@@ -33,7 +33,7 @@ public final class RemoteImages {
         diskChecked = false;
     }
 
-    private static final long RETRY_AFTER_MS = 30_000;
+    private static final long RETRY_AFTER_MS = 8_000;
     private static final int MEMORY_LIMIT = 1200;
 
     public static Image cached(String url, double size) {
@@ -81,6 +81,12 @@ public final class RemoteImages {
         if (waiters.size() > 1) return;
 
         final int px = decodePx(decodeSize);
+        attemptLoad(url, k, px, 0);
+    }
+
+    private static final int MAX_RETRY = 3;
+
+    private static void attemptLoad(String url, String key, int px, int attempt) {
         CompletableFuture
                 .supplyAsync(() -> readDisk(url), Http.pool())
                 .thenCompose(disk -> {
@@ -107,18 +113,27 @@ public final class RemoteImages {
                             } catch (Exception ignored) {
                             }
                         }
+                        boolean permanent = Http.isPermanentFailure(err)
+                                || (bytes == null && err == null);
+                        if (!permanent && attempt < MAX_RETRY) {
+                            // 网络抖动先自动重试，别让图标一直空着
+                            long delay = 1200L * (attempt + 1);
+                            CompletableFuture.delayedExecutor(delay, java.util.concurrent.TimeUnit.MILLISECONDS)
+                                    .execute(() -> attemptLoad(url, key, px, attempt + 1));
+                            return;
+                        }
                         // 4xx 永久失败，其余冷却 30 秒
-                        long until = Http.isPermanentFailure(err) || bytes == null && err == null
-                                ? Long.MAX_VALUE : System.currentTimeMillis() + RETRY_AFTER_MS;
-                        FAILED.put(url, until);
+                        FAILED.put(url, permanent ? Long.MAX_VALUE
+                                : System.currentTimeMillis() + RETRY_AFTER_MS);
                     } else {
+                        FAILED.remove(url);
                         if (CACHE.size() > MEMORY_LIMIT) trimCache();
-                        CACHE.put(k, img);
-                        ACCESSED.put(k, System.currentTimeMillis());
+                        CACHE.put(key, img);
+                        ACCESSED.put(key, System.currentTimeMillis());
                     }
                     if (FAILED.size() > 2000) trimFailed();
                     final Image result = img;
-                    List<Consumer<Image>> pending = WAITERS.remove(k);
+                    List<Consumer<Image>> pending = WAITERS.remove(key);
                     if (pending == null) return;
                     Platform.runLater(() -> {
                         for (Consumer<Image> cb : pending) cb.accept(result);

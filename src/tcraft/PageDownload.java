@@ -157,6 +157,7 @@ public class PageDownload implements Page {
         boolean available = true;
         java.util.List<String> versions;
         boolean fetched;
+        int buildToken;
     }
 
     private void buildVanilla(VBox page) {
@@ -415,9 +416,20 @@ public class PageDownload implements Page {
             }
             return;
         }
-        for (String v : lc.versions) {
+        // 版本多的分组分批建行，避免展开时卡住一秒
+        buildChunk(lc, lc.versions, 0, ++lc.buildToken);
+    }
+
+    private void buildChunk(LoaderCard lc, java.util.List<String> versions, int from, int token) {
+        if (token != lc.buildToken || lc.list == null) return;
+        int end = Math.min(from + 30, versions.size());
+        for (int i = from; i < end; i++) {
+            String v = versions.get(i);
             String info = lc.installerOnly ? installerRowInfo(lc, v) : null;
             addVersionRow(lc, v, info);
+        }
+        if (end < versions.size()) {
+            javafx.application.Platform.runLater(() -> buildChunk(lc, versions, end, token));
         }
     }
 

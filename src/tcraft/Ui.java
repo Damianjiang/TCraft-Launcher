@@ -221,6 +221,7 @@ public final class Ui {
 
         public void add(Node... nodes) {
             content.getChildren().addAll(nodes);
+            expandedHeight = -1;
         }
 
         public void setLazyContent(Runnable builder) {
@@ -272,78 +273,105 @@ public final class Ui {
 
         public void toggle() {
             if (!collapsible) return;
+            boolean builtNow = lazyContent != null && !lazyBuilt;
             ensureContent();
+            if (builtNow) {
+                // 内容刚建好，先让布局跑一帧，否则动画会卡在首帧
+                javafx.application.Platform.runLater(this::runToggle);
+            } else {
+                runToggle();
+            }
+        }
+
+        private void runToggle() {
             boolean collapse = !collapsed;
             stopToggleAnimation();
             setEffect(null);
+            applyCss();
+            content.applyCss();
+            if (expandedHeight <= 0) {
+                expandedHeight = Math.max(20, content.prefHeight(Math.max(100, getWidth() - 30)));
+            }
             if (collapse) {
-                expandedHeight = Math.max(20, content.getHeight());
-                content.setVisible(true);
-                content.setManaged(true);
-                content.setOpacity(1);
-                content.setTranslateY(0);
-                int ms = aniMs(180);
-                if (ms <= 0) {
-                    content.setVisible(false);
-                    content.setManaged(false);
-                    content.setMaxHeight(Region.USE_COMPUTED_SIZE);
-                    animationCleanup();
-                    collapsed = true;
-                    updateChevron();
-                    return;
+                double height = content.getHeight() > 0 ? content.getHeight() : expandedHeight;
+                if (height > 600) {
+                    // 长内容只动裁剪，逐帧改高度会反复重排
+                    javafx.scene.shape.Rectangle clip = new javafx.scene.shape.Rectangle();
+                    clip.widthProperty().bind(content.widthProperty());
+                    clip.setHeight(height);
+                    content.setClip(clip);
+                    Timeline t = new Timeline(new KeyFrame(Duration.millis(Math.max(1, aniMs(140))),
+                            new KeyValue(clip.heightProperty(), 0, Interpolator.EASE_IN)));
+                    t.setOnFinished(e -> finishCollapse());
+                    toggleAnim = t;
+                    t.play();
+                } else {
+                    int ms = Math.max(1, aniMs(150));
+                    content.setCache(true);
+                    content.setCacheHint(CacheHint.SPEED);
+                    Timeline t = new Timeline(
+                            new KeyFrame(Duration.ZERO, new KeyValue(content.maxHeightProperty(), height)),
+                            new KeyFrame(Duration.millis(ms), new KeyValue(content.maxHeightProperty(), 0,
+                                    Interpolator.EASE_IN)));
+                    t.setOnFinished(e -> finishCollapse());
+                    toggleAnim = t;
+                    t.play();
                 }
-                boolean useCache = expandedHeight <= 300;
-                content.setCache(useCache);
-                content.setCacheHint(useCache ? CacheHint.SPEED : CacheHint.DEFAULT);
-                Timeline t = new Timeline(
-                        new KeyFrame(Duration.ZERO, new KeyValue(content.maxHeightProperty(), expandedHeight)),
-                        new KeyFrame(Duration.millis(ms), new KeyValue(content.maxHeightProperty(), 0,
-                                Interpolator.EASE_IN)));
-                t.setOnFinished(e -> {
-                    if (toggleAnim != t) return;
-                    toggleAnim = null;
-                    content.setVisible(false);
-                    content.setManaged(false);
-                    content.setMaxHeight(Region.USE_COMPUTED_SIZE);
-                    animationCleanup();
-                });
-                toggleAnim = t;
-                t.play();
             } else {
                 content.setVisible(true);
                 content.setManaged(true);
-                content.setMaxHeight(Region.USE_COMPUTED_SIZE);
                 content.setOpacity(1);
                 content.setTranslateY(0);
-                applyCss();
-                content.applyCss();
-                double target = Math.max(20, content.prefHeight(Math.max(100, getWidth() - 30)));
-                int ms = aniMs(target > 300 ? 180 : 240);
-                if (ms <= 0) {
+                if (expandedHeight > 600) {
                     content.setMaxHeight(Region.USE_COMPUTED_SIZE);
-                    animationCleanup();
-                    collapsed = false;
-                    updateChevron();
-                    return;
+                    applyCss();
+                    content.applyCss();
+                    double height = Math.max(20, content.getBoundsInParent().getHeight());
+                    javafx.scene.shape.Rectangle clip = new javafx.scene.shape.Rectangle();
+                    clip.widthProperty().bind(content.widthProperty());
+                    clip.setHeight(0);
+                    content.setClip(clip);
+                    Timeline t = new Timeline(new KeyFrame(Duration.millis(Math.max(1, aniMs(180))),
+                            new KeyValue(clip.heightProperty(), height, Interpolator.EASE_OUT)));
+                    t.setOnFinished(e -> {
+                        content.setClip(null);
+                        setEffect(glow);
+                    });
+                    toggleAnim = t;
+                    t.play();
+                } else {
+                    content.setMaxHeight(0);
+                    content.setCache(true);
+                    content.setCacheHint(CacheHint.SPEED);
+                    Timeline t = new Timeline(
+                            new KeyFrame(Duration.ZERO, new KeyValue(content.maxHeightProperty(), 0)),
+                            new KeyFrame(Duration.millis(Math.max(1, aniMs(170))),
+                                    new KeyValue(content.maxHeightProperty(), expandedHeight,
+                                            Interpolator.EASE_OUT)));
+                    t.setOnFinished(e -> {
+                        content.setMaxHeight(Region.USE_COMPUTED_SIZE);
+                        content.setCache(false);
+                        setEffect(glow);
+                    });
+                    toggleAnim = t;
+                    t.play();
                 }
-                boolean useCache = target <= 300;
-                content.setCache(useCache);
-                content.setCacheHint(useCache ? CacheHint.SPEED : CacheHint.DEFAULT);
-                content.setMaxHeight(0);
-                Timeline t = new Timeline(
-                        new KeyFrame(Duration.ZERO, new KeyValue(content.maxHeightProperty(), 0)),
-                        new KeyFrame(Duration.millis(ms), new KeyValue(content.maxHeightProperty(),
-                                target, Interpolator.EASE_OUT)));
-                t.setOnFinished(e -> {
-                    if (toggleAnim != t) return;
-                    toggleAnim = null;
-                    content.setMaxHeight(Region.USE_COMPUTED_SIZE);
-                    animationCleanup();
-                });
-                toggleAnim = t;
-                t.play();
             }
             collapsed = collapse;
+            updateChevron();
+        }
+
+        private void finishCollapse() {
+            content.setVisible(false);
+            content.setManaged(false);
+            content.setMaxHeight(Region.USE_COMPUTED_SIZE);
+            content.setOpacity(1);
+            content.setTranslateY(0);
+            content.setCache(false);
+            content.setClip(null);
+            setEffect(glow);
+            toggleAnim = null;
+            collapsed = true;
             updateChevron();
         }
 
