@@ -4227,3 +4227,4 @@ Mod文件	Mod file	Mod 檔案
 该收藏缺少 CurseForge 的数字 id，请取消收藏后重新收藏	This favorite is missing the numeric CurseForge ID. Remove it and favorite it again.	該收藏缺少 CurseForge 的數字 id，請取消收藏後重新收藏	
 已下载 %.1f MB	%.1f MB downloaded	已下載 %.1f MB	
 页面退出处理失败	Page exit handling failed	頁面退出處理失敗	
+更新日志（含 %d 个版本）	Changelog (%d versions)	更新日誌（含 %d 個版本）

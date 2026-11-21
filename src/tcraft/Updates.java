@@ -35,6 +35,8 @@ public final class Updates {
     private static final String ATOM_URL = RELEASES_URL + ".atom";
     private static final String API_URL =
             "https://api.github.com/repos/Damianjiang/TCraft-Launcher/releases/latest";
+    private static final String LIST_URL =
+            "https://api.github.com/repos/Damianjiang/TCraft-Launcher/releases?per_page=30";
 
     private static volatile boolean checking;
 
@@ -84,7 +86,7 @@ public final class Updates {
             Release release = null;
             Exception error = null;
             try {
-                release = fetchLatest();
+                release = mergeChangelog(fetchLatest());
             } catch (Exception e) {
                 error = e;
             }
@@ -196,6 +198,66 @@ public final class Updates {
         return win != null && win.stage != null && win.stage.isShowing();
     }
 
+    private static volatile java.util.List<Release> releaseCache;
+    private static volatile long releaseCacheAt;
+
+    // 跨版本更新时把中间版本的日志按版本倒序拼起来
+    private static Release mergeChangelog(Release latest) {
+        String current = Build.VERSION == null ? "" : Build.VERSION.trim();
+        if (!isComparable(current) || !isComparable(latest.tag)
+                || compare(latest.tag, current) <= 0) {
+            return latest;
+        }
+        try {
+            java.util.List<Release> all = releaseList();
+            java.util.List<Release> between = new java.util.ArrayList<>();
+            for (Release r : all) {
+                if (!isComparable(r.tag) || !tagAllowed(r.tag)) continue;
+                if (compare(r.tag, current) > 0 && compare(r.tag, latest.tag) <= 0) {
+                    between.add(r);
+                }
+            }
+            between.sort((a, b) -> compare(b.tag, a.tag));
+            if (between.size() <= 1) return latest;
+            int limit = Math.min(between.size(), 10);
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < limit; i++) {
+                Release r = between.get(i);
+                if (i > 0) sb.append("\n\n");
+                sb.append("### v").append(clean(r.tag)).append("\n\n");
+                String body = r.changelog == null ? "" : r.changelog.trim();
+                sb.append(body.isEmpty() ? "该版本未填写更新日志。" : body);
+            }
+            if (between.size() > limit) sb.append("\n\n…更早版本请到 Releases 查看");
+            String text = sb.toString();
+            if (text.length() > 20000) text = text.substring(0, 20000) + "\n\n…内容过长已截断";
+            return new Release(latest.tag, text, between.size());
+        } catch (Exception e) {
+            Data.get().log("合并更新日志失败：" + Log.describe(e));
+            return latest;
+        }
+    }
+
+    private static synchronized java.util.List<Release> releaseList() throws Exception {
+        long now = System.currentTimeMillis();
+        java.util.List<Release> cached = releaseCache;
+        if (cached != null && now - releaseCacheAt < 300_000L) return cached;
+        String json = fetch(LIST_URL, "application/vnd.github+json");
+        java.util.List<Release> out = new java.util.ArrayList<>();
+        for (Object o : Json.arr(Json.parse(json))) {
+            Map<String, Object> m = Json.obj(o);
+            if (Json.bool(m, "draft", false)) continue;
+            String tag = Json.str(m, "tag_name", "").trim();
+            if (tag.isEmpty()) continue;
+            out.add(new Release(tag, Json.str(m, "body", "")));
+        }
+        if (!out.isEmpty()) {
+            releaseCache = out;
+            releaseCacheAt = now;
+        }
+        return out;
+    }
+
     private static void handle(MainWindow win, Release release, boolean manual) {
         String current = Build.VERSION == null ? "" : Build.VERSION.trim();
         String latest = release.tag == null ? "" : release.tag.trim();
@@ -234,7 +296,9 @@ public final class Updates {
         body.setPadding(new Insets(14, 7, 0, 7));
         Label latest = Ui.bold(Lang.tf("最新版本：v%s", clean(release.tag)), 14, Theme.accentDark);
         Label now = Ui.label(Lang.tf("当前版本：v%s", clean(Build.VERSION)), 13, Theme.text);
-        Label logTitle = Ui.semi("更新日志", 12.5, Theme.text);
+        Label logTitle = Ui.semi(release.versions > 1
+                ? Lang.tf("更新日志（含 %d 个版本）", release.versions)
+                : Lang.t("更新日志"), 12.5, Theme.text);
         Label log = Ui.label(release.changelog == null || release.changelog.isEmpty()
                 ? "该版本未填写更新日志。" : release.changelog, 12.5, Theme.gray1);
         log.setWrapText(true);
@@ -494,10 +558,16 @@ public final class Updates {
     private static final class Release {
         final String tag;
         final String changelog;
+        final int versions;
 
         Release(String tag, String changelog) {
+            this(tag, changelog, 1);
+        }
+
+        Release(String tag, String changelog, int versions) {
             this.tag = tag;
             this.changelog = changelog;
+            this.versions = versions;
         }
     }
 }
