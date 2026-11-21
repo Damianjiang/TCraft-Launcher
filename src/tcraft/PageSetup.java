@@ -183,6 +183,8 @@ public class PageSetup implements Page {
                 data.set("SystemCurseKey", "");
                 data.set("SystemMirrorMode", 0);
                 data.set("SystemMirrorUrl", "");
+                data.set("SystemUpdateMirrorMode", 0);
+                data.set("SystemUpdateMirrorUrl", "");
                 data.set("SystemHttpProxyType", 1);
                 data.set("SystemProxyAddress", "");
                 data.set("SystemProxyHost", "");
@@ -2161,6 +2163,27 @@ public class PageSetup implements Page {
                 testProxyBtn);
         proxy.add(actions);
         proxyNote.setText(Data.get().describeProxy());
+
+        Ui.Card update = addCard(page, "TCL 检查更新");
+        update.add(directCheck("启动时自动检查更新", "CheckUpdateOnStartup", true));
+        ComboBox<String> combo = Ui.combo(
+                new String[]{"官方（默认）", "自动测速选最快", "gh-proxy.com", "gh-proxy.org",
+                        "ghfast.top", "ghproxy.net", "ghproxy.imciel.com", "自定义镜像"},
+                Math.max(0, Math.min(7, data.getInt("SystemUpdateMirrorMode", 0))));
+        combo.setPrefWidth(220);
+        combo.setMaxWidth(Double.MAX_VALUE);
+        combo.setOnAction(e -> {
+            int i = combo.getSelectionModel().getSelectedIndex();
+            if (i >= 0) data.set("SystemUpdateMirrorMode", i);
+        });
+        update.add(Ui.settingRow("更新源", combo));
+        TextField updateUrl = textRow(update, "自定义地址", "https://gh-proxy.com/",
+                data.get("SystemUpdateMirrorUrl", ""),
+                s1 -> data.set("SystemUpdateMirrorUrl", s1 == null ? "" : s1.trim()));
+        updateUrl.setDisable(data.getInt("SystemUpdateMirrorMode", 0) != 7);
+        combo.setOnAction(e -> updateUrl.setDisable(
+                combo.getSelectionModel().getSelectedIndex() != 7));
+        update.add(Ui.hint("只影响版本号与更新日志的读取；点「前往下载」统一跳官网，由用户自己选节点下载。", 0));
 
         Ui.Card mirror = addCard(page, "资源镜像");
         TextField mirrorUrl = textRow(mirror, "镜像地址", "https://mod.mcimirror.top",

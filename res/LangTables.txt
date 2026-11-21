@@ -4228,3 +4228,11 @@ Mod文件	Mod file	Mod 檔案
 已下载 %.1f MB	%.1f MB downloaded	已下載 %.1f MB	
 页面退出处理失败	Page exit handling failed	頁面退出處理失敗	
 更新日志（含 %d 个版本）	Changelog (%d versions)	更新日誌（含 %d 個版本）
+更新检查	Update check	更新檢查
+官方（默认）	Official (default)	官方（預設）
+官方失败时走内置加速	Built-in mirrors if official fails	官方失敗時走內建加速
+自定义镜像	Custom mirror	自訂鏡像
+更新镜像地址	Update mirror URL	更新鏡像位址
+更新源	Update source	更新來源
+自动测速选最快	Auto: fastest mirror	自動測速選最快
+自定义地址	Custom URL	自訂位址

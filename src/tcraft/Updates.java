@@ -8,6 +8,8 @@ import javafx.geometry.Pos;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 import org.w3c.dom.Document;
@@ -31,10 +33,49 @@ public final class Updates {
 
     public static final String RELEASES_URL =
             "https://github.com/Damianjiang/TCraft-Launcher/releases";
+    // 下载统一走官网，用户可在弹窗里自行选节点
+    public static final String DOWNLOAD_URL =
+            "https://damianjiang.github.io/TCraft-Launcher/?download=mirror#download";
 
     private static final String ATOM_URL = RELEASES_URL + ".atom";
     private static final String API_URL =
             "https://api.github.com/repos/Damianjiang/TCraft-Launcher/releases/latest";
+
+    private static final String[] MIRRORS = {
+            "https://gh-proxy.com/",
+            "https://gh-proxy.org/",
+            "https://ghfast.top/",
+            "https://ghproxy.net/",
+            "https://ghproxy.imciel.com/"
+    };
+
+    private static String updateMirror() {
+        if (Data.get().getInt("SystemUpdateMirrorMode", 0) != 7) return "";
+        String url = Data.get().get("SystemUpdateMirrorUrl", "");
+        if (url == null) return "";
+        url = url.trim();
+        while (url.endsWith("/")) url = url.substring(0, url.length() - 1);
+        if (!url.startsWith("http://") && !url.startsWith("https://")) return "";
+        return url + "/";
+    }
+
+    // 0 官方 / 1 自动测速 / 2..6 指定内置节点 / 7 自定义
+    private static java.util.List<String> apiBases() {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        int mode = Data.get().getInt("SystemUpdateMirrorMode", 0);
+        if (mode == 0) return out;
+        if (mode == 1) {
+            out.addAll(java.util.Arrays.asList(MIRRORS));
+            return out;
+        }
+        if (mode >= 2 && mode <= 6) {
+            out.add(MIRRORS[mode - 2]);
+            return out;
+        }
+        String custom = updateMirror();
+        if (!custom.isEmpty()) out.add(custom);
+        return out;
+    }
     private static final String LIST_URL =
             "https://api.github.com/repos/Damianjiang/TCraft-Launcher/releases?per_page=30";
 
@@ -299,15 +340,11 @@ public final class Updates {
         Label logTitle = Ui.semi(release.versions > 1
                 ? Lang.tf("更新日志（含 %d 个版本）", release.versions)
                 : Lang.t("更新日志"), 12.5, Theme.text);
-        Label log = Ui.label(release.changelog == null || release.changelog.isEmpty()
-                ? "该版本未填写更新日志。" : release.changelog, 12.5, Theme.gray1);
-        log.setWrapText(true);
-        log.setMaxWidth(470);
-        VBox logContent = new VBox(log);
+        VBox logContent = new VBox(Md.render(release.changelog));
+        logContent.setMaxWidth(470);
         logContent.setPadding(new Insets(7, 9, 7, 9));
         logContent.setBackground(Ui.fill(Theme.fieldBg, 6));
         logContent.setBorder(Ui.border(Theme.gray6, 6, 1));
-        // 小框滚轮按全局步长的 0.7 倍
         ScrollPane logScroll = Ui.scroll(logContent, 2.1);
         logScroll.setPrefViewportHeight(190);
         logScroll.setMinHeight(110);
@@ -320,8 +357,8 @@ public final class Updates {
         actions.getChildren().addAll(
                 Ui.button("前往下载", Ui.BTN_HIGHLIGHT, () -> {
                     win.closeModal();
-                    if (!Shell.openUrl(RELEASES_URL)) {
-                        win.toast("打开链接失败", RELEASES_URL, 3);
+                    if (!Shell.openUrl(DOWNLOAD_URL)) {
+                        win.toast("打开链接失败", DOWNLOAD_URL, 3);
                     }
                 }),
                 Ui.button("稍后", Ui.BTN_NORMAL, win::closeModal));
@@ -332,6 +369,32 @@ public final class Updates {
     }
 
     private static Release fetchLatest() throws Exception {
+        int mode = Data.get().getInt("SystemUpdateMirrorMode", 0);
+        if (mode == 1) {
+            try {
+                return fetchFastest();
+            } catch (Exception e) {
+                Data.get().log("自动测速失败，回退顺序尝试：" + Log.describe(e));
+            }
+        }
+        Exception apiError = null;
+        if (mode >= 2) {
+            for (String base : apiBases()) {
+                try {
+                    Release r = fetchApi(base);
+                    Data.get().log("更新信息通过指定节点获取：" + base);
+                    return r;
+                } catch (Exception e) {
+                    apiError = e;
+                }
+            }
+        }
+        try {
+            return fetchApi("");
+        } catch (Exception e) {
+            apiError = e;
+        }
+
         Exception atomError = null;
         try {
             return fetchAtom();
@@ -339,16 +402,39 @@ public final class Updates {
             atomError = e;
         }
         try {
-            return fetchApi();
-        } catch (Exception e) {
-            e.addSuppressed(atomError);
-            atomError = e;
-        }
-        try {
             return fetchPage();
         } catch (Exception e) {
-            e.addSuppressed(atomError);
+            if (apiError != null) e.addSuppressed(apiError);
+            if (atomError != null) e.addSuppressed(atomError);
             throw e;
+        }
+    }
+
+    // 官方与各镜像并发请求，谁先返回用谁
+    private static Release fetchFastest() throws Exception {
+        java.util.List<String> bases = new java.util.ArrayList<>();
+        bases.add("");
+        bases.addAll(java.util.Arrays.asList(MIRRORS));
+        java.util.concurrent.CompletableFuture<Release> winner = new java.util.concurrent.CompletableFuture<>();
+        java.util.concurrent.atomic.AtomicInteger left =
+                new java.util.concurrent.atomic.AtomicInteger(bases.size());
+        for (String base : bases) {
+            Http.pool().execute(() -> {
+                try {
+                    Release r = fetchApi(base);
+                    winner.complete(r);
+                } catch (Exception ignored) {
+                } finally {
+                    left.decrementAndGet();
+                }
+            });
+        }
+        try {
+            Release r = winner.get(10, java.util.concurrent.TimeUnit.SECONDS);
+            Data.get().log("更新源自动选择完成");
+            return r;
+        } catch (Exception e) {
+            throw new IOException("所有更新源都没有响应");
         }
     }
 
@@ -416,13 +502,11 @@ public final class Updates {
         return tag == null ? "" : tag;
     }
 
-    @SuppressWarnings("unchecked")
-    private static Release fetchApi() throws Exception {
-        String json = fetch(API_URL, "application/vnd.github+json");
+    private static Release fetchApi(String base) throws Exception {
+        String json = fetch(base + API_URL, "application/vnd.github+json");
         Map<String, Object> obj = Json.obj(Json.parse(json));
         String tag = Json.str(obj, "tag_name", "").trim();
         if (tag.isEmpty()) throw new IOException("API 中没有 tag");
-        // latest 只给一个 tag，不满足即跳源
         if (!tagAllowed(tag)) {
             throw new IOException("API 返回的 " + tag + " 不在当前测试版开关允许范围内");
         }
