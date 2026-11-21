@@ -1199,7 +1199,7 @@ public final class Ui {
                 iconBox.setMinWidth(34);
                 iconBox.setPrefWidth(34);
                 iconBox.setMaxWidth(34);
-                // 图标居中，并与文字留出间距
+                // 图标居中，右侧留间距
                 HBox.setMargin(iconBox, new Insets(0, 9, 0, 2));
                 getChildren().add(iconBox);
             }
@@ -2265,7 +2265,7 @@ public final class Ui {
         return pill;
     }
 
-    // 带标题、阶段与百分比的加载卡片，用于版本列表 / 搜索等耗时操作
+    // 带标题、阶段和百分比的加载卡片
     public static final class LoadCard extends StackPane {
         private static final double BAR_W = 300;
         private final Label titleLabel;

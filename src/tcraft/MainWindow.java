@@ -73,6 +73,7 @@ public final class MainWindow {
     public StackPane searchLayer;
 
     private VBox toastList;
+    private javafx.animation.Timeline toastWatchdog;
     private Rectangle bgRect;
     private javafx.scene.media.MediaView vidBack;
     private javafx.scene.media.MediaPlayer vidPlayer;
@@ -1510,6 +1511,7 @@ public final class MainWindow {
         StackPane.setAlignment(toastList, Pos.BOTTOM_RIGHT);
         StackPane.setMargin(toastList, new Insets(0, 20, 20, 0));
         toastLayer.getChildren().add(toastList);
+        startToastWatchdog();
         b.getChildren().add(toastLayer);
 
         extraLayer = new StackPane();
@@ -2467,6 +2469,9 @@ public final class MainWindow {
             at.dismiss();
             dismissToast(stack);
         });
+        // 悬浮暂停倒计时，移开继续
+        stack.addEventHandler(MouseEvent.MOUSE_ENTERED, e -> at.pauseProgress());
+        stack.addEventHandler(MouseEvent.MOUSE_EXITED, e -> at.resumeProgress());
         // toastList 还没挂回 Scene 时延迟重试
         Runnable[] addRef = new Runnable[1];
         addRef[0] = () -> {
@@ -2514,6 +2519,24 @@ public final class MainWindow {
         };
         addRef[0].run();
         installToastDrag(card, stack, at, close);
+    }
+
+    // 兜底清理过期提示，悬浮中的跳过
+    private void startToastWatchdog() {
+        if (toastWatchdog != null) toastWatchdog.stop();
+        toastWatchdog = new javafx.animation.Timeline(
+                new javafx.animation.KeyFrame(Duration.seconds(1), e -> sweepToasts()));
+        toastWatchdog.setCycleCount(javafx.animation.Animation.INDEFINITE);
+        toastWatchdog.play();
+    }
+
+    private void sweepToasts() {
+        if (toastList == null) return;
+        for (javafx.scene.Node n : new java.util.ArrayList<>(toastList.getChildren())) {
+            ActiveToast at = (ActiveToast) n.getProperties().get("toast");
+            if (at == null || at.dismissed) continue;
+            if (at.pausedRemaining < 0 && at.remainingMs() <= 0) dismissToast(n);
+        }
     }
 
     private void emphasizeToast(ActiveToast at) {

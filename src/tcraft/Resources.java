@@ -193,7 +193,7 @@ public final class Resources {
         return home().resolve("dependencies").resolve("libs").resolve(WEBP_JAR);
     }
 
-    // 首次启动和 JavaFX 一起补 WebP 解码库；失败只影响图标，不拦启动
+    // 首启随 JavaFX 补 WebP 库，失败不拦启动
     private static boolean ensureWebp(StartupWindow ui) {
         Path target = webpJar();
         try {
@@ -415,7 +415,7 @@ public final class Resources {
     private static void download(String url, Path target, StartupWindow ui, String label,
                                  int base, int span) throws Exception {
         Path tmp = target.resolveSibling(target.getFileName() + ".part");
-        // 连接阶段没有字节进度，先切不确定态，避免进度条停着不动
+        // 连接阶段无进度，先切不确定态
         ui.setIndeterminate(label + Lang.t(" · 连接中…"));
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         c.setConnectTimeout(12000);

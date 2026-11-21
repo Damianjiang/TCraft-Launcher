@@ -50,7 +50,7 @@ public class PageInstanceSetup implements Page {
 
     @Override
     public double leftWidth() {
-        return 250;
+        return 210;
     }
 
     @Override

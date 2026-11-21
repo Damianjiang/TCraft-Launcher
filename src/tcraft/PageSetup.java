@@ -2358,7 +2358,7 @@ public class PageSetup implements Page {
         communityCard(page);
     }
 
-    // 切源后清掉接口缓存与失败记录，返回列表会立即重新请求
+    // 切源清缓存，返回列表立即重取
     private static void clearMirrorCaches() {
         Modrinth.clearCache();
         CurseForge.clearCache();

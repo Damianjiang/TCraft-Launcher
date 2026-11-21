@@ -1413,7 +1413,7 @@ public final class Downloader {
         }
     }
 
-    // 带字节进度的文本请求，用于版本清单等大 JSON
+    // 带字节进度的文本请求
     public static String getText(java.util.function.DoubleConsumer progress, String... urls) throws IOException {
         Exception last = null;
         for (String url : Sources.rank(java.util.Arrays.asList(urls))) {

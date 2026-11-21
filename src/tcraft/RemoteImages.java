@@ -44,7 +44,7 @@ public final class RemoteImages {
         return img;
     }
 
-    // 切换下载源后清掉失败记录，下一次请求会重新走候选
+    // 切源后清失败记录，下次重新走候选
     public static void clearFailures() {
         FAILED.clear();
     }
@@ -73,7 +73,7 @@ public final class RemoteImages {
             fire(callback, cached);
             return;
         }
-        // 页面重建时允许重新尝试，不拿旧的失败记录一直挡着
+        // 重建页面允许重试，不被旧失败记录挡住
         if (failed(url)) FAILED.remove(url);
         // compute 保证登记与首例判定原子，防回调孤儿
         List<Consumer<Image>> waiters = WAITERS.compute(k, (kk, list) -> {
@@ -89,7 +89,7 @@ public final class RemoteImages {
 
     private static final int MAX_RETRY = 3;
 
-    // 先走镜像，失败立刻换下一个候选
+    // 镜像优先，失败换下一个候选
     private static CompletableFuture<byte[]> fetchCandidates(String url) {
         return fetchCandidate(url, 0);
     }
@@ -136,7 +136,7 @@ public final class RemoteImages {
                             } catch (Exception ignored) {
                             }
                         }
-                        // 缺 WebP 解码库时换网络重试没有意义，直接返回占位
+                        // 缺解码库时不重试，直接占位
                         boolean noDecoder = bytes != null && isWebp(bytes) && webpUnavailable;
                         boolean permanent = Http.isPermanentFailure(err)
                                 || (bytes == null && err == null);
@@ -288,7 +288,7 @@ public final class RemoteImages {
 
     private static Image decode(byte[] bytes, int px) {
         try {
-            // JavaFX 不支持 WebP，Modrinth 图标多数是这个格式；库没下到就静默降级
+            // JavaFX 不支持 WebP，Modrinth 图标多为该格式；缺库静默降级
             if (isWebp(bytes)) return decodeWebp(bytes, px);
             Image img = new Image(new ByteArrayInputStream(bytes), px, px, true, true);
             return img.isError() ? null : img;

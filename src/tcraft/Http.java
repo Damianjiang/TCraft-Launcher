@@ -155,7 +155,7 @@ public final class Http {
         return get(url, Map.of());
     }
 
-    // 单次请求：镜像候选按顺序快速切换，不在这里做退避重试
+    // 单次请求，镜像候选按序切换，不做退避重试
     public static String getOnce(String url, int timeoutSec) throws IOException {
         return getOnce(url, Map.of(), timeoutSec);
     }
