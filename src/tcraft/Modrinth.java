@@ -20,7 +20,6 @@ public final class Modrinth {
         return search(query, projectType, limit, null, null, null, 0, null);
     }
 
-    // 搜索结果短缓存（90s）：切分类/翻页来回点不重复打 API
     private static final Map<String, Object[]> SEARCH_CACHE = Collections.synchronizedMap(
             new LinkedHashMap<>(32, 0.75f, true) {
                 @Override
@@ -81,7 +80,6 @@ public final class Modrinth {
 
     private static final int CACHE_LIMIT = 200;
 
-    // 无界缓存在长会话里会吃内存，用访问序 LRU 逐出最旧
     private static final Map<String, List<Object>> VERSIONS_CACHE = Collections.synchronizedMap(
             new LinkedHashMap<>(64, 0.75f, true) {
                 @Override
@@ -163,7 +161,6 @@ public final class Modrinth {
     }
 
     public static void downloadUrl(Tasks.Task task, String url, Path target, String sha1) throws IOException {
-        // sha1 边下边校验交给 Fetch
         Fetch.file(task, url, target, sha1, 0, 0.98);
         if (task != null) task.remainingFiles = 1;
     }

@@ -31,7 +31,7 @@ public final class Mesa {
         Path dir = Resources.home().resolve("dependencies").resolve("mesa");
         Path jar = dir.resolve(FILE);
         if (Files.isRegularFile(jar)) {
-            // 已有的 jar 也过一遍校验，半截文件不能直接拿去当 javaagent
+            // 半截文件不能当 javaagent
             try {
                 if (Files.size(jar) > 0 && SHA1.equalsIgnoreCase(sha1(jar))) return jar;
             } catch (Exception ignored) {

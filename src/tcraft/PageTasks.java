@@ -261,7 +261,6 @@ public class PageTasks implements Page {
             stageLabel.setText(taskText(task.state == Tasks.State.FAILED && task.error != null ? task.error : task.stage));
             speedLabel.setText(task.speed == null ? "" : task.speed);
             cancel.setVisible(task.state == Tasks.State.RUNNING);
-            // 子任务状态未变时跳过重建
             StringBuilder sig = new StringBuilder();
             for (Tasks.SubTask sub : task.subs) sig.append(sub.state).append(':').append(sub.name).append('|');
             if (sig.toString().equals(subSig)) return;

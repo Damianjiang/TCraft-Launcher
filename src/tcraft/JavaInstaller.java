@@ -74,10 +74,8 @@ public final class JavaInstaller {
         if (progress != null) progress.accept(0);
         java.util.concurrent.atomic.AtomicInteger done = new java.util.concurrent.atomic.AtomicInteger();
         Path backup = base.resolve("." + component + ".old");
-        // 新目录就绪才算装完；没装完时 catch 里把旧运行时还原回去
         boolean installed = false;
         try {
-            // 目录和符号链接先串行建好，几十上百个文件走并发池下载
             List<Map.Entry<String, Map<String, Object>>> fileEntries = new java.util.ArrayList<>();
             for (Map.Entry<String, Object> e : files.entrySet()) {
                 if (cancelled != null && cancelled.getAsBoolean()) {
@@ -96,13 +94,12 @@ public final class JavaInstaller {
                     String linkTarget = Json.str(file, "target", "");
                     if (linkTarget.startsWith("/") || linkTarget.startsWith("\\")) continue;
                     try {
-                        // 相对链接必须仍落在临时目录内，允许 JDK 自身的 ../lib 结构
+                        // 相对链接允许 ../，但须仍落在临时目录内
                         Path resolved = dst.getParent().resolve(linkTarget).normalize();
                         if (!resolved.startsWith(temp)) continue;
                         Files.createDirectories(dst.getParent());
                         Files.createSymbolicLink(dst, Paths.get(linkTarget));
                     } catch (Exception ignored) {
-                        // 不支持符号链接时跳过，Java 仍可运行
                     }
                     done.incrementAndGet();
                 } else {
@@ -177,7 +174,6 @@ public final class JavaInstaller {
                 if (firstError.get() != null) throw firstError.get();
             }
 
-            // 旧运行时改名备份，成功后删，失败还原
             if (status != null) status.accept(Lang.t("正在解压 Java 运行时…"));
             if (progress != null) progress.accept(0.96);
             deleteDir(backup);
@@ -211,7 +207,6 @@ public final class JavaInstaller {
             if (progress != null) progress.accept(1);
             return exe;
         } catch (Exception e) {
-            // 失败即清临时目录并还原备份运行时
             deleteDir(temp);
             if (!installed && Files.exists(backup)) {
                 deleteDir(target);

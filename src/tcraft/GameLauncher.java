@@ -180,7 +180,6 @@ public final class GameLauncher {
         Map<Path, MissingFile> out = new java.util.LinkedHashMap<>();
         List<Map<String, Object>> chain = readChain(game, instance.version);
         if (chain.isEmpty()) throw new Exception("版本 JSON 无效或不存在：" + instance.version);
-        // 依赖库，含旧版 natives
         List<String> allLibNames = new ArrayList<>();
         for (Map<String, Object> j : chain) {
             for (Object o : Json.arr(j.get("libraries"))) {
@@ -280,7 +279,6 @@ public final class GameLauncher {
     public static void downloadMissing(List<MissingFile> files, java.util.function.DoubleConsumer progress,
                                        java.util.function.BooleanSupplier cancelled) throws Exception {
         if (files.isEmpty()) return;
-        // 并发补全，串行太慢
         int threads = Math.max(1, Math.min(8, files.size()));
         java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(threads, r -> {
             Thread t = new Thread(r, "TCL-MissingFile");
@@ -302,7 +300,6 @@ public final class GameLauncher {
             }
             boolean canceled = false;
             for (java.util.concurrent.Future<?> future : futures) {
-                // 取消即关闭线程池：已排队任务不启动，运行中的中断后按取消收尾
                 if (!canceled && cancelled.getAsBoolean()) {
                     canceled = true;
                     pool.shutdownNow();
@@ -315,7 +312,7 @@ public final class GameLauncher {
                         pool.shutdownNow();
                     }
                     if (first == null) {
-                        // 取消路径只抛 CancellationException，真失败才用真实原因，调用方靠类型区分
+                        // 调用方靠异常类型区分取消与真失败
                         first = canceled
                                 ? new java.util.concurrent.CancellationException("已取消")
                                 : e.getCause() instanceof Exception ex ? ex : new Exception(e.getCause());
@@ -425,7 +422,6 @@ public final class GameLauncher {
         Map<String, Object> merged = new LinkedHashMap<>();
         for (Map<String, Object> j : chain) merged.putAll(j);
 
-        // 理论上 resolveJava 已经按版本要求选好；这里只做最后校验
         int requiredJava = 0;
         for (Map<String, Object> j : chain) {
             requiredJava = Math.max(requiredJava,
@@ -447,7 +443,6 @@ public final class GameLauncher {
                 libs.put(Json.str(lib, "name", String.valueOf(libs.size())), lib);
             }
         }
-        // 同一个 artifact 有 arm64 natives 时排除非 arm64 的
         List<String> libNames = new ArrayList<>(libs.keySet());
         List<Path> classpath = new ArrayList<>();
         Path nativesDir = versionDir.resolve("natives");
@@ -469,7 +464,6 @@ public final class GameLauncher {
                 if (Files.isRegularFile(jar)) {
                     classpath.add(jar);
                 } else if (!artifactUrl.isEmpty() || !Json.str(lib, "url", "").isEmpty()) {
-                    // lib.url 缺失即报错，防启动后 NoClassDefFound
                     missingLibs.add(path);
                 }
             }
@@ -527,7 +521,7 @@ public final class GameLauncher {
                 try {
                     valid = MsAuth.validate(account.accessToken);
                 } catch (Exception e) {
-                    // 校验请求本身失败（网络抖动）不能当作令牌有效，交给刷新兜底
+                    // 校验请求失败不能当作令牌有效
                     valid = false;
                 }
             }
@@ -570,7 +564,6 @@ public final class GameLauncher {
         int insRam = data.getInstanceInt("Ram", 0);
         int ramType = data.getInstanceInt("RamType", data.getInt("LaunchRamType", 0));
         int ram = Math.max(512, insRam > 0 ? insRam : data.getInt("LaunchRam", 4096));
-        // 自动按物理内存的 1/4 分配
         if (ramType == 0) {
             long totalMb = physicalMemoryMb();
             ram = (int) Math.max(2048, Math.min(8192, totalMb / 4));
@@ -647,7 +640,6 @@ public final class GameLauncher {
         cmd.add(javaExe);
         // macOS 上 GLFW 必须运行在进程主线程
         if ("osx".equals(osName())) cmd.add("-XstartOnFirstThread");
-        // 渲染器实例优先；mesa-loader 以 javaagent 注入
         int renderer = data.getInstanceInt("Renderer", -1);
         if (renderer < 0) renderer = data.getInt("LaunchAdvanceRenderer", 0);
         if (Shell.windows() && renderer > 0) {
@@ -698,7 +690,6 @@ public final class GameLauncher {
             }
             default -> { }
         }
-        // 把当前代理同步给游戏 JVM
         if (data.getBool("SystemHttpProxyForGame", false)) {
             cmd.addAll(data.proxyJvmArgs());
         }
@@ -812,7 +803,7 @@ public final class GameLauncher {
                 String arg = win ? "/c" : "-c";
                 Process preProcess = new ProcessBuilder(shell, arg, pre).directory(run.toFile())
                         .redirectErrorStream(true).start();
-                // 输出必须排水防管道塞死，EOF 即退
+                // 输出须排水防管道塞死
                 Thread consumer = new Thread(() -> {
                     try (BufferedReader br = new BufferedReader(
                             new InputStreamReader(preProcess.getInputStream(), StandardCharsets.UTF_8))) {
@@ -830,14 +821,13 @@ public final class GameLauncher {
                         data.launchLog("启动前命令超过 5 分钟未结束，已强制结束：" + pre);
                     }
                 }
-                // 不等待模式：命令留在后台常驻（如隧道、代理），输出已排水，不能定时杀掉
+                // 不等待模式：命令常驻后台（隧道/代理），不杀
                 data.launchLog("已执行启动前命令：" + pre);
             } catch (Exception e) {
                 data.launchLog("启动前命令执行失败：" + e.getMessage());
             }
         }
 
-        // 启动前先回收启动器内存
         boolean optimizeRam = data.getInstanceBool("OptimizeRam", data.getBool("LaunchOptimizeRam", true));
         if (optimizeRam) {
             System.gc();
@@ -852,14 +842,14 @@ public final class GameLauncher {
         builder.redirectErrorStream(true);
         Process process = builder.start();
         data.launchLog("游戏目录：" + run);
-        // 日志只记 PID 与版本；诊断看游戏 latest.log
+        // 诊断看游戏 latest.log
         data.launchLog("已启动游戏进程，PID " + process.pid());
         data.log("启动游戏：" + instance.version + "（PID " + process.pid() + "）");
         Thread reader = new Thread(() -> {
             try (BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
                 String line;
                 while ((line = br.readLine()) != null) {
-                    // 日志只进内存环形缓冲，供异常退出时分析
+                    // 进环形缓冲，供崩溃后分析
                     data.launchLog(line);
                 }
             } catch (Exception ignored) {

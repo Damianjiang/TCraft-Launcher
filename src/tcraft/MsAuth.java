@@ -24,7 +24,7 @@ public final class MsAuth {
     private static final String TOKEN_URL = LEGACY
             ? "https://login.live.com/oauth20_token.srf"
             : "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
-    private static final String AGENT = "TCraftLauncher-JavaFX/" + Build.VERSION;
+    private static final String AGENT = Http.UA;
     private static final String XBL_URL = "https://user.auth.xboxlive.com/user/authenticate";
     private static final String XSTS_URL = "https://xsts.auth.xboxlive.com/xsts/authorize";
     private static final String MC_LOGIN_URL =
@@ -319,7 +319,6 @@ public final class MsAuth {
         }
     }
 
-    // 令牌有效直接查档案，过期先续期再取皮肤
     public static String refreshSkin(Data.Account account) throws Exception {
         String token = account.accessToken == null ? "" : account.accessToken;
         if (token.isEmpty() || account.expiresAt <= System.currentTimeMillis()) {
@@ -388,7 +387,6 @@ public final class MsAuth {
         return Json.obj(Json.parse(text));
     }
 
-    // 解析错误响应时不挑格式，HTML 也能往下走
     private static Map<String, Object> lenientParse(String text) {
         try {
             return parse(text);

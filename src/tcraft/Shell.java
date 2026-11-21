@@ -40,7 +40,6 @@ public final class Shell {
                 cur.append(c);
             }
         }
-        // 引号未闭合时把剩余内容当成一个参数，宁可少切也不要丢参数
         if (quoted || cur.length() > 0) out.add(cur.toString());
         return out;
     }
@@ -120,7 +119,6 @@ public final class Shell {
         }
     }
 
-    // 子进程：输出丢弃、超时强杀、失败落日志
     private static void runHidden(long timeoutSeconds, String... cmd) throws java.io.IOException {
         Process p;
         try {
@@ -144,7 +142,6 @@ public final class Shell {
         }
     }
 
-    // 默认 10s：PowerShell 冷启动偏慢，需要更久时用重载传入
     private static void runHidden(String... cmd) throws java.io.IOException {
         runHidden(10, cmd);
     }
@@ -169,7 +166,7 @@ public final class Shell {
                         d.browse(java.net.URI.create(url));
                         return true;
                     } catch (Exception ignored) {
-                        // URL 含未转义字符时 URI.create 直接抛，得落到 rundll32
+                        // URI.create 遇未转义字符会抛，走 rundll32
                     }
                 }
             }
@@ -223,7 +220,7 @@ public final class Shell {
             d.open(f);
             return true;
         } catch (Throwable e) {
-            // 无图形环境时 Desktop 抛错，交调用方回退
+            // 无图形环境时 Desktop 会抛错
             return false;
         }
     }
@@ -248,7 +245,7 @@ public final class Shell {
             }
         }
         if (!os.contains("win")) {
-            // gio 失败就当失败，宁可删不掉也不能悄悄改成永久删除
+            // gio 失败即失败，不可回退成永久删除
             try {
                 Process p = new ProcessBuilder("gio", "trash", path)
                         .redirectErrorStream(true)
@@ -278,7 +275,6 @@ public final class Shell {
             }
             return p.exitValue() == 0;
         } catch (Exception e) {
-            // PowerShell 起不来同样返回失败，让调用方把真实原因报出来
             return false;
         }
     }

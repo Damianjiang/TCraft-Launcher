@@ -108,7 +108,7 @@ public class PageInstanceSetup implements Page {
 
     private Node nav(String title, String icon, String key) {
         Ui.ListItem item = new Ui.ListItem(Theme.icon(icon, 16, Theme.text), title, null, 34);
-        item.setUserData(key); // refreshRight 用来同步左栏选中态
+        item.setUserData(key); // refreshRight 同步左栏选中态用
         item.setSelected(key.equals(data.instanceSection));
         item.setOnMouseClicked(e -> {
             if (key.equals(data.instanceSection)) return;
@@ -161,7 +161,7 @@ public class PageInstanceSetup implements Page {
         data.setInstance("WindowWidth", "854");
         data.setInstance("WindowHeight", "480");
         data.save();
-        win.openSetup("settings");
+        win.refreshRight();
         win.toast("已重置", "版本设置已恢复默认", 1);
     }
 
@@ -368,7 +368,6 @@ public class PageInstanceSetup implements Page {
         HBox searchRow = new HBox(10);
         searchRow.setAlignment(Pos.CENTER_LEFT);
         diagSearch = Ui.field("搜索日志关键字");
-        // 每键全量重建 ListView 太重，200ms 防抖
         javafx.animation.PauseTransition diagSearchDebounce =
                 new javafx.animation.PauseTransition(javafx.util.Duration.millis(200));
         diagSearchDebounce.setOnFinished(e -> diagApplyFilter());
@@ -441,7 +440,7 @@ public class PageInstanceSetup implements Page {
         Path target = diagSourcePaths.get(index);
         diagPath.setText(target.toString());
         diagStatus.setText(Lang.t("正在读取…"));
-        // 代次计数：快速切换来源时旧结果不覆盖新日志
+        // 代次计数，防旧异步结果覆盖
         final int gen = ++diagLoadGen;
         Thread t = new Thread(() -> {
             java.util.List<String[]> result = new ArrayList<>();
@@ -897,7 +896,7 @@ public class PageInstanceSetup implements Page {
         actions.getChildren().addAll(
                 Ui.button("打开日志页", Ui.BTN_NORMAL, () -> win.openSetup("log")),
                 Ui.button("清空记录", Ui.BTN_RED, () -> {
-                    data.log.removeIf(l -> l.contains("启动") || l.contains("游戏"));
+                    data.log.removeIf(l -> l.contains("启动") || l.contains("游戏") || l.contains("安装"));
                     win.refreshRight();
                     win.toast("已清空", "启动记录已清除", 1);
                 }));
@@ -947,7 +946,6 @@ public class PageInstanceSetup implements Page {
                 loginRequire.getSelectionModel().getSelectedIndex()));
         basic.add(Ui.settingRow("登录要求", loginRequire));
 
-        // 内存：自动 / 自定义，每个实例独立
         int ramType = data.getInstanceInt("RamType", 0);
         Ui.RadioBox autoRam = Ui.radioBox("自动配置", ramType == 0);
         Ui.RadioBox customRam = Ui.radioBox("自定义", ramType == 1);
@@ -1031,7 +1029,6 @@ public class PageInstanceSetup implements Page {
         basic.add(sizeRow);
 
         Ui.Card java = addCard(page, "Java 与高级");
-        // 实例可指定 Java；无缓存先占位后台扫
         java.util.List<Data.JavaRuntime> runtimes;
         if (data.hasJavaScanCache()) {
             runtimes = data.scanJavaRuntimes();
@@ -1215,7 +1212,6 @@ public class PageInstanceSetup implements Page {
         Ui.ListItem item = new Ui.ListItem(icon, display,
                 (disabled ? "已禁用 · " : "") + (display.equals(fileDisplay) ? "" : fileDisplay + " · ") + sizeOf(mod), 40);
         if (wantLocalName && cached == null) {
-            // 名字后台读：逐个 ZipFile 卡主线程；池固定 2 线程
             MOD_NAME_POOL.execute(() -> {
                 String local = readLocalModName(mod);
                 if (local == null || local.isBlank()) return;
@@ -1241,7 +1237,7 @@ public class PageInstanceSetup implements Page {
         return item;
     }
 
-    // 只解析 Mod 内的名称，不读缓存；读盘操作，须在后台线程调用
+    // 读盘操作，须在后台线程调用；不读缓存
     private static String readLocalModName(Path mod) {
         String found = "";
         try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(mod.toFile())) {
@@ -1283,7 +1279,6 @@ public class PageInstanceSetup implements Page {
             new java.util.concurrent.ConcurrentHashMap<>();
     private static final int MOD_NAME_CACHE_LIMIT = 2000;
 
-    // 读包名固定 2 线程：够快，又不会几百个 Mod 一次起几百条线程
     private static final java.util.concurrent.ExecutorService MOD_NAME_POOL =
             java.util.concurrent.Executors.newFixedThreadPool(2, r -> {
                 Thread t = new Thread(r, "TCL-Mod-Name");
@@ -1291,7 +1286,6 @@ public class PageInstanceSetup implements Page {
                 return t;
             });
 
-    // 缓存上限固定，来回切换多个大型整合包也不会无限增长
     private static void cacheModName(String key, String name) {
         if (MOD_NAME_CACHE.size() >= MOD_NAME_CACHE_LIMIT) MOD_NAME_CACHE.clear();
         MOD_NAME_CACHE.put(key, name);
@@ -1343,7 +1337,6 @@ public class PageInstanceSetup implements Page {
     }
 
     private void modDetail(Path mod, String display, boolean disabled) {
-        // 大 jar 的 ZipFile 解析是磁盘 IO，跟读 Mod 名一样放后台，弹卡回 FX
         MOD_NAME_POOL.execute(() -> {
             String[] meta = null;
             try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(mod.toFile())) {
@@ -1489,7 +1482,6 @@ public class PageInstanceSetup implements Page {
                     win.refreshRight();
                 });
             } catch (Exception e) {
-                // 失败时还原备份，Mod 不能就这么丢了
                 if (backup[0] != null && !Files.exists(oldMod)) {
                     try {
                         Files.move(backup[0], oldMod, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
@@ -1558,7 +1550,6 @@ public class PageInstanceSetup implements Page {
                 item.addAction(toggle);
                 if (isShader && !disabled) {
                     StackPane use = Ui.listAction("circle-check", 26, 15, "设为当前使用", () -> {
-                        // 写 options.txt 挪后台
                         Threads.start("TCL-ShaderUse", () -> {
                             writeOption(root, "shaderPack", display);
                             javafx.application.Platform.runLater(() -> {
@@ -1720,7 +1711,7 @@ public class PageInstanceSetup implements Page {
             Path target;
             try {
                 target = save.resolveSibling(name.trim()).toAbsolutePath().normalize();
-                // normalize 后必须还落在 saves 目录里，绝对路径和 .. 一律拒绝
+                // normalize 后须仍落在存档目录内
                 if (!target.startsWith(save.getParent().toAbsolutePath().normalize())) {
                     win.toast("重命名失败", "目标路径超出了存档目录。", 3);
                     return;
@@ -1806,7 +1797,6 @@ public class PageInstanceSetup implements Page {
 
     private void deleteSave(Path save) {
         Dialogs.confirm(win, "删除存档", Lang.tf("确定要删除存档 %s 吗？\n该世界将永久丢失，无法恢复。", save.getFileName()), () -> {
-            // 大存档几万个文件，递归删除放后台
             Threads.start("TCL-SaveDelete", () -> {
                 String error = null;
                 try (var stream = Files.walk(save)) {
@@ -1854,7 +1844,6 @@ public class PageInstanceSetup implements Page {
             win.toast("目标路径已存在文件", target.getFileName().toString(), 2);
             return;
         }
-        // 挪文件 + 重写 options.txt 一起放后台，完成后回 FX 刷新
         Threads.start("TCL-PackToggle", () -> {
             String error = null;
             try {
@@ -1924,7 +1913,6 @@ public class PageInstanceSetup implements Page {
                 }
                 String fTime = time;
                 Ui.ListItem item = new Ui.ListItem(Theme.icon("map", 16, Theme.text), save.getFileName().toString(), "最后修改 " + time, 40);
-                // 四项操作：打开、重命名、导出、删除
                 StackPane open = Ui.listAction("folder-open", 26, 15, "打开存档文件夹", () -> openFolder(save.toString()));
                 StackPane rename = Ui.listAction("pencil", 26, 15, "重命名存档", () -> renameSave(save));
                 StackPane export = Ui.listAction("upload", 26, 15, "导出为 .zip", () -> exportSave(save));
@@ -2342,7 +2330,6 @@ public class PageInstanceSetup implements Page {
             card.add(Ui.button("打开实例文件夹", Ui.BTN_NORMAL, () -> openFolder(instanceRoot().toString())));
             return;
         }
-        // 流式扫整个 mrpack 可能有几百 MB，放后台，扫完回 FX 渲染
         final Path scanPack = packPath;
         Threads.start("TCL-CompScan", () -> {
             java.util.Map<String, byte[]> entries = new java.util.LinkedHashMap<>();
@@ -2598,7 +2585,7 @@ public class PageInstanceSetup implements Page {
     }
 
     private void jijApplyJars(Path modPath, String error, List<String[]> jars) {
-        // 入口比对：已经切到别的 Mod 时，旧读取结果直接丢掉
+        // 入口比对，防旧读取结果覆盖
         if (modPath != jijCurrentMod) return;
         if (error != null) {
             jijTip.setText("读取失败：" + error);
@@ -2640,7 +2627,6 @@ public class PageInstanceSetup implements Page {
     }
 
     private void jijExportEntry(Path modPath, String entryName) {
-        // 全量扫 zip 挪后台，扫完回 FX 提示
         Threads.start("TCL-JiJ-Export", () -> {
             String error = null;
             Path folder = null;
@@ -2681,7 +2667,6 @@ public class PageInstanceSetup implements Page {
     private void jijExportAll() {
         if (jijCurrentMod == null) return;
         final Path modPath = jijCurrentMod;
-        // 全量扫 zip 挪后台，扫完回 FX 提示
         Threads.start("TCL-JiJ-ExportAll", () -> {
             String error = null;
             Path folder = null;
@@ -2762,7 +2747,6 @@ public class PageInstanceSetup implements Page {
                         task.stage = "正在复制 " + done + " / " + files.size();
                     }
                 }
-                // 版本 json 改名并把 id 改成新实例名
                 PageInstance.rewriteVersionJson(newFolder, ins.version, copyName);
                 javafx.application.Platform.runLater(() -> {
                     Data.Instance copy = new Data.Instance(copyName, copyName, ins.loader, ins.loaderVersion,
@@ -2854,7 +2838,6 @@ public class PageInstanceSetup implements Page {
             boolean hasLoader = hasModLoader(ins);
             if (opt.requireModLoader() && !hasLoader) continue;
             if (opt.requireOptiFine() && !hasOptiFine(ins)) continue;
-            // rules 非空直接显示，否则查目录是否存在
             boolean visible;
             if (opt.rules() != null) visible = true;
             else {
@@ -2884,7 +2867,6 @@ public class PageInstanceSetup implements Page {
         modrinth.setOnAction(() -> exportModrinth = modrinth.isSelected());
         options.add(modrinth);
         if (exportRulesOverride != null) {
-            // 配置覆盖时固定导出内容
             options.add(Ui.label(Lang.tf("导出内容列表：从配置文件中读取（%d 行）。", exportRulesOverride.size()), 12.5, Theme.gray2));
         }
 
@@ -2964,11 +2946,11 @@ public class PageInstanceSetup implements Page {
         String lower = relativePath.toLowerCase(java.util.Locale.ROOT);
         for (String rule : rules) {
             String r = rule.trim().toLowerCase(java.util.Locale.ROOT);
-            // # 是注释行，导出模板里给用户看的
+            // # 是注释行
             if (r.isEmpty() || r.startsWith("#")) continue;
             boolean revert = r.startsWith("!");
             if (revert) r = r.substring(1);
-            // 目录规则（mods/ 这类）按前缀匹配整个目录，全串匹配永远落空
+            // 目录规则按前缀匹配整个目录，全串匹配会落空
             String pattern = r.endsWith("/") ? globToRegex(r) + ".*" : globToRegex(r);
             if (lower.matches(pattern)) keep = !revert;
         }
@@ -3029,7 +3011,6 @@ public class PageInstanceSetup implements Page {
                 if (parent != null) Files.createDirectories(parent);
                 target = Paths.get(exportConfiguredPackPath).toFile();
             } catch (Exception ex) {
-                // 路径无效时提示，再手动选择
                 String msg = "指定的路径：" + exportConfiguredPackPath + "\n\n" + ex.getMessage();
                 Dialogs.confirm(win, "无法使用配置文件中指定的导出路径", msg + Lang.t("\n\n仍要手动选择导出位置吗？"),
                         () -> startExport(nameField, versionField, ruleOverride, true));
@@ -3066,7 +3047,6 @@ public class PageInstanceSetup implements Page {
                 Files.createDirectories(overrides);
                 task.subs.get(0).state = Tasks.State.RUNNING;
 
-                // 跳过 assets、versions、libraries 等目录
                 java.util.List<Path> hostedCandidates = new ArrayList<>();
                 final int[] copied = {0};
                 try (var walk = Files.walk(game, 20)) {
@@ -3098,7 +3078,6 @@ public class PageInstanceSetup implements Page {
                 }
                 task.subs.get(0).state = Tasks.State.DONE;
 
-                // 用 sha1 查 Modrinth 托管地址
                 task.subs.get(1).state = Tasks.State.RUNNING;
                 java.util.Map<Path, String> downloadUrls = new java.util.LinkedHashMap<>();
                 if (exportDontCheckHosted) {
@@ -3122,7 +3101,6 @@ public class PageInstanceSetup implements Page {
                         for (Map.Entry<String, Path> e : byHash.entrySet()) {
                             Map<String, Object> hit = Json.obj(root.get(e.getKey()));
                             if (hit.isEmpty()) continue;
-                            // 校验返回的 sha1
                             String confirmed = Json.str(Json.obj(hit.get("hashes")), "sha1", "");
                             if (!confirmed.equalsIgnoreCase(e.getKey())) continue;
                             List<Object> files = Json.arr(hit.get("files"));
@@ -3131,7 +3109,7 @@ public class PageInstanceSetup implements Page {
                             if (!url.isEmpty()) downloadUrls.put(e.getValue(), url);
                         }
                     } catch (Exception e) {
-                        // 联网失败时询问是否继续；取消必须放行等待线程，不能挂满 5 分钟
+                        // 取消须放行等待线程，不能挂满 5 分钟
                         final Exception fe = e;
                         final boolean[] proceed = {false};
                         CountDownLatch latch = new CountDownLatch(1);
@@ -3234,7 +3212,6 @@ public class PageInstanceSetup implements Page {
                 javafx.application.Platform.runLater(() ->
                         win.toast(task.canceled ? "导出已取消" : "导出失败", task.error, 3));
             } finally {
-                // 成功失败都要清临时目录，失败残留能把临时盘吃满
                 if (cache != null) {
                     try (var walk = Files.walk(cache)) {
                         walk.sorted(java.util.Comparator.reverseOrder()).forEach(p -> p.toFile().delete());

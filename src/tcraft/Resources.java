@@ -40,7 +40,6 @@ public final class Resources {
         return dir;
     }
 
-    // 日志统一放 .tcl/log
     public static Path logDir() {
         Path dir = home().resolve("log");
         try {
@@ -222,7 +221,7 @@ public final class Resources {
             if (last != null) throw last;
             return false;
         } catch (Exception e) {
-            System.err.println("[TCL] WebP 解码库下载失败：" + e);
+            Log.error("[" + java.time.LocalDateTime.now().toLocalTime().withNano(0) + "] WebP 解码库下载失败：" + e);
             return false;
         }
     }
@@ -302,7 +301,7 @@ public final class Resources {
         Files.createDirectories(dir);
         String marker = version + "-" + classifier;
         Path ready = dir.resolve(".ready");
-        // 清掉非当前版本的 jar，同名模块多版本会让启动失败
+        // 同名模块多版本会让启动失败
         removeStaleJfxJars(dir, classifier, version);
         // .ready 不可信，按 javafx.properties 校验
         boolean jarsPresent = true;
@@ -320,7 +319,7 @@ public final class Resources {
             ui.setStatus("运行库检查完成", 70);
             return dir;
         }
-        // 版本不符或文件残缺时清掉旧 jar，17 和 21 混用起不来
+        // 17 和 21 混用起不来
         for (String module : JFX_MODULES) {
             Files.deleteIfExists(dir.resolve(jarName(module, classifier, version)));
         }
@@ -392,7 +391,6 @@ public final class Resources {
 
     private static void downloadArtifact(String module, String classifier, String version, Path target,
                                          StartupWindow ui, int base, int span, int index, int total) throws Exception {
-        // 国内镜像优先，官方仓库兜底
         List<String> repos = new ArrayList<>();
         repos.add("https://mirrors.cloud.tencent.com/nexus/repository/maven-public");
         repos.add("https://repo1.maven.org/maven2");

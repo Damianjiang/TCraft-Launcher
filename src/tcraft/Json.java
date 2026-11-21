@@ -7,7 +7,7 @@ import java.util.Map;
 
 public final class Json {
 
-    // 服务端响应不会有这个深度，超了只可能是恶意构造或解析错位
+    // 防恶意深嵌套
     private static final int MAX_DEPTH = 128;
 
     public static class MalformedException extends RuntimeException {
@@ -168,7 +168,7 @@ public final class Json {
             char c = s.charAt(i++);
             if (c == '"') break;
             if (c == '\\') {
-                // 转义符后面没内容了，按未闭合处理，不能越界
+                // 转义符后无内容按未闭合处理
                 if (i >= s.length()) throw new MalformedException("JSON 字符串未闭合");
                 char e = s.charAt(i++);
                 switch (e) {

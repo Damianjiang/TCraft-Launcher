@@ -31,7 +31,6 @@ public class PageResourceDetail implements Page {
 
     private List<ResourceVersion> allVersions;
     private String loadError = "";
-    private boolean loadFailed = false;
 
     private String versionFilter;
     private boolean groupedDrop, groupedFold;
@@ -150,7 +149,6 @@ public class PageResourceDetail implements Page {
         texts.setMinWidth(0);
         if (info.desc != null && !info.desc.isEmpty()) {
             Label desc = Ui.label(info.desc, 11.5, Theme.gray2);
-            // 单行截断，否则长描述会挤掉平台名
             desc.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
             desc.setWrapText(false);
             desc.setMinWidth(0);
@@ -214,7 +212,6 @@ public class PageResourceDetail implements Page {
 
     private void startLoad() {
         allVersions = null;
-        loadFailed = false;
         loadError = "";
         panLoadHost.getChildren().setAll(loadingCard());
         panLoadHost.setVisible(true);
@@ -225,7 +222,7 @@ public class PageResourceDetail implements Page {
             try {
                 List<ResourceVersion> list = new ArrayList<>();
                 if (info.isCurseForge()) {
-                    // 旧版收藏可能只存了 slug 没存数字 id，给可操作的提示而不是原始异常
+                    // 旧版收藏可能只存 slug 没存数字 id
                     if (!pid.matches("\\d+")) {
                         throw new Exception("该收藏缺少 CurseForge 的数字 id，请取消收藏后重新收藏");
                     }
@@ -239,7 +236,6 @@ public class PageResourceDetail implements Page {
                         if (!v.downloadUrls.isEmpty()) list.add(v);
                     }
                 }
-                // 解析前置并填进 Dependencies
                 resolveDependencies(list);
                 Platform.runLater(() -> {
                     allVersions = list;
@@ -247,7 +243,6 @@ public class PageResourceDetail implements Page {
                 });
             } catch (Exception e) {
                 Platform.runLater(() -> {
-                    loadFailed = true;
                     loadError = e.getMessage() == null ? "网络错误" : e.getMessage();
                     showLoadError();
                 });
@@ -530,7 +525,6 @@ public class PageResourceDetail implements Page {
             if (pair.getKey().equals(targetCardName)) {
                 buildCardContent(stack, pair.getValue());
             } else {
-                // 折叠卡先不建几百行节点，展开时经 Ui.Card 的懒构建钩子再建
                 card.setLazyContent(() -> buildCardContent(stack, pair.getValue()));
             }
             card.add(stack);
@@ -912,7 +906,7 @@ public class PageResourceDetail implements Page {
         if (hasDeps) task.subs.add(new Tasks.SubTask("下载前置文件"));
         String ext = extOf(file).toLowerCase();
         boolean worldZip = file.resourceType.equals("world") && (ext.equals("zip") || ext.equals("mca"));
-        // 世界下载通常没有前置，子任务下标不固定，用引用不用下标
+        // 子任务下标不固定，用引用不用下标
         Tasks.SubTask worldSub = worldZip ? new Tasks.SubTask("安装世界存档") : null;
         if (worldSub != null) task.subs.add(worldSub);
         Tasks.INSTANCE.add(task);

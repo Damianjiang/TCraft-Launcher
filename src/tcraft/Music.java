@@ -37,14 +37,13 @@ public final class Music {
         } catch (Exception ignored) {
         }
         available = !FILES.isEmpty();
-        // 刷新后列表可能变短，index 不归位 currentName() 会越界
+        // 列表变短时 index 归零防越界
         if (index >= FILES.size()) index = 0;
     }
 
-    // UiMusicAuto 开着就起播；MediaPlayer 只能 FX 线程建，调用方保证
+    // MediaPlayer 只能 FX 线程建，调用方保证
     public static synchronized void autoStart() {
         if (!available() || !Data.get().getBool("UiMusicAuto", false)) return;
-        // 刷新时已在播，换到新列表的第一首
         stopPlayer();
         try {
             boolean random = Data.get().getBool("UiMusicRandom", false);
@@ -183,7 +182,7 @@ public final class Music {
         try {
             Media media = new Media(FILES.get(i).toUri().toString());
             player = new MediaPlayer(media);
-            // 时长是异步解析的，构造后立刻 getDuration() 恒为 UNKNOWN
+            // 时长异步解析，构造后 getDuration 恒 UNKNOWN
             totalTime = null;
             player.totalDurationProperty().addListener((o, was, now) -> totalTime = now);
             boolean multiple = FILES.size() > 1;
@@ -191,30 +190,29 @@ public final class Music {
             player.setVolume(volumePercent() / 100.0);
             player.play();
             paused = false;
-            // 真正播起来才清零连败计数，坏曲目在 onReady 前不能重置它
+            // 播 1.5s 才清零连败计数
             player.currentTimeProperty().addListener((o, was, now) -> {
                 if (now != null && now.toMillis() > 1500) errorStreak = 0;
             });
-            // 坏曲目异步报错，不挂 onError 连播会在这里静默停住
+            // 不挂 onError 连播会静默停住
             final MediaPlayer mp = player;
             player.setOnError(() -> javafx.application.Platform.runLater(() -> {
                 // 已被切走的旧播放器的迟到回调不计数
                 if (player != mp) return;
                 errorStreak++;
                 if (errorStreak >= FILES.size()) {
-                    // 全部曲目连败即停止播放
                     stopPlayer();
                     paused = true;
                     return;
                 }
                 Music.next();
             }));
-            // 回调栈里直接 dispose 旧播放器有重入风险，挪到下一帧
+            // 直接 dispose 有重入风险，挪下一帧
             if (multiple) player.setOnEndOfMedia(() -> javafx.application.Platform.runLater(Music::next));
         } catch (Exception e) {
             player = null;
             paused = true;
-            // 构造期同步失败（URI 非法等）也是坏曲目，走同一熔断
+            // 构造期失败也走同一熔断
             errorStreak++;
             if (errorStreak < FILES.size()) {
                 javafx.application.Platform.runLater(Music::next);

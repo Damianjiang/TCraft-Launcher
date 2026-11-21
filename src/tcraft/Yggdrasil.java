@@ -122,7 +122,6 @@ public final class Yggdrasil {
     public static boolean validate(Server server, String accessToken, String clientToken)
             throws IOException, AuthException {
         if (accessToken == null || accessToken.isEmpty()) return false;
-        // validate 也带 token，明文 HTTP 等于交给中间人
         requireSecure(server);
         String body = "{\"accessToken\":" + Json.quote(accessToken)
                 + ",\"clientToken\":" + Json.quote(clientToken == null ? "" : clientToken) + "}";
@@ -182,7 +181,6 @@ public final class Yggdrasil {
         return p;
     }
 
-    // 先读认证响应里的 textures，没有再查 sessionserver 档案
     public static String skinUrlOf(Server server, Profile profile) throws IOException {
         String direct = textureUrl(profile.properties.get("textures"));
         if (direct != null) return direct;

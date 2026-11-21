@@ -1,7 +1,6 @@
 package tcraft;
 
 import java.io.BufferedWriter;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
@@ -9,7 +8,6 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -25,7 +23,6 @@ public final class Log {
     private static final long MAX_FILE_BYTES = 2L * 1024 * 1024;
     private static final int KEEP_ROTATIONS = 4;
     private static final long EXPORT_LIMIT = 32L * 1024 * 1024;
-    private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
 
     private static final Object LOCK = new Object();
     private static final ArrayBlockingQueue<String[]> QUEUE = new ArrayBlockingQueue<>(QUEUE_CAPACITY);
@@ -71,7 +68,7 @@ public final class Log {
     public static void startSession() {
         if (!SESSION.compareAndSet(false, true)) return;
         try {
-            // 启动壳的 stdout 日志也可能跨版本累积，超过 1MB 归档
+            // launch.log 超 1MB 归档
             rotateIfBig(Resources.logDir().resolve("launch.log"), 1024 * 1024, "launch");
         } catch (Throwable ignored) {
         }
@@ -146,7 +143,7 @@ public final class Log {
     }
 
     public static int cleanup() {
-        // 只关句柄不杀写线程，清理后仍可继续记录新日志
+        // 只关句柄不杀写线程
         synchronized (LOCK) {
             closeMain();
             closeError();

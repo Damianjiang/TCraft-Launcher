@@ -567,7 +567,7 @@ public final class Modpacks {
                 }
             }
 
-            // 登记实例：内容在 versions/，继承加载器版本；desc 创建时翻译
+            // desc 创建时翻译
             String desc = info.typeName + Lang.t(" 整合包 · MC ") + info.mcVersion
                     + (info.loader.isEmpty() ? "" : Lang.t("，") + info.loader + " " + info.loaderVersion);
             Data.Instance instance = new Data.Instance(instanceName, instanceName,
@@ -590,7 +590,7 @@ public final class Modpacks {
             task.progress = 0.92;
             Tasks.INSTANCE.changed();
 
-            // 装完版本才置 DONE，防启动找不到 json
+            // 防启动时找不到版本 json
             String loader = info.loader.isEmpty() ? "原版" : info.loader;
             String actual;
             try {
@@ -602,7 +602,7 @@ public final class Modpacks {
                     task.stage = "已取消";
                     return;
                 }
-                // 内容已解压，不删实例目录，只报失败原因
+                // 内容已解压，不删实例目录
                 task.state = Tasks.State.FAILED;
                 task.error = Lang.tf("整合包内容已解压，但游戏版本安装失败：%s",
                         e.getMessage() == null ? Lang.t("网络错误") : e.getMessage());
@@ -636,7 +636,7 @@ public final class Modpacks {
         }
     }
 
-    // 清除包内实例设置的命令与附加参数，这两类只允许本机填写
+    // 包内自带的命令与附加参数只允许本机填写，一律清除
     private static void sanitizeImportedInstanceSettings(Path versionFolder) {
         try {
             Path ini = versionFolder.resolve("TCL").resolve("Setup.ini");
@@ -693,7 +693,7 @@ public final class Modpacks {
             if (!target.startsWith(versionFolder)) continue; // 别写穿
             // TCL/ 是配置目录，-javaagent 会挂进 JVM
             if (target.startsWith(versionFolder.resolve("TCL"))) {
-                data_log("跳过写向 TCL 目录的整合包内容：" + relPath);
+                logSkipped("跳过写向 TCL 目录的整合包内容：" + relPath);
                 continue;
             }
             List<String> urls = new ArrayList<>();
@@ -736,7 +736,7 @@ public final class Modpacks {
                 if (!found.contains(String.valueOf(id))) missing.add(id);
             }
             if (!missing.isEmpty()) {
-                data_log("整合包缺失以下文件（可能已被原作者删除）：" + missing);
+                logSkipped("整合包缺失以下文件（可能已被原作者删除）：" + missing);
                 boolean go = askInBackground(win, "整合包内容缺失",
                         Lang.tf("未找到该整合包所需的 %d 个内容，它们可能已被原作者删除。\n"
                                 + "缺失这些内容可能导致整合包出现异常！是否继续安装？", missing.size()));
@@ -762,7 +762,6 @@ public final class Modpacks {
             java.util.Map<String, Object> f = Json.obj(o);
             ResourceVersion rv = ResourceVersion.fromCurseForgeJson(f, "mod");
             if (rv.downloadUrls.isEmpty() || rv.fileName.isEmpty()) continue;
-            // 按模块推断保存目录
             List<String> modules = new ArrayList<>();
             for (Object m : Json.arr(f.get("modules"))) {
                 modules.add(Json.str(Json.obj(m), "name", ""));
@@ -772,7 +771,7 @@ public final class Modpacks {
             if (!lower.endsWith(".jar") && !lower.endsWith(".litemod")) {
                 long modId = (long) Json.num(f, "modId", 0);
                 if (modId > 0) {
-                    // 分类查不到就中止安装，不能把材质包静默装进 mods
+                    // 分类查不到就中止，不能把材质包装进 mods
                     int classId;
                     try {
                         classId = classCache.computeIfAbsent(modId, id -> {
@@ -795,7 +794,7 @@ public final class Modpacks {
             if (!target.startsWith(versionFolder)) continue; // 别写穿目录
             // TCL/ 是配置目录，不允许被写穿
             if (target.startsWith(versionFolder.resolve("TCL"))) {
-                data_log("跳过写向 TCL 目录的整合包内容：" + target.getFileName());
+                logSkipped("跳过写向 TCL 目录的整合包内容：" + target.getFileName());
                 continue;
             }
             if (!Files.isRegularFile(target)) {
@@ -826,7 +825,7 @@ public final class Modpacks {
             if (!target.startsWith(versionFolder)) continue;
             // TCL/ 是配置目录，不允许被写穿
             if (target.startsWith(versionFolder.resolve("TCL"))) {
-                data_log("跳过写向 TCL 目录的整合包内容：" + relPath);
+                logSkipped("跳过写向 TCL 目录的整合包内容：" + relPath);
                 continue;
             }
             if (!Files.isRegularFile(target)) {
@@ -1052,7 +1051,7 @@ public final class Modpacks {
         throw new java.io.IOException("没有可用的下载地址：" + target.getFileName());
     }
 
-    private static void data_log(Object msg) {
+    private static void logSkipped(Object msg) {
         Data.get().log(String.valueOf(msg));
     }
 }

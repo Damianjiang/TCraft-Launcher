@@ -218,7 +218,7 @@ public class PageLaunch implements Page {
     private void openLaunchMenu(Node anchor) {
         Data.Instance instance = data.instance();
         boolean hasInstance = instance != null;
-        // 连点兜底：上一张还挂着就先收掉，不能叠两层
+        // 连点兜底：上一张还挂着就先收掉
         if (menuPopup != null && menuPopup.isShowing()) menuPopup.hide();
         Popup popup = new Popup();
         popup.setAutoHide(true);
@@ -306,7 +306,7 @@ public class PageLaunch implements Page {
             });
             return;
         }
-        // 先清掉旧 handler，页面反复重建时会重复挂
+        // 页面反复重建会重复挂 handler
         if (aprilScene != null && aprilScene.getRoot() != null) aprilScene.getRoot().setOnMouseMoved(null);
         aprilScene = scene;
         scene.getRoot().setOnMouseMoved(e -> {
@@ -344,7 +344,7 @@ public class PageLaunch implements Page {
                 b.getMinX() + btn.getWidth() / 2 + aprilOffset[0].getX(),
                 b.getMinY() + btn.getHeight() / 2 + aprilOffset[0].getY());
         javafx.geometry.Point2D vec = mouse.subtract(center);
-        // 鼠标恰好压在按钮中心时 normalize 会出 NaN，把整个变换污染掉
+        // 鼠标压在按钮中心时 normalize 出 NaN
         if (vec.magnitude() < 1e-6) return;
         javafx.geometry.Point2D dir = vec.normalize();
         javafx.geometry.Point2D direction = dir.multiply(-1);

@@ -34,7 +34,7 @@ public final class InstanceMeta {
         return versionDir(ins).resolve("TCL").resolve("Setup.ini");
     }
 
-    // Setup.ini 按 lastModified 缓存，免重复读
+    // 按 lastModified 缓存
     private static final java.util.concurrent.ConcurrentHashMap<String, CachedIni> INI_CACHE =
             new java.util.concurrent.ConcurrentHashMap<>();
 

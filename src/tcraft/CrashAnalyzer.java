@@ -50,7 +50,6 @@ public final class CrashAnalyzer {
         List<Hit> hits = new ArrayList<>();
         List<String> fallback = new ArrayList<>();
         if (lines == null) return new Result(hits, fallback);
-        // 规则与行各只小写一次；命中按规则表顺序输出
         String[] ruleLows = new String[RULES.length];
         String[] ruleFound = new String[RULES.length];
         for (int i = 0; i < RULES.length; i++) {

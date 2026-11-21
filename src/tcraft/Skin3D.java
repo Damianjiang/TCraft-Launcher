@@ -63,7 +63,6 @@ public final class Skin3D extends Region {
             }
         }));
         autoTimer.setCycleCount(Timeline.INDEFINITE);
-        // scene 变 null 即停表
         sceneProperty().addListener((o, oldScene, newScene) -> applyRunState());
         autoTimer.play();
     }
@@ -119,7 +118,7 @@ public final class Skin3D extends Region {
             clearSkin();
             return;
         }
-        // 图片可能还在后台解码，此时读像素只会得到整片白色
+        // 图片未解码完时读像素全是白色
         if (image.getProgress() < 1) {
             javafx.beans.value.ChangeListener<Number> wait = new javafx.beans.value.ChangeListener<>() {
                 @Override
@@ -397,7 +396,7 @@ public final class Skin3D extends Region {
             mx /= 4;
             my /= 4;
             mz /= 4;
-            // 法线同步旋转，只旋转不平移
+            // 法线只旋转不平移
             double nx, ny, nz;
             {
                 double y1 = f.ny * cp - f.nz * sp;
@@ -446,13 +445,12 @@ public final class Skin3D extends Region {
         int step = (int) Math.ceil(1.0 / Math.max(0.2, pxPerTexel));
         step = Math.max(1, Math.min(4, step));
 
-        // 固定左上前方光源，白色皮肤也能看出各面
+        // 固定左上前方光源
         double lx = -0.35, ly = -0.55, lz = 0.78;
         double ln = Math.sqrt(lx * lx + ly * ly + lz * lz);
         double lambert = Math.max(0, (pr.nx * lx + pr.ny * ly + pr.nz * lz) / ln);
         double shade = 0.52 + 0.48 * lambert;
 
-        // 极淡的面轮廓，纯色皮肤也能分清各部位
         g.setStroke(Color.color(0, 0, 0, 0.18));
         g.setLineWidth(1.0);
         g.strokePolygon(pr.sx, pr.sy, 4);

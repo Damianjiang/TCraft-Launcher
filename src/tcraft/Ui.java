@@ -138,14 +138,13 @@ public final class Ui {
         private boolean lazyBuilt;
 
         public Card(String title) {
-            // title 归一成 ""，card(null) 走无标题卡片
             if (title == null) title = "";
             setBackground(glassFill(14));
             setBorder(glassBorder(14));
             setEffect(glow);
             setAlignment(Pos.TOP_LEFT);
             setMaxWidth(Double.MAX_VALUE);
-            // 不设 clip，clip 会把 DropShadow 一起裁掉
+            // clip 会裁掉 DropShadow
 
             VBox root = new VBox();
             root.setMaxWidth(Double.MAX_VALUE);
@@ -276,7 +275,7 @@ public final class Ui {
             boolean builtNow = lazyContent != null && !lazyBuilt;
             ensureContent();
             if (builtNow) {
-                // 内容刚建好，先让布局跑一帧，否则动画会卡在首帧
+                // 先让布局跑一帧，否则动画卡首帧
                 javafx.application.Platform.runLater(this::runToggle);
             } else {
                 runToggle();
@@ -295,7 +294,7 @@ public final class Ui {
             if (collapse) {
                 double height = content.getHeight() > 0 ? content.getHeight() : expandedHeight;
                 if (height > 600) {
-                    // 长内容只动裁剪，逐帧改高度会反复重排
+                    // 长内容只动裁剪防重排
                     javafx.scene.shape.Rectangle clip = new javafx.scene.shape.Rectangle();
                     clip.widthProperty().bind(content.widthProperty());
                     clip.setHeight(height);
@@ -382,13 +381,6 @@ public final class Ui {
             }
             content.setCache(false);
             setEffect(glow);
-        }
-
-        private void animationCleanup() {
-            setEffect(glow);
-            content.setCache(false);
-            content.setOpacity(1);
-            content.setTranslateY(0);
         }
 
         private void updateChevron() {
@@ -522,7 +514,7 @@ public final class Ui {
         animateBg(region, from, to, ms, null);
     }
 
-    // 同槽位先停旧动画再播新，防 hover 被拽回
+    // 同槽位先停旧动画，防拽回
     static void startExclusive(Node owner, Object slot, javafx.animation.Animation t) {
         Object old = owner.getProperties().put(slot, t);
         if (old instanceof javafx.animation.Animation running) running.stop();
@@ -645,14 +637,14 @@ public final class Ui {
         }
     }
 
-    // 当前打开的菜单卡片；二级菜单靠它拿到同一张卡片
+    // 二级菜单靠它拿到同一张卡片
     private static javafx.stage.Popup activeMenu;
 
     public static javafx.stage.Popup activeMenu() {
         return activeMenu;
     }
 
-    // 只构建菜单行（不含卡片外壳），二级菜单原地换内容时复用
+    // 不含外壳，二级菜单换内容时复用
     public static VBox menuRows(MenuRow... rows) {
         VBox box = new VBox(0);
         for (MenuRow row : rows) {
@@ -688,7 +680,7 @@ public final class Ui {
     private static VBox menuCardShell(double width) {
         VBox card = new VBox(0);
         card.setPadding(new Insets(8));
-        // 只设下限，实际宽度在 showMenuCard 里按内容量出来后回填
+        // 实际宽度在 showMenuCard 回填
         card.setMinWidth(width);
         card.setBackground(fill(popupBg(), 10));
         card.setBorder(border(Color.color(Theme.text.getRed(), Theme.text.getGreen(), Theme.text.getBlue(), 0.10), 10, 1));
@@ -725,7 +717,6 @@ public final class Ui {
         return screen;
     }
 
-    // 取更宽敞一侧扣边距算最大高度
     private static double calcMaxMenuHeight(javafx.geometry.Bounds ab,
                                             javafx.geometry.Rectangle2D area) {
         double below = area.getMaxY() - ab.getMaxY() - 16;
@@ -837,7 +828,7 @@ public final class Ui {
         box.w = w;
         box.vw = w + MENU_SHADOW_PAD * 2;
         box.vh = panelH + MENU_SHADOW_PAD * 2;
-        // 统一走滚动壳：内容放得下时壳里不显示滚动条，外观和裸卡片一致
+        // 统一走滚动壳，放得下时不显滚动条
         box.visual = scrollShell(card, w, panelH, contentH);
         return box;
     }
@@ -884,7 +875,7 @@ public final class Ui {
         root.setMinSize(vw, vh);
         root.setPrefSize(vw, vh);
         root.setMaxSize(vw, vh);
-        // 外层再裁一刀，防子节点撑大 bounds
+        // 防子节点撑大 bounds
         root.setClip(new Rectangle(vw, vh));
 
         javafx.scene.layout.Pane view = new javafx.scene.layout.Pane();
@@ -1199,7 +1190,6 @@ public final class Ui {
                 iconBox.setMinWidth(34);
                 iconBox.setPrefWidth(34);
                 iconBox.setMaxWidth(34);
-                // 图标居中，右侧留间距
                 HBox.setMargin(iconBox, new Insets(0, 9, 0, 2));
                 getChildren().add(iconBox);
             }
@@ -1668,8 +1658,6 @@ public final class Ui {
                 new javafx.scene.transform.Scale(1, 1, 9, 9);
         private boolean selected;
         private Color textColor = Theme.text;
-        private final javafx.beans.property.BooleanProperty selectedProp =
-                new javafx.beans.property.SimpleBooleanProperty(false);
         private Runnable onAction;
 
         public RadioBox(String text, boolean checked) {
@@ -1750,7 +1738,6 @@ public final class Ui {
         public void setSelected(boolean value) {
             if (value == selected) return;
             selected = value;
-            selectedProp.set(value);
             if (selected) {
                 javafx.animation.Timeline tl = new javafx.animation.Timeline(new javafx.animation.KeyFrame(
                         Duration.millis(Math.max(1, aniMs(390))),
@@ -2037,7 +2024,7 @@ public final class Ui {
         return scroll(content, SmoothScroll.DEFAULT_WHEEL_SPEED);
     }
 
-    // 小框滚轮放慢，滚动更平缓
+    // 小框滚轮放慢
     public static ScrollPane scroll(Node content, double wheelSpeed) {
         if (content instanceof Region region) region.setMaxWidth(Double.MAX_VALUE);
         ScrollPane sp = new ScrollPane(content);

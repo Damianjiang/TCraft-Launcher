@@ -222,7 +222,7 @@ public class PageOther implements Page {
         return l;
     }
 
-    // 30 分钟内的解析结果直接复用，来回切页不重拉 1MB+
+    // 30 分钟缓存，切页不重拉
     private VBox newsPage;
     private final java.util.List<Node> newsNodes = new java.util.ArrayList<>();
     private boolean newsLoading;
@@ -249,11 +249,11 @@ public class PageOther implements Page {
         page.getChildren().addAll(skeletons);
         Thread thread = new Thread(() -> {
             try {
-                // news.json 有 1MB+，靠 gzip 压；解析也留在后台
+                // news.json 1MB+，解析留后台
                 String body = Http.get("https://launchercontent.mojang.com/v2/news.json");
                 java.util.List<Object> entries = Json.arr(Json.obj(Json.parse(body)), "entries");
                 javafx.application.Platform.runLater(() -> {
-                    // 页面重进过后旧请求收尾直接丢弃，不影响新一轮动画
+                    // 页面重进后旧请求收尾直接丢弃
                     if (gen != newsGen) return;
                     newsCache = entries;
                     newsCacheAt = System.currentTimeMillis();
@@ -316,7 +316,7 @@ public class PageOther implements Page {
             page.getChildren().add(empty);
             newsNodes.add(empty);
         }
-        // 新卡片单独淡入，页面本身不整体变暗
+        // 新卡片单独淡入
         int ms = Ui.aniMs(130);
         for (Node n : newsNodes) {
             if (ms <= 0) break;
@@ -396,7 +396,6 @@ public class PageOther implements Page {
         return r;
     }
 
-    // 横幅图异步加载，UniformToFill 固定高
     private Node newsImage(String url) {
         final double h = 160;
         StackPane box = new StackPane();
@@ -411,7 +410,6 @@ public class PageOther implements Page {
             return box;
         }
         if (RemoteImages.failed(url)) return box;
-        // 加载期间放镐子动画占位，成功替换、失败留灰底
         Ui.Loading loading = new Ui.Loading(140, 70, null);
         loading.start();
         box.getChildren().add(loading);
@@ -431,7 +429,6 @@ public class PageOther implements Page {
             double cw = box.getWidth();
             double iw = img.getWidth(), ih = img.getHeight();
             if (cw <= 0 || iw <= 0 || ih <= 0) return;
-            // 溢出部分由 clip 裁掉（UniformToFill）
             double scale = Math.max(cw / iw, h / ih);
             iv.setFitWidth(iw * scale);
             iv.setFitHeight(ih * scale);
@@ -461,7 +458,6 @@ public class PageOther implements Page {
     }
 
     private void cleanJunk() {
-        // 删文件放后台，logs 大的话 FX 线程会卡一阵
         Threads.start("TCL-CleanJunk", () -> {
             int[] removed = {0};
             String error = null;

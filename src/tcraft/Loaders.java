@@ -107,7 +107,6 @@ public final class Loaders {
                 if (!v.isEmpty()) out.add(v);
             }
         }
-        // 没有适用版本就返回空列表，网络失败才抛异常
         return out;
     }
 

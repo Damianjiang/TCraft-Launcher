@@ -389,7 +389,6 @@ public final class Servers {
     private static String readMcString(InputStream s) throws java.io.IOException {
         int length = readVarInt(s);
         if (length <= 0) return "";
-        // 长度异常直接失败
         if (length > 1048576) throw new java.io.IOException("服务器返回的字符串长度异常：" + length);
         return new String(s.readNBytes(length), StandardCharsets.UTF_8);
     }
@@ -482,7 +481,6 @@ public final class Servers {
             try {
                 root = Json.obj(Json.parse(json));
             } catch (RuntimeException e) {
-                // 垃圾 JSON 按离线处理并报真实原因
                 result.errorMessage = Lang.t("服务器状态解析失败：") + (e.getMessage() == null || e.getMessage().isBlank()
                         ? Lang.t("响应不是有效的 JSON") : e.getMessage());
                 return result;
@@ -509,7 +507,7 @@ public final class Servers {
         return result;
     }
 
-    // SRV 记录极少变，结果缓存 10 分钟（含失败）
+    // SRV 结果缓存 10 分钟（含失败）
     private static final Map<String, Object[]> SRV_CACHE =
             java.util.Collections.synchronizedMap(new java.util.LinkedHashMap<>());
     private static final long SRV_TTL_MS = 600_000L;

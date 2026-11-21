@@ -55,7 +55,7 @@ public final class Dialogs {
                     onOk.run();
                 }
                 : () -> {
-                    // 先置结果再关窗：关闭钩子会触发 onCancel，顺序反了会被当成取消
+                    // 顺序反了会被关闭钩子当成取消
                     onOk.run();
                     win.closeModal();
                 };
@@ -708,7 +708,6 @@ public final class Dialogs {
 
     private static String importLocalSkin(String playerName, java.nio.file.Path source) throws Exception {
         if (!java.nio.file.Files.isRegularFile(source)) throw new Exception("皮肤文件不存在");
-        // 复用在线下载的 PNG 校验
         return Skins.save(playerName, java.nio.file.Files.readAllBytes(source));
     }
 
@@ -950,13 +949,9 @@ public final class Dialogs {
     private static String fetchMojangSkin(String nameOrUuid, String accountName) throws Exception {
         String id = nameOrUuid.trim();
         String uuid;
-        if (id.length() == 32) {
-            try {
-                Integer.parseInt(id, 16);
-                uuid = id.toLowerCase();
-            } catch (NumberFormatException e) {
-                uuid = mojangUuidFromName(id);
-            }
+        // parseInt 会溢出，用正则判 32 位 UUID
+        if (id.matches("[0-9a-fA-F]{32}")) {
+            uuid = id.toLowerCase();
         } else {
             uuid = mojangUuidFromName(id);
         }
@@ -1033,7 +1028,6 @@ public final class Dialogs {
         return Skins.download(accountName, url);
     }
 
-    // 从 Yggdrasil properties 取皮肤，失败回退默认
     private static String fetchYggdrasilSkin(Yggdrasil.Server server, Yggdrasil.Profile profile) {
         if (server == null || profile == null) return "Steve.png";
         try {
@@ -1077,7 +1071,6 @@ public final class Dialogs {
                 + "-" + s.substring(16, 20) + "-" + s.substring(20);
     }
 
-    // 与「检查更新」共用同一套弹窗卡片样式
     public static void colorTag(MainWindow win, Data.Instance ins, Runnable onChanged) {
         win.showModal(buildColorCard(win, ins, onChanged), true);
     }
@@ -1105,7 +1098,6 @@ public final class Dialogs {
             dot.setBackground(Ui.fill(colorOf(preset[1]), 17));
             dot.setCursor(javafx.scene.Cursor.HAND);
             if (!current.isEmpty() && current.equalsIgnoreCase(preset[1])) {
-                // 当前标签：白色内圈 + 深色外描边，一眼看出已选中
                 Region ring = new Region();
                 ring.setPrefSize(16, 16);
                 ring.setMinSize(16, 16);

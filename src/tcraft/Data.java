@@ -246,7 +246,7 @@ public final class Data {
     private final java.util.List<Runnable> versionWaiters = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     public void launchLog(String line) {
-        // 只留 500 行给崩溃分析；游戏日志本就在实例目录
+        // 500 行供崩溃分析
         launchLog.add(Redact.apply("[" + LocalDateTime.now().toLocalTime().withNano(0) + "] " + line));
     }
 
@@ -273,7 +273,7 @@ public final class Data {
         pruneInstances();
         if (instances.isEmpty()) seedInstances();
         if (folders.isEmpty()) folders.add(new FolderItem("当前文件夹", gameDir));
-        // exe 外壳选定的 Java 优先级最高，先认它，省一次启动扫描
+        // exe 外壳选定的 Java 优先级最高
         String forcedJava = System.getProperty("tcraft.java", "");
         if (!forcedJava.isEmpty() && usableJavaFast(forcedJava)) {
             javaPath = forcedJava;
@@ -290,7 +290,7 @@ public final class Data {
             }
         }
         if (javaPath == null || javaPath.isEmpty()) {
-            // 构造期不逐盘探测，先取缓存；缺的由 TCL-Java-Scan 补
+            // 构造期不逐盘探测，先取缓存
             javaPath = cachedJavaPath();
             if (javaPath.isEmpty()) startJavaScanFill();
         }
@@ -445,7 +445,7 @@ public final class Data {
         }
     }
 
-    // 缓存里有结果时设置页可以直接渲染，不用等后台扫完
+    // 设置页免等扫描
     public boolean hasJavaScanCache() {
         return javaScanCache != null && System.currentTimeMillis() - javaScanAt < 300_000;
     }
@@ -468,7 +468,6 @@ public final class Data {
         return cached.get(0).path;
     }
 
-    // 扫完仍空填最优，结果进缓存
     private void startJavaScanFill() {
         Thread t = new Thread(() -> {
             try {
@@ -571,7 +570,7 @@ public final class Data {
         return found;
     }
 
-    // 每个候选都要起进程读版本，串行在差机器上要几十秒
+    // 起进程读版本，须并行
     private static List<JavaRuntime> probeAll(List<String> candidates) {
         java.util.LinkedHashMap<String, JavaRuntime> found = new java.util.LinkedHashMap<>();
         List<String> unique = new ArrayList<>();
@@ -684,7 +683,7 @@ public final class Data {
         }
         String userHome = System.getProperty("user.home");
         if (!win && userHome != null) {
-            // JetBrains / SDKMAN 装在用户目录，桌面启动的 PATH 里常常没有
+            // JetBrains / SDKMAN 装在用户目录，常不在 PATH
             addJavaRoot(out, Paths.get(userHome, ".jdks"), win, mac);
             addJavaRoot(out, Paths.get(userHome, ".sdkman", "candidates", "java"), win, mac);
             if (mac) addJavaRoot(out, Paths.get(userHome, "Library", "Java", "JavaVirtualMachines"), win, mac);
@@ -893,7 +892,7 @@ public final class Data {
                 if (!Files.isRegularFile(dir.resolve(name + ".json"))) return;
                 boolean exists = false;
                 for (Instance i : instances) {
-                    // 已登记实例用的就是这个版本目录，不重复生成「已导入的版本」
+                    // 已登记的版本目录不重复生成
                     if (i.folder != null && i.folder.equals(gameDir)
                             && (i.name.equals(name) || name.equals(i.version))) exists = true;
                 }
@@ -990,7 +989,7 @@ public final class Data {
                     versions.sort((a, b) -> b.time.compareTo(a.time));
                     fallbackVersions = false;
                 }
-                // 版本数量属于常规状态，不写盘；只有回退到离线兜底才需要留痕
+                // 版本数量不写盘，仅兜底数据需留痕
             } catch (Exception e) {
                 log("获取官方版本列表失败，改用标注过的离线兜底数据：" + Log.describe(e));
                 seedBuiltinVersions();
@@ -1106,7 +1105,7 @@ public final class Data {
 
     public void load() {
         try {
-            // 先清掉旧键，importConfig 换文件后残留键会把导入变成叠加
+            // 清旧键，防导入残留叠加
             props.clear();
             if (!Files.exists(configPath)) {
                 props.setProperty("UiThemePreset", "-1");
@@ -1189,7 +1188,7 @@ public final class Data {
                     Instance ins = new Instance(p[0], p[1], p[2], p[3], p[4], p[5],
                             parseLong(p[6]), Boolean.parseBoolean(p[7]), p[8]);
                     if (p.length >= 10) ins.isolation = (int) parseLong(p[9]);
-                    // 旧格式没有 addedAt 段，回退 lastPlayed；空段/非法值同理
+                    // 旧格式无 addedAt，回退 lastPlayed
                     long added = p.length >= 11 ? parseLong(p[10]) : 0;
                     ins.addedAt = added > 0 ? added : ins.lastPlayed;
                     instances.add(ins);
@@ -1286,7 +1285,8 @@ public final class Data {
             props.setProperty("folder.current", gameDirSnap == null ? "" : gameDirSnap);
             props.setProperty("folder.count", String.valueOf(folderSnap.size()));
             for (int i = 0; i < folderSnap.size(); i++) {
-                props.setProperty("folder." + i, folderSnap.get(i).name + "|" + folderSnap.get(i).path);
+                props.setProperty("folder." + i, Favorite.esc(folderSnap.get(i).name)
+                        + "|" + Favorite.esc(folderSnap.get(i).path));
             }
             props.setProperty("java.path", javaPathSnap == null ? "" : javaPathSnap);
             props.setProperty("favorite.count", String.valueOf(favoriteSnap.size()));
@@ -1301,7 +1301,7 @@ public final class Data {
             Errors.error("保存配置失败（账户、实例与设置可能不会被保留）", e);
             return;
         } catch (RuntimeException e) {
-            // 列表在遍历中被并发改动等情况：记日志而不是把异常抛给调用方
+            // 并发改动等：记日志不外抛
             Errors.error("保存配置时发生异常（本次改动可能未写入）", e);
             return;
         }
@@ -1366,7 +1366,7 @@ public final class Data {
         try {
             applyProxyProps();
         } finally {
-            // 改代理后重建 HttpClient，老连接还是旧配置
+            // 老连接仍是旧代理配置
             if (INSTANCE != null) Http.rebuild();
         }
     }
@@ -1471,7 +1471,7 @@ public final class Data {
             try (InputStream in = Files.newInputStream(source)) {
                 incoming.load(in);
             }
-            // 外来配置：命令/可执行/下载代理类键一律拒收
+            // 命令/可执行/代理类键拒收
             List<String> dropped = new ArrayList<>();
             for (String key : new ArrayList<>(incoming.stringPropertyNames())) {
                 if (isImportBlockedKey(key)) {
@@ -1521,15 +1521,14 @@ public final class Data {
         if (k.equals("java.path")) return true;
         // legacy 键与实例变体都落到 java.executable
         if (k.equals("instancejava") || (k.startsWith("instance.") && k.endsWith(".java"))) return true;
-        // classpath 头部是 JVM 最先加载的 jar，等于任意代码执行
-        // 全局/legacy/实例三种 classpathhead 键都算
+        // classpath 头最先加载，等于任意代码执行
         if (k.endsWith("classpathhead")) return true;
         // 缓存根重定向配合清理功能可以删任意目录
         if (k.equals("systemsystemcache")) return true;
         // 下载源与代理可以把后续所有下载导向第三方
         if (k.equals("systembmclroot")) return true;
         if (k.startsWith("systemproxy")) return true;
-        // -javaagent / -agentpath 之类的参数同样是任意代码执行入口
+        // -javaagent 等是任意代码执行入口
         return k.endsWith("jvmargs") || k.endsWith("gameargs");
     }
 

@@ -24,7 +24,6 @@ import javafx.util.Duration;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -126,7 +125,6 @@ public final class Errors {
     }
 
     private static void enqueue(Report r) {
-        // 2 秒内同一错误不重复弹
         String key = r.title + "|" + r.headline + "|" + r.detail;
         long now = System.currentTimeMillis();
         log(r.title, r.headline, r.detail);
@@ -281,7 +279,6 @@ public final class Errors {
         MainWindow w = window;
         if (w == null) return;
         onFx(() -> w.toast(Lang.t("正在导出日志"), Lang.t("导出完成后会自动打开所在文件夹"), 1));
-        // 完整日志可能较大，读取与写盘放到后台
         Thread worker = new Thread(() -> {
             Path file = exportReport(r);
             onFx(() -> {
@@ -336,7 +333,6 @@ public final class Errors {
         return sanitize(sb.toString());
     }
 
-    // 导出错误记录与完整运行日志
     private static void appendHistory(StringBuilder sb) {
         String errors = cap(Log.exportErrors(), "错误记录");
         String runtime = cap(Log.exportCurrent(), "运行日志");
@@ -358,7 +354,6 @@ public final class Errors {
         }
     }
 
-    // 反馈文件不宜过大，单段超过 4MB 截断并注明
     private static String cap(String text, String label) {
         int max = 4 * 1024 * 1024;
         if (text == null || text.length() <= max) return text == null ? "" : text;
@@ -411,14 +406,12 @@ public final class Errors {
                 try {
                     showFallbackStage(r);
                 } catch (Throwable t) {
-                    // 构建失败也要放行队列，后续错误不能被卡死
                     showing = false;
                     logOnly("错误弹窗降级失败", t);
                     scheduleDrain();
                 }
             });
         } catch (Throwable t) {
-            // 没有图形环境，错误已落盘
             showing = false;
             logOnly("无图形环境，错误弹窗降级失败", t);
             synchronized (QUEUE) {
@@ -573,7 +566,7 @@ public final class Errors {
         String entry = sanitize("[" + LocalDateTime.now().withNano(0) + "] " + title + " — " + headline
                 + " @ " + Thread.currentThread().getName());
         try {
-            // 内存兜底；错误进 errors.log 与 launcher.log，均带完整堆栈
+            // 错误进 errors.log 与 launcher.log，带完整堆栈
             Data.get().log.add(entry);
             if (Data.get().getBool("SystemDebugMode", false)) System.out.println("[TCL] " + entry);
         } catch (Throwable ignored) {

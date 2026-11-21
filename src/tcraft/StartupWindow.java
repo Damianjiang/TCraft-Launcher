@@ -13,7 +13,7 @@ import java.io.InputStream;
 
 import javax.imageio.ImageIO;
 
-// 仅在首次运行/修复 JavaFX 运行库时显示下载进度窗；正常启动不创建
+// 仅首次运行/修复 JavaFX 运行库时显示
 public final class StartupWindow {
 
     private static final int W = 460;
@@ -68,7 +68,7 @@ public final class StartupWindow {
             javax.swing.SwingUtilities.invokeAndWait(() -> box[0] = new StartupWindow());
             return box[0] != null ? box[0] : new StartupWindow(true);
         } catch (Throwable t) {
-            System.err.println("[TCL] 加载窗不可用：" + t);
+            Log.error("[" + java.time.LocalDateTime.now().toLocalTime().withNano(0) + "] 加载窗不可用：" + t);
             return new StartupWindow(true);
         }
     }
@@ -78,7 +78,6 @@ public final class StartupWindow {
         panel = null;
     }
 
-    // 正常启动不需要进度窗
     public static StartupWindow none() {
         return new StartupWindow(true);
     }
@@ -87,7 +86,6 @@ public final class StartupWindow {
         return window != null && window.isShowing();
     }
 
-    // 连接或等待响应时用不确定进度，跑马灯继续动
     public void setIndeterminate(String text) {
         status = text == null ? "" : text;
         detail = "";
@@ -106,7 +104,7 @@ public final class StartupWindow {
         applyDownload(text, done, total, total > 0 ? (int) Math.min(99, done * 100 / total) : -1);
     }
 
-    // 多模块下载：percent 是整体进度，卡片上另外显示当前文件百分比、大小与速度
+    // percent 为整体进度，当前文件进度另显在详情行
     public void setDownload(String text, long done, long total, int overallPercent) {
         applyDownload(text, done, total, overallPercent);
     }
@@ -114,7 +112,6 @@ public final class StartupWindow {
     private void applyDownload(String text, long done, long total, int overallPercent) {
         long now = System.currentTimeMillis();
         if (downloadStartMs == 0) downloadStartMs = now;
-        // 速度 200ms 更新一次，数字不乱跳
         if (now - downloadLastMs >= 200) {
             double secs = Math.max(0.001, (now - downloadStartMs) / 1000.0);
             double avg = done / secs / 1048576.0;
@@ -139,7 +136,6 @@ public final class StartupWindow {
         if (closed) return;
         closed = true;
         if (window == null) return;
-        // 主窗口显示后立即取消置顶
         try {
             window.setAlwaysOnTop(false);
         } catch (Exception ignored) {
@@ -239,7 +235,6 @@ public final class StartupWindow {
     private static String clip(String text, int width, Graphics2D g2) {
         if (text == null) return "";
         if (g2.getFontMetrics().stringWidth(text) <= width) return text;
-        // 按平均字宽估一次截断点，别逐字符量（O(n²)）
         java.awt.FontMetrics fm = g2.getFontMetrics();
         int avg = Math.max(1, fm.stringWidth(text) / text.length());
         int keep = Math.max(1, (width - fm.stringWidth("…")) / avg);

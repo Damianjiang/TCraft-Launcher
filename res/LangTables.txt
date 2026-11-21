@@ -1597,7 +1597,6 @@ Java 版本范围错误：	Invalid Java version range: 	Java 版本範圍錯誤�
 创建房间中	Creating the room	建立房間中	
 加入房间中	Joining the room	加入房間中	
 功能隐藏（已暂时关闭，按 F12 以重新启用）	Feature hidden (temporarily off, press F12 to re-enable)	功能隱藏（已暫時關閉，按 F12 以重新啟用）	
-原名 ://u200a//u200a//u200a	Original name:	原名:	
 取消安装	Cancel installation	取消安裝	
 可以添加	Can be added	可以新增	
 可更新 (	Updatable (	可更新 (	
@@ -3412,7 +3411,6 @@ Mixin 注入失败	Mixin injection failed	Mixin 注入失敗
 当前：跟随系统代理	Current: system proxy	目前：跟隨系統代理
 当前：HTTP 代理 	Current: HTTP proxy 	目前：HTTP 代理 
 当前：SOCKS5 代理 	Current: SOCKS5 proxy 	目前：SOCKS5 代理 
-
 填充	Fill	填充	
 墨松绿	Dark pine green	墨松綠	
 备份实例 · 	Backup instance · 	備份實例 · 	
@@ -4177,7 +4175,6 @@ Java 21（1.20.5+）	Java 21 (1.20.5+)	Java 21（1.20.5+）
 共 %d 首	%d tracks	共 %d 首	
 已清空背景音乐	Background music cleared	已清空背景音樂	
 删除了 %d 个文件	Deleted %d files	刪除了 %d 個檔案	
-
 字体预览 The quick brown fox 中文 123	Font preview The quick brown fox 中文 123	字型預覽 The quick brown fox 中文 123	
 字体已安装	Font installed	字型已安裝	
 安装字体失败	Failed to install font	安裝字型失敗	
@@ -4185,7 +4182,6 @@ Java 21（1.20.5+）	Java 21 (1.20.5+)	Java 21（1.20.5+）
 标题栏图片已更换	Title bar image changed	標題列圖片已更換	
 更换图片失败	Failed to change image	更換圖片失敗	
 已清空标题栏图片	Title bar image cleared	已清空標題列圖片	
-
 TCL/Videos 里没有可用视频，请放入 mp4/m4v/mov。	No usable video in TCL/Videos. Put mp4/m4v/mov files there.	TCL/Videos 中沒有可用視頻，請放入 mp4/m4v/mov。	
 实例指定的 Java %d 低于版本要求 %d，自动更换	Instance Java %d is below required Java %d; switching automatically	實例指定的 Java %d 低於版本要求 %d，自動更換	
 未找到 Java %d，正在自动下载	Java %d not found; downloading automatically	未找到 Java %d，正在自動下載	
@@ -4202,7 +4198,6 @@ TCL/Videos 里没有可用视频，请放入 mp4/m4v/mov。	No usable video in T
 检查游戏需要的 Java	Checking required Java	檢查遊戲需要的 Java	
 启动器错误日志（当前）	Launcher error log (current)	啟動器錯誤日誌（當前）	
 实时监听 errors.log（只记录错误与崩溃）…	Tailing errors.log (errors and crashes only)…	即時監聽 errors.log（只記錄錯誤與崩潰）…	
-
 背景图片已刷新	Background image refreshed	背景圖片已重新整理	
 背景音乐已刷新	Background music refreshed	背景音樂已重新整理	
 整合包文件	Modpack file	整合包檔案	

@@ -48,7 +48,6 @@ final class SmoothScroll {
     private final List<EffectNode> suspended = new ArrayList<>();
     private PauseTransition restoreDelay;
     private boolean effectsSuspended;
-    // 带大特效的节点缓存，内容树变了才重扫，不然每次滚轮都全树递归
     private List<EffectNode> effectCache;
     private final Map<Parent, ListChangeListener<Node>> effectWatchers = new HashMap<>();
 
@@ -56,7 +55,6 @@ final class SmoothScroll {
         install(pane, DEFAULT_WHEEL_SPEED);
     }
 
-    // 小框滚轮步长放大，滚动更平缓
     static void install(ScrollPane pane, double wheelSpeed) {
         if (pane == null || pane.getProperties().get(KEY) instanceof SmoothScroll) return;
         pane.getProperties().put(WHEEL_KEY, wheelSpeed);
@@ -118,7 +116,6 @@ final class SmoothScroll {
         double speed = wheelSpeed();
         double px = -dx * speed;
         double py = -dy * speed;
-        // 只有横向溢出时让滚轮横移
         if (py != 0 && overflow(false) <= 0.5 && overflow(true) > 0.5) {
             px = py;
             py = 0;
@@ -392,7 +389,6 @@ final class SmoothScroll {
         effectWatchers.clear();
     }
 
-    // 内容树变更即作废缓存，挂起期也要补扫
     private void invalidateEffectCache() {
         if (effectCache == null && effectWatchers.isEmpty()) return;
         effectCache = null;

@@ -38,7 +38,6 @@ public final class CurseForge {
 
     private static final int CACHE_LIMIT = 200;
 
-    // 与 Modrinth 侧同款访问序 LRU；files 全量清单可达数 MB
     private static final Map<Long, List<Object>> FILES_CACHE = java.util.Collections.synchronizedMap(
             new java.util.LinkedHashMap<>(64, 0.75f, true) {
                 @Override
@@ -54,7 +53,6 @@ public final class CurseForge {
                 }
             });
 
-    // 搜索结果短缓存（90s）：切分类/翻页来回点不重复打 API
     private static final Map<String, Object[]> SEARCH_CACHE = java.util.Collections.synchronizedMap(
             new java.util.LinkedHashMap<>(32, 0.75f, true) {
                 @Override
@@ -150,11 +148,6 @@ public final class CurseForge {
         }
         INFO_CACHE.put(id, p);
         return p;
-    }
-
-    private static void downloadFile(Tasks.Task task, String url, Path target) throws IOException {
-        // 续传与重试交给 Fetch
-        Fetch.file(task, url, target, null, 0, 0.99);
     }
 
     public static List<Object> filesByIds(List<Long> ids) throws IOException {

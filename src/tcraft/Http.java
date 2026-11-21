@@ -22,7 +22,7 @@ public final class Http {
     private Http() {
     }
 
-    private static final String UA = "TCraftLauncher-JavaFX/" + Build.VERSION;
+    static final String UA = "TCraftLauncher-JavaFX/" + Build.VERSION;
 
     private static final int MAX_ATTEMPTS = 3;
     private static final long[] BACKOFF_MS = {300, 900};
@@ -56,7 +56,7 @@ public final class Http {
 
     private static HttpClient build(HttpClient.Redirect redirects) {
         HttpClient.Builder b = HttpClient.newBuilder()
-                // 6s 够完成跨洋握手，再长会拖慢重试
+                // 跨洋握手 6s
                 .connectTimeout(Duration.ofSeconds(6))
                 .followRedirects(redirects)
                 // 服务端不支持 h2 时自动回落 HTTP/1.1
@@ -302,7 +302,7 @@ public final class Http {
                 continue;
             }
             if (code < 200 || code >= 300) {
-                // 先关响应体再抛，429/5xx 逐次重试时连接才不会泄漏
+                // 先关响应体，防重试时连接泄漏
                 try {
                     resp.body().close();
                 } catch (IOException ignored) {
@@ -343,7 +343,7 @@ public final class Http {
                 // 4xx 除了 408 / 429 重试没意义
                 if (!retryable(code)) throw new IOException("HTTP " + code);
                 last = new IOException("HTTP " + code);
-                // 429/503 服务端说了等多久就等多久，最多 10 秒
+                // 按 Retry-After 等待，最多 10 秒
                 nextDelay = retryAfter > 0 ? Math.min(retryAfter, 10_000)
                         : BACKOFF_MS[Math.min(attempt, BACKOFF_MS.length - 1)];
                 continue;
@@ -358,7 +358,7 @@ public final class Http {
         throw last == null ? new IOException(Lang.t("请求失败：") + url) : last;
     }
 
-    // 文本响应的解压上限，恶意源的大压缩比 gzip 会打满内存
+    // 解压上限，防大压缩比打满内存
     private static final long TEXT_MAX_BYTES = 20L * 1024 * 1024;
 
     private static String readText(InputStream raw, HttpResponse<?> resp) throws IOException {
@@ -407,7 +407,7 @@ public final class Http {
             }
             int code = resp.statusCode();
             if (code >= 200 && code < 300) {
-                // 二进制响应也设上限，皮肤/图标等合法尺寸远小于 8MB
+                // 二进制上限 8MB
                 try (InputStream body = resp.body()) {
                     return Fetch.readAll(body, 20_000, 8L * 1024 * 1024);
                 }
@@ -450,7 +450,7 @@ public final class Http {
                 .handle((resp, err) -> {
                     if (err != null) throw new CompletionException(unwrap(err));
                     int code = resp.statusCode();
-                    // 与 getBytes 同一个 8MB 上限，恶意源不能吃满堆
+                    // 同 getBytes 的 8MB 上限
                     try (java.io.InputStream body = resp.body()) {
                         if (code >= 200 && code < 300) return Fetch.readAll(body, 20_000, 8L * 1024 * 1024);
                         long retryAfter = retryAfterMs(resp);
@@ -499,7 +499,6 @@ public final class Http {
     }
 
     public static Body open(String url) throws IOException {
-        // 有镜像先走镜像，失败再回原站
         List<String> candidates = Mirrors.images(url);
         IOException last = null;
         for (int i = 0; i < candidates.size(); i++) {
@@ -578,7 +577,6 @@ public final class Http {
                             .build();
                     client.send(req, HttpResponse.BodyHandlers.discarding());
                 } catch (Exception ignored) {
-                    // 预热失败无所谓
                 }
             }
         });

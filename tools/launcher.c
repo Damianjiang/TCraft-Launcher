@@ -85,7 +85,7 @@ static int create_dirs(const wchar_t *path) {
     return 1;
 }
 
-// 目录是否可写（拿一个临时文件试，比看属性可靠）
+// 目录是否可写，拿临时文件试写
 static int dir_writable(const wchar_t *dir) {
     wchar_t probe[MAX_PATH_LEN];
     HANDLE h;
@@ -653,7 +653,7 @@ static int run(const wchar_t *java, DWORD *exit_code) {
     cat_str(cmd, L"\" -Dfile.encoding=UTF-8 -Dtcraft.dir=\"", MAX_PATH_LEN * 2);
     cat_str(cmd, home_dir, MAX_PATH_LEN * 2);
     {
-        // JavaFX 已下载时直接带 module-path 启动，少起一个 JVM
+        // JavaFX 已下载时直接带 module-path 启动
         wchar_t deps[MAX_PATH_LEN];
         wchar_t check[MAX_PATH_LEN];
         copy_str(deps, home_dir, MAX_PATH_LEN);
@@ -1139,7 +1139,7 @@ static int extract_java_zip(void) {
     remove_tree(java_dl_tmp, 0);
     create_dirs(java_dl_tmp);
 
-    // Windows 自带 bsdtar，比 Expand-Archive 快一个数量级
+    // Windows 自带 bsdtar，解压更快
     tar[0] = 0;
     if (GetEnvironmentVariableW(L"SystemRoot", tar, MAX_PATH_LEN) && tar[0]) {
         cat_str(tar, L"\\System32\\tar.exe", MAX_PATH_LEN);
@@ -1498,7 +1498,7 @@ static int download_url_parallel(const wchar_t *url, const char *source)
         if (!slash) goto cleanup;
         total = (unsigned long)wcstoul(slash + 1, NULL, 10);
     }
-    if (total < 32UL * 1024UL * 1024UL) goto cleanup;   // 小文件单流更快，不值得分块
+    if (total < 32UL * 1024UL * 1024UL) goto cleanup;   // 小文件单流更快
 
     chunk = total / JAVA_DL_PARTS;
     for (i = 0; i < JAVA_DL_PARTS; i++) {
@@ -2124,7 +2124,7 @@ static void offer_download(void) {
     open_jdk_page();
 }
 
-// 让 Windows 按真实 DPI 渲染，不然高分屏下整个界面被位图拉伸
+// 高分屏按真实 DPI 渲染
 static void enable_dpi_awareness(void) {
     HMODULE u = GetModuleHandleW(L"user32.dll");
     if (!u) u = LoadLibraryW(L"user32.dll");

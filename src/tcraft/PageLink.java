@@ -38,7 +38,7 @@ public class PageLink implements Page {
     private static int rpcPort = -1;
     private static String clientAddress = "";
     private static final int LINK_CODE_VERSION = 3;
-    // 联机线程写、FX 线程读，double 不加 volatile 有撕裂风险
+    // 联机线程写、FX 线程读
     private static volatile double linkPing;
     private static volatile int peopleCount = 1;
     private static volatile int myNat = 10;
@@ -252,7 +252,6 @@ public class PageLink implements Page {
         actions.getChildren().addAll(
                 Ui.button("返回", Ui.BTN_NORMAL, this::cancelLoading),
                 Ui.button("重试", Ui.BTN_THEME, () -> {
-                    // worker 已随错误退出，重试必须真重开一轮
                     loadingError = null;
                     startLoading();
                 }));
@@ -393,7 +392,6 @@ public class PageLink implements Page {
                     final boolean lost = !anyOther;
                     final boolean hostGone = !serverSide && !hasServer;
                     javafx.application.Platform.runLater(() -> {
-                        // 页面不在前台就只监测不弹 UI，回到页面再提示
                         if (!"link".equals(win.currentKey)) return;
                         updateFinishInfo();
                         if (!warned[0] && hostGone) {
@@ -739,7 +737,7 @@ public class PageLink implements Page {
                 lastDecodeError = "";
                 return payload.containsKey("v") ? payload : null;
             } catch (Json.MalformedException e) {
-                // lastDecodeError 经 toast 展示，整串查不到表，创建处翻译
+                // lastDecodeError 整串查不到表，创建处翻译
                 lastDecodeError = Lang.tf("联机码内容不是合法 JSON：%s",
                         e.getMessage() == null ? Lang.t("格式损坏") : e.getMessage());
                 return null;
@@ -805,7 +803,7 @@ public class PageLink implements Page {
     }
 
     private void runLink() {
-        // 取消后立刻重开会 ++peerGeneration，旧 worker 的错误回调不能污染新一轮
+        // 旧 worker 的错误回调不能污染新一轮
         final int gen = peerGeneration;
         try {
             EasyTier.ensureInstalled(false, (stage, v) -> setStage(stage));
@@ -845,13 +843,13 @@ public class PageLink implements Page {
 
             setStage("正在启动联机模块…");
             EasyTier.start(a.toString());
-            // core 起来之后，取消和报错两条路都得回收它
+            // core 起来后，取消和报错两条路都要回收它
             try {
                 waitUntilConnected(port);
                 if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
                 if (!serverSide) waitStable(port);
 
-                // 取消落在等待窗口时中断标志可能被吞，落 FINISH 前再核一次状态
+                // 中断标志可能被吞，落 FINISH 前再核一次状态
                 if (state != State.LOADING) return;
                 state = State.FINISH;
                 javafx.application.Platform.runLater(() -> {
@@ -971,7 +969,7 @@ public class PageLink implements Page {
         }
         List<String> ranked = new ArrayList<>(probe);
         if (!probe.isEmpty()) {
-            // 节点太多就只测前 12 个，联机等不了那么久
+            // 只测前 12 个节点
             List<String> measure = probe.size() > 12 ? new ArrayList<>(probe.subList(0, 12)) : probe;
             nodeLatency.putAll(EasyTier.measureNodes(measure, 1200));
             ranked.sort((a, b) -> {
@@ -994,7 +992,7 @@ public class PageLink implements Page {
         List<String> out = new ArrayList<>();
         nodeLatency.clear();
         Data d = Data.get();
-        // 加入方始终使用联机码里房主的实际节点，双方必须连到同一个节点
+        // 双方必须连到同一节点，加入方用联机码里的节点
         if (!serverSide && !pendingNode.isBlank()) {
             out.add(pendingNode);
             selectedNode = pendingNode;
@@ -1179,7 +1177,7 @@ public class PageLink implements Page {
     }
 
     private String localAddress() {
-        // getLocalHost 可能做 DNS 反查把 FX 线程卡住，改枚举网卡
+        // getLocalHost 可能做 DNS 反查卡住 FX 线程
         try {
             java.util.Enumeration<java.net.NetworkInterface> nis = java.net.NetworkInterface.getNetworkInterfaces();
             while (nis.hasMoreElements()) {

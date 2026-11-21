@@ -54,13 +54,13 @@ final class LogRing extends AbstractList<String> {
         return removed;
     }
 
-    // 返回快照迭代器，遍历不长期持锁
+    // 快照迭代器，不长期持锁
     @Override
     public synchronized Iterator<String> iterator() {
         return new java.util.ArrayList<>(items).iterator();
     }
 
-    // 返回拷贝快照；直接迭代 subList 与写日志并发会抛 CME
+    // 拷贝快照，直接迭代会与写并发抛 CME
     public synchronized List<String> snapshot(int last) {
         ArrayList<String> copy = new ArrayList<>(items);
         int from = Math.max(0, copy.size() - Math.max(0, last));

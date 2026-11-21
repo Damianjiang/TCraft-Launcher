@@ -174,7 +174,6 @@ public class PageDownload implements Page {
         }
         final Ui.LoadCard loadRef = versionLoad;
         data.refreshVersions(false, () -> {
-            // 选择页或已切页时不重建，别打乱动画
             if (win.currentPageNode() != this) return;
             if (inSelectPage) return;
             if ("download".equals(win.currentKey) && "原版游戏".equals(data.downloadCategory)) {
@@ -194,7 +193,6 @@ public class PageDownload implements Page {
             return;
         }
         if (data.isFallbackVersions()) {
-            // 兜底数据要标注出来
             vanillaBox.getChildren().add(Ui.hint(
                     Lang.t("当前是离线兜底数据：官方版本清单拉取失败，版本与时间可能不完整。")
                             + Lang.t("联网后点「刷新」即可获取真实清单。"), 2));
@@ -312,14 +310,11 @@ public class PageDownload implements Page {
 
         VBox selectContent = new VBox(10);
         selectContent.getChildren().add(nameCard);
-        // 与加载器卡片同一条左缘对齐
-        VBox.setMargin(nameCard, new Insets(0, 0, 0, 0));
         selectContent.getChildren().add(hintBox);
         for (LoaderCard lc : loaderCardList) selectContent.getChildren().add(lc.card);
         selectContent.setPadding(new Insets(2, 2, 0, 2));
         selectBox.getChildren().add(selectContent);
 
-        // 初始显隐由 refreshAll 决定
         refreshAll();
     }
 
@@ -341,7 +336,7 @@ public class PageDownload implements Page {
         card.header.setPrefHeight(40);
         card.header.setMaxHeight(40);
         Label t = card.titleLabel();
-        // 短标题按 112 对齐，长标题保底不截断
+        // 标题列 112 对齐，长标题不截断
         t.setMinWidth(112);
         t.setMaxWidth(Region.USE_PREF_SIZE);
         lc.statusIcon = Ui.image(blockImg, 18, 18, true);
@@ -433,7 +428,6 @@ public class PageDownload implements Page {
             }
             return;
         }
-        // 版本多的分组分批建行，展开不卡一秒
         buildChunk(lc, lc.versions, 0, ++lc.buildToken);
     }
 
@@ -527,7 +521,6 @@ public class PageDownload implements Page {
                 lc.statusLabel.setTextFill("获取失败".equals(status) || "无".equals(status) ? Theme.red : Theme.gray4);
                 collapse(lc.clearBtn, false);
             }
-            // 「无」错误时保持折叠
             if (lc.error != null && lc.error.equals("无")) lc.card.setCollapsed(true);
         }
         refreshHints();
@@ -733,7 +726,7 @@ public class PageDownload implements Page {
         vanillaBox.setTranslateX(0);
         selectBox.setOpacity(0);
         selectBox.setTranslateX(40);
-        // KeyFrame 是绝对时间点，要补保持帧，否则插值会提前开始
+        // KeyFrame 是绝对时间点，须补保持帧
         Timeline t = new Timeline(
                 new KeyFrame(Duration.millis(10),
                         new KeyValue(vanillaBox.opacityProperty(), 1),
@@ -958,7 +951,6 @@ public class PageDownload implements Page {
         cWide.setHgrow(Priority.ALWAYS);
         cWide.setFillWidth(true);
         ColumnConstraints cLoader = new ColumnConstraints();
-        // 非 Mod 不参与 grow，否则版本框会被压窄
         if (isMod) {
             cLoader.setHgrow(Priority.ALWAYS);
             cLoader.setFillWidth(true);
@@ -992,7 +984,6 @@ public class PageDownload implements Page {
         final Label status = Ui.label("", 12, Theme.gray2);
         status.setVisible(false);
         status.setManaged(false);
-        // 一路源失败但仍有结果时提示结果可能不全
         hintError = Ui.hint("", 1);
         // Ui.hint 子节点顺序是图标、文字
         hintErrorText = (Label) hintError.getChildren().get(1);
@@ -1101,7 +1092,7 @@ public class PageDownload implements Page {
         };
     }
 
-    // 资源搜索的请求代次：只有最后一次请求的结果允许写进界面
+    // 请求代次：仅最后一次请求可写界面
     private int resourceRequestGen;
 
     private void fetchResources(String q, String category, String projectType, int classId,
@@ -1139,11 +1130,10 @@ public class PageDownload implements Page {
         rows.getChildren().setAll(searchLoad);
         javafx.application.Platform.runLater(() -> searchLoad.setStage(
                 source.equals("全部") ? "并发请求 Modrinth 与 CurseForge…" : "请求 " + source + "…"));
-        // 请求期间禁用翻页，连点会发出多个请求，旧结果还会盖掉新页面
+        // 请求期间禁用翻页，连点会重复请求
         prev.setDisable(true);
         next.setDisable(true);
         Thread worker = new Thread(() -> {
-            // 两个源并发请求，串行要等两倍
             List<Resource> list = java.util.Collections.synchronizedList(new ArrayList<>());
             String[] err = new String[2];
             java.util.concurrent.CountDownLatch latch =
@@ -1196,7 +1186,7 @@ public class PageDownload implements Page {
                 });
             }
             try {
-                // 有上限地等待：网络卡住时也要把界面从「正在搜索」里放出来
+                // 有上限等待，超时也放行界面
                 if (!latch.await(25, java.util.concurrent.TimeUnit.SECONDS)) {
                     if (err[0] == null) err[0] = "请求超时";
                     if (err[1] == null) err[1] = "请求超时";
@@ -1206,7 +1196,7 @@ public class PageDownload implements Page {
             }
             String mrError = err[0];
             String cfError = err[1];
-            // 超时后迟到的 addAll 不受 synchronizedList 迭代保护，先落快照再排序
+            // 迟到的 addAll 无迭代保护，先落快照再排序
             List<Resource> fList;
             synchronized (list) {
                 fList = new ArrayList<>(list);
@@ -1217,17 +1207,14 @@ public class PageDownload implements Page {
             String fError = mrError != null ? mrError : cfError;
             boolean hasMore = list.size() >= RESOURCE_PAGE_SIZE;
             javafx.application.Platform.runLater(() -> {
-                // 已经发了更新的请求，这批结果直接丢弃
                 if (gen != resourceRequestGen) return;
                 rows.getChildren().clear();
-                // 一路失败时提示结果可能不全
                 String partial = null;
                 if (!fList.isEmpty()) {
                     if (fMrError != null && wantCf) {
                         partial = "无法连接到 Modrinth，所以目前仅显示了来自 CurseForge 的内容，搜索结果可能不全。\n"
                                 + "请稍后再试，或使用 VPN 改善网络环境。";
                     } else if (fCfError != null && wantMr) {
-                        // 原始错误已带括号指引，给一句干净说明
                         String why = fCfError.contains("API Key")
                                 ? Lang.t("缺少 CurseForge API Key，可在 设置 → 系统 中配置")
                                 : fCfError;
@@ -1354,13 +1341,6 @@ public class PageDownload implements Page {
         return iv;
     }
 
-    private Data.Favorite findFavorite(String type, String slug) {
-        for (Data.Favorite f : data.favorites) {
-            if (f.type.equals(type) && f.slug.equals(slug)) return f;
-        }
-        return null;
-    }
-
     private void buildFavorites(VBox page) {
         if (data.favorites.isEmpty()) {
             Ui.Card card = Ui.card("资源收藏夹");
@@ -1474,14 +1454,5 @@ public class PageDownload implements Page {
             case "世界" -> "map";
             default -> "mod";
         };
-    }
-
-    private static class SeparatorLine extends Region {
-        SeparatorLine() {
-            setMinHeight(1);
-            setMaxHeight(1);
-            setBackground(Ui.fill(Color.web("#343d4a", 0.10), 0));
-            VBox.setMargin(this, new Insets(2, 0, 2, 0));
-        }
     }
 }

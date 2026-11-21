@@ -8,7 +8,7 @@ public final class Lang {
 
     public static volatile int mode = 0;
     public static volatile int setting = 0;
-    // reload 整体换表，后台线程读到的要么旧表要么新表，不会读到半张
+    // 整体换表，读不到半张
     private static volatile Map<String, String[]> TABLE = Map.of();
 
     static {
@@ -23,7 +23,7 @@ public final class Lang {
         try {
             String text = loadTableText();
             if (!text.isEmpty()) {
-                // 记事本保存的 UTF-8 可能带 BOM，不去掉第一条词条会失配
+                // 记事本 UTF-8 可能带 BOM
                 if (text.charAt(0) == '\uFEFF') text = text.substring(1);
                 for (String line : text.split("\\R")) {
                     if (line.isEmpty()) continue;
@@ -116,7 +116,7 @@ public final class Lang {
             String s = tx.getText();
             if (s != null && !s.isEmpty()) tx.setText(t(s));
         }
-        // 下拉列表的选项不是 Labeled，单独翻译，否则语言切换后仍是中文
+        // ComboBox 选项不是 Labeled，须单独翻译
         if (node instanceof javafx.scene.control.ComboBox<?> combo) {
             javafx.collections.ObservableList items = combo.getItems();
             for (int i = 0; i < items.size(); i++) {

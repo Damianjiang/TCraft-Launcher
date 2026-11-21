@@ -32,7 +32,6 @@ public class PageAccountManager implements Page {
     // 每次启动只自动补拉一次
     private static final java.util.Set<String> autoChecked =
             java.util.concurrent.ConcurrentHashMap.newKeySet();
-    // 限两个并发，空闲线程自动回收
     private static final java.util.concurrent.ThreadPoolExecutor skinPool =
             new java.util.concurrent.ThreadPoolExecutor(2, 2, 30,
                     java.util.concurrent.TimeUnit.SECONDS,
@@ -110,7 +109,6 @@ public class PageAccountManager implements Page {
         }
     }
 
-    // 仍是默认皮肤的在线账户自动补拉一次
     private void autoLoadSkins() {
         for (Data.Account a : data.accounts) {
             if (!a.online || "msa".equals(a.userType)) continue;
@@ -126,7 +124,6 @@ public class PageAccountManager implements Page {
         return java.nio.file.Files.isRegularFile(Theme.skinDir().resolve(skin.substring(6)));
     }
 
-    // 在线账户从认证服务器重取皮肤
     private void refreshAccount(Data.Account a, boolean silent) {
         if (a == null || !a.online || !refreshing.add(a)) return;
         final String who = a.name;

@@ -4,12 +4,10 @@ import javafx.animation.FadeTransition;
 import javafx.animation.Interpolator;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
-import javafx.animation.ParallelTransition;
 import javafx.animation.PauseTransition;
 import javafx.animation.ScaleTransition;
 import javafx.animation.Timeline;
 import javafx.animation.Transition;
-import javafx.animation.TranslateTransition;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.beans.value.ChangeListener;
@@ -96,12 +94,11 @@ public final class MainWindow {
     private PauseTransition rightCacheCleanup;
     private Timeline rightRefreshAnim;
     private int rightRefreshToken;
-    // 退场未完的页面；动画打断时补 onHide
+    // 动画打断时补 onHide
     private Page rightPendingHide;
-    // 已经隐藏过的页面：动画打断和正常结束，onHide 只该各调一次
+    // onHide 只该各调一次
     private Page lastHiddenPage;
     private Runnable modalCloseHook;
-    private TextFieldBridge searchField;
 
     private Page currentPage;
     private Node curLeft, curRight;
@@ -119,7 +116,6 @@ public final class MainWindow {
     private double pressSceneX, pressSceneY, startW, startH, startX, startY;
     private double dragX, dragY;
     private boolean titleDrag;
-    // 缓存背景绘制，ImagePattern / GaussianBlur 新建起来都不便宜
     private Image bgPaintImage;
     private int bgPaintSuit = -1;
     private double bgPaintW = -1, bgPaintH = -1;
@@ -153,8 +149,6 @@ public final class MainWindow {
     private javafx.scene.Node leftGroup;
     private Label titleInnerLabel;
 
-    private StackPane langButton;
-
     private int extraShown = -1;
 
     public MainWindow(Stage stage) {
@@ -167,7 +161,6 @@ public final class MainWindow {
 
         Path pictures = Paths.get(data.gameDir, "TCL", "Pictures");
         Theme.onWallpaperReady = this::onWallpaperReady;
-        // 壁纸扫描与解码放后台，就绪后回 FX 刷背景与主题色
         Threads.start("TCL-Wallpaper-Init", () -> {
             if (Theme.loadCustomWallpaper(pictures)) {
                 data.log("已从 " + pictures + " 加载自定义背景");
@@ -178,7 +171,7 @@ public final class MainWindow {
         loadThemeFromSettings();
         buildFrame();
         long tFrame = System.nanoTime();
-        // 音乐目录扫描挪后台；MediaPlayer 只能 FX 线程建，回主线程再起播
+        // MediaPlayer 只能 FX 线程建
         Threads.start("TCL-Music-Init", () -> {
             try {
                 Music.init(data.gameDir);
@@ -200,10 +193,9 @@ public final class MainWindow {
             applyBackground();
             refreshTitleBar();
         });
-        // 壁纸取色完成且颜色变化时重建一次，让程序化颜色同步，不用等鼠标划过
         Theme.onAccentApplied = () -> {
             if (closing || !stage.isShowing()) return;
-            // 入场动画期间重建会换掉整个 frame，动画直接断掉；等动画结束再重建
+            // 入场动画期间延后重建
             if (introRunning) {
                 pendingAccentRebuild = true;
                 return;
@@ -213,7 +205,7 @@ public final class MainWindow {
         stage.initStyle(javafx.stage.StageStyle.TRANSPARENT);
         stage.setScene(scene);
         stage.setTitle("TCraft Launcher");
-        // 图标可能加载不到，add(null) 会抛 NPE
+        // add(null) 会抛 NPE
         javafx.scene.image.Image winIcon = Theme.loadImage("logo.png");
         if (winIcon != null) stage.getIcons().add(winIcon);
         stage.setMinWidth(810);
@@ -239,7 +231,6 @@ public final class MainWindow {
         long tPage = System.nanoTime();
         startShellTimer();
         bindVideoWindowState();
-        // 视频背景延后到首帧之后，别挡住主界面显示
         Platform.runLater(() -> refreshVideoBackground(false));
         if (Boolean.getBoolean("tcl.time")) {
             data.log("阶段明细：frame " + (tFrame - tPhase) / 1_000_000
@@ -269,11 +260,11 @@ public final class MainWindow {
             px = parseDouble(data.get("Window.X", ""), Double.NaN);
             py = parseDouble(data.get("Window.Y", ""), Double.NaN);
         }
-        // 记住了位置就按坐标所在那块屏算边界，多屏时别一律钳回主屏
+        // 多屏按坐标所在屏算边界
         javafx.geometry.Rectangle2D vb = Double.isNaN(px) || Double.isNaN(py)
                 ? javafx.stage.Screen.getPrimary().getVisualBounds()
                 : screenFor(px, py);
-        // 最小尺寸不能超过屏幕，小屏缩放时 810x470 会超
+        // 最小尺寸不能超过屏幕
         double minW = Math.min(810, Math.max(320, vb.getWidth() - 8));
         double minH = Math.min(470, Math.max(240, vb.getHeight() - 8));
         stage.setMinWidth(minW);
@@ -444,7 +435,7 @@ public final class MainWindow {
                 || stored == 30 || stored == 60) ? stored : (stored >= 1 && stored <= 5 ? legacy[stored] : 0);
         if (minutes <= 0 || data.getInt("UiBackgroundType", 0) == 1) return;
         Path pictures = Paths.get(data.gameDir, "TCL", "Pictures");
-        // 目录扫描放后台，重建反复触发时也不能叠出多个 timer
+        // 重建反复触发，不能叠出多个 timer
         Threads.start("TCL-Wallpaper-Rotate", () -> {
             long count;
             try (var s = Files.list(pictures)) {
@@ -534,7 +525,7 @@ public final class MainWindow {
         }
         List<Path> files = scanVideos();
         if (files.isEmpty()) {
-            // 保持用户选的视频类型，不擅自切回图片；清掉播放，回落到壁纸
+            // 不擅自改视频类型，只回落壁纸
             stopVideo();
             applyBackground();
             if (showHint) toast("背景视频", Lang.t("TCL/Videos 里没有可用视频，请放入 mp4/m4v/mov。"), 2);
@@ -613,7 +604,7 @@ public final class MainWindow {
         Platform.runLater(() -> applyVideoViewport(vidBack));
     }
 
-    // 视频每帧都在变，整窗投影会跟着重算，播放期间直接关掉
+    // 播放期间关投影
     private void setVideoModeEffects(boolean video) {
         if (frameShadowPlate == null) return;
         frameShadowPlate.setEffect(video ? null : Theme.shadow(22, 6, 0.35, Color.web("#2a3240")));
@@ -669,7 +660,6 @@ public final class MainWindow {
         else player.play();
     }
 
-    // 单个视频损坏时跳到下一个，全部失败就回退图片背景
     private void skipBrokenVideo() {
         vidErrors++;
         if (vidErrors >= Math.max(1, vidPlaylist.size())) {
@@ -684,7 +674,7 @@ public final class MainWindow {
         playVideo();
     }
 
-    // 提前加载下一个视频，切换时只建播放器，黑屏能短一点
+    // 提前加载下一个，减少黑屏
     private void preloadNext() {
         if (vidPlaylist.size() < 2) return;
         Path next = vidPlaylist.get(Math.floorMod(vidIndex + 1, vidPlaylist.size()));
@@ -747,7 +737,6 @@ public final class MainWindow {
             } catch (Exception ignored) {
             }
         });
-        // 切出前台即暂停解码
         stage.focusedProperty().addListener((o, a, focused) -> {
             if (vidPlayer == null) return;
             try {
@@ -763,8 +752,6 @@ public final class MainWindow {
 
     private boolean stageWasHidden;
     private volatile boolean gameStopRequested;
-
-    private Data.Instance insForCrash;
 
     private void analyzeCrashAsync(Data.Instance ins) {
         if (ins == null) return;
@@ -785,7 +772,6 @@ public final class MainWindow {
         gameProcess = process;
         gameStopRequested = false;
         final Data.Instance crashIns = data.instance();
-        insForCrash = crashIns;
         data.log("游戏进程已启动，PID " + process.pid());
         // UiMusicStop/Start 键义为游戏期暂停/继续
         if (data.getBool("UiMusicStop", false)) Music.pauseForGame();
@@ -804,7 +790,7 @@ public final class MainWindow {
             });
         }
         Thread watcher = new Thread(() -> {
-            // powershell 改优先级要等进程返回，不能占 FX 线程
+            // powershell 要等进程返回，不能占 FX 线程
             Shell.setProcessPriority(process.pid(), data.getInt("LaunchPriority", 1));
             int code = -1;
             try {
@@ -822,7 +808,7 @@ public final class MainWindow {
                         return;
                     }
                     stage.show();
-                    // show 只恢复可见不置顶，游戏窗口还在时主窗会被压在下面
+                    // show 不置顶，须 toFront
                     stage.toFront();
                     stageWasHidden = false;
                 }
@@ -873,7 +859,6 @@ public final class MainWindow {
         frame = new StackPane();
         frame.setMaxWidth(Double.MAX_VALUE);
         frame.setMaxHeight(Double.MAX_VALUE);
-        // 投影放独立底板，整窗逐帧重绘太贵
         Region shadowPlate = new Region();
         frameShadowPlate = shadowPlate;
         shadowPlate.setBackground(Ui.fill(Color.WHITE, windowRadius()));
@@ -980,7 +965,6 @@ public final class MainWindow {
         int op = data.getInt("UiBackgroundOpacity", 1000);
         int blur = data.getInt("UiBackgroundBlur", 0);
         double alpha = Math.max(0, Math.min(1, op / 1000.0));
-        // 视频在播时不合成静态壁纸，少一次全屏绘制
         boolean show = img != null && w > 0 && h > 0 && alpha > 0 && vidPlayer == null;
         bgRect.setVisible(show);
         bgRect.setOpacity(alpha);
@@ -994,7 +978,7 @@ public final class MainWindow {
         } else {
             bgRect.setEffect(null);
         }
-        // 高斯模糊边缘发白，放大背景层再裁掉溢出
+        // 模糊边缘发白，放大裁溢出
         double pad = radius * 1.5;
         if (radius > 0 && w > 2 * pad && h > 2 * pad) {
             bgRect.setScaleX((w + 2 * pad) / w);
@@ -1087,7 +1071,7 @@ public final class MainWindow {
             body.setBackground(new Background(new BackgroundFill(Color.web("#f5f5f5"), CornerRadii.EMPTY, Insets.EMPTY)));
             return;
         }
-        // resize 每帧都会走到这里，渐变按 accent 缓存
+        // 渐变按 accent 缓存
         if (panelGradCache == null || panelGradAccent != Theme.accent) {
             double hue = Theme.accent.getHue(), sat = Theme.accent.getSaturation() * 0.8;
             panelGradAccent = Theme.accent;
@@ -1143,7 +1127,6 @@ public final class MainWindow {
             showLanguageMenu(langBtn);
             e.consume();
         });
-        langButton = langBtn;
         right.getChildren().addAll(
                 Ui.iconButtonWhite("search", 28, 16, "全局搜索（Ctrl+K）", this::showGlobalSearch),
                 langBtn,
@@ -1180,7 +1163,7 @@ public final class MainWindow {
         bar.getChildren().addAll(left, navBox, titleInner, right);
         PauseTransition adaptDebounce = new PauseTransition(Duration.millis(100));
         adaptDebounce.setOnFinished(e -> adaptTitleTabs());
-        // 首次拿到真实宽度立即定稿，首帧只定一次；后续窗口缩放才防抖
+        // 首帧立即定稿，后续缩放防抖
         final boolean[] sized = {false};
         bar.widthProperty().addListener((o, a, b) -> {
             if (b.doubleValue() <= 0) return;
@@ -1301,7 +1284,7 @@ public final class MainWindow {
         return badge;
     }
 
-    // 只刷新顶部导航，不动标题栏/右栏，整窗重建会闪一下
+    // 整窗重建会闪，只刷导航
     public void refreshNav() {
         if (navBox == null) return;
         navBox.getChildren().clear();
@@ -1314,7 +1297,7 @@ public final class MainWindow {
         adaptTitleTabs();
     }
 
-    // 功能隐藏开关后局部刷新：不重建整窗，只更新导航和当前右栏
+    // 局部刷新，不重建整窗
     public void refreshAfterHide(String key) {
         java.util.List<double[]> scrolls = captureScrolls();
         refreshNav();
@@ -1327,7 +1310,6 @@ public final class MainWindow {
             default -> null;
         };
         if (nav != null && currentPage != null && nav.equals(currentKey)) {
-            // 当前导航页被隐藏，切到第一个还可见的页
             openPage(firstVisiblePage(), false);
         } else {
             refreshRight(false);
@@ -1492,14 +1474,13 @@ public final class MainWindow {
         pageHost = new StackPane(content);
         pageHost.setAlignment(Pos.TOP_LEFT);
         pageHost.setPickOnBounds(false);
-        // 页面容器 min 归零，不然切页时窗口会被撑大
+        // min 归零，防切页撑大窗口
         content.setMinSize(0, 0);
         pageHost.setMinSize(0, 0);
         rightHost.setMinSize(0, 0);
-        // root 也不能有 min，会被内容撑开溢出窗口
         root.setMinSize(0, 0);
         b.getChildren().add(pageHost);
-        // pageHost 不能绑 body 宽度，会循环依赖撑大窗口
+        // 绑 body 宽度会循环依赖
 
         toastLayer = new StackPane();
         toastLayer.setAlignment(Pos.BOTTOM_RIGHT);
@@ -1644,7 +1625,6 @@ public final class MainWindow {
             page = createPage(currentKey);
             right = page.right();
         } catch (Exception e) {
-            // 构造失败走错误反馈
             Errors.error(Lang.t("构造「") + currentKey + Lang.t("」右栏失败"), e);
             return;
         }
@@ -1667,7 +1647,7 @@ public final class MainWindow {
             rightHost.getChildren().removeIf(n -> n != curRight);
         }
         Node old = curRight;
-        // 连续点击时回到完整状态再重新退场，不能停在半透明
+        // 连续点击须从完整状态重新退场
         old.setOpacity(1);
         old.setTranslateY(0);
         old.setScaleX(1);
@@ -1676,7 +1656,7 @@ public final class MainWindow {
         old.setCacheHint(javafx.scene.CacheHint.SPEED);
         rightHost.setMouseTransparent(true);
 
-        // 新旧右栏叠放做交叉淡入淡出，旧栏先消失中间会闪一帧空白
+        // 防旧栏先撤时闪空白
         right.setOpacity(0);
         right.setTranslateY(8);
         rightHost.getChildren().add(right);
@@ -1734,7 +1714,7 @@ public final class MainWindow {
         cross.play();
     }
 
-    // 右栏页面退场时调用；同一个页面只调一次，动画被打断也不会漏
+    // 同一页面只调一次
     private void hidePage(Page page) {
         if (page == null || page == lastHiddenPage) return;
         lastHiddenPage = page;
@@ -1896,7 +1876,6 @@ public final class MainWindow {
             applyPage(page);
             currentPage = page;
         } catch (Exception e) {
-            // 构建失败弹错误窗，不只 toast
             data.log("页面构建失败：" + key + " → " + e);
             Errors.error(Lang.t("打开页面「") + key + Lang.t("」失败"), e);
         } finally {
@@ -1943,7 +1922,7 @@ public final class MainWindow {
             setOpacitySafe(right, 1);
             right.setTranslateY(0);
             for (Node n : childrenOf(right)) {
-                // 绑定透明度由绑定方驱动，完全不写入
+                // 绑定透明度由绑定方驱动
                 if (n.opacityProperty().isBound()) continue;
                 setOpacitySafe(n, 0);
                 n.setTranslateY(-14);
@@ -1956,11 +1935,10 @@ public final class MainWindow {
         if (page == null) return;
         leftHost.setMouseTransparent(true);
         rightHost.setMouseTransparent(true);
-        // 必须用已挂载节点，重调 page.left() 会生成看不见的新树
+        // 重调 page.left() 会生成看不见的新树
         Node left = curLeft;
         Node right = curRight;
         if (left != null) {
-            // 缩放淡出期间缓存左栏贴图，逐帧重栅格化不划算
             left.setCache(true);
             left.setCacheHint(javafx.scene.CacheHint.SPEED);
             Timeline tl = new Timeline(
@@ -2002,7 +1980,6 @@ public final class MainWindow {
                 left.setOpacity(0);
                 left.setScaleX(0.96);
                 left.setScaleY(0.96);
-                // 缩放期间缓存贴图，省掉逐帧重排重绘
                 left.setCache(true);
                 left.setCacheHint(javafx.scene.CacheHint.SPEED);
                 Timeline tl = new Timeline(
@@ -2064,12 +2041,11 @@ public final class MainWindow {
                 c.setTranslateY(0);
                 continue;
             }
-            // 绑定中的透明度由绑定方驱动，不参与级联
             if (c.opacityProperty().isBound()) continue;
             int delay = Math.min(112, i * 14);
             setOpacitySafe(c, 0);
             c.setTranslateY(-12);
-            // 级联只做前 8 个，其余直接落终态，收尾别拖太长
+            // 级联只做前 8 个
             if (i >= 8) {
                 setOpacitySafe(c, 1);
                 c.setTranslateY(0);
@@ -2093,7 +2069,6 @@ public final class MainWindow {
         }
         currentScroll = findScroll(right);
         if (currentScroll != null) {
-            // 仅回顶按钮可见性翻转时才全量刷新
             scrollListener = (o, a, b) -> {
                 if (btnExtraTop != null && btnExtraTop.isVisible() != (currentScroll.getVvalue() > 0.03)) {
                     updateExtras();
@@ -2130,7 +2105,7 @@ public final class MainWindow {
         return out.size() > 24 ? out.subList(0, 24) : out;
     }
 
-    // 绑定中的 opacity 由绑定方驱动，跳过写入，既不打断动画也不抛异常
+    // 绑定 opacity 由绑定方驱动，跳过写入
     private static void setOpacitySafe(Node node, double value) {
         if (node == null || node.opacityProperty().isBound()) return;
         node.setOpacity(value);
@@ -2221,7 +2196,7 @@ public final class MainWindow {
         openPage("launch", true);
     }
 
-    // 首帧前摆好入场初始姿态，直接显示终态会先闪一帧
+    // 直接摆终态会先闪一帧
     public void prepareIntro() {
         if (isSoftwareRendering()) {
             root.setOpacity(baseOpacity);
@@ -2243,7 +2218,7 @@ public final class MainWindow {
         if (titleLogoNode != null) titleLogoNode.setOpacity(0);
     }
 
-    // 等窗口画出首帧再放动画，否则动画会在界面可见之前跑掉大半
+    // 等首帧后再放动画
     public void playIntroWhenReady() {
         if (!introPrepared) return;
         javafx.animation.AnimationTimer timer = new javafx.animation.AnimationTimer() {
@@ -2259,7 +2234,7 @@ public final class MainWindow {
         timer.start();
     }
 
-    // 回弹缓动：末尾轻微过冲再落回，比纯 EASE_OUT 更有落定感
+    // 回弹缓动：末尾过冲再落回
     private static final Interpolator EASE_OUT_BACK = new Interpolator() {
         @Override
         protected double curve(double t) {
@@ -2460,7 +2435,7 @@ public final class MainWindow {
         stack.setMaxWidth(360);
         stack.setOpacity(0);
         stack.setTranslateX(60);
-        // 时长用原始毫秒，防 aniMs=0 时 toast 即逝
+        // 防 aniMs=0 时 toast 即逝
         int duration = 800 + Math.max(5, Math.min(23, (message == null ? 0 : message.length() + title.length())) * 180);
         ActiveToast at = new ActiveToast(stack, card, progress, close, title, message, duration);
         stack.getProperties().put("toast", at);
@@ -2469,7 +2444,6 @@ public final class MainWindow {
             at.dismiss();
             dismissToast(stack);
         });
-        // 悬浮暂停倒计时，移开继续
         stack.addEventHandler(MouseEvent.MOUSE_ENTERED, e -> at.pauseProgress());
         stack.addEventHandler(MouseEvent.MOUSE_EXITED, e -> at.resumeProgress());
         // toastList 还没挂回 Scene 时延迟重试
@@ -2521,7 +2495,7 @@ public final class MainWindow {
         installToastDrag(card, stack, at, close);
     }
 
-    // 兜底清理过期提示，悬浮中的跳过
+    // 兜底清理过期提示
     private void startToastWatchdog() {
         if (toastWatchdog != null) toastWatchdog.stop();
         toastWatchdog = new javafx.animation.Timeline(
@@ -2690,7 +2664,6 @@ public final class MainWindow {
         } else {
             modalLayer.setBackground(Ui.fill(target, 0));
         }
-        // 初始左倾 4°、下移 40px，60ms 后同时回正、淡入
         modalRotate = new Rotate(-4, 0, 0);
         modalRotate.pivotYProperty().bind(Bindings.createDoubleBinding(
                 () -> card.getLayoutBounds().getHeight() / 2, card.layoutBoundsProperty()));
@@ -2772,9 +2745,9 @@ public final class MainWindow {
     }
 
     public void closeModal() {
-        // 退场动画期间再点遮罩不算新一次关闭
+        // 防退场中重复关闭
         if (modalLayer == null || !modalLayer.isVisible() || modalContent == null) return;
-        // 入场动画还在跑就先停，两个动画同时写 opacity/rotate 会打架
+        // 先停入场动画，避免写值打架
         if (modalEnter != null) modalEnter.stop();
         if (maskFade != null) maskFade.stop();
         if (modalExit != null) modalExit.stop();
@@ -2792,7 +2765,6 @@ public final class MainWindow {
         final Rotate rot = modalRotate;
         modalContent = null;
         modalRotate = null;
-        // 退场 20ms 后开始淡出，位移回落到 20px、倾斜 6°，150ms 收束
         int moveMs = Ui.aniMs(150);
         if (card != null && moveMs > 0) {
             Timeline out = new Timeline(
@@ -2825,7 +2797,6 @@ public final class MainWindow {
                 modalLayer.setBackground(Ui.fill(Color.TRANSPARENT, 0));
                 finishModalHide();
             } else {
-                // 遮罩延迟 30ms 再淡出，比卡片收束（150ms）略慢
                 maskFade = maskTransition(modalLayer, maskColor(modalLayer), Color.TRANSPARENT,
                         maskMs, Ui.aniMs(30), Ui.EASE_OUT_FLUENT_WEAK);
                 maskFade.setOnFinished(e -> finishModalHide());
@@ -2857,7 +2828,7 @@ public final class MainWindow {
         Label empty = Ui.label("没有匹配的结果", 12, Theme.gray3);
         empty.setOpacity(0.7);
         empty.setVisible(false);
-        empty.setManaged(false);   // 隐藏时不能占位，否则卡片底部会多出一条空挡
+        empty.setManaged(false);
         card.getChildren().addAll(field, scroll, empty);
         StackPane.setAlignment(card, Pos.TOP_CENTER);
         StackPane.setMargin(card, new Insets(70, 0, 0, 0));
@@ -2918,7 +2889,7 @@ public final class MainWindow {
             String query = q == null ? "" : q.trim().toLowerCase();
             int count = 0;
             for (Object[] entry : entries) {
-                // 原文与译文都参与匹配，英文界面输中文也能搜到
+                // 原文与译文都参与匹配
                 String title = (String) entry[4];
                 String sub = (String) entry[5];
                 String titleRaw = (String) entry[0];
@@ -2982,7 +2953,6 @@ public final class MainWindow {
         searchLayer.setOnMouseClicked(e -> {
             if (e.getTarget() == searchLayer) closeSearch();
         });
-        searchField = new TextFieldBridge(field);
     }
 
     // 条目 6 列：标题/副题/图标/动作 + 译文两列（过滤用）
@@ -2999,11 +2969,6 @@ public final class MainWindow {
             searchLayer.getChildren().clear();
         });
         ft.play();
-    }
-
-    private static class TextFieldBridge {
-        TextFieldBridge(javafx.scene.control.TextField field) {
-        }
     }
 
     public void showAccountDialog() {
@@ -3043,7 +3008,7 @@ public final class MainWindow {
         hidePage(currentPage);
         rightPendingHide = null;
         lastHiddenPage = null;
-        // 视频播放器不重建，只把画面摘下来，等新 body 建好再挂回去
+        // 播放器不重建，只摘画面再挂回
         detachVideoView();
         root.getChildren().clear();
         loadThemeFromSettings();
@@ -3076,7 +3041,7 @@ public final class MainWindow {
         }
     }
 
-    // 重建后用旧界面快照淡出，整页不闪
+    // 快照淡出，整页不闪
     private void fadeSnapshot(javafx.scene.image.WritableImage snap) {
         if (snap == null || animationsOff()) return;
         javafx.scene.image.ImageView cover = new javafx.scene.image.ImageView(snap);
@@ -3314,7 +3279,6 @@ public final class MainWindow {
         launchPanel.setCenter(launchInner);
         launchLayer.getChildren().addAll(launchMask, launchPanel);
 
-        // 延迟 100ms 淡入 150ms，0.8 → 1 回弹
         launchInner.setScaleX(0.8);
         launchInner.setScaleY(0.8);
         Timeline slide = new Timeline(new KeyFrame(Duration.millis(190),
@@ -3461,7 +3425,7 @@ public final class MainWindow {
                 java.nio.file.Path json = Isolation.base(ins).resolve("versions")
                         .resolve(ins.version).resolve(ins.version + ".json");
                 if (!java.nio.file.Files.isRegularFile(json)) {
-                    // 异常消息经 Errors 弹窗直接展示，整串查不到表，片段各自先译
+                    // 整串查不到表，片段各自先译
                     throw new Exception(Lang.t("未找到版本文件 ") + json + Lang.t("，请先在「下载」页安装 ") + ins.version);
                 }
                 data.launchLog("游戏目录：" + Isolation.run(ins) + (Isolation.on(ins) ? "（已隔离）" : "（共用）"));
@@ -3526,11 +3490,10 @@ public final class MainWindow {
                     wait.play();
                 });
             } catch (Exception ex) {
-                // 取消不报错，面板已由 cancelLaunch 关
+                // 取消不报错
                 if (ex instanceof java.util.concurrent.CancellationException || launchCancelled) return;
                 String msg = ex.getMessage() == null ? "未知错误" : ex.getMessage();
                 data.launchLog("启动失败：" + msg);
-                // 失败弹错误窗给真实原因，不用一闪而过的 toast
                 Errors.alert("Minecraft 启动失败", ex);
                 Platform.runLater(() -> {
                     launchStep.setText(Lang.t("启动失败"));
@@ -3574,7 +3537,7 @@ public final class MainWindow {
     private void setLaunchProgress(double value) {
         if (launchProgressFill == null) return;
         long now = System.currentTimeMillis();
-        // 节流：进度回调太密集，频繁 new Timeline 会卡 FX 线程
+        // 节流，防频繁建 Timeline 卡 FX
         if (value < 1 && now - lastLaunchProgressAt < 120) {
             if (Math.abs(value - lastLaunchProgressValue) < 0.03) return;
         }

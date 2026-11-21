@@ -191,7 +191,6 @@ public final class Downloader {
             sub(task, 1, Tasks.State.DONE);
         }
 
-        // 按平台规则过滤依赖库
         sub(task, 2, Tasks.State.RUNNING);
         task.stage = "下载依赖库";
         List<Object> libraries = Json.arr(versionData.get("libraries"));
@@ -227,7 +226,6 @@ public final class Downloader {
         }
         int total = Math.max(1, libFiles.size());
         if (!libFiles.isEmpty()) {
-            // 依赖库数量多且文件偏大，串行下太慢，走和资源阶段一样的并发池
             int threads = Math.max(1, Math.min(64, Data.get().getInt("SystemMaxThreads", 64)));
             task.threads = threads;
             Tasks.INSTANCE.changed();
@@ -347,7 +345,6 @@ public final class Downloader {
             pool.shutdownNow();
         }
         check(task);
-        // 失败文件补抓一轮，不让最后几个卡住整个安装
         if (!retryQueue.isEmpty()) {
             task.stage = "补抓失败文件 0 / " + retryQueue.size();
             int retried = 0;
@@ -406,7 +403,6 @@ public final class Downloader {
             sub(task, 5, Tasks.State.DONE);
         }
 
-        // 附加载器下到 mods 或缓存目录
         if (inst != null) {
             Data.Instance probe = new Data.Instance("", actualVersion, loader, "", "", "", 0, false,
                     game.toString(), Isolation.FOLLOW);
@@ -428,8 +424,12 @@ public final class Downloader {
                 instanceIcon(loader, version),
                 System.currentTimeMillis(), false, game.toString(), Isolation.FOLLOW);
         int selected = -1;
+        // 同名实例按目录区分
+        String gameNorm = game.toString().replace('\\', '/').toLowerCase(java.util.Locale.ROOT);
         for (int i = 0; i < data.instances.size(); i++) {
-            if (data.instances.get(i).name.equals(instance.name)) { selected = i; break; }
+            Data.Instance ex = data.instances.get(i);
+            if (ex.name.equals(instance.name) && ex.folder.replace('\\', '/')
+                    .toLowerCase(java.util.Locale.ROOT).equals(gameNorm)) { selected = i; break; }
         }
         if (selected < 0) {
             data.instances.add(instance);
@@ -570,7 +570,7 @@ public final class Downloader {
             long done = 0;
             if (Files.isRegularFile(part)) {
                 done = Files.size(part);
-                // 续传时先重放已有部分，继续算摘要
+                // 续传先重放已有部分续算摘要
                 if (digest != null && done > 0) {
                     try (InputStream rin = Files.newInputStream(part)) {
                         byte[] rbuf = new byte[65536];
@@ -595,7 +595,6 @@ public final class Downloader {
                     if (digest != null) {
                         String actual = java.util.HexFormat.of().formatHex(digest.digest());
                         if (!sha1.equalsIgnoreCase(actual)) {
-                            // 校验失败，丢掉 .part 重下
                             Files.deleteIfExists(part);
                             digest.reset();
                             done = 0;
@@ -775,7 +774,6 @@ public final class Downloader {
         // 安装器会被执行，无 .sha1 即中止
         String installerSha1 = fetchRemoteSha1(installerUrl);
         if (installerSha1 == null) {
-            // 官方 maven 连不上时镜像侧再取 .sha1
             String mirrorSha1 = mirrorSha1Url(installerUrl);
             if (mirrorSha1 != null) installerSha1 = fetchRemoteSha1(mirrorSha1);
         }
@@ -796,19 +794,17 @@ public final class Downloader {
                     "{\"profiles\":{},\"settings\":{\"enableSnapshots\":false,\"enableAdvanced\":false},"
                             + "\"version\":3}", StandardCharsets.UTF_8);
         }
-        // 安装器日志量大，输出落文件，不然管道塞满两边卡死
+        // 安装器日志量大，落文件防管道塞死
         Path logFile = installer.getParent().resolve(loader.toLowerCase() + "-" + mc + ".log");
         Files.createDirectories(logFile.getParent());
         List<String> cmd = new ArrayList<>();
         cmd.add(javaExe);
         cmd.add("-Dfile.encoding=UTF-8");
-        // 安装器需联网下载依赖，代理一并传入
         cmd.addAll(data.proxyJvmArgs());
         cmd.add("-jar");
         cmd.add(installer.toString());
         cmd.add("--installClient");
         cmd.add(game.toString());
-        // 安装器从官方 maven 拉依赖很慢，先用镜像预下
         prefetchInstallerLibraries(task, installer, game, loader);
         if (task.canceled) throw new IOException("已取消");
         task.stage = "正在运行 " + loader + " 安装器";
@@ -841,7 +837,6 @@ public final class Downloader {
         return null;
     }
 
-    // 取 maven 旁边的 .sha1 文件；拿不到或格式不对时返回 null
     private static String fetchRemoteSha1(String url) {
         try {
             String text = getText(url + ".sha1");
@@ -873,7 +868,6 @@ public final class Downloader {
                 }
             }
             if (libs.isEmpty()) return;
-            // 先把地址解析出来，下载走并发池
             List<Object[]> prefetch = new ArrayList<>();
             for (Map<String, Object> lib : libs) {
                 Map<String, Object> artifact = Json.obj(Json.obj(lib.get("downloads")).get("artifact"));
@@ -909,7 +903,6 @@ public final class Downloader {
                         Path target = game.resolve("libraries").resolve(path);
                         try {
                             if (!Files.isRegularFile(target) || Files.size(target) <= 0) {
-                                // 有 sha1 就让下载器校验，坏文件不会留给安装器
                                 String sha1 = (String) p[2];
                                 String label = normalizeSha1(sha1) != null ? sha1
                                         : loader + Lang.t(" 依赖 ") + target.getFileName();
@@ -1046,7 +1039,6 @@ public final class Downloader {
         if (loaders.isEmpty()) throw new IOException("没有可用的 Fabric 加载器");
         String loaderVersion = null;
         if (wantedVersion != null && !wantedVersion.isBlank()) {
-            // 选中的版本不在列表里就回退稳定版
             for (Object o : loaders) {
                 if (wantedVersion.trim().equals(Json.str(Json.obj(o, "loader"), "version", ""))) {
                     loaderVersion = wantedVersion.trim();
@@ -1181,7 +1173,6 @@ public final class Downloader {
         if (task.canceled) throw new IOException("已取消");
     }
 
-    // 会话内缓存已校验文件，同一次安装不重复哈希 assets
     private static final java.util.Map<String, Boolean> VERIFIED = new java.util.concurrent.ConcurrentHashMap<>();
 
     private static boolean assetReady(Path file, long expectedSize, String sha1) {
@@ -1211,7 +1202,7 @@ public final class Downloader {
     private static final java.util.regex.Pattern SHA1_40 =
             java.util.regex.Pattern.compile("[0-9a-fA-F]{40}");
 
-    // 只接受 40 位十六进制，其余（label、空串）视为没有哈希可校验
+    // 仅接受 40 位十六进制，其余视为无哈希
     private static String normalizeSha1(String value) {
         if (value == null) return null;
         String v = value.trim();
@@ -1231,7 +1222,6 @@ public final class Downloader {
         downloadFile(task, url, target, progressFrom, progressTo, label, null);
     }
 
-    // expectedSha1 非空时，已存在的文件也要过一遍校验
     private static void downloadFile(Tasks.Task task, String url, Path target,
                                      double progressFrom, double progressTo, String label,
                                      String expectedSha1) throws IOException {
@@ -1239,7 +1229,6 @@ public final class Downloader {
         if (sha1 == null) sha1 = normalizeSha1(label);
         if (Files.isRegularFile(target) && Files.size(target) > 0) {
             if (sha1 != null) {
-                // 有哈希就一定要对得上，对不上说明文件被换过或是半截文件
                 boolean ok;
                 try {
                     ok = GameLauncher.sha1Of(target).equalsIgnoreCase(sha1);
@@ -1262,7 +1251,6 @@ public final class Downloader {
         }
         Files.createDirectories(target.getParent());
         Exception last = null;
-        // 候选源按测速结果排序，别一直命中慢源
         for (String candidate : Sources.rank(mirrors(url))) {
             try {
                 Fetch.file(task, candidate, target, sha1, progressFrom, progressTo);
@@ -1388,7 +1376,6 @@ public final class Downloader {
     private static long limitWindowStart;
     private static long limitWindowBytes;
 
-    // bytes 是本次新写入的字节数；limit<=0 不限速，无锁直通
     public static void throttle(int bytes, long limit) {
         if (limit <= 0 || bytes <= 0) return;
         long waitMs = 0;
@@ -1400,7 +1387,6 @@ public final class Downloader {
             }
             limitWindowBytes += bytes;
             if (limitWindowBytes > limit) {
-                // 本秒配额用完就睡到下一个窗口，聚合速率≈设置值
                 waitMs = Math.max(1, 1000 - (now - limitWindowStart));
             }
         }
@@ -1413,7 +1399,6 @@ public final class Downloader {
         }
     }
 
-    // 带字节进度的文本请求
     public static String getText(java.util.function.DoubleConsumer progress, String... urls) throws IOException {
         Exception last = null;
         for (String url : Sources.rank(java.util.Arrays.asList(urls))) {

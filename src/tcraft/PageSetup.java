@@ -23,13 +23,10 @@ public class PageSetup implements Page {
 
     private final MainWindow win;
     private final Data data = Data.get();
-    private final String initialSection;
-    private VBox navPanel;
     private VBox ramDisplayHost;
 
     public PageSetup(MainWindow win, String section) {
         this.win = win;
-        this.initialSection = section;
         data.setupSection = section;
         win.pendingSetupSection = section;
     }
@@ -79,7 +76,6 @@ public class PageSetup implements Page {
             data.setupSection = visibleSections.get(0)[3];
             win.pendingSetupSection = data.setupSection;
         }
-        navPanel = items;
         for (String[] s : visibleSections) items.getChildren().add(navItem(s[1], s[2], s[3], s[0]));
         Ui.ListItem back = new Ui.ListItem(Theme.icon("arrow-left", 16, Theme.text), "返回", null, 34);
         back.setOnMouseClicked(e -> win.openPage("launch", true));
@@ -197,7 +193,7 @@ public class PageSetup implements Page {
             }
             case "java" -> {
                 data.invalidateJavaScan();
-                // detectJava 要起一堆 java 进程试版本，放后台，扫完再写回
+                // detectJava 要起多个进程，放后台
                 Threads.start("TCL-JavaDetect", () -> {
                     String detected = data.detectJava();
                     javafx.application.Platform.runLater(() -> {
@@ -368,7 +364,7 @@ public class PageSetup implements Page {
         HBox initRow = new HBox(12, initRam, initVal);
         maxRow.setAlignment(Pos.CENTER_LEFT);
         initRow.setAlignment(Pos.CENTER_LEFT);
-        // 滑条常驻，自动配置时置灰，保留内存分配可见性
+        // 滑条常驻，自动配置时置灰
         mem.add(radios, Ui.settingRow("最大内存", maxRow), Ui.settingRow("初始内存", initRow));
         auto.setOnAction(() -> {
             data.set("LaunchRamType", 0);
@@ -384,7 +380,6 @@ public class PageSetup implements Page {
         optimize.setOnAction(() -> data.set("LaunchOptimizeRam", optimize.isSelected()));
         mem.add(optimize);
 
-        // 用真实物理内存，2 秒刷新一次
         ramDisplayHost = new VBox(0);
         mem.add(ramDisplayHost);
         refreshMemoryDisplay(data.getInt("LaunchRam", 4096));
@@ -436,7 +431,7 @@ public class PageSetup implements Page {
         });
         adv.add(waitCmd);
 
-        // 选启动用 javaw；无缓存先占位后台扫
+        // 无扫描缓存先占位，后台扫
         List<String> javas;
         if (data.hasJavaScanCache()) {
             javas = findJavas();
@@ -456,7 +451,7 @@ public class PageSetup implements Page {
             String path = javaCombo.getSelectionModel().getSelectedItem();
             if (path == null || path.equals("未找到 Java")) return;
             if (data.javaPath.equals(path)) return;
-            // javaMajor 可能起 java -version 子进程，识别放后台
+            // javaMajor 会起子进程，识别放后台
             win.toast("正在识别 Java 版本…", path, 0);
             Threads.start("TCL-Java-Switch", () -> {
                 int major = Data.javaMajor(path);
@@ -494,7 +489,7 @@ public class PageSetup implements Page {
                     i -> {
                         data.set("LaunchAdvanceRenderer", i);
                         if (i > 0) {
-                            // 首次选择时后台拉取 mesa-loader，别等进游戏前才卡界面
+                            // 首次选择时后台拉取 mesa-loader
                             Threads.start("TCL-Mesa", () -> {
                                 try {
                                     Mesa.ensure();
@@ -639,7 +634,6 @@ public class PageSetup implements Page {
         FlowPane swatches = new FlowPane(18, 10);
         swatches.setPadding(new Insets(6, 0, 4, 0));
         int current = data.getInt("UiThemePreset", -1);
-        // 先排可选主题，未解锁的垫底置灰
         for (int pass = 0; pass < 2; pass++) {
             for (int i0 = 0; i0 < Theme.THEME_NAMES.length; i0++) {
                 final int i = i0;
@@ -728,7 +722,7 @@ public class PageSetup implements Page {
         TextField logoText = textRow(detail, "标题栏文字", "TCL", data.get("UiLogoText", "TCL"), s -> {
             data.set("UiLogoText", s);
         });
-        // 输入过程中不要重建整个界面，失焦或回车时再刷新
+        // 失焦或回车再重建，输入中不重建
         logoText.focusedProperty().addListener((o, a, focused) -> {
             if (!focused) win.rebuildUi();
         });
@@ -841,7 +835,6 @@ public class PageSetup implements Page {
                 boolean isPage = pageDef[1].equals("UiHiddenLaunch") || pageDef[1].equals("UiHiddenInstance")
                         || pageDef[1].equals("UiHiddenDownload") || pageDef[1].equals("UiHiddenLink")
                         || pageDef[1].equals("UiHiddenOther");
-                // 不能把所有导航页都藏掉
                 if (isPage) {
                     int visible = 0;
                     for (String[] p : pages) {
@@ -914,7 +907,6 @@ public class PageSetup implements Page {
         Ui.Card bg = addCard(page, "背景");
         VBox imageBox = new VBox(2);
         VBox videoBox = new VBox(2);
-        // 两套设置预先建好，切换只做显隐
         Runnable applyMode = () -> {
             boolean video = data.getInt("UiBackgroundType", 0) == 1;
             imageBox.setVisible(!video);
@@ -931,7 +923,6 @@ public class PageSetup implements Page {
                 });
 
         int mark = bg.content.getChildren().size();
-        // 有图片才显示自适应/轮播/不透明度/模糊
         if (imageCount > 0) {
             // 下拉顺序与存储值一一对应
             String[] suitNames = {"自动", "平铺", "居中", "拉伸", "左上 (保持长宽比)",
@@ -989,7 +980,7 @@ public class PageSetup implements Page {
                 data.set("UiThemePreset", -1);
                 Theme.applyWallpaperTheme();
             } else {
-                // 关掉跟随壁纸：把此刻的取色固化成自定义主题，别掉回默认蓝
+                // 关掉跟随壁纸：把当前取色固化成自定义主题
                 Theme.saveCurrentAsCustom(data);
                 data.set("UiThemePreset", 14);
             }
@@ -1066,8 +1057,24 @@ public class PageSetup implements Page {
         }, "%");
         sound.add(directCheck("随机播放", "UiMusicRandom", false));
         sound.add(directCheck("启动时自动播放", "UiMusicAuto", false));
-        sound.add(directCheck("游戏启动后自动开始播放，游戏退出后自动暂停播放", "UiMusicStart", true));
-        sound.add(directCheck("游戏启动后自动暂停播放，游戏退出后自动开始播放", "UiMusicStop", true));
+        Ui.Check musicStart = directCheck("游戏启动后自动开始播放，游戏退出后自动暂停播放", "UiMusicStart", false);
+        Ui.Check musicStop = directCheck("游戏启动后自动暂停播放，游戏退出后自动开始播放", "UiMusicStop", false);
+        musicStart.setOnAction(() -> {
+            data.set("UiMusicStart", musicStart.isSelected());
+            if (musicStart.isSelected()) {
+                musicStop.setSelected(false);
+                data.set("UiMusicStop", false);
+            }
+        });
+        musicStop.setOnAction(() -> {
+            data.set("UiMusicStop", musicStop.isSelected());
+            if (musicStop.isSelected()) {
+                musicStart.setSelected(false);
+                data.set("UiMusicStart", false);
+            }
+        });
+        sound.add(musicStart);
+        sound.add(musicStop);
         FlowPane musicButtons = new FlowPane(10, 10);
         musicButtons.getChildren().addAll(
                 Ui.button("打开文件夹", Ui.BTN_NORMAL, this::openMusicFolder),
@@ -1079,7 +1086,7 @@ public class PageSetup implements Page {
                 }),
                 Ui.button("清空背景音乐", Ui.BTN_RED, () -> Dialogs.confirm(win,
                         "清空背景音乐", Lang.t("即将删除背景音乐文件夹中的所有文件。\n此操作不可撤销，是否确定？"), () -> {
-                            // 先释放播放器；Windows 下播放中的文件无法删除
+                            // Windows 播放中的文件删不掉
                             Music.clear();
                             clearMusicFolder();
                             win.refreshExtraButtons();
@@ -1203,7 +1210,6 @@ public class PageSetup implements Page {
         }
     }
 
-    // 挪到独立容器，便于整组显隐
     private static void moveRows(Ui.Card card, int mark, VBox target) {
         var children = card.content.getChildren();
         List<Node> rows = new ArrayList<>(children.subList(mark, children.size()));
@@ -1449,7 +1455,7 @@ public class PageSetup implements Page {
         orderHint.setWrapText(true);
         found.add(orderHint);
         if (!data.hasJavaScanCache()) {
-            // 首次扫描要探测很多路径，放后台，扫完自动刷新
+            // 首次扫描放后台，扫完自动刷新
             found.add(Ui.label("正在扫描本机的 Java…", 12.5, Theme.gray2));
             Threads.start("TCL-JavaScan", () -> {
                 data.scanJavaRuntimes();
@@ -1469,7 +1475,7 @@ public class PageSetup implements Page {
             Ui.ListItem item = new Ui.ListItem(Theme.icon("coffee", 17, selected ? Theme.accent : Theme.text),
                     name, rt.path(), 44);
             item.setSelected(selected);
-            // 上移 / 下移：写进 LaunchJavaOrder，自动选择时按这个顺序挑
+            // 顺序写进 LaunchJavaOrder，自动选择按此挑
             StackPane up = Ui.iconButton("arrow-up", 26, 15, "上移", () -> moveJava(rt, -1));
             StackPane down = Ui.iconButton("arrow-down", 26, 15, "下移", () -> moveJava(rt, 1));
             up.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED,
@@ -1511,7 +1517,7 @@ public class PageSetup implements Page {
     }
 
     private void moveJava(Data.JavaRuntime rt, int dir) {
-        // 缓存过期时 orderedJavas 会触发全盘探测，排序列表放后台
+        // orderedJavas 可能触发全盘探测，放后台
         Threads.start("TCL-Java-Order", () -> {
             List<Data.JavaRuntime> list = orderedJavas();
             int index = -1;
@@ -1564,7 +1570,7 @@ public class PageSetup implements Page {
         chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(Lang.t("所有文件"), "*.*"));
         File file = chooser.showOpenDialog(win.stage);
         if (file == null) return;
-        // 探测要起 java -version 子进程，选完文件后整段放后台
+        // 探测要起子进程，整段放后台
         Threads.start("TCL-Java-Import", () -> {
             int major = Data.javaMajor(file.getAbsolutePath());
             javafx.application.Platform.runLater(() -> {
@@ -1579,7 +1585,7 @@ public class PageSetup implements Page {
         });
     }
 
-    // 有些 Java 装在非常规位置，自动扫描覆盖不到，手动指定目录
+    // 自动扫描覆盖不到的非常规位置，手动指定
     private void pickJavaFolder() {
         javafx.stage.DirectoryChooser chooser = new javafx.stage.DirectoryChooser();
         chooser.setTitle(Lang.t("选择要搜索 Java 的文件夹"));
@@ -1671,7 +1677,6 @@ public class PageSetup implements Page {
                 tick[0].stop();
                 return;
             }
-            // 上一拍未完成则跳过本次读盘，任务不排队
             if (busy.get()) return;
             long size;
             try {
@@ -1685,7 +1690,7 @@ public class PageSetup implements Page {
             if (key.equals(lastKey[0])) return;
             lastKey[0] = key;
             busy.set(true);
-            // 读盘过滤放后台，600ms 一轮会卡主线程
+            // 读盘过滤放后台，防卡主线程
             Threads.start("TCL-Log-View", () -> {
                 String[] lines = new String[0];
                 String text = "";
@@ -1758,7 +1763,7 @@ public class PageSetup implements Page {
     private String[] readLogLines(Path file) {
         try {
             if (Files.isRegularFile(file)) {
-                // 只读末尾 384 KiB，整份读入会把 FX 线程拖死
+                // 只读末尾 384 KiB
                 long size = Files.size(file);
                 long start = Math.max(0, size - 384 * 1024L);
                 byte[] bytes = new byte[(int) (size - start)];
@@ -1790,7 +1795,7 @@ public class PageSetup implements Page {
                 return tail;
             }
         } catch (Exception e) {
-            // 读盘失败回退内存日志时，状态栏要说明，不能装作一切正常
+            // 回退内存日志时状态栏要说明
             lastLogReadError = e.getMessage() == null ? e.toString() : e.getMessage();
         }
         return data.log.toArray(new String[0]);
@@ -1816,7 +1821,6 @@ public class PageSetup implements Page {
         chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(Lang.t("日志文件"), "*.log"));
         File file = chooser.showSaveDialog(win.stage);
         if (file == null) return;
-        // 日志可能很大，读取、脱敏、写盘都放后台
         Thread worker = new Thread(() -> {
             try {
                 String content = all ? Log.exportAll() : Log.exportCurrent();
@@ -2048,7 +2052,7 @@ public class PageSetup implements Page {
 
     private static java.util.List<String> deleteDirCollect(Path dir, java.util.List<String> failedSink) {
         if (!Files.isDirectory(dir)) return failedSink;
-        Path running = Resources.jar(); // 运行中的 jar 被 JVM 锁定，跳过且不计为失败
+        Path running = Resources.jar(); // 运行中的 jar 被 JVM 锁定，跳过
         try (var stream = Files.walk(dir)) {
             for (Path p : stream.sorted(Comparator.reverseOrder()).toList()) {
                 try {
@@ -2354,7 +2358,7 @@ public class PageSetup implements Page {
                         new java.net.InetSocketAddress(host, Integer.parseInt(port)));
             }
         } catch (Exception e) {
-            // 返回串经 setText/toast 展示，都不经过 localize，创建处翻译
+            // 返回串不经 localize，创建处翻译
             return Lang.tf("代理参数无效：%s", e.getMessage());
         }
         long start = System.currentTimeMillis();
@@ -2381,7 +2385,6 @@ public class PageSetup implements Page {
         communityCard(page);
     }
 
-    // 切源清缓存，返回列表立即重取
     private static void clearMirrorCaches() {
         Modrinth.clearCache();
         CurseForge.clearCache();

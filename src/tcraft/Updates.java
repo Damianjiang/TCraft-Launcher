@@ -8,8 +8,6 @@ import javafx.geometry.Pos;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 import org.w3c.dom.Document;
@@ -139,7 +137,6 @@ public final class Updates {
         thread.setDaemon(true);
         thread.start();
 
-        // 超时只在后台打标记，不碰界面
         TIMEOUT.schedule(() -> {
             if (generation != GENERATION.get() || !checking) return;
             if (pendingGen == generation) return;
@@ -148,7 +145,6 @@ public final class Updates {
             Data.get().log("检查更新超时：12 秒没有返回");
         }, 12, java.util.concurrent.TimeUnit.SECONDS);
 
-        // FX 线程轮询取结果，不依赖 runLater 回调
         stopPoller();
         poller = new Timeline(new KeyFrame(Duration.millis(120), e -> poll(generation, win, manual, hint)));
         poller.setCycleCount(Timeline.INDEFINITE);
@@ -242,7 +238,6 @@ public final class Updates {
     private static volatile java.util.List<Release> releaseCache;
     private static volatile long releaseCacheAt;
 
-    // 跨版本更新时把中间版本的日志按版本倒序拼起来
     private static Release mergeChangelog(Release latest) {
         String current = Build.VERSION == null ? "" : Build.VERSION.trim();
         if (!isComparable(current) || !isComparable(latest.tag)
@@ -307,7 +302,6 @@ public final class Updates {
             return;
         }
         if (!isComparable(current)) {
-            // 不可比版本只记日志，弹窗留给手动检查
             if (manual) {
                 showUpdate(win, release);
             } else {
@@ -410,7 +404,6 @@ public final class Updates {
         }
     }
 
-    // 官方与各镜像并发请求，谁先返回用谁
     private static Release fetchFastest() throws Exception {
         java.util.List<String> bases = new java.util.ArrayList<>();
         bases.add("");
@@ -464,7 +457,6 @@ public final class Updates {
                 break;
             }
         }
-        // 无符合条目即报真实原因，不拿首条兜底
         if (entry == null) {
             throw new IOException("GitHub Releases 中没有符合测试版开关设置的版本");
         }
@@ -531,7 +523,7 @@ public final class Updates {
     private static String fetch(String url, String accept) throws IOException {
         HttpRequest request = HttpRequest.newBuilder(URI.create(url))
                 .timeout(java.time.Duration.ofSeconds(6))
-                .header("User-Agent", "TCraftLauncher-JavaFX/" + Build.VERSION)
+                .header("User-Agent", Http.UA)
                 .header("Accept", accept)
                 .GET()
                 .build();

@@ -47,7 +47,6 @@ public final class Theme {
     public static Color semiTransparent = Color.web("#eaf2fe", 1 / 255.0);
     // 显式给 alpha，8 位 hex 会被当 RRGGBBAA 解析
     public static Color halfWhite = Color.color(1, 1, 1, 0x55 / 255.0);
-    public static Color white = Color.WHITE;
     public static Color brush7 = Color.web("#e0eafd");
     public static Color redBack = Color.color(251 / 255.0, 221 / 255.0, 221 / 255.0, 0x80 / 255.0);
     public static Color darkBtnBg = Color.color(25 / 255.0, 25 / 255.0, 30 / 255.0, 214 / 255.0);
@@ -59,7 +58,6 @@ public final class Theme {
     public static Color gray4 = Color.web("#a6a6a6");
     public static Color gray5 = Color.web("#cccccc");
     public static Color gray6 = Color.web("#ebebeb");
-    public static Color gray7 = Color.web("#f0f0f0");
 
     public static Color green = Color.web("#2ba55c");
     public static Color red = Color.web("#ff4c4c");
@@ -96,7 +94,7 @@ public final class Theme {
 
     // 壁纸就绪后在 FX 线程回调刷背景/主题色
     public static volatile Runnable onWallpaperReady;
-    // 壁纸取色完成且颜色确实变化时回调，用于把程序化颜色统一刷一遍
+    // 壁纸取色完成且颜色确实变化时回调
     public static volatile Runnable onAccentApplied;
 
     private Theme() {
@@ -219,7 +217,6 @@ public final class Theme {
 
     private static boolean fontsLoaded;
 
-    // 已扫过就直接用缓存列表；重新扫描+loadFont 别挂在进设置页的路径上
     public static synchronized void ensureUserFonts() {
         if (!fontsLoaded) loadUserFonts();
     }
@@ -292,7 +289,6 @@ public final class Theme {
             new java.util.concurrent.atomic.AtomicInteger();
 
     public static void resetWallpaper() {
-        // 整屏壁纸同步解码会把 FX 线程卡住，挪后台，完成后回 FX 赋值
         final int gen = wallpaperGen.incrementAndGet();
         Threads.start("TCL-Wallpaper", () -> {
             Image img = loadImage("wallpaper.jpg");
@@ -320,13 +316,12 @@ public final class Theme {
                 stream.filter(Files::isRegularFile).filter(Theme::isWallpaperImage).forEach(images::add);
             }
             if (images.isEmpty()) return false;
-            // 启动取色已经选过同一张图，保持一致；否则随机
+            // 与启动取色选同一张图，否则随机
             Path pick = pendingWallpaper != null && Files.isRegularFile(pendingWallpaper)
                     ? pendingWallpaper
                     : images.get((int) (Math.random() * images.size()));
             pendingWallpaper = null;
             currentWallpaperFile = pick;
-            // 壁纸是整屏大图，同步解码会把 FX 线程卡住，交给后台解码
             Image img = new Image(pick.toUri().toString(), true);
             if (img.isError()) return false;
             final int gen = wallpaperGen.incrementAndGet();
@@ -339,7 +334,7 @@ public final class Theme {
             }));
             javafx.application.Platform.runLater(() -> {
                 if (wallpaperGen.get() != gen) return;
-                // 极快的解码失败可能抢在监听挂上之前，落壁纸前再判一次
+                // 解码失败可能抢在监听挂上之前
                 if (loaded.isError()) {
                     resetWallpaper();
                     return;
@@ -353,7 +348,7 @@ public final class Theme {
         }
     }
 
-    // 按字节预算的 LRU，整屏壁纸一张就几十 MB，按条数清表太粗暴
+    // 按字节预算的 LRU
     private static final java.util.Map<String, Image> IMAGE_CACHE =
             java.util.Collections.synchronizedMap(new java.util.LinkedHashMap<>(64, 0.75f, true));
     private static final long IMAGE_CACHE_BUDGET = 256L * 1024 * 1024;
@@ -370,7 +365,7 @@ public final class Theme {
             if (old != null) imageCacheBytes -= imageBytes(old);
             imageCacheBytes += imageBytes(img);
             var it = IMAGE_CACHE.entrySet().iterator();
-            // 字节预算为主；解码失败的图宽高是 0 计不了字节，留个条数兜底
+            // 解码失败的图计不了字节，条数兜底
             while ((imageCacheBytes > IMAGE_CACHE_BUDGET || IMAGE_CACHE.size() > 512)
                     && IMAGE_CACHE.size() > 1 && it.hasNext()) {
                 var e = it.next();
@@ -383,7 +378,6 @@ public final class Theme {
     public static Image loadImage(String name) {
         if (name == null || name.isEmpty()) return null;
         try {
-            // 绝对路径的用户文件
             if (name.contains("/") || name.contains("\\")) {
                 Path abs = Paths.get(name);
                 if (Files.isRegularFile(abs)) return cachedImage(abs);
@@ -490,7 +484,7 @@ public final class Theme {
         titleBar = hsl(hue + delta, sat, Math.max(14, light - 22));
     }
 
-    // 上次壁纸取色结果：启动时先用它，不先铺默认蓝
+    // 启动先用上次壁纸取色结果
     public static boolean applyCachedAccent() {
         try {
             Data d = Data.get();
@@ -532,7 +526,7 @@ public final class Theme {
         return diff > 0.06;
     }
 
-    // 启动前先定主题色：先建界面后显示，否则闪一帧默认蓝
+    // 启动前先定主题色
     private static volatile Path pendingWallpaper;
     private static boolean skipInitialAccentExtract;
     private static boolean startupPrepared;
@@ -552,7 +546,7 @@ public final class Theme {
                 return;
             }
             if (applyCachedAccent()) {
-                // 沿用上次取色的那张壁纸，主题与背景保持一致
+                // 沿用上次取色的那张壁纸
                 try {
                     String name = d.get("UiAccentCacheWallpaper", "");
                     if (!name.isBlank() && pictures != null) {
@@ -564,7 +558,7 @@ public final class Theme {
                 skipInitialAccentExtract = true;
                 return;
             }
-            // 没有缓存：用缩小图快速取色，不等整张大图解码
+            // 无缓存时用缩小图取色
             Image small = loadAccentPreview(pictures);
             if (small != null) {
                 Color c = extractAccent(small);
@@ -597,7 +591,6 @@ public final class Theme {
                 if (url == null) return null;
                 uri = url.toExternalForm();
             }
-            // 同步解码缩小图，400 宽足够取色且很快
             Image img = new Image(uri, 400, 0, true, false);
             return img.isError() ? null : img;
         } catch (Throwable t) {
@@ -744,7 +737,7 @@ public final class Theme {
             css = css.replace("#4890f5", hex(accentLight))
                     .replace("#1370f3", hex(accent))
                     .replace("#eaf2fe", hex(accentPale3));
-            // 文件名带代次，StyleManager 按 URL 缓存；带进程号，多开实例互不干扰
+            // StyleManager 按 URL 缓存，文件名带代次与进程号
             Path out = Paths.get(System.getProperty("java.io.tmpdir"),
                     cssOwnPrefix() + Long.toHexString(System.currentTimeMillis()) + "-" + cssGen++ + ".css");
             Files.writeString(out, css, StandardCharsets.UTF_8);
@@ -760,7 +753,7 @@ public final class Theme {
         return "tcraft-theme-" + ProcessHandle.current().pid() + "-";
     }
 
-    // 本进程只留当前代；别的实例（老版本或已退出的）的文件放一天再扫
+    // 本进程只留当前代；别的实例的文件放一天再扫
     private static void sweepThemeCss(Path keep) {
         String own = cssOwnPrefix();
         try (var stream = Files.list(Paths.get(System.getProperty("java.io.tmpdir")))) {
@@ -815,14 +808,14 @@ public final class Theme {
     }
 
     public static void applyWallpaperTheme() {
-        // 启动时已用缩小图/缓存定过色，首次挂载壁纸不重复取色
+        // 启动已定过色，首次挂载壁纸不重复取色
         if (skipInitialAccentExtract) {
             skipInitialAccentExtract = false;
             return;
         }
         Image img = wallpaper;
         if (img == null) return;
-        // 取色上万次扫描放后台；解码未完不取色
+        // 取色扫描放后台；解码未完不取色
         if (img.getProgress() < 1) {
             img.widthProperty().addListener(new javafx.beans.value.ChangeListener<Number>() {
                 @Override
@@ -920,7 +913,7 @@ public final class Theme {
             styleShape(c, color);
             group.getChildren().add(c);
         }
-        // viewBox 支持任意底（如 1024）；null 按默认 24
+        // viewBox 支持任意底；null 按默认 24
         double vbx = 24;
         if (svg != null) {
             int rootStart = svg.indexOf("<svg");

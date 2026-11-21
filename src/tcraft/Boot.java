@@ -19,7 +19,7 @@ public final class Boot {
     }
 
     public static void main(String[] args) {
-        // 语言先于一切 UI：按 SystemLanguage 显示启动壳
+        // 语言先于一切 UI
         applySystemProperties();
         if (Runtime.version().feature() < 17) {
             fail(Lang.t("TCraft Launcher 需要 Java 17 或更高版本。\n\n")
@@ -31,7 +31,7 @@ public final class Boot {
             System.err.println("[TCL] 已有实例在运行，本次启动退出");
             return;
         }
-        // 只有缺 JavaFX、需要下载或修复运行库时才显示进度窗；正常启动直接进主界面
+        // 仅缺 JavaFX/需下载时显示进度窗
         StartupWindow ui = hasFx() ? StartupWindow.none() : StartupWindow.open();
         startupWindow = ui;
         ui.setStatus(Lang.t("正在准备运行环境…"), 5);
@@ -80,7 +80,7 @@ public final class Boot {
                 return true;
             }
             try {
-                // 首次运行会由当前进程拉起新 JVM，旧进程退出需要一点时间
+                // 旧进程退出需要一点时间
                 Thread.sleep(100);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -127,10 +127,9 @@ public final class Boot {
                 System.setProperty("prism.verbose", "true");
             }
             // Data.get() 前的语言读取点；0简/1英/2繁/3随系统
-            // 语言表三列全量、与模式无关，静态块已建好，这里只切模式
             Lang.setMode(parseInt(p.getProperty("SystemLanguage", "0")));
         } catch (Throwable ignored) {
-            // 配置损坏时按默认启动，保证仍能打开
+            // 配置损坏按默认启动
         }
     }
 
@@ -216,7 +215,7 @@ public final class Boot {
         }
     }
 
-    // 日志可能几十 MB，只从尾部读一段出来
+    // 日志可能几十 MB，只留尾部
     static Path writeCrash(Throwable t) {
         return Log.crash(t);
     }

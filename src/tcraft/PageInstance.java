@@ -63,7 +63,6 @@ public class PageInstance implements Page {
         Ui.SearchBox search = Ui.searchBox("搜索实例");
         search.textProperty().addListener((o, a, b) -> {
             query = b == null ? "" : b.toLowerCase(java.util.Locale.ROOT);
-            // 连续输入时只重建一次列表，不必每个按键都重排
             if (searchDebounce == null) {
                 searchDebounce = new PauseTransition(Duration.millis(180));
                 searchDebounce.setOnFinished(e -> refreshList());
@@ -182,7 +181,6 @@ public class PageInstance implements Page {
             collectionFilter = value;
             refreshList();
         });
-        // 合集标签支持右键改名删除
         if (!value.isEmpty()) {
             Ui.tooltip(chip, value + Lang.t("（右键可重命名或删除）"));
             chip.setOnContextMenuRequested(e -> {
@@ -407,7 +405,7 @@ public class PageInstance implements Page {
         Ui.menuCard(anchor, instanceRows(anchor, ins).toArray(new Ui.MenuRow[0]));
     }
 
-    // 一级菜单的行；二级菜单「返回」时原地重建同一份内容
+    // 二级菜单「返回」时原地重建同一份内容
     private List<Ui.MenuRow> instanceRows(Node anchor, Data.Instance ins) {
         List<Ui.MenuRow> rows = new ArrayList<>();
         rows.add(Ui.MenuRow.of("启动游戏", "play", () -> {
@@ -498,7 +496,7 @@ public class PageInstance implements Page {
         Ui.swapMenuCard(popup, content, 210);
     }
 
-    // 返回行：同一张卡片里换回一级菜单，不关窗、不重播动画
+    // 同一张卡片里换回一级菜单，不关窗
     private Ui.ListItem backRow(javafx.stage.Popup popup, Node anchor, Data.Instance ins) {
         Ui.ListItem back = new Ui.ListItem(Theme.icon("arrow-left", 16, Theme.text), "返回", null, 34);
         back.setOnMouseClicked(e -> Ui.swapMenuCard(popup,
@@ -659,7 +657,7 @@ public class PageInstance implements Page {
     }
 
     private void createInstanceShortcut(Data.Instance ins) {
-        // PowerShell 要等进程返回，留在 FX 线程会把整个界面卡住
+        // PowerShell 要等进程返回，不能占 FX 线程
         Threads.start("TCL-Shortcut", () -> {
             try {
                 String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
@@ -695,7 +693,7 @@ public class PageInstance implements Page {
                     pb.redirectErrorStream(true);
                     Process p = pb.start();
                     try (java.io.InputStream in = p.getInputStream()) {
-                        // 先等退出再读输出，防挂死拖死线程
+                        // 先等退出再读输出，防挂死
                         if (!p.waitFor(30, java.util.concurrent.TimeUnit.SECONDS)) {
                             p.destroyForcibly();
                             throw new Exception("WScript.Shell 创建快捷方式超时");
@@ -918,7 +916,7 @@ public class PageInstance implements Page {
             try {
                 info = Modpacks.readInfo(packPath);
             } catch (Throwable t) {
-                // 深层嵌套可抛 SOE，须兜底防 UI 卡预读
+                // 深层嵌套可抛 SOE，须兜底
                 javafx.application.Platform.runLater(() ->
                         Dialogs.confirm(win, "预读整合包失败",
                                 Lang.tf("读取整合包时出错：%s", t.getMessage() == null ? t.toString() : t.getMessage()),

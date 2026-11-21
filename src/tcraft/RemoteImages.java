@@ -73,9 +73,9 @@ public final class RemoteImages {
             fire(callback, cached);
             return;
         }
-        // 重建页面允许重试，不被旧失败记录挡住
+        // 重建页面允许重试
         if (failed(url)) FAILED.remove(url);
-        // compute 保证登记与首例判定原子，防回调孤儿
+        // compute 保证登记与首例判定原子
         List<Consumer<Image>> waiters = WAITERS.compute(k, (kk, list) -> {
             if (list == null) list = new CopyOnWriteArrayList<>();
             list.add(callback);
@@ -89,7 +89,6 @@ public final class RemoteImages {
 
     private static final int MAX_RETRY = 3;
 
-    // 镜像优先，失败换下一个候选
     private static CompletableFuture<byte[]> fetchCandidates(String url) {
         return fetchCandidate(url, 0);
     }
@@ -130,7 +129,7 @@ public final class RemoteImages {
                     }
                     if (img == null) {
                         if (fromDisk) {
-                            // 坏图留在缓存不会恢复，删除后下轮重新下载
+                            // 坏图留在缓存不会恢复
                             try {
                                 Files.deleteIfExists(fileOf(url));
                             } catch (Exception ignored) {
@@ -143,7 +142,7 @@ public final class RemoteImages {
                         if (noDecoder) {
                             FAILED.put(url, System.currentTimeMillis() + RETRY_AFTER_MS);
                         } else if (!permanent && attempt < MAX_RETRY) {
-                            // 网络抖动先自动重试，图标不留白
+                            // 网络抖动先自动重试
                             long delay = 600L * (attempt + 1) * (attempt + 1);
                             CompletableFuture.delayedExecutor(delay, java.util.concurrent.TimeUnit.MILLISECONDS)
                                     .execute(() -> attemptLoad(url, key, px, attempt + 1));
@@ -200,7 +199,7 @@ public final class RemoteImages {
     private static void trimCache() {
         int target = MEMORY_LIMIT * 3 / 4;
         if (CACHE.size() <= target) return;
-        // 并发 map 的迭代序与访问序无关，按最近访问时间从旧到新淘汰
+        // 按最近访问时间从旧到新淘汰
         List<String> keys = new java.util.ArrayList<>(CACHE.keySet());
         keys.sort(java.util.Comparator.comparingLong(k -> ACCESSED.getOrDefault(k, 0L)));
         for (String k : keys) {
@@ -288,7 +287,7 @@ public final class RemoteImages {
 
     private static Image decode(byte[] bytes, int px) {
         try {
-            // JavaFX 不支持 WebP，Modrinth 图标多为该格式；缺库静默降级
+            // JavaFX 不支持 WebP，缺库静默降级
             if (isWebp(bytes)) return decodeWebp(bytes, px);
             Image img = new Image(new ByteArrayInputStream(bytes), px, px, true, true);
             return img.isError() ? null : img;

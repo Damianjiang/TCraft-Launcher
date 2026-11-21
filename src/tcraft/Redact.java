@@ -27,7 +27,7 @@ final class Redact {
 
     static String apply(String text) {
         if (text == null || text.isEmpty()) return "";
-        // 绝大多数日志不带敏感词，先过一遍关键词再跑正则
+        // 先过关键词再跑正则
         String lower = text.toLowerCase(java.util.Locale.ROOT);
         if (!lower.contains("token") && !lower.contains("password")
                 && !lower.contains("bearer") && !lower.contains("proxypass")

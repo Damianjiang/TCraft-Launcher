@@ -30,7 +30,7 @@ public final class Sources {
         }
         if (sample.size() < 2) return urls;
 
-        // 并发测速，同一域名只发一次
+        // 同一域名只测一次
         Map<String, Future<Double>> jobs = new LinkedHashMap<>();
         for (Map.Entry<String, String> e : sample.entrySet()) {
             if (cached(e.getKey()) != null) continue;
@@ -40,7 +40,7 @@ public final class Sources {
                 jobs.put(h, INFLIGHT.computeIfAbsent(h, k -> Http.pool().submit(() -> {
                     try {
                         double kbps = probe(url);
-                        // 失败结果同样入缓存，同一文件不重复探测
+                        // 失败也入缓存防重复探测
                         SPEED.put(h, new double[]{kbps, System.currentTimeMillis()});
                         return kbps;
                     } finally {

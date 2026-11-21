@@ -27,7 +27,7 @@ public class App extends Application {
 
     @Override
     public void start(Stage stage) {
-        Platform.setImplicitExit(false);   // 启动游戏后可能隐藏主窗，隐式退出会把整个程序带崩
+        Platform.setImplicitExit(false);   // 隐式退出会在隐藏主窗时带崩程序
         Log.startSession();
         long tPhase = System.nanoTime();
 
@@ -56,7 +56,7 @@ public class App extends Application {
             if (Boolean.getBoolean("tcl.time")) {
                 Data.get().log("阶段：界面构建 " + (System.nanoTime() - tPhase) / 1_000_000 + " ms");
             }
-            // 首帧优先：扫 Java/预取运行库留到空闲
+            // 首帧优先，重活留到空闲
             window.prepareIntro();
             stage.show();
             if (Boolean.getBoolean("tcl.time")) {
@@ -64,7 +64,7 @@ public class App extends Application {
             }
             stage.setAlwaysOnTop(false);
             window.playIntroWhenReady();
-            // 告诉首次运行留下的旧进程：主界面已经出来了，可以把启动窗收掉
+            // 通知旧进程收掉启动窗
             try {
                 Files.writeString(Resources.logDir().resolve(".window-ready"), "1");
             } catch (Exception ignored) {
@@ -94,7 +94,7 @@ public class App extends Application {
         top.setOnFinished(e -> stage.setAlwaysOnTop(false));
         top.play();
 
-        // 空闲后再做这两件事，让界面首帧先吃满磁盘与网络
+        // 空闲后再做，首帧优先
         PauseTransition idle = new PauseTransition(Duration.millis(2000));
         idle.setOnFinished(e -> {
             Thread javaScan = new Thread(() -> {
@@ -135,7 +135,7 @@ public class App extends Application {
     }
 
     private void applyInitialTheme() {
-        // 先定主题色再建界面，首帧不出默认蓝
+        // 先定主题色，首帧不出默认蓝
         Theme.prepareStartupAccent(java.nio.file.Paths.get(Data.get().gameDir, "TCL", "Pictures"));
     }
 
@@ -284,7 +284,7 @@ public class App extends Application {
 
     @Override
     public void stop() {
-        // FX 线程上同步等 easytier 会卡住退出，交给后台线程收尾
+        // 同步等 easytier 会卡退出
         EasyTier.stopAsync();
     }
 }

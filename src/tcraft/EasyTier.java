@@ -300,7 +300,7 @@ public final class EasyTier {
         c.setConnectTimeout(12000);
         c.setReadTimeout(20000);
         c.setInstanceFollowRedirects(true);
-        c.setRequestProperty("User-Agent", "TCraftLauncher-JavaFX/" + Build.VERSION);
+        c.setRequestProperty("User-Agent", Http.UA);
         int code = c.getResponseCode();
         if (code != 200) throw new Exception("HTTP " + code);
         long total = c.getContentLengthLong();
@@ -521,7 +521,6 @@ public final class EasyTier {
             core.descendants().forEach(ProcessHandle::destroy);
             core.destroy();
             if (!core.waitFor(3, TimeUnit.SECONDS)) {
-                // 温和关闭失败即强杀（含子进程），防端口被占
                 core.descendants().forEach(ProcessHandle::destroyForcibly);
                 core.destroyForcibly();
             }
@@ -647,7 +646,7 @@ public final class EasyTier {
 
     private static String runCommand(String... cmd) throws Exception {
         Process p = new ProcessBuilder(cmd).redirectErrorStream(true).start();
-        // 先等退出再读：进程不关 stdout 时 transferTo 会永远阻塞
+        // 进程不关 stdout 时 transferTo 永远阻塞，先等退出
         if (!p.waitFor(3, TimeUnit.SECONDS)) p.destroyForcibly();
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (InputStream in = p.getInputStream()) {
@@ -707,7 +706,7 @@ public final class EasyTier {
         c.setConnectTimeout(10000);
         c.setReadTimeout(15000);
         c.setInstanceFollowRedirects(true);
-        c.setRequestProperty("User-Agent", "TCraftLauncher-JavaFX/" + Build.VERSION);
+        c.setRequestProperty("User-Agent", Http.UA);
         c.setRequestProperty("Accept", "application/json");
         int code = c.getResponseCode();
         if (code != 200) throw new Exception("HTTP " + code);

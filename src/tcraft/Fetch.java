@@ -37,14 +37,14 @@ public final class Fetch {
         if (PART_LOCKS.putIfAbsent(lockKey, lock) != null) {
             throw new IOException(Lang.t("该文件已在下载中：") + target.getFileName());
         }
-        // 无哈希无法校验旧 .part，取锁后删除重下
+        // 无哈希不能续传，删除重下
         if (expect == null) Files.deleteIfExists(part);
         IOException last = null;
         try {
             long done = 0;
             if (Files.isRegularFile(part)) {
                 done = Files.size(part);
-                // 续传时先重放已有部分，继续算摘要
+                // 重放续算摘要
                 if (digest != null && done > 0) replay(part, digest);
             }
 
@@ -56,7 +56,6 @@ public final class Fetch {
                     if (digest != null) {
                         String actual = HexFormat.of().formatHex(digest.digest());
                         if (!expect.equals(actual)) {
-                            // 校验失败，丢掉 .part 重下
                             Files.deleteIfExists(part);
                             digest = sha1();
                             done = 0;
@@ -65,7 +64,6 @@ public final class Fetch {
                         }
                     }
                 } catch (IOException e) {
-                    // 取消直接退出，不走重试退避
                     if (task != null && task.canceled) throw e;
                     last = e;
                     if (e instanceof Http.StatusException se && se.code == 416) {
@@ -81,7 +79,7 @@ public final class Fetch {
                     }
                     continue;
                 }
-                // 占用类错误不属网络，重试无意义
+                // 占用类错误不重试
                 try {
                     Files.move(part, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                 } catch (java.nio.file.FileSystemException e) {
@@ -140,7 +138,7 @@ public final class Fetch {
             } finally {
                 out.close();
             }
-            // 长度对不上说明连接被掐断，交给外层重试
+            // 长度不符=连接被掐断，交外层重试
             if (body.length >= 0 && written != body.length) {
                 throw new IOException(Lang.t("下载不完整：") + written + " / " + body.length);
             }
@@ -165,7 +163,7 @@ public final class Fetch {
                 int take = (int) Math.min(n, maxBytes - out.size());
                 if (take > 0) out.write(buffer, 0, take);
                 if (out.size() >= maxBytes) {
-                    // 上限不是截断线：后面还有数据就是真超限，报错不给半截
+                    // 超限报错，不给半截
                     if (in.read() != -1) throw new java.io.IOException("响应超过大小上限");
                     break;
                 }
