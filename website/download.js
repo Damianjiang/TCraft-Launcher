@@ -182,6 +182,18 @@
         testBtn.textContent = '重新测速';
     }
 
+    const params = new URLSearchParams(location.search);
+    if (params.get('download')) {
+        const step = params.get('download');
+        setTimeout(() => {
+            open();
+            if (step === 'mirror') {
+                buildNodes();
+                show(step2);
+            }
+        }, 300);
+    }
+
     document.querySelectorAll('.btn-download').forEach(btn => {
         btn.addEventListener('click', e => {
             e.preventDefault();
