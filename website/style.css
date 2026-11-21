@@ -270,3 +270,150 @@ body.locked { overflow: hidden; }
     .download h2 { font-size: 22px; }
     .btn-download { min-width: 0; width: 100%; max-width: 320px; }
 }
+
+/* 下载弹窗 */
+.dl-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(24, 30, 38, .55);
+}
+
+.dl-modal.open { display: flex; }
+
+.dl-dialog {
+    position: relative;
+    width: min(620px, 100%);
+    max-height: min(86vh, 760px);
+    overflow: auto;
+    padding: 26px 26px 22px;
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, .28);
+}
+
+.dl-close {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #888;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.dl-close:hover { background: #f2f4f7; color: #333; }
+
+.dl-step h3 { margin: 0 0 8px; font-size: 20px; font-weight: 600; }
+.dl-hint { margin: 0 0 16px; color: #777; font-size: 13px; }
+
+.dl-choice {
+    display: block;
+    width: 100%;
+    margin-bottom: 12px;
+    padding: 14px 16px;
+    text-align: left;
+    border: 1px solid #e3e7ec;
+    border-radius: 10px;
+    background: #fafbfc;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.dl-choice:hover { border-color: #4f8f38; background: #f4faf1; }
+.dl-choice strong { display: block; font-size: 15px; color: #333; }
+.dl-choice small { display: block; margin-top: 3px; font-size: 12px; color: #888; }
+
+.dl-nodes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+
+.dl-node {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 11px 12px;
+    border: 1px solid #e3e7ec;
+    border-radius: 9px;
+    background: #fafbfc;
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.dl-node:hover, .dl-node.selected { border-color: #4f8f38; background: #f4faf1; }
+.dl-node-ping { color: #999; font-size: 12px; }
+.dl-node-ping.ok { color: #3f7d2c; }
+.dl-node-ping.bad { color: #c14b4b; }
+
+.dl-row { display: flex; justify-content: space-between; margin-top: 16px; }
+
+.dl-link {
+    padding: 6px 4px;
+    border: 0;
+    background: transparent;
+    color: #2f6fa8;
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.dl-meta { margin: 0 0 10px; color: #888; font-size: 12px; }
+
+.dl-log-h { color: #333; }
+
+.dl-log {
+    max-height: 190px;
+    margin: 0 0 14px;
+    padding: 12px 14px;
+    overflow: auto;
+    border: 1px solid #e6eaef;
+    border-radius: 9px;
+    background: #f7f9fb;
+    color: #444;
+    font-size: 12.5px;
+    line-height: 1.7;
+    word-break: break-word;
+}
+
+.dl-log h4, .dl-log h5, .dl-log h6 { margin: 10px 0 4px; font-size: 13.5px; color: #333; }
+.dl-log h4:first-child, .dl-log h5:first-child, .dl-log h6:first-child { margin-top: 0; }
+.dl-log ul { margin: 4px 0 8px; padding-left: 18px; }
+.dl-log li { margin: 2px 0; }
+.dl-log p { margin: 4px 0; }
+.dl-log code { padding: 1px 4px; border-radius: 4px; background: #eceff3; font-size: 12px; }
+.dl-log a { color: #2f6fa8; }
+
+.dl-assets { display: grid; gap: 8px; }
+
+.dl-asset {
+    display: grid;
+    grid-template-columns: 118px 1fr 70px;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid #e3e7ec;
+    border-radius: 9px;
+    color: #333;
+    text-decoration: none;
+    font-size: 13px;
+}
+
+.dl-asset:hover { border-color: #4f8f38; background: #f4faf1; }
+.dl-os { color: #2f6fa8; font-size: 12px; }
+.dl-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dl-size { color: #999; font-size: 12px; text-align: right; }
+.dl-empty { color: #888; font-size: 13px; }
+
+@media (max-width: 560px) {
+    .dl-nodes { grid-template-columns: 1fr; }
+    .dl-asset { grid-template-columns: 84px 1fr 56px; }
+}

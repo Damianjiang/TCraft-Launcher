@@ -112,11 +112,50 @@
         <p class="notice">启动器仍在开发中。TCraft Launcher 与 Mojang Studios、Microsoft 及其在中国大陆的代理公司无任何从属或关联，是非官方 Minecraft 启动器。</p>
     </footer>
 
+
+    <div class="dl-modal" id="dlModal" aria-hidden="true">
+        <div class="dl-dialog" role="dialog" aria-modal="true" aria-label="下载 TCraft Launcher">
+            <button class="dl-close" id="dlClose" type="button" aria-label="关闭">×</button>
+
+            <div class="dl-step" id="dlStep1">
+                <h3>下载 TCraft Launcher</h3>
+                <p class="dl-hint">选择下载方式，镜像不可用时可随时切换节点。</p>
+                <button class="dl-choice" id="dlMirror" type="button">
+                    <strong>国内镜像加速</strong>
+                    <small>自动读取最新版本，可选加速节点并测速</small>
+                </button>
+                <button class="dl-choice" id="dlGithub" type="button">
+                    <strong>前往 GitHub Releases</strong>
+                    <small>直接打开官方发布页，自己选择文件</small>
+                </button>
+            </div>
+
+            <div class="dl-step" id="dlStep2" hidden>
+                <h3>选择加速节点</h3>
+                <p class="dl-hint">点节点即可读取最新版本；「测速」会各拉一个小文件比较耗时。</p>
+                <div class="dl-nodes" id="dlNodes"></div>
+                <div class="dl-row">
+                    <button class="dl-link" id="dlBack" type="button">返回</button>
+                    <button class="dl-link" id="dlTest" type="button">测速</button>
+                </div>
+            </div>
+
+            <div class="dl-step" id="dlStep3" hidden>
+                <h3 id="dlTitle">最新版本</h3>
+                <p class="dl-meta" id="dlMeta"></p>
+                <div class="dl-log" id="dlLog"></div>
+                <div class="dl-assets" id="dlAssets"></div>
+            </div>
+        </div>
+    </div>
+
     <div class="lightbox" id="lightbox">
         <button class="close" type="button" aria-label="关闭">×</button>
         <img alt="">
     </div>
 
+    <script src="markdown.js"></script>
+    <script src="download.js"></script>
     <script>
         const loader = document.getElementById('loader');
 
