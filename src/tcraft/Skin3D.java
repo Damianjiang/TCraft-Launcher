@@ -289,13 +289,15 @@ public final class Skin3D extends Region {
                 frontU, frontV, frontU + Ws, frontV + Hs, cx, cy, cz);
         addFace(new double[]{x1, y0, z0, x0, y0, z0, x0, y1, z0, x1, y1, z0},
                 backU, backV, backU + Ws, backV + Hs, cx, cy, cz);
-        addFace(new double[]{x1, y0, z1, x1, y0, z0, x1, y1, z0, x1, y1, z1},
-                rightU, rightV, rightU + Ds, rightV + Hs, cx, cy, cz);
+        // 右侧条带贴 -x 面（右臂在 -x），左侧条带贴 +x 面
         addFace(new double[]{x0, y0, z0, x0, y0, z1, x0, y1, z1, x0, y1, z0},
+                rightU, rightV, rightU + Ds, rightV + Hs, cx, cy, cz);
+        addFace(new double[]{x1, y0, z1, x1, y0, z0, x1, y1, z0, x1, y1, z1},
                 leftU, leftV, leftU + Ds, leftV + Hs, cx, cy, cz);
-        addFace(new double[]{x0, y0, z1, x1, y0, z1, x1, y0, z0, x0, y0, z0},
+        // 顶/底条带上缘都朝模型背后，底面与顶面同朝向（对照 Minecraft ModelBox）
+        addFace(new double[]{x0, y0, z0, x1, y0, z0, x1, y0, z1, x0, y0, z1},
                 topU, topV, topU + Ws, topV + Ds, cx, cy, cz);
-        addFace(new double[]{x0, y1, z1, x1, y1, z1, x1, y1, z0, x0, y1, z0},
+        addFace(new double[]{x0, y1, z0, x1, y1, z0, x1, y1, z1, x0, y1, z1},
                 botU, botV, botU + Ws, botV + Ds, cx, cy, cz);
     }
 

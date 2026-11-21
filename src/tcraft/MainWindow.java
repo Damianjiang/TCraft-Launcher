@@ -1180,7 +1180,7 @@ public final class MainWindow {
         bar.getChildren().addAll(left, navBox, titleInner, right);
         PauseTransition adaptDebounce = new PauseTransition(Duration.millis(100));
         adaptDebounce.setOnFinished(e -> adaptTitleTabs());
-        // 首次拿到真实宽度立即定稿，避免首帧后再缩一下；后续窗口缩放才防抖
+        // 首次拿到真实宽度立即定稿，首帧只定一次；后续窗口缩放才防抖
         final boolean[] sized = {false};
         bar.widthProperty().addListener((o, a, b) -> {
             if (b.doubleValue() <= 0) return;
@@ -1745,7 +1745,7 @@ public final class MainWindow {
         }
     }
 
-    // 清掉内容最小尺寸，避免长文本撑宽页面
+    // 清掉内容最小尺寸，长文本不撑宽页面
     private void constrainRight(Node right) {
         rightHost.setMinWidth(0);
         rightHost.setMinHeight(0);
@@ -3076,7 +3076,7 @@ public final class MainWindow {
         }
     }
 
-    // 重建后用旧界面快照淡出，避免整页闪一下
+    // 重建后用旧界面快照淡出，整页不闪
     private void fadeSnapshot(javafx.scene.image.WritableImage snap) {
         if (snap == null || animationsOff()) return;
         javafx.scene.image.ImageView cover = new javafx.scene.image.ImageView(snap);

@@ -135,7 +135,7 @@ public class App extends Application {
     }
 
     private void applyInitialTheme() {
-        // 先定主题色再建界面，避免启动闪一下默认蓝
+        // 先定主题色再建界面，首帧不出默认蓝
         Theme.prepareStartupAccent(java.nio.file.Paths.get(Data.get().gameDir, "TCL", "Pictures"));
     }
 

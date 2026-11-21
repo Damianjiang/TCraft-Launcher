@@ -302,7 +302,7 @@ public final class GameLauncher {
             }
             boolean canceled = false;
             for (java.util.concurrent.Future<?> future : futures) {
-                // 取消即关闭线程池：已排队任务不再启动，运行中的中断后按取消收尾
+                // 取消即关闭线程池：已排队任务不启动，运行中的中断后按取消收尾
                 if (!canceled && cancelled.getAsBoolean()) {
                     canceled = true;
                     pool.shutdownNow();

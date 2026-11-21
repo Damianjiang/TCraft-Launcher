@@ -433,7 +433,7 @@ public class PageDownload implements Page {
             }
             return;
         }
-        // 版本多的分组分批建行，避免展开时卡住一秒
+        // 版本多的分组分批建行，展开不卡一秒
         buildChunk(lc, lc.versions, 0, ++lc.buildToken);
     }
 

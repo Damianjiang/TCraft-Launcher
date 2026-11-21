@@ -127,7 +127,7 @@ public final class Boot {
                 System.setProperty("prism.verbose", "true");
             }
             // Data.get() 前的语言读取点；0简/1英/2繁/3随系统
-            // 语言表三列全量、与模式无关，静态块已建好，这里只切模式不再重解析
+            // 语言表三列全量、与模式无关，静态块已建好，这里只切模式
             Lang.setMode(parseInt(p.getProperty("SystemLanguage", "0")));
         } catch (Throwable ignored) {
             // 配置损坏时按默认启动，保证仍能打开

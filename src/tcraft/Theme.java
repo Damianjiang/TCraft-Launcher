@@ -7,6 +7,7 @@ import javafx.scene.effect.DropShadow;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.image.PixelReader;
+import javafx.scene.image.WritableImage;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
@@ -489,7 +490,7 @@ public final class Theme {
         titleBar = hsl(hue + delta, sat, Math.max(14, light - 22));
     }
 
-    // 上次壁纸取色结果：启动时先用它，避免先铺一层默认蓝再等取色
+    // 上次壁纸取色结果：启动时先用它，不先铺默认蓝
     public static boolean applyCachedAccent() {
         try {
             Data d = Data.get();
@@ -551,7 +552,7 @@ public final class Theme {
                 return;
             }
             if (applyCachedAccent()) {
-                // 沿用上次取色的那张壁纸，避免这次随机到另一张导致主题与背景不一致
+                // 沿用上次取色的那张壁纸，主题与背景保持一致
                 try {
                     String name = d.get("UiAccentCacheWallpaper", "");
                     if (!name.isBlank() && pictures != null) {
@@ -563,7 +564,7 @@ public final class Theme {
                 skipInitialAccentExtract = true;
                 return;
             }
-            // 没有缓存：用缩小图快速取色，避免等整张大图解码
+            // 没有缓存：用缩小图快速取色，不等整张大图解码
             Image small = loadAccentPreview(pictures);
             if (small != null) {
                 Color c = extractAccent(small);
@@ -1030,13 +1031,26 @@ public final class Theme {
 
     public static Node headImage(Image skin, double size) {
         int scale = Math.max(1, (int) Math.floor(skin.getWidth() / 64.0));
+        int tex = 8 * scale;
+        int s = (int) Math.round(size);
+        // 点采样预渲染成 1:1 位图，绕开 ImageView 缩放的双线性
+        WritableImage out = new WritableImage(s, s);
+        PixelReader pr = skin.getPixelReader();
+        javafx.scene.image.PixelWriter pw = out.getPixelWriter();
+        for (int py = 0; py < s; py++) {
+            int ty = texelAt(py, s, tex);
+            for (int px = 0; px < s; px++) {
+                int tx = texelAt(px, s, tex);
+                int face = pr.getArgb(8 * scale + tx, 8 * scale + ty);
+                int hat = pr.getArgb(40 * scale + tx, 8 * scale + ty);
+                pw.setArgb(px, py, hatOver(hat, face));
+            }
+        }
         javafx.scene.layout.StackPane head = new javafx.scene.layout.StackPane();
         head.setMinSize(size, size);
         head.setPrefSize(size, size);
         head.setMaxSize(size, size);
-        head.getChildren().addAll(
-                skinLayer(skin, 8 * scale, 8 * scale, 8 * scale, size),
-                skinLayer(skin, 40 * scale, 8 * scale, 8 * scale, size));
+        head.getChildren().add(new ImageView(out));
         Rectangle clip = new Rectangle(size, size);
         clip.setArcWidth(3);
         clip.setArcHeight(3);
@@ -1044,14 +1058,23 @@ public final class Theme {
         return head;
     }
 
-    // 面部与帽子两层叠加
-    private static ImageView skinLayer(Image skin, int x, int y, int texels, double size) {
-        ImageView iv = new ImageView(skin);
-        iv.setViewport(new javafx.geometry.Rectangle2D(x, y, texels, texels));
-        iv.setFitWidth(size);
-        iv.setFitHeight(size);
-        iv.setSmooth(false);
-        return iv;
+    // texel 中心对齐的最近邻采样
+    private static int texelAt(int px, int out, int tex) {
+        return Math.min(tex - 1, (int) ((px + 0.5) * tex / out));
+    }
+
+    // 帽子层压在面部层上
+    private static int hatOver(int hat, int face) {
+        int ha = (hat >>> 24) & 0xFF;
+        if (ha == 0) return face;
+        if (ha == 0xFF) return hat;
+        int fa = (face >>> 24) & 0xFF;
+        int a = ha + fa * (0xFF - ha) / 0xFF;
+        if (a == 0) return 0;
+        int r = ((hat >> 16 & 0xFF) * ha + (face >> 16 & 0xFF) * fa * (0xFF - ha) / 0xFF) / a;
+        int g = ((hat >> 8 & 0xFF) * ha + (face >> 8 & 0xFF) * fa * (0xFF - ha) / 0xFF) / a;
+        int b = ((hat & 0xFF) * ha + (face & 0xFF) * fa * (0xFF - ha) / 0xFF) / a;
+        return a << 24 | r << 16 | g << 8 | b;
     }
 
     public static Image snapshot(Node node) {

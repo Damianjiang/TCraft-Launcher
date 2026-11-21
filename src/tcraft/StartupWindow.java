@@ -114,7 +114,7 @@ public final class StartupWindow {
     private void applyDownload(String text, long done, long total, int overallPercent) {
         long now = System.currentTimeMillis();
         if (downloadStartMs == 0) downloadStartMs = now;
-        // 速度 200ms 更新一次，避免数字乱跳
+        // 速度 200ms 更新一次，数字不乱跳
         if (now - downloadLastMs >= 200) {
             double secs = Math.max(0.001, (now - downloadStartMs) / 1000.0);
             double avg = done / secs / 1048576.0;

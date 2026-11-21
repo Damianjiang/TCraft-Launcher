@@ -22,7 +22,7 @@ public final class Skins {
         int[] size = pngSize(png);
         if (size == null) throw new IOException("皮肤文件不是有效的 PNG 图片");
         int w = size[0], h = size[1];
-        // 先读 IHDR 再落盘，防止超大 PNG 解码占满内存
+        // 先读 IHDR 再落盘，超大 PNG 在解码前就拒掉
         if (w < 64 || w % 64 != 0 || (h != w && h != w / 2) || (long) w * h > 2048L * 2048L) {
             throw new IOException("皮肤图片尺寸无效（" + w + "×" + h + "，应为 64×32、64×64 或它们的整数倍）");
         }

@@ -2532,7 +2532,7 @@ public class PageInstanceSetup implements Page {
         jijCombo = new ComboBox<>();
         for (Path p : modJars) jijCombo.getItems().add(p.getFileName().toString());
         jijCombo.setPrefWidth(340);
-        // 程序化 select 也会触发 onAction，先 select 再挂监听，避免双重加载
+        // 程序化 select 也会触发 onAction，先 select 再挂监听，只加载一次
         jijCombo.getSelectionModel().select(0);
         jijCombo.setOnAction(e -> {
             int idx = jijCombo.getSelectionModel().getSelectedIndex();

@@ -143,7 +143,7 @@ public final class RemoteImages {
                         if (noDecoder) {
                             FAILED.put(url, System.currentTimeMillis() + RETRY_AFTER_MS);
                         } else if (!permanent && attempt < MAX_RETRY) {
-                            // 网络抖动先自动重试，别让图标一直空着
+                            // 网络抖动先自动重试，图标不留白
                             long delay = 600L * (attempt + 1) * (attempt + 1);
                             CompletableFuture.delayedExecutor(delay, java.util.concurrent.TimeUnit.MILLISECONDS)
                                     .execute(() -> attemptLoad(url, key, px, attempt + 1));
