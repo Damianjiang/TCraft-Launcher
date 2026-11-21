@@ -228,7 +228,7 @@ public final class Downloader {
         int total = Math.max(1, libFiles.size());
         if (!libFiles.isEmpty()) {
             // 依赖库数量多且文件偏大，串行下太慢，走和资源阶段一样的并发池
-            int threads = Math.max(1, Math.min(32, Data.get().getInt("SystemMaxThreads", 64)));
+            int threads = Math.max(1, Math.min(64, Data.get().getInt("SystemMaxThreads", 64)));
             task.threads = threads;
             Tasks.INSTANCE.changed();
             ExecutorService libPool = Executors.newFixedThreadPool(threads, r -> {
@@ -289,7 +289,7 @@ public final class Downloader {
         final AtomicInteger assetDone = new AtomicInteger();
         final java.util.concurrent.ConcurrentLinkedQueue<String[]> retryQueue =
                 new java.util.concurrent.ConcurrentLinkedQueue<>();
-        int threads = Math.max(1, Math.min(32, Data.get().getInt("SystemMaxThreads", 64)));
+        int threads = Math.max(1, Math.min(64, Data.get().getInt("SystemMaxThreads", 64)));
         task.threads = threads;
         task.remainingFiles = totalAssets;
         Tasks.INSTANCE.changed();
@@ -1410,6 +1410,42 @@ public final class Downloader {
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
+        }
+    }
+
+    // 带字节进度的文本请求，用于版本清单等大 JSON
+    public static String getText(java.util.function.DoubleConsumer progress, String... urls) throws IOException {
+        Exception last = null;
+        for (String url : Sources.rank(java.util.Arrays.asList(urls))) {
+            try {
+                return readText(url, progress);
+            } catch (Exception e) {
+                last = e;
+            }
+        }
+        throw new IOException(last == null ? "网络请求失败" : last.getMessage());
+    }
+
+    private static String readText(String url, java.util.function.DoubleConsumer progress) throws IOException {
+        try (Http.Body body = Http.open(url, java.time.Duration.ofSeconds(25))) {
+            long total = body.length;
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream(
+                    total > 0 && total < Integer.MAX_VALUE ? (int) total : 8192);
+            byte[] buf = new byte[65536];
+            long done = 0;
+            long lastPush = 0;
+            int n;
+            while ((n = body.in.read(buf)) >= 0) {
+                out.write(buf, 0, n);
+                done += n;
+                long now = System.currentTimeMillis();
+                if (progress != null && total > 0 && now - lastPush > 80) {
+                    lastPush = now;
+                    progress.accept(Math.min(1.0, done / (double) total));
+                }
+            }
+            if (progress != null) progress.accept(1.0);
+            return out.toString(java.nio.charset.StandardCharsets.UTF_8);
         }
     }
 

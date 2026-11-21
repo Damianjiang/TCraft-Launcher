@@ -188,7 +188,7 @@ public class PageOther implements Page {
 
         Ui.Card thanks = Ui.card("参考与致谢");
         thanks.add(paragraph("TCL 的功能规划与交互设计参考了 HMCL（Hello Minecraft! Launcher）的成熟方案，界面与代码为独立编写，与 HMCL、PCL（Plain Craft Launcher）均无隶属、赞助或背书关系。\n"
-                + "图标来自 Lucide（ISC），联机能力来自 EasyTier，在此一并致谢。"));
+                + "图标来自 Lucide（ISC），WebP 解码使用 jwebp（Apache-2.0），联机能力来自 EasyTier，在此一并致谢。"));
         VBox.setMargin(thanks, new Insets(0, 0, 15, 0));
         page.getChildren().add(thanks);
 

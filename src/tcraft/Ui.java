@@ -1198,10 +1198,12 @@ public final class Ui {
                 iconBox.setAlignment(Pos.CENTER);
                 iconBox.setMinWidth(34);
                 iconBox.setPrefWidth(34);
-                HBox.setMargin(icon, new Insets(0, 0, 0, 6));
+                iconBox.setMaxWidth(34);
+                // 图标居中，并与文字留出间距
+                HBox.setMargin(iconBox, new Insets(0, 9, 0, 2));
                 getChildren().add(iconBox);
             }
-            VBox texts = new VBox(0);
+            VBox texts = new VBox(1);
             texts.setAlignment(Pos.CENTER_LEFT);
             title = label(text, height < 40 ? 13 : 14, Theme.text);
             texts.getChildren().add(title);
@@ -2261,6 +2263,82 @@ public final class Ui {
         if (action != null) pill.setOnMouseClicked(e -> action.run());
         pill.setMaxWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
         return pill;
+    }
+
+    // 带标题、阶段与百分比的加载卡片，用于版本列表 / 搜索等耗时操作
+    public static final class LoadCard extends StackPane {
+        private static final double BAR_W = 300;
+        private final Label titleLabel;
+        private final Label stageLabel;
+        private final Label pctLabel;
+        private final javafx.scene.shape.Rectangle fill;
+        private Timeline loop;
+
+        public LoadCard(String title, String stage) {
+            setMaxWidth(360);
+            setMaxHeight(javafx.scene.layout.Region.USE_PREF_SIZE);
+            setBackground(glassFill(10));
+            setBorder(glassBorder(10));
+            setPadding(new Insets(16, 20, 16, 20));
+            titleLabel = bold(title, 13.5, Theme.text);
+            stageLabel = label(stage == null ? "" : stage, 12, Theme.gray2);
+            pctLabel = label("", 11, Theme.gray3);
+            StackPane bar = new StackPane();
+            bar.setMaxWidth(BAR_W);
+            javafx.scene.shape.Rectangle track = new javafx.scene.shape.Rectangle(BAR_W, 4);
+            track.setArcWidth(4);
+            track.setArcHeight(4);
+            track.setFill(Theme.gray6);
+            fill = new javafx.scene.shape.Rectangle(0, 4);
+            fill.setArcWidth(4);
+            fill.setArcHeight(4);
+            fill.setFill(Theme.accent);
+            StackPane.setAlignment(fill, Pos.CENTER_LEFT);
+            bar.getChildren().addAll(track, fill);
+            HBox foot = new HBox(8, stageLabel, new Region(), pctLabel);
+            HBox.setHgrow(foot.getChildren().get(1), Priority.ALWAYS);
+            foot.setMaxWidth(BAR_W);
+            VBox box = new VBox(9, titleLabel, bar, foot);
+            box.setFillWidth(true);
+            getChildren().add(box);
+            startLoop();
+        }
+
+        public void setStage(String text) {
+            stageLabel.setText(text == null ? "" : text);
+        }
+
+        public void setProgress(double value) {
+            if (value < 0) {
+                startLoop();
+                pctLabel.setText("");
+                return;
+            }
+            stopLoop();
+            double v = Math.max(0, Math.min(1, value));
+            fill.setTranslateX(0);
+            fill.setWidth(BAR_W * v);
+            pctLabel.setText(Math.round(v * 100) + "%");
+        }
+
+        private void startLoop() {
+            stopLoop();
+            fill.setWidth(70);
+            Timeline t = new Timeline(
+                    new KeyFrame(Duration.ZERO, new KeyValue(fill.translateXProperty(), -70)),
+                    new KeyFrame(Duration.millis(1100), new KeyValue(fill.translateXProperty(), BAR_W,
+                            Interpolator.EASE_BOTH)));
+            t.setCycleCount(javafx.animation.Animation.INDEFINITE);
+            loop = t;
+            t.play();
+        }
+
+        private void stopLoop() {
+            if (loop != null) {
+                loop.stop();
+                loop = null;
+            }
+        }
     }
 
     public static Node loadingCard(String text) {

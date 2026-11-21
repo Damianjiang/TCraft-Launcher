@@ -187,16 +187,58 @@ public final class Resources {
         }
     }
 
+    private static final String WEBP_JAR = "webp-0.2.0.jar";
+
+    public static Path webpJar() {
+        return home().resolve("dependencies").resolve("libs").resolve(WEBP_JAR);
+    }
+
+    // 首次启动和 JavaFX 一起补 WebP 解码库；失败只影响图标，不拦启动
+    private static boolean ensureWebp(StartupWindow ui) {
+        Path target = webpJar();
+        try {
+            if (Files.isRegularFile(target) && Files.size(target) > 100_000) return false;
+            Files.createDirectories(target.getParent());
+            ui.setStatus("正在下载 WebP 解码库…", 88);
+            String[] urls = {
+                    "https://mirrors.cloud.tencent.com/nexus/repository/maven-public/org/glavo/webp/0.2.0/webp-0.2.0.jar",
+                    "https://repo1.maven.org/maven2/org/glavo/webp/0.2.0/webp-0.2.0.jar"
+            };
+            Exception last = null;
+            for (String url : urls) {
+                try {
+                    byte[] data = Http.getBytes(url);
+                    if (data == null || data.length < 100_000 || data[0] != 'P' || data[1] != 'K') {
+                        throw new IOException("下载内容不是 jar");
+                    }
+                    Path tmp = target.resolveSibling(WEBP_JAR + ".part");
+                    Files.write(tmp, data);
+                    Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
+                    return true;
+                } catch (Exception e) {
+                    last = e;
+                }
+            }
+            if (last != null) throw last;
+            return false;
+        } catch (Exception e) {
+            System.err.println("[TCL] WebP 解码库下载失败：" + e);
+            return false;
+        }
+    }
+
     public static void bootstrap(String[] args, StartupWindow ui) throws Exception {
         if (jar() == null) return; // 开发模式由 IDE 提供 JavaFX
         ui.setStatus("检查运行环境…", 10);
-        if (fxPresent()) {
-            ui.setStatus("正在启动主界面…", 90);
-            return;
+        boolean fxReady = fxPresent();
+        Path rt = fxReady ? home().resolve("dependencies").resolve(platform()).resolve("openjfx")
+                : ensureJavaFx(ui);
+        boolean webpReady = ensureWebp(ui);
+        if (!fxReady || webpReady) {
+            ui.setStatus("正在启动主界面…", 95);
+            relaunch(jar(), rt, platform(), args, ui);
         }
-        Path rt = ensureJavaFx(ui);
-        ui.setStatus("正在启动主界面…", 95);
-        relaunch(jar(), rt, platform(), args, ui);
+        ui.setStatus("正在启动主界面…", 90);
     }
 
     public static Path iconFile(String name) {
@@ -350,12 +392,10 @@ public final class Resources {
 
     private static void downloadArtifact(String module, String classifier, String version, Path target,
                                          StartupWindow ui, int base, int span, int index, int total) throws Exception {
+        // 国内镜像优先，官方仓库兜底
         List<String> repos = new ArrayList<>();
-        if (System.getProperty("user.country", "").equalsIgnoreCase("CN")) {
-            repos.add("https://mirrors.cloud.tencent.com/nexus/repository/maven-public");
-        }
-        repos.add("https://repo1.maven.org/maven2");
         repos.add("https://mirrors.cloud.tencent.com/nexus/repository/maven-public");
+        repos.add("https://repo1.maven.org/maven2");
 
         Exception last = null;
         for (String repo : repos) {
@@ -375,9 +415,11 @@ public final class Resources {
     private static void download(String url, Path target, StartupWindow ui, String label,
                                  int base, int span) throws Exception {
         Path tmp = target.resolveSibling(target.getFileName() + ".part");
+        // 连接阶段没有字节进度，先切不确定态，避免进度条停着不动
+        ui.setIndeterminate(label + Lang.t(" · 连接中…"));
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-        c.setConnectTimeout(20000);
-        c.setReadTimeout(120000);
+        c.setConnectTimeout(12000);
+        c.setReadTimeout(45000);
         c.setInstanceFollowRedirects(true);
         c.setRequestProperty("User-Agent", "TCraftLauncher");
         try {
@@ -400,7 +442,8 @@ public final class Resources {
                             int p = base + (int) Math.min(span, done * span / total);
                             ui.setDownload(label, done, total, p);
                         } else {
-                            ui.setDownload(label, done, total, -1);
+                            ui.setIndeterminate(label + Lang.t(" · 已下载 ")
+                                    + String.format(java.util.Locale.ROOT, "%.1f MB", done / 1048576.0));
                         }
                     }
                 }
@@ -501,7 +544,10 @@ public final class Resources {
         // MainWindow 反射查 GraphicsPipeline，需要开放 com.sun.prism
         cmd.add("--add-exports=javafx.graphics/com.sun.prism=ALL-UNNAMED");
         cmd.add("-cp");
-        cmd.add(jar.toString());
+        Path webp = webpJar();
+        cmd.add(Files.isRegularFile(webp)
+                ? jar + File.pathSeparator + webp
+                : jar.toString());
         cmd.add("tcraft.Boot");
         if (args != null && args.length > 0) cmd.addAll(Arrays.asList(args));
 

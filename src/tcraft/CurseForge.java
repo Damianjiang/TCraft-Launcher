@@ -62,6 +62,13 @@ public final class CurseForge {
                     return size() > 32;
                 }
             });
+
+    public static void clearCache() {
+        FILES_CACHE.clear();
+        INFO_CACHE.clear();
+        SEARCH_CACHE.clear();
+    }
+
     private static final long SEARCH_TTL_MS = 90_000L;
 
     public static List<Project> search(String query, int classId, int limit) throws IOException {
@@ -168,6 +175,13 @@ public final class CurseForge {
     }
 
     private static String get(String url, String key) throws IOException {
-        return Http.get(url, Map.of("Accept", "application/json", "x-api-key", key));
+        Map<String, String> headers = Map.of("Accept", "application/json", "x-api-key", key);
+        for (String candidate : Mirrors.apiCandidates(url)) {
+            try {
+                return Http.getOnce(candidate, headers, candidate.equals(url) ? 4 : 10);
+            } catch (IOException ignored) {
+            }
+        }
+        return Http.get(url, headers);
     }
 }

@@ -3665,23 +3665,22 @@ TCL 需要 Java 才能启动游戏。列表中的第一个可用 Java 将被默�
 提示：SOCKS5 只对游戏进程生效，启动器自身的下载 / 搜索走的是 HTTP 代理通道（Clash、v2rayN 的混合端口都同时支持 HTTP，填那个端口即可）。	Note: SOCKS5 only applies to the game process. The launcher's own downloads and searches use the HTTP proxy channel (Clash and v2rayN mixed ports also accept HTTP, so use that port).	提示：SOCKS5 只對遊戲行程生效，啟動器自身的下載 / 搜尋走的是 HTTP 代理通道（Clash、v2rayN 的混合連接埠都同時支援 HTTP，填那個連接埠即可）。	
 填自建或内网的 BMCLAPI 兼容镜像根（如 http://192.168.1.10:8080），填了会一起测速；下载时「镜像优先」会自动走它。留空则只测官方源与内置 BMCLAPI。	Enter a self-hosted or intranet BMCLAPI-compatible mirror root (e.g. http://192.168.1.10:8080); it is included in the speed test and used by Mirror first. Leave empty to test only the official source and built-in BMCLAPI.	填自建或內網的 BMCLAPI 相容鏡像根（如 http://192.168.1.10:8080），填了會一起測速；下載時「鏡像優先」會自動走它。留空則只測官方來源與內建 BMCLAPI。	
 复制联机码	Copy Link Code	複製聯機碼
-粘贴朋友发给你的 Base64 联机码，加入朋友的房间。	Paste the Base64 link code your friend sent you to join their room.	貼上朋友傳給你的 Base64 聯機碼，加入朋友的房間。
-粘贴 Base64 联机码	Paste Base64 Link Code	貼上 Base64 聯機碼
+粘贴朋友发给你的联机码，加入朋友的房间。	Paste the link code your friend sent you to join their room.	貼上朋友傳給你的聯機碼，加入朋友的房間。
+粘贴联机码	Paste Link Code	貼上聯機碼
 把朋友发给你的整段内容粘贴进来，识别到联机码后会自动连接。	Paste the whole message from your friend; it connects automatically once a link code is recognized.	把朋友傳給你的整段內容貼上，識別到聯機碼後會自動連線。
 使用上一次的联机码	Use the previous link code	使用上一次的聯機碼
 联机码有误	Invalid link code	聯機碼有誤
-请粘贴房主发给你的完整 Base64 联机码。	Paste the complete Base64 link code the host sent you.	請貼上房主傳給你的完整 Base64 聯機碼。
+请粘贴房主发给你的完整联机码。	Paste the complete link code the host sent you.	請貼上房主傳給你的完整聯機碼。
 联机码格式不正确，请让房主重新复制。	The link code is malformed; ask the host to copy it again.	聯機碼格式不正確，請讓房主重新複製。
 联机码版本过高	Link code is too new	聯機碼版本過高
 此联机码对应的 TCL 版本更高，请升级启动器。	This link code belongs to a newer TCL version; update the launcher.	此聯機碼對應的 TCL 版本較新，請更新啟動器。
 联机码缺少房间信息，请让房主重新复制。	The link code is missing room information; ask the host to copy it again.	聯機碼缺少房間資訊，請讓房主重新複製。
 已复制联机码！	Link code copied!	已複製聯機碼！
-把下面的 Base64 联机码整段发给朋友，让他们在「加入房间」里粘贴即可。	Send the whole Base64 link code below to your friends; they just paste it into Join Room.	把下面的 Base64 聯機碼整段傳給朋友，讓他們在「加入房間」貼上即可。
-在 TCL 启动器「联机 → 加入房间」中粘贴下面的 Base64 联机码，即可加入房间：	Paste the Base64 link code below into TCL's Multiplayer → Join Room to join:	在 TCL 啟動器「聯機 → 加入房間」中貼上下面的 Base64 聯機碼，即可加入房間：
+把下面的联机码整段发给朋友，让他们在「加入房间」里粘贴即可。	Send the whole link code below to your friends; they just paste it into Join Room.	把下面的聯機碼整段傳給朋友，讓他們在「加入房間」貼上即可。
+在 TCL 启动器「联机 → 加入房间」中粘贴下面的联机码，即可加入房间：	Paste the link code below into TCL's Multiplayer → Join Room to join:	在 TCL 啟動器「聯機 → 加入房間」中貼上下面的聯機碼，即可加入房間：
 你确定要关闭联机房间吗？\n所有玩家都需要重新粘贴联机码才可加入游戏！	Close the multiplayer room?\nEvery player will need to paste the link code again to join!	你確定要關閉聯機房間嗎？\n所有玩家都需要重新貼上聯機碼才可加入遊戲！
 房间已过期：联机码里的发现节点已下线，请让房主重新创建房间！	Room expired: the discovery node in the link code went offline; ask the host to create the room again!	房間已過期：聯機碼裡的發現節點已下線，請讓房主重新建立房間！
 无法连接到房主：可能的原因是网络环境不佳、房主已关闭房间或联机码输错。	Can't reach the host: bad network, a closed room, or a wrong link code.	無法連線到房主：可能的原因是網路環境不佳、房主已關閉房間或聯機碼輸入錯誤。
-创建一个联机房间，把单人存档分享给朋友一起玩；也可以粘贴收到的 Base64 联机码，加入别人的房间。	Create a multiplayer room to share a single-player world with friends; you can also paste a Base64 link code to join someone else's room.	建立一個聯機房間，把單人存檔分享給朋友一起玩；也可以貼上收到的 Base64 聯機碼，加入別人的房間。
 正在测速节点…	Testing node latency…	正在測試節點速度…
 节点：未知	Unknown node	節點：未知
 用浏览器打开微软设备登录页，输入下面的代码完成微软账号登录，授权后启动器会自动继续。	Open the Microsoft device sign-in page in a browser, enter the code below, and the launcher continues automatically after authorization.	用瀏覽器開啟微軟裝置登入頁，輸入下面的代碼完成微軟帳號登入，授權後啟動器會自動繼續。
@@ -3715,9 +3714,7 @@ XSTS 授权失败（错误码 %s）	XSTS authorization failed (error %s)	XSTS �
 Minecraft 登录失败：%s	Minecraft sign-in failed: %s	Minecraft 登入失敗：%s
 无法确认游戏所有权：%s	Could not confirm game ownership: %s	無法確認遊戲所有權：%s
 获取 Minecraft 档案失败：%s	Failed to fetch the Minecraft profile: %s	取得 Minecraft 檔案失敗：%s
-把下面的 Base64 联机码整段发给朋友，让他们在「加入房间」里粘贴即可。\n%s\n%s	Send the whole Base64 link code below to your friends; they just paste it into Join Room.\n%s\n%s	把下面的 Base64 聯機碼整段傳給朋友，讓他們在「加入房間」裡貼上即可。\n%s\n%s
 如果多人游戏列表里没有自动出现房间，请选择「直接连接」，\n地址填 %s\n（可点击下方的地址复制）。\n注意：使用离线登录时不要手动输入 IP！	If the room does not appear in the multiplayer list, choose Direct Connect and use this address:\n%s\n(click the address below to copy it).\nNote: do not type the IP manually when using an offline account!	如果多人遊戲清單裡沒有自動出現房間，請選擇「直接連線」，\n位址填 %s\n（可點擊下方的位址複製）。\n注意：使用離線登入時不要手動輸入 IP！
-在 TCL 启动器「联机 → 加入房间」中粘贴下面的 Base64 联机码，即可加入房间：\n%s\n%s	Paste the Base64 link code below into TCL's Multiplayer → Join Room to join:\n%s\n%s	在 TCL 啟動器「聯機 → 加入房間」中貼上下面的 Base64 聯機碼，即可加入房間：\n%s\n%s
 节点：%s%s	Node: %s%s	節點：%s%s
 （%d ms）	 (%d ms)	（%d ms）
 %d 人	%d players	%d 人
@@ -4156,7 +4153,6 @@ OpenJFX 17 没有 32 位 Linux 原生包。请安装 64 位 Java 后重新启动
 \n\n是否开始安装？	\n\nStart installation now?	\n\n是否開始安裝？	
 版本扫描失败：%s	Version scan failed: %s	版本掃描失敗：%s	
 联机码内容不是合法 JSON：%s	The link code is not valid JSON: %s	聯機碼內容不是合法 JSON：%s	
-联机码 Base64 解码失败：%s	Failed to Base64-decode the link code: %s	聯機碼 Base64 解碼失敗：%s	
 格式损坏	Malformed	格式損壞	
  · 当前账户	 · current account	 · 目前帳戶	
 无法识别整合包格式（压缩包里没有清单文件）	Unrecognized modpack format (no manifest file in the archive)	無法識別整合包格式（壓縮包裡沒有清單檔案）	

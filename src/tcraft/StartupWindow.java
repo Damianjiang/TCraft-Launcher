@@ -87,6 +87,14 @@ public final class StartupWindow {
         return window != null && window.isShowing();
     }
 
+    // 连接或等待响应时用不确定进度，跑马灯继续动
+    public void setIndeterminate(String text) {
+        status = text == null ? "" : text;
+        detail = "";
+        percent = -1;
+        repaint();
+    }
+
     public void setStatus(String text, int value) {
         status = text == null ? "" : text;
         detail = "";

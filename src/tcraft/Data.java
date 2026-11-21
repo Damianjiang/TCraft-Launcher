@@ -937,6 +937,11 @@ public final class Data {
     }
 
     public void refreshVersions(boolean force, Runnable onDone) {
+        refreshVersions(force, onDone, null);
+    }
+
+    public void refreshVersions(boolean force, Runnable onDone,
+                                java.util.function.DoubleConsumer progress) {
         final long now = System.currentTimeMillis();
         synchronized (this) {
             if (!force && now - lastVersionRefresh < 5 * 60 * 1000L && !versions.isEmpty()) {
@@ -957,9 +962,9 @@ public final class Data {
                 String official = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
                 String mirror = "https://bmclapi2.bangbang93.com/mc/game/version_manifest_v2.json";
                 int src = getInt("SystemVersionSource", 1);
-                String text = src == 0 ? Downloader.getText(mirror, official)
-                        : src == 2 ? Downloader.getText(official)
-                        : Downloader.getText(official, mirror);
+                String text = src == 0 ? Downloader.getText(progress, mirror, official)
+                        : src == 2 ? Downloader.getText(progress, official)
+                        : Downloader.getText(progress, official, mirror);
                 java.util.Map<String, Object> m = Json.obj(Json.parse(text));
                 List<Object> vs = Json.arr(m.get("versions"));
                 List<McVersion> real = new ArrayList<>();

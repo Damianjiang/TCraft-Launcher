@@ -30,6 +30,10 @@ public final class Modrinth {
             });
     private static final long SEARCH_TTL_MS = 90_000L;
 
+    public static void clearCache() {
+        SEARCH_CACHE.clear();
+    }
+
     public static List<Object> search(String query, String projectType, int limit,
                                       List<String> versions, List<String> loaders,
                                       String category, int offset, String index) throws IOException {
@@ -165,6 +169,12 @@ public final class Modrinth {
     }
 
     private static String get(String url) throws IOException {
+        for (String candidate : Mirrors.apiCandidates(url)) {
+            try {
+                return Http.getOnce(candidate, candidate.equals(url) ? 4 : 10);
+            } catch (IOException ignored) {
+            }
+        }
         return Http.get(url);
     }
 }

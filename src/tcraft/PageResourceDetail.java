@@ -1252,7 +1252,6 @@ public class PageResourceDetail implements Page {
             return box;
         }
         box.getChildren().add(Ui.image("NoIcon.png", size, size, true));
-        if (RemoteImages.failed(u)) return box;
         RemoteImages.load(u, size, img -> {
             if (img != null) box.getChildren().setAll(imageView(img, size));
         });

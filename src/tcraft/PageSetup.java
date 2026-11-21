@@ -160,7 +160,6 @@ public class PageSetup implements Page {
                 data.set("UiWindowRadius", 6);
                 data.set("UiComponentOpacity", 50);
                 data.set("UiLauncherTransparent", 600);
-                data.set("UiLauncherLogo", true);
                 data.set("UiMenuAnimation", true);
                 data.set("UiListButtonsAlwaysShow", false);
                 data.set("UiAnimSpeed", 100);
@@ -182,6 +181,8 @@ public class PageSetup implements Page {
                 data.set("SystemMaxThreads", "64");
                 data.set("SystemSpeedLimit", "");
                 data.set("SystemCurseKey", "");
+                data.set("SystemMirrorMode", 0);
+                data.set("SystemMirrorUrl", "");
                 data.set("SystemHttpProxyType", 1);
                 data.set("SystemProxyAddress", "");
                 data.set("SystemProxyHost", "");
@@ -486,7 +487,7 @@ public class PageSetup implements Page {
         });
         adv.add(crash);
         if (Shell.windows()) {
-            comboRow(adv, "渲染器", new String[]{"默认（游戏自带渲染器）", "软件渲染（llvmpipe）",
+            comboRow(adv, "渲染器（下次启动生效）", new String[]{"默认（游戏自带渲染器）", "软件渲染（llvmpipe）",
                     "DirectX 12（d3d12）", "Vulkan（zink）"}, data.getInt("LaunchAdvanceRenderer", 0),
                     i -> {
                         data.set("LaunchAdvanceRenderer", i);
@@ -582,12 +583,16 @@ public class PageSetup implements Page {
         Ui.Card conn = addCard(page, "连接选项");
         comboRow(conn, "模式", new String[]{"优先直连", "优先低延迟"},
                 data.getInt("LinkLatencyMode", 0), i -> data.set("LinkLatencyMode", i));
+        TextField customPeer = textRow(conn, "自定义节点", "tcp://mc.yqst.top:11010,tcp://225284.xyz:11010",
+                data.get("LinkCustomPeer", ""), s -> data.set("LinkCustomPeer", s));
         comboRow(conn, "节点", new String[]{
                 "自动选择", "etnode（陶瓦官方节点）", "225284.xyz（上海）",
-                "et1.fuis.top（武汉）", "自定义（见下方输入框）"},
-                data.getInt("LinkPeer", 0), i -> data.set("LinkPeer", i));
-        textRow(conn, "自定义节点", "tcp://mc.yqst.top:11010,tcp://225284.xyz:11010",
-                data.get("LinkCustomPeer", ""), s -> data.set("LinkCustomPeer", s));
+                "et1.fuis.top（武汉）", "自定义（见上方输入框）"},
+                data.getInt("LinkPeer", 0), i -> {
+                    data.set("LinkPeer", i);
+                    customPeer.setDisable(i != 4);
+                });
+        customPeer.setDisable(data.getInt("LinkPeer", 0) != 4);
 
         Ui.Card dl = addCard(page, "下载节点");
         String[] hosts = EasyTier.mirrorHosts();
@@ -656,10 +661,6 @@ public class PageSetup implements Page {
             }
         }
         theme.add(swatches);
-        Ui.Check logo = Ui.checkBox("打开启动器时显示 TCL 图标", false);
-        logo.setSelected(data.getBool("UiLauncherLogo", true));
-        logo.setOnAction(() -> data.set("UiLauncherLogo", logo.isSelected()));
-        theme.add(logo);
         Ui.SliderBar componentSlider = sliderRow(theme, "组件半透明", 0, 100, data.getInt("UiComponentOpacity", 50), v -> {
             data.set("UiComponentOpacity", v.intValue());
             Theme.applyComponentOpacity();
@@ -680,7 +681,10 @@ public class PageSetup implements Page {
         Ui.Card listBtn = addCard(page, "列表按钮");
         Ui.Check buttons = Ui.checkBox("所有列表的操作按钮常驻显示", false);
         buttons.setSelected(data.getBool("UiListButtonsAlwaysShow", false));
-        buttons.setOnAction(() -> data.set("UiListButtonsAlwaysShow", buttons.isSelected()));
+        buttons.setOnAction(() -> {
+            data.set("UiListButtonsAlwaysShow", buttons.isSelected());
+            win.rebuildUi();
+        });
         listBtn.add(buttons, Ui.label("开启后按钮会一直占住右侧空间，列表标题可显示的宽度会略微变窄。", 12, Theme.gray3));
 
         Ui.Card detail = addCard(page, "界面细节");
@@ -970,7 +974,10 @@ public class PageSetup implements Page {
         }
         Ui.Check colorful = Ui.checkBox("叠加彩色背景", false);
         colorful.setSelected(data.getBool("UiBackgroundColorful", true));
-        colorful.setOnAction(() -> data.set("UiBackgroundColorful", colorful.isSelected()));
+        colorful.setOnAction(() -> {
+            data.set("UiBackgroundColorful", colorful.isSelected());
+            win.applyBackground();
+        });
         bg.add(colorful);
         Ui.Check autoTheme = Ui.checkBox("根据背景图自动调整主题色", false);
         autoTheme.setSelected(data.getBool("UiAutoThemeFromBackground", true));
@@ -1253,6 +1260,7 @@ public class PageSetup implements Page {
         Label bmclHint = Ui.label("填自建或内网的 BMCLAPI 兼容镜像根（如 http://192.168.1.10:8080），版本清单 / 文件 / 资源 / 安装器会全部走这个根；适合 Win7 老电脑或公司内网环境。留空则用官方 + 内置 BMCLAPI。", 12, Theme.gray3);
         bmclHint.setWrapText(true);
         download.add(bmclHint);
+
         textRow(download, "最大线程数", "64", data.get("SystemMaxThreads", "64"), s -> data.set("SystemMaxThreads", s));
         textRow(download, "速度限制", "不限", data.get("SystemSpeedLimit", ""), s -> data.set("SystemSpeedLimit", s));
         textRow(download, "缓存文件夹", "留空使用默认", data.get("SystemSystemCache", ""), s -> {
@@ -1277,34 +1285,13 @@ public class PageSetup implements Page {
                 Math.max(0, Math.min(4, data.getInt("ToolDownloadTranslateV2", 0))),
                 i -> data.set("ToolDownloadTranslateV2", i));
         textRow(communityRes, "CurseForge Key", "默认", data.get("SystemCurseKey", ""),
-                s -> data.set("SystemCurseKey", s));
+                s -> {
+                    data.set("SystemCurseKey", s == null ? "" : s.trim());
+                    CurseForge.clearCache();
+                });
         communityRes.add(Ui.label("留空时使用内置公共 Key；OptiFabric 等 CurseForge 资源需要有效 Key 才能获取列表。",
                 12, Theme.gray3));
 
-        Ui.Card proxy = addCard(page, "网络");
-        Ui.RadioBox none = Ui.radioBox("不代理", false);
-        Ui.RadioBox system = Ui.radioBox("系统代理", false);
-        Ui.RadioBox custom = Ui.radioBox("自定义代理", false);
-        int mode = data.getInt("SystemHttpProxyType", 1);
-        (mode == 0 ? none : mode == 2 ? custom : system).setSelected(true);
-        HBox radios = new HBox(18, none, system, custom);
-        proxy.add(radios);
-        textRow(proxy, "代理地址", "例如：127.0.0.1:1080", data.get("SystemProxyAddress", ""), s -> data.set("SystemProxyAddress", s));
-        textRow(proxy, "账号", "可选", data.get("SystemProxyUser", ""), s -> data.set("SystemProxyUser", s));
-        textRow(proxy, "密码", "可选", data.get("SystemProxyPass", ""), s -> data.set("SystemProxyPass", s));
-        none.setOnAction(() -> {
-            data.set("SystemHttpProxyType", 0);
-            data.applyProxy();
-        });
-        system.setOnAction(() -> {
-            data.set("SystemHttpProxyType", 1);
-            data.applyProxy();
-        });
-        custom.setOnAction(() -> {
-            data.set("SystemHttpProxyType", 2);
-            data.applyProxy();
-        });
-        proxy.add(directCheck("启动游戏时使用此代理", "SystemHttpProxyForGame", false));
 
         Ui.Card language = addCard(page, "辅助功能");
         String[] langNames = {"简体中文", "English", "繁體中文", "跟随系统"};
@@ -1403,7 +1390,6 @@ public class PageSetup implements Page {
         other.add(updateRow);
 
         communityCard(page);
-        uninstallCard(page);
     }
 
     private void communityCard(VBox page) {
@@ -1423,52 +1409,6 @@ public class PageSetup implements Page {
         if (!Shell.openUrl("https://qm.qq.com/q/UONlv4VgwE")) {
             win.toast("打开链接失败", "https://qm.qq.com/q/UONlv4VgwE", 3);
         }
-    }
-
-    private void uninstallCard(VBox page) {
-        Ui.Card danger = addCard(page, "卸载");
-        Path appData = Resources.home();
-        Label desc = Ui.label("仅清理启动器自建的内容（配置、日志、缓存、联机内核），不会删除游戏目录、存档与已安装的 Minecraft。"
-                + "确认后停止联机内核并退出；便携版程序文件需手动删除。", 12, Theme.gray2);
-        desc.setWrapText(true);
-        danger.add(desc);
-        danger.add(standaloneButton("卸载 TCraft Launcher", Ui.BTN_RED, 170, () ->
-                Dialogs.confirm(win, "确认卸载 TCraft Launcher",
-                        Lang.tf("即将删除：\n· %s（配置、日志、缓存、联机内核）\n\n"
-                                + "游戏目录与存档不会被触碰。此操作不可撤销，确认后启动器立即退出。", appData),
-                        () -> {
-                            // 递归删整个数据目录放后台，删完再退出
-                            Threads.start("TCL-Uninstall", () -> {
-                                // killLeftovers 要枚举全部系统进程，FX 回调里做会卡住界面
-                                try {
-                                    EasyTier.killLeftovers();
-                                    EasyTier.stop();
-                                } catch (Throwable ignored) {
-                                }
-                                // 趁 JVM 还在时删除，失败项收集起来
-                                List<String> failed = new ArrayList<>();
-                                deleteDirCollect(appData, failed);
-                                javafx.application.Platform.runLater(() -> {
-                                    if (!failed.isEmpty()) {
-                                        Errors.error("卸载：有 " + failed.size() + " 项删除失败（详见 errors.log）",
-                                                new RuntimeException("删除失败：" + String.join("；", failed)),
-                                                Errors.Behavior.NONE);
-                                        win.toast("部分文件删除失败",
-                                                "已记录到日志，请重启系统后重试", 3);
-                                    }
-                                    javafx.application.Platform.exit();
-                                    Thread t = new Thread(() -> {
-                                        try {
-                                            Thread.sleep(500);
-                                        } catch (Exception ignored) {
-                                        }
-                                        System.exit(0);
-                                    }, "TCL-Uninstall-Exit");
-                                    t.setDaemon(true);
-                                    t.start();
-                                });
-                            });
-                        }, true)));
     }
 
     private void buildJava(VBox page) {
@@ -1697,7 +1637,7 @@ public class PageSetup implements Page {
                             win.toast("日志已清理", "", 1);
                         }, true)));
         ops.add(buttons);
-        ops.add(directCheck("调试模式（排查问题时开启，会把日志同步输出到控制台）", "SystemDebugMode", false));
+        ops.add(directCheck("调试模式（重启生效，排查问题时开启，会把日志同步输出到控制台）", "SystemDebugMode", false));
 
         Ui.Card live = addCard(page, "实时日志");
         ComboBox<String> level = Ui.combo(new String[]{"全部级别", "警告及错误", "仅错误"}, 0);
@@ -2156,22 +2096,56 @@ public class PageSetup implements Page {
         String[] modes = {"不使用代理", "跟随系统代理", "HTTP 代理", "SOCKS5 代理"};
         int mode = Math.max(0, Math.min(3, data.getInt("SystemHttpProxyType", 1)));
         ComboBox<String> modeCombo = Ui.combo(modes, mode);
+        proxy.add(Ui.settingRow("代理模式", modeCombo));
+        javafx.animation.PauseTransition proxyApply =
+                new javafx.animation.PauseTransition(javafx.util.Duration.millis(400));
+        proxyApply.setOnFinished(e -> data.applyProxy());
+        java.util.function.Consumer<String> touchProxy = v -> {
+            data.save();
+            proxyApply.playFromStart();
+        };
+        TextField host = textRow(proxy, "主机", "例如 127.0.0.1", data.get("SystemProxyHost", ""),
+                s -> { data.set("SystemProxyHost", s); touchProxy.accept(s); });
+        TextField port = textRow(proxy, "端口", "7890", data.get("SystemProxyPort", "7890"),
+                s -> { data.set("SystemProxyPort", s); touchProxy.accept(s); });
+        TextField user = textRow(proxy, "用户名", "可选", data.get("SystemProxyUser", ""),
+                s -> { data.set("SystemProxyUser", s); touchProxy.accept(s); });
+        TextField pass = textRow(proxy, "密码", "可选", data.get("SystemProxyPass", ""),
+                s -> { data.set("SystemProxyPass", s); touchProxy.accept(s); });
+        Ui.Check forGame = directCheck("启动游戏时使用此代理", "SystemHttpProxyForGame", false);
+        proxy.add(forGame);
+        Label proxyNote = Ui.label("", 12, Theme.gray3);
+        proxyNote.setWrapText(true);
+        proxy.add(proxyNote);
+        StackPane testProxyBtn = Ui.button("测试当前代理", Ui.BTN_NORMAL, () -> {
+            proxyNote.setText(Lang.t("正在测试代理…"));
+            Threads.start("TCL-Proxy-Test", () -> {
+                String result = testProxy();
+                Platform.runLater(() -> {
+                    proxyNote.setText(result);
+                    win.toast(result.startsWith("连接成功") ? "代理可用" : "代理不可用", result,
+                            result.startsWith("连接成功") ? 1 : 3);
+                });
+            });
+        });
+        Runnable applyEnabled = () -> {
+            int i = modeCombo.getSelectionModel().getSelectedIndex();
+            boolean needHost = i >= 2;
+            host.setDisable(!needHost);
+            port.setDisable(!needHost);
+            user.setDisable(!needHost);
+            pass.setDisable(!needHost);
+            testProxyBtn.setDisable(i == 0);
+            forGame.setDisable(i == 0);
+        };
         modeCombo.setOnAction(e -> {
             int i = modeCombo.getSelectionModel().getSelectedIndex();
             if (i < 0) return;
             data.set("SystemHttpProxyType", i);
             data.applyProxy();
+            applyEnabled.run();
         });
-        proxy.add(Ui.settingRow("代理模式", modeCombo));
-        TextField host = textRow(proxy, "主机", "例如 127.0.0.1", data.get("SystemProxyHost", ""),
-                s -> data.set("SystemProxyHost", s));
-        TextField port = textRow(proxy, "端口", "7890", data.get("SystemProxyPort", "7890"),
-                s -> data.set("SystemProxyPort", s));
-        textRow(proxy, "用户名", "可选", data.get("SystemProxyUser", ""), s -> data.set("SystemProxyUser", s));
-        textRow(proxy, "密码", "可选", data.get("SystemProxyPass", ""), s -> data.set("SystemProxyPass", s));
-        Label proxyNote = Ui.label("", 12, Theme.gray3);
-        proxyNote.setWrapText(true);
-        proxy.add(proxyNote);
+        applyEnabled.run();
         Label socksHint = Ui.label("提示：SOCKS5 只对游戏进程生效，启动器自身的下载 / 搜索走的是 HTTP 代理通道"
                 + "（Clash、v2rayN 的混合端口都同时支持 HTTP，填那个端口即可）。", 12, Theme.gray3);
         socksHint.setWrapText(true);
@@ -2184,19 +2158,30 @@ public class PageSetup implements Page {
                     proxyNote.setText(Data.get().describeProxy());
                     win.toast("代理设置", "已保存并应用", 1);
                 }),
-                Ui.button("测试当前代理", Ui.BTN_NORMAL, () -> {
-                    proxyNote.setText(Lang.t("正在测试代理…"));
-                    Threads.start("TCL-Proxy-Test", () -> {
-                        String result = testProxy();
-                        Platform.runLater(() -> {
-                            proxyNote.setText(result);
-                            win.toast(result.startsWith("连接成功") ? "代理可用" : "代理不可用", result,
-                                    result.startsWith("连接成功") ? 1 : 3);
-                        });
-                    });
-                }));
+                testProxyBtn);
         proxy.add(actions);
         proxyNote.setText(Data.get().describeProxy());
+
+        Ui.Card mirror = addCard(page, "资源镜像");
+        TextField mirrorUrl = textRow(mirror, "镜像地址", "https://mod.mcimirror.top",
+                data.get("SystemMirrorUrl", ""), s1 -> {
+                    data.set("SystemMirrorUrl", s1 == null ? "" : s1.trim());
+                    clearMirrorCaches();
+                });
+        comboRow(mirror, "Mod 镜像源",
+                new String[]{"官方源（默认）", "内置镜像（mod.mcimirror.top）", "手动填写"},
+                Math.max(0, Math.min(2, data.getInt("SystemMirrorMode", 0))),
+                i -> {
+                    data.set("SystemMirrorMode", i);
+                    mirrorUrl.setDisable(i != 2);
+                    clearMirrorCaches();
+                    data.save();
+                });
+        mirrorUrl.setDisable(data.getInt("SystemMirrorMode", 0) != 2);
+        Label mirrorHint = Ui.label("影响 Modrinth / CurseForge 的接口、图标与文件下载。默认只走官方；选了镜像后优先走镜像，失败自动回退官方。"
+                + "内置镜像为第三方公益服务，也可以填自己的反代地址。", 12, Theme.gray3);
+        mirrorHint.setWrapText(true);
+        mirror.add(mirrorHint);
 
         Ui.Card speed = addCard(page, "下载源测速");
         Label speedNote = Ui.label("测速结果只代表当前网络到该源的连通质量，不影响已下载的内容。", 12, Theme.gray3);
@@ -2371,10 +2356,16 @@ public class PageSetup implements Page {
     private void buildMore(VBox page) {
         header(page, "更多", "社区与启动器维护。");
         communityCard(page);
-        uninstallCard(page);
     }
 
-    private void comboRow(Ui.Card card, String label, String[] items, int selected, Consumer<Integer> onChange) {
+    // 切源后清掉接口缓存与失败记录，返回列表会立即重新请求
+    private static void clearMirrorCaches() {
+        Modrinth.clearCache();
+        CurseForge.clearCache();
+        RemoteImages.clearFailures();
+    }
+
+    private ComboBox<String> comboRow(Ui.Card card, String label, String[] items, int selected, Consumer<Integer> onChange) {
         ComboBox<String> combo = Ui.combo(items, selected);
         combo.setPrefWidth(220);
         combo.setMaxWidth(Double.MAX_VALUE);
@@ -2389,6 +2380,7 @@ public class PageSetup implements Page {
         row.setAlignment(Pos.CENTER_LEFT);
         row.setMinHeight(38);
         card.add(row);
+        return combo;
     }
 
     private TextField textRow(Ui.Card card, String label, String hint, String value, Consumer<String> onChange) {

@@ -44,6 +44,11 @@ public final class RemoteImages {
         return img;
     }
 
+    // 切换下载源后清掉失败记录，下一次请求会重新走候选
+    public static void clearFailures() {
+        FAILED.clear();
+    }
+
     public static boolean failed(String url) {
         if (url == null) return false;
         Long until = FAILED.get(url);
@@ -68,10 +73,8 @@ public final class RemoteImages {
             fire(callback, cached);
             return;
         }
-        if (failed(url)) {
-            fire(callback, null);
-            return;
-        }
+        // 页面重建时允许重新尝试，不拿旧的失败记录一直挡着
+        if (failed(url)) FAILED.remove(url);
         // compute 保证登记与首例判定原子，防回调孤儿
         List<Consumer<Image>> waiters = WAITERS.compute(k, (kk, list) -> {
             if (list == null) list = new CopyOnWriteArrayList<>();
@@ -86,6 +89,26 @@ public final class RemoteImages {
 
     private static final int MAX_RETRY = 3;
 
+    // 先走镜像，失败立刻换下一个候选
+    private static CompletableFuture<byte[]> fetchCandidates(String url) {
+        return fetchCandidate(url, 0);
+    }
+
+    private static CompletableFuture<byte[]> fetchCandidate(String url, int index) {
+        List<String> list = Mirrors.images(url);
+        if (list.isEmpty()) {
+            return CompletableFuture.failedFuture(new java.io.IOException("没有可用地址"));
+        }
+        if (index >= list.size()) {
+            return CompletableFuture.failedFuture(new java.io.IOException("全部地址都失败"));
+        }
+        String candidate = list.get(index);
+        return Http.getBytesOnce(candidate, candidate.equals(url) ? 3 : 8)
+                .exceptionallyCompose(e -> {
+                    return fetchCandidate(url, index + 1);
+                });
+    }
+
     private static void attemptLoad(String url, String key, int px, int attempt) {
         CompletableFuture
                 .supplyAsync(() -> readDisk(url), Http.pool())
@@ -93,7 +116,7 @@ public final class RemoteImages {
                     if (disk != null && disk.length > 0) {
                         return CompletableFuture.completedFuture(Map.entry(disk, Boolean.TRUE));
                     }
-                    return Http.getBytesAsync(url).thenApply(downloaded -> {
+                    return fetchCandidates(url).thenApply(downloaded -> {
                         writeDisk(url, downloaded);
                         return Map.entry(downloaded, Boolean.FALSE);
                     });
@@ -113,11 +136,15 @@ public final class RemoteImages {
                             } catch (Exception ignored) {
                             }
                         }
+                        // 缺 WebP 解码库时换网络重试没有意义，直接返回占位
+                        boolean noDecoder = bytes != null && isWebp(bytes) && webpUnavailable;
                         boolean permanent = Http.isPermanentFailure(err)
                                 || (bytes == null && err == null);
-                        if (!permanent && attempt < MAX_RETRY) {
+                        if (noDecoder) {
+                            FAILED.put(url, System.currentTimeMillis() + RETRY_AFTER_MS);
+                        } else if (!permanent && attempt < MAX_RETRY) {
                             // 网络抖动先自动重试，别让图标一直空着
-                            long delay = 1200L * (attempt + 1);
+                            long delay = 600L * (attempt + 1) * (attempt + 1);
                             CompletableFuture.delayedExecutor(delay, java.util.concurrent.TimeUnit.MILLISECONDS)
                                     .execute(() -> attemptLoad(url, key, px, attempt + 1));
                             return;
@@ -261,11 +288,44 @@ public final class RemoteImages {
 
     private static Image decode(byte[] bytes, int px) {
         try {
+            // JavaFX 不支持 WebP，Modrinth 图标多数是这个格式；库没下到就静默降级
+            if (isWebp(bytes)) return decodeWebp(bytes, px);
             Image img = new Image(new ByteArrayInputStream(bytes), px, px, true, true);
             return img.isError() ? null : img;
-        } catch (Exception e) {
+        } catch (Throwable e) {
             return null;
         }
+    }
+
+    private static java.lang.reflect.Method webpRead;
+    private static java.lang.reflect.Constructor<?> webpOptions;
+    private static java.lang.reflect.Constructor<?> webpImage;
+    private static boolean webpUnavailable;
+
+    private static Image decodeWebp(byte[] bytes, int px) {
+        if (webpUnavailable) return null;
+        try {
+            if (webpRead == null) {
+                Class<?> optionsClass = Class.forName("org.glavo.webp.WebPImageLoadOptions");
+                webpOptions = optionsClass.getConstructor(double.class, double.class, boolean.class, boolean.class);
+                Class<?> imageClass = Class.forName("org.glavo.webp.WebPImage");
+                webpRead = imageClass.getMethod("read", java.io.InputStream.class, optionsClass);
+                webpImage = Class.forName("org.glavo.webp.javafx.WebPFXImage")
+                        .getConstructor(imageClass);
+            }
+            Object options = webpOptions.newInstance((double) px, (double) px, true, true);
+            Object decoded = webpRead.invoke(null, new ByteArrayInputStream(bytes), options);
+            return (Image) webpImage.newInstance(decoded);
+        } catch (Throwable t) {
+            webpUnavailable = true;
+            return null;
+        }
+    }
+
+    private static boolean isWebp(byte[] b) {
+        return b != null && b.length > 12
+                && b[0] == 'R' && b[1] == 'I' && b[2] == 'F' && b[3] == 'F'
+                && b[8] == 'W' && b[9] == 'E' && b[10] == 'B' && b[11] == 'P';
     }
 
     private static void fire(Consumer<Image> cb, Image img) {

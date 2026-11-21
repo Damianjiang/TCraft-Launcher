@@ -98,7 +98,7 @@ public class PageLink implements Page {
         cards.setMaxWidth(660);
         cards.setPickOnBounds(false);
         Node create = linkCard("create-room", "创建房间", "邀请朋友加入你的单人游戏。", this::createRoom);
-        Node join = linkCard("join-room", "加入房间", "粘贴朋友发给你的 Base64 联机码，加入朋友的房间。", this::joinRoom);
+        Node join = linkCard("join-room", "加入房间", "粘贴朋友发给你的联机码，加入朋友的房间。", this::joinRoom);
         HBox.setHgrow(create, Priority.ALWAYS);
         HBox.setHgrow(join, Priority.ALWAYS);
         cards.getChildren().addAll(create, join);
@@ -322,8 +322,8 @@ public class PageLink implements Page {
 
     private String finishDesc() {
         if (serverSide) {
-            return Lang.tf("把下面的 Base64 联机码整段发给朋友，让他们在「加入房间」里粘贴即可。\n%s\n%s",
-                    wrapCode(linkCode), nodeText());
+            return Lang.tf("把下面的联机码整段发给朋友，让他们在「加入房间」里粘贴即可。\n%s",
+                    linkCode);
         }
         return Lang.tf("如果多人游戏列表里没有自动出现房间，请选择「直接连接」，\n地址填 %s\n"
                 + "（可点击下方的地址复制）。\n注意：使用离线登录时不要手动输入 IP！", clientAddress);
@@ -484,8 +484,8 @@ public class PageLink implements Page {
     }
 
     private void copyCode() {
-        String text = Lang.tf("在 TCL 启动器「联机 → 加入房间」中粘贴下面的 Base64 联机码，即可加入房间：\n%s\n%s",
-                linkCode, nodeText());
+        String text = Lang.tf("在 TCL 启动器「联机 → 加入房间」中粘贴下面的联机码，即可加入房间：\n%s",
+                linkCode);
         ClipboardContent cc = new ClipboardContent();
         cc.putString(text);
         Clipboard.getSystemClipboard().setContent(cc);
@@ -496,15 +496,6 @@ public class PageLink implements Page {
         if (selectedNode.isEmpty()) return Lang.t("节点：未知");
         String ping = selectedNodePing >= 0 ? Lang.tf("（%d ms）", selectedNodePing) : "";
         return Lang.tf("节点：%s%s", selectedNode, ping);
-    }
-
-    private static String wrapCode(String code) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < code.length(); i++) {
-            if (i > 0 && i % 44 == 0) sb.append('\n');
-            sb.append(code.charAt(i));
-        }
-        return sb.toString();
     }
 
     private void exitRoom() {
@@ -581,7 +572,7 @@ public class PageLink implements Page {
             win.toast("联机已禁用", "请先在 设置 → 联机 中启用联机功能。", 2);
             return;
         }
-        TextField field = Ui.field("粘贴 Base64 联机码");
+        TextField field = Ui.field("粘贴联机码");
         field.setText(lastCode);
         field.setPrefHeight(32);
         PauseTransition auto = new PauseTransition(javafx.util.Duration.millis(200));
@@ -595,7 +586,7 @@ public class PageLink implements Page {
             auto.stop();
             if (now != null && now.trim().length() >= 16) auto.playFromStart();
         });
-        showInput("粘贴 Base64 联机码",
+        showInput("粘贴联机码",
                 "把朋友发给你的整段内容粘贴进来，识别到联机码后会自动连接。",
                 lastCode.isEmpty() ? "" : "使用上一次的联机码", field, this::joinWithCode);
     }
@@ -606,7 +597,7 @@ public class PageLink implements Page {
         Map<String, Object> payload = decodeLinkCode(raw);
         if (payload == null) {
             win.toast("联机码有误", lastDecodeError.isEmpty()
-                    ? "请粘贴房主发给你的完整 Base64 联机码。" : lastDecodeError, 2);
+                    ? "请粘贴房主发给你的完整联机码。" : lastDecodeError, 2);
             return false;
         }
         int version = (int) Json.num(payload, "v", 0);
@@ -634,7 +625,7 @@ public class PageLink implements Page {
         }
         pendingNode = node;
         serverSide = false;
-        lastCode = extractToken(raw);
+        lastCode = raw.trim();
         startLoading();
         return true;
     }
@@ -649,8 +640,75 @@ public class PageLink implements Page {
     }
 
     private static Map<String, Object> decodeLinkCode(String raw) {
+        Map<String, Object> plain = decodePlain(raw);
+        if (plain != null) return plain;
         String token = extractToken(raw);
         return token.isEmpty() ? null : decodePayload(token);
+    }
+
+    private static Map<String, Object> decodePlain(String raw) {
+        if (raw == null) return null;
+        String text = raw.replace('：', ':').replace('\u3000', ' ').trim();
+        if (text.isEmpty() || text.length() > 4000) return null;
+        java.util.Map<String, String> kv = new java.util.HashMap<>();
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile(
+                "(?i)(房间|密钥|端口|节点|节点ID|版本|room|secret|port|node|nodeid|version)\\s*:\\s*([^\\r\\n]+)")
+                .matcher(text);
+        while (m.find()) {
+            String key = m.group(1).toLowerCase(java.util.Locale.ROOT);
+            kv.put(switch (key) {
+                case "房间", "room" -> "n";
+                case "密钥", "secret" -> "s";
+                case "端口", "port" -> "p";
+                case "节点", "node" -> "a";
+                case "节点id", "nodeid" -> "id";
+                default -> "v";
+            }, m.group(2).trim());
+        }
+        if (kv.isEmpty()) {
+            // 兼容单行竖线格式
+            String[] parts = text.split("\\s*[|｜]\\s*");
+            if (parts.length >= 4) {
+                kv.put("n", parts[0]);
+                kv.put("s", parts[1]);
+                kv.put("p", parts[2]);
+                if (parts[3].contains("://")) kv.put("a", parts[3]);
+                if (parts.length >= 5) kv.put("id", parts[4]);
+            }
+        }
+        String name = kv.getOrDefault("n", "");
+        String secret = kv.getOrDefault("s", "");
+        if (!safeToken(name) || !safeToken(secret)) return null;
+        String node = kv.getOrDefault("a", "");
+        if (!node.isEmpty()) {
+            node = node.replaceFirst("\\s*（[^）]*）\\s*$", "").trim();
+            if (!safeNode(node)) return null;
+        }
+        int port = 25565;
+        try {
+            int v = Integer.parseInt(kv.getOrDefault("p", "25565").trim());
+            if (v >= 1024 && v <= 65535) port = v;
+        } catch (Exception ignored) {
+        }
+        int id = 0;
+        try {
+            id = Math.max(0, Integer.parseInt(kv.getOrDefault("id", "0").trim()));
+        } catch (Exception ignored) {
+        }
+        int version = LINK_CODE_VERSION;
+        try {
+            String v = kv.get("v");
+            if (v != null) version = (int) Double.parseDouble(v.trim().split("\\s+")[0]);
+        } catch (Exception ignored) {
+        }
+        Map<String, Object> out = new java.util.HashMap<>();
+        out.put("v", version);
+        out.put("n", name);
+        out.put("s", secret);
+        out.put("p", port);
+        out.put("a", node);
+        out.put("id", id);
+        return out;
     }
 
     private static String extractToken(String raw) {
@@ -687,7 +745,7 @@ public class PageLink implements Page {
                 return null;
             }
         } catch (Exception e) {
-            lastDecodeError = Lang.tf("联机码 Base64 解码失败：%s",
+            lastDecodeError = Lang.tf("联机码解析失败：%s",
                     e.getMessage() == null ? Lang.t("格式损坏") : e.getMessage());
             return null;
         }
@@ -1068,13 +1126,16 @@ public class PageLink implements Page {
     }
 
     private static String buildLinkCode() {
-        String payload = "{\"v\":" + LINK_CODE_VERSION
-                + ",\"n\":" + Json.quote(networkName)
-                + ",\"s\":" + Json.quote(networkSecret)
-                + ",\"p\":" + serverPort
-                + ",\"id\":" + Math.max(0, discoverNodeId)
-                + ",\"a\":" + Json.quote(selectedNode == null ? "" : selectedNode) + "}";
-        return Base64.getEncoder().encodeToString(payload.getBytes(StandardCharsets.UTF_8));
+        StringBuilder sb = new StringBuilder();
+        sb.append("TCL联机码 ").append(LINK_CODE_VERSION).append('\n');
+        sb.append("房间：").append(networkName).append('\n');
+        sb.append("密钥：").append(networkSecret).append('\n');
+        sb.append("端口：").append(serverPort).append('\n');
+        if (selectedNode != null && !selectedNode.isEmpty()) {
+            sb.append("节点：").append(selectedNode).append('\n');
+        }
+        sb.append("节点ID：").append(Math.max(0, discoverNodeId));
+        return sb.toString();
     }
 
     private String stableName() {

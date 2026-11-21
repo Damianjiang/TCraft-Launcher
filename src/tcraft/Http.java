@@ -9,6 +9,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -152,6 +153,20 @@ public final class Http {
 
     public static String get(String url) throws IOException {
         return get(url, Map.of());
+    }
+
+    // 单次请求：镜像候选按顺序快速切换，不在这里做退避重试
+    public static String getOnce(String url, int timeoutSec) throws IOException {
+        return getOnce(url, Map.of(), timeoutSec);
+    }
+
+    public static String getOnce(String url, Map<String, String> headers, int timeoutSec) throws IOException {
+        try {
+            return follow("GET", url, null, Duration.ofSeconds(timeoutSec), headers, null, true);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException(Lang.t("请求被中断"), e);
+        }
     }
 
     public static String get(String url, Map<String, String> headers) throws IOException {
@@ -403,6 +418,24 @@ public final class Http {
         throw last == null ? new IOException(Lang.t("请求失败：") + url) : last;
     }
 
+    public static CompletableFuture<byte[]> getBytesOnce(String url, int timeoutSec) {
+        HttpRequest req = HttpRequest.newBuilder(URI.create(url))
+                .timeout(Duration.ofSeconds(timeoutSec))
+                .header("User-Agent", UA)
+                .GET()
+                .build();
+        return client.sendAsync(req, HttpResponse.BodyHandlers.ofInputStream())
+                .thenApply(resp -> {
+                    int code = resp.statusCode();
+                    try (java.io.InputStream body = resp.body()) {
+                        if (code >= 200 && code < 300) return Fetch.readAll(body, 20_000, 8L * 1024 * 1024);
+                        throw new CompletionException(new StatusException(code, retryAfterMs(resp)));
+                    } catch (java.io.IOException e) {
+                        throw new CompletionException(e);
+                    }
+                });
+    }
+
     public static CompletableFuture<byte[]> getBytesAsync(String url) {
         return bytesAttempt(url, 0);
     }
@@ -466,7 +499,20 @@ public final class Http {
     }
 
     public static Body open(String url) throws IOException {
-        return open(url, Duration.ofSeconds(30), -1, -1);
+        // 有镜像先走镜像，失败再回原站
+        List<String> candidates = Mirrors.images(url);
+        IOException last = null;
+        for (int i = 0; i < candidates.size(); i++) {
+            String candidate = candidates.get(i);
+            boolean mirror = !candidate.equals(url);
+            try {
+                return openAttempt(candidate, Duration.ofSeconds(mirror ? 15 : 30), -1, -1,
+                        mirror ? 1 : MAX_ATTEMPTS);
+            } catch (IOException e) {
+                last = e;
+            }
+        }
+        throw last != null ? last : new IOException(Lang.t("请求失败：") + url);
     }
 
     public static Body open(String url, Duration timeout) throws IOException {
@@ -478,8 +524,13 @@ public final class Http {
     }
 
     public static Body open(String url, Duration timeout, long rangeStart, long rangeEnd) throws IOException {
+        return openAttempt(url, timeout, rangeStart, rangeEnd, MAX_ATTEMPTS);
+    }
+
+    private static Body openAttempt(String url, Duration timeout, long rangeStart, long rangeEnd,
+                                    int maxAttempts) throws IOException {
         IOException last = null;
-        for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        for (int attempt = 0; attempt < maxAttempts; attempt++) {
             if (attempt > 0) sleep(BACKOFF_MS[Math.min(attempt - 1, BACKOFF_MS.length - 1)]);
             HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url))
                     .timeout(timeout)

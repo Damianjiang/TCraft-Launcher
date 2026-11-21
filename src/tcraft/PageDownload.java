@@ -161,6 +161,18 @@ public class PageDownload implements Page {
     }
 
     private void buildVanilla(VBox page) {
+        vanillaBox = new VBox(0);
+        vanillaBox.setMaxWidth(Double.MAX_VALUE);
+        Ui.LoadCard versionLoad = null;
+        if (data.versions.isEmpty()) {
+            versionLoad = new Ui.LoadCard("正在获取 Minecraft 版本列表", "连接 Mojang…");
+            StackPane box = new StackPane(versionLoad);
+            box.setAlignment(Pos.TOP_CENTER);
+            box.setPadding(new Insets(30, 0, 0, 0));
+            box.setPickOnBounds(false);
+            vanillaBox.getChildren().add(box);
+        }
+        final Ui.LoadCard loadRef = versionLoad;
         data.refreshVersions(false, () -> {
             // 选择页或已切页时不重建，别打乱动画
             if (win.currentPageNode() != this) return;
@@ -168,16 +180,13 @@ public class PageDownload implements Page {
             if ("download".equals(win.currentKey) && "原版游戏".equals(data.downloadCategory)) {
                 win.refreshRight();
             }
+        }, p -> {
+            if (loadRef == null) return;
+            javafx.application.Platform.runLater(() -> {
+                loadRef.setProgress(p);
+                loadRef.setStage(p >= 1 ? "解析版本列表…" : "下载版本清单…");
+            });
         });
-        vanillaBox = new VBox(0);
-        vanillaBox.setMaxWidth(Double.MAX_VALUE);
-        if (data.versions.isEmpty()) {
-            StackPane box = new StackPane(Ui.loadingCard("正在获取 Minecraft 版本列表…"));
-            box.setAlignment(Pos.TOP_CENTER);
-            box.setPadding(new Insets(30, 0, 0, 0));
-            box.setPickOnBounds(false);
-            vanillaBox.getChildren().add(box);
-        }
         Data.McVersion release = data.firstOf("release");
         Data.McVersion snapshot = data.firstOf("snapshot");
         if (data.versions.isEmpty()) {
@@ -359,8 +368,16 @@ public class PageDownload implements Page {
             rebuildList(lc);
             return;
         }
-        lc.list.getChildren().setAll(Ui.loadingCard("正在获取 " + lc.title + " 版本列表…"));
+        lc.list.getChildren().setAll(loaderLoading(lc));
         prefetchOne(lc);
+    }
+
+    private Node loaderLoading(LoaderCard lc) {
+        Ui.LoadCard card = new Ui.LoadCard("正在获取 " + lc.title + " 版本列表", "拉取版本清单…");
+        StackPane box = new StackPane(card);
+        box.setPadding(new Insets(8, 0, 8, 0));
+        box.setAlignment(Pos.CENTER_LEFT);
+        return box;
     }
 
     private void prefetchOne(LoaderCard lc) {
@@ -405,7 +422,7 @@ public class PageDownload implements Page {
         if (lc.list == null) return;
         lc.list.getChildren().clear();
         if (lc.versions == null) {
-            lc.list.getChildren().add(Ui.loadingCard("正在获取 " + lc.title + " 版本列表…"));
+            lc.list.getChildren().add(loaderLoading(lc));
             return;
         }
         if (lc.versions.isEmpty()) {
@@ -981,7 +998,11 @@ public class PageDownload implements Page {
         hintErrorText = (Label) hintError.getChildren().get(1);
         hintError.setVisible(false);
         hintError.setManaged(false);
-        resourceLoadingHost = Ui.loadingCard(Lang.tf("正在加载 %s 列表…", Lang.t(category)));
+        Ui.LoadCard firstLoad = new Ui.LoadCard(Lang.tf("正在加载 %s 列表", Lang.t(category)), "请求资源列表…");
+        StackPane firstLoadBox = new StackPane(firstLoad);
+        firstLoadBox.setPadding(new Insets(8, 0, 12, 0));
+        firstLoadBox.setAlignment(Pos.CENTER_LEFT);
+        resourceLoadingHost = firstLoadBox;
         page.getChildren().addAll(hintError, resourceLoadingHost, status);
 
         Ui.Card card = Ui.card(Lang.tf("%s 资源", Lang.t(category)));
@@ -1112,8 +1133,12 @@ public class PageDownload implements Page {
         }
         final int gen = ++resourceRequestGen;
         // loadingCard 节点是异步替换的，localize 不经过，创建处翻译
-        rows.getChildren().setAll(Ui.loadingCard(resourcePage == 0 ? Lang.t("正在搜索…")
-                : Lang.tf("正在加载第 %d 页…", resourcePage + 1)));
+        Ui.LoadCard searchLoad = new Ui.LoadCard(
+                resourcePage == 0 ? Lang.t("正在搜索") : Lang.tf("正在加载第 %d 页", resourcePage + 1),
+                source.equals("全部") ? "Modrinth · CurseForge" : source);
+        rows.getChildren().setAll(searchLoad);
+        javafx.application.Platform.runLater(() -> searchLoad.setStage(
+                source.equals("全部") ? "并发请求 Modrinth 与 CurseForge…" : "请求 " + source + "…"));
         // 请求期间禁用翻页，连点会发出多个请求，旧结果还会盖掉新页面
         prev.setDisable(true);
         next.setDisable(true);
@@ -1314,7 +1339,6 @@ public class PageDownload implements Page {
             return box;
         }
         box.getChildren().add(Ui.image("NoIcon.png", size, size, true));
-        if (RemoteImages.failed(url)) return box;
         RemoteImages.load(url, size, img -> {
             if (img != null) box.getChildren().setAll(imageView(img, size));
         });

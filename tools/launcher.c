@@ -613,6 +613,16 @@ static void capture_args(void) {
     copy_str(g_args, p, 4096);
 }
 
+static void append_webp_cp(wchar_t *cmd, const wchar_t *home_dir) {
+    wchar_t path[MAX_PATH_LEN];
+    copy_str(path, home_dir, MAX_PATH_LEN);
+    cat_str(path, L"\\dependencies\\libs\\webp-0.2.0.jar", MAX_PATH_LEN);
+    if (file_exists(path)) {
+        cat_str(cmd, L";", MAX_PATH_LEN * 2);
+        cat_str(cmd, path, MAX_PATH_LEN * 2);
+    }
+}
+
 static int java_has_builtin_fx(const wchar_t *java) {
     wchar_t home[MAX_PATH_LEN];
     wchar_t prop[MAX_PATH_LEN];
@@ -655,6 +665,7 @@ static int run(const wchar_t *java, DWORD *exit_code) {
             cat_str(cmd, L"\" --add-modules=javafx.controls,javafx.graphics,javafx.base,javafx.media,javafx.web,javafx.swing,javafx.fxml -cp \"",
                     MAX_PATH_LEN * 2);
             cat_str(cmd, jar_path, MAX_PATH_LEN * 2);
+            append_webp_cp(cmd, home_dir);
             cat_str(cmd, L"\" tcraft.Boot", MAX_PATH_LEN * 2);
         } else if (file_exists(check)) {
             cat_str(cmd, L"\" -Djava.library.path=\"", MAX_PATH_LEN * 2);
@@ -664,6 +675,7 @@ static int run(const wchar_t *java, DWORD *exit_code) {
             cat_str(cmd, L"\" --add-modules=javafx.controls,javafx.graphics,javafx.base,javafx.media -cp \"",
                     MAX_PATH_LEN * 2);
             cat_str(cmd, jar_path, MAX_PATH_LEN * 2);
+            append_webp_cp(cmd, home_dir);
             cat_str(cmd, L"\" tcraft.Boot", MAX_PATH_LEN * 2);
         } else {
             cat_str(cmd, L"\" -jar \"", MAX_PATH_LEN * 2);
