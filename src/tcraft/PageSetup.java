@@ -2172,17 +2172,17 @@ public class PageSetup implements Page {
                 Math.max(0, Math.min(7, data.getInt("SystemUpdateMirrorMode", 0))));
         combo.setPrefWidth(220);
         combo.setMaxWidth(Double.MAX_VALUE);
-        combo.setOnAction(e -> {
-            int i = combo.getSelectionModel().getSelectedIndex();
-            if (i >= 0) data.set("SystemUpdateMirrorMode", i);
-        });
         update.add(Ui.settingRow("更新源", combo));
         TextField updateUrl = textRow(update, "自定义地址", "https://gh-proxy.com/",
                 data.get("SystemUpdateMirrorUrl", ""),
                 s1 -> data.set("SystemUpdateMirrorUrl", s1 == null ? "" : s1.trim()));
         updateUrl.setDisable(data.getInt("SystemUpdateMirrorMode", 0) != 7);
-        combo.setOnAction(e -> updateUrl.setDisable(
-                combo.getSelectionModel().getSelectedIndex() != 7));
+        combo.setOnAction(e -> {
+            int i = combo.getSelectionModel().getSelectedIndex();
+            if (i < 0) return;
+            data.set("SystemUpdateMirrorMode", i);
+            updateUrl.setDisable(i != 7);
+        });
         update.add(Ui.hint("只影响版本号与更新日志的读取；点「前往下载」统一跳官网，由用户自己选节点下载。", 0));
 
         Ui.Card mirror = addCard(page, "资源镜像");
