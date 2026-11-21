@@ -2875,7 +2875,7 @@ public class PageInstanceSetup implements Page {
             options.add(cb);
         }
         for (ExportOption sub : exportSubOptions) {
-            Ui.Check cb = Ui.checkBox(Lang.t("存档 · ") + sub.title(), true);
+            Ui.Check cb = Ui.checkBox(sub.title(), true);
             exportChecked.put(sub.key(), true);
             cb.setOnAction(() -> exportChecked.put(sub.key(), cb.isSelected()));
             options.add(cb);
@@ -2922,10 +2922,10 @@ public class PageInstanceSetup implements Page {
                 String n = p.getFileName().toString();
                 for (String b : blacklist) if (n.contains(b)) return;
                 if (Files.isRegularFile(p) && (n.toLowerCase().endsWith(".zip") || n.toLowerCase().endsWith(".rar"))) {
-                    exportSubOptions.add(new ExportOption(folder + "/" + n, n,
+                    exportSubOptions.add(new ExportOption(folder + "/" + n, label + " · " + n,
                             globEscape(folder + "/" + n), null, true, false, false, false));
                 } else if (acceptFolder && Files.isDirectory(p)) {
-                    exportSubOptions.add(new ExportOption(folder + "/" + n, n,
+                    exportSubOptions.add(new ExportOption(folder + "/" + n, label + " · " + n,
                             globEscape(folder + "/" + n + "/"), null, true, false, false, false));
                 }
             });
