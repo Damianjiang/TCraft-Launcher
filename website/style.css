@@ -366,6 +366,8 @@ body.locked { overflow: hidden; }
     cursor: pointer;
 }
 
+.dl-link:disabled { color: #b6bec9; cursor: default; }
+
 .dl-meta { margin: 0 0 10px; color: #888; font-size: 12px; }
 
 .dl-log-h { color: #333; }

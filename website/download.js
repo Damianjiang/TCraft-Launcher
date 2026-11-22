@@ -24,6 +24,7 @@
     const assetsBox = document.getElementById('dlAssets');
     const testBtn = document.getElementById('dlTest');
     const backBtn = document.getElementById('dlBack');
+    const copyBtn = document.getElementById('dlCopy');
     let release = null;
     let selected = null;
 
@@ -33,12 +34,14 @@
 
     function open() {
         modal.classList.add('open');
+        modal.setAttribute('aria-hidden', 'false');
         document.body.classList.add('locked');
         show(step1);
     }
 
     function close() {
         modal.classList.remove('open');
+        modal.setAttribute('aria-hidden', 'true');
         document.body.classList.remove('locked');
     }
 
@@ -81,10 +84,61 @@
         return (bytes / 1048576).toFixed(1) + ' MB';
     }
 
+    // 复制给群里转发的纯文本：Markdown 语法剥掉，只留内容
+    function plainText(r) {
+        const lines = String(r.body || '该版本未填写更新日志。')
+            .replace(/<!--[\s\S]*?-->/g, '')
+            .replace(/\r\n?/g, '\n')
+            .split('\n');
+        const out = [];
+        for (const raw of lines) {
+            let t = raw.trimEnd()
+                .replace(/^#{1,3}\s+/, '')
+                .replace(/^[-*]\s+/, '· ')
+                .replace(/`([^`]+)`/g, '$1')
+                .replace(/\*\*([^*]+)\*\*/g, '$1');
+            t = t.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, (m, text, url) =>
+                text === url ? text : text + '（' + url + '）');
+            out.push(t);
+        }
+        return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+    }
+
+    function copyInfo() {
+        if (!release) return;
+        const text = 'TCraft Launcher ' + release.tag_name + '\n'
+            + '发布时间：' + (release.published_at || '').slice(0, 10) + '\n\n'
+            + '更新内容：\n' + plainText(release) + '\n\n'
+            + '下载：' + RELEASES;
+        const done = ok => {
+            copyBtn.textContent = ok ? '已复制' : '复制失败，请手动复制';
+            setTimeout(() => { copyBtn.textContent = '复制版本信息'; }, 1800);
+        };
+        const fallback = () => {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            let ok = false;
+            try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+            ta.remove();
+            done(ok);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => done(true), fallback);
+        } else {
+            fallback();
+        }
+    }
+
     function render(node) {
         title.textContent = '最新版本 ' + release.tag_name;
         meta.textContent = (release.published_at || '').slice(0, 10) + ' 发布';
         log.innerHTML = renderMarkdown(release.body || '该版本未填写更新日志。');
+        copyBtn.disabled = false;
+        copyBtn.textContent = '复制版本信息';
         assetsBox.innerHTML = '';
         const assets = (release.assets || []).filter(a => !/\.sha256$/i.test(a.name));
         const sorted = assets.slice().sort((a, b) => a.name.localeCompare(b.name));
@@ -112,6 +166,7 @@
         selected = node;
         [...nodesBox.querySelectorAll('.dl-node')].forEach(n => n.classList.remove('selected'));
         if (btn) btn.classList.add('selected');
+        copyBtn.disabled = true;
         title.textContent = '正在获取版本信息…';
         meta.textContent = '';
         log.textContent = '正在通过 ' + node.name + ' 读取最新版本，请稍候。';
@@ -211,6 +266,7 @@
     });
     backBtn.addEventListener('click', () => show(step2));
     testBtn.addEventListener('click', testNodes);
+    copyBtn.addEventListener('click', copyInfo);
     modal.addEventListener('click', e => {
         if (e.target === modal) close();
     });
