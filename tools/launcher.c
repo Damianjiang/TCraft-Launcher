@@ -306,10 +306,9 @@ static unsigned long long jar_offset(const wchar_t *exe, unsigned long long *siz
             return 0;
         }
     }
-    CloseHandle(fh);
-
-    // EOCD 就在末尾附近，从后往前第一个签名可信
-    for (i = tail_len - 4; ; i--) {
+    // EOCD 就在末尾附近，从后往前扫；EOCD 最短 22 字节，起点保证 i+19 不越界
+    // 候选算出的 offset 处必须是 PK\x03\x04（伪签名/改坏时继续向前扫），与 Java 侧 headerLength 对齐
+    for (i = tail_len - 22; ; i--) {
         if (tail[i] == 0x50 && tail[i + 1] == 0x4b && tail[i + 2] == 0x05 && tail[i + 3] == 0x06) {
             unsigned long long cd_size = (unsigned long long)tail[i + 12]
                     | ((unsigned long long)tail[i + 13] << 8)
@@ -321,13 +320,26 @@ static unsigned long long jar_offset(const wchar_t *exe, unsigned long long *siz
                     | ((unsigned long long)tail[i + 19] << 24);
             unsigned long long eocd = start + i;
             if (eocd >= cd_size + cd_off) {
-                offset = eocd - cd_size - cd_off;
+                unsigned long long cand = eocd - cd_size - cd_off;
+                if (cand < (unsigned long long)start + i) {
+                    unsigned char magic[4];
+                    DWORD gotm = 0;
+                    LARGE_INTEGER at;
+                    at.QuadPart = (LONGLONG)cand;
+                    SetFilePointer(fh, at.LowPart, &at.HighPart, FILE_BEGIN);
+                    if (ReadFile(fh, magic, 4, &gotm, NULL) && gotm == 4
+                        && magic[0] == 0x50 && magic[1] == 0x4b
+                        && magic[2] == 0x03 && magic[3] == 0x04) {
+                        offset = (unsigned long)cand;
+                        break;
+                    }
+                }
             }
-            break;
         }
         if (i == 0) break;
     }
     free(tail);
+    CloseHandle(fh);
     return offset;
 }
 
@@ -649,9 +661,11 @@ static int run(const wchar_t *java, DWORD *exit_code) {
 
     copy_str(cmd, L"\"", MAX_PATH_LEN * 2);
     cat_str(cmd, java, MAX_PATH_LEN * 2);
-    // 向 Java 侧传入启动器目录
+    // 向 Java 侧传入启动器目录与 exe 自身路径（自更新要替换的文件）
     cat_str(cmd, L"\" -Dfile.encoding=UTF-8 -Dtcraft.dir=\"", MAX_PATH_LEN * 2);
     cat_str(cmd, home_dir, MAX_PATH_LEN * 2);
+    cat_str(cmd, L"\" -Dtcraft.exe=\"", MAX_PATH_LEN * 2);
+    cat_str(cmd, self_path, MAX_PATH_LEN * 2);
     {
         // JavaFX 已下载时直接带 module-path 启动
         wchar_t deps[MAX_PATH_LEN];
@@ -662,7 +676,9 @@ static int run(const wchar_t *java, DWORD *exit_code) {
         cat_str(check, L"\\.ready", MAX_PATH_LEN);
         if (java_has_builtin_fx(java)) {
             // 自带 JavaFX 的 Java 17 直接用内置模块，Win7 不找外置原生库
-            cat_str(cmd, L"\" --add-modules=javafx.controls,javafx.graphics,javafx.base,javafx.media,javafx.web,javafx.swing,javafx.fxml -cp \"",
+            cat_str(cmd, L"\" --add-modules=javafx.controls,javafx.graphics,javafx.base,javafx.media,javafx.web,javafx.swing,javafx.fxml",
+                    MAX_PATH_LEN * 2);
+            cat_str(cmd, L" --add-exports=javafx.graphics/com.sun.prism=ALL-UNNAMED -cp \"",
                     MAX_PATH_LEN * 2);
             cat_str(cmd, jar_path, MAX_PATH_LEN * 2);
             append_webp_cp(cmd, home_dir);
@@ -672,7 +688,9 @@ static int run(const wchar_t *java, DWORD *exit_code) {
             cat_str(cmd, deps, MAX_PATH_LEN * 2);
             cat_str(cmd, L"\" --module-path=\"", MAX_PATH_LEN * 2);
             cat_str(cmd, deps, MAX_PATH_LEN * 2);
-            cat_str(cmd, L"\" --add-modules=javafx.controls,javafx.graphics,javafx.base,javafx.media -cp \"",
+            cat_str(cmd, L"\" --add-modules=javafx.controls,javafx.graphics,javafx.base,javafx.media",
+                    MAX_PATH_LEN * 2);
+            cat_str(cmd, L" --add-exports=javafx.graphics/com.sun.prism=ALL-UNNAMED -cp \"",
                     MAX_PATH_LEN * 2);
             cat_str(cmd, jar_path, MAX_PATH_LEN * 2);
             append_webp_cp(cmd, home_dir);
@@ -1335,6 +1353,12 @@ static int download_url(const wchar_t *url, const char *source) {
     close_fn(req);
     close_fn(inet);
     FreeLibrary(w);
+    // Content-Length 已知时对账：提前 EOF（代理剥离长度/短连接）会被上面的循环当成功
+    if (ok && java_dl_total_known && file_size_u(java_dl_zip) != java_dl_total) {
+        sprintf(java_dl_error, "%s 下载不完整", source);
+        java_dl_retryable = 1;
+        ok = 0;
+    }
     if (!ok) {
         DeleteFileW(java_dl_zip);
         return 0;
@@ -1518,7 +1542,10 @@ static int download_url_parallel(const wchar_t *url, const char *source)
         handles[i] = CreateThread(NULL, 0, java_part_thread, &parts[i], 0, NULL);
         if (!handles[i]) {
             java_dl_abort = 1;
-            for (n = 0; n < i; n++) WaitForSingleObject(handles[n], 5000);
+            for (n = 0; n < i; n++) {
+                WaitForSingleObject(handles[n], 5000);
+                CloseHandle(handles[n]);
+            }
             goto cleanup;
         }
     }
@@ -1823,6 +1850,8 @@ static void scan_finish(void) {
     } else {
         status_set("没有找到可用的 Java，正在自动下载 Java 17…");
         java_dl_start();
+        // 下载已启动，扫描/下载按钮保持禁用，避免扫描覆盖下载进度
+        return;
     }
     EnableWindow(GetDlgItem(java_dlg, IDC_JAVA_SCAN), TRUE);
     EnableWindow(GetDlgItem(java_dlg, IDC_JAVA_DOWN), TRUE);

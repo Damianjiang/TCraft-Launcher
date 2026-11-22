@@ -2260,6 +2260,7 @@ public final class Ui {
         private final Label pctLabel;
         private final javafx.scene.shape.Rectangle fill;
         private Timeline loop;
+        private boolean indeterminate = true;
 
         public LoadCard(String title, String stage) {
             setMaxWidth(360);
@@ -2288,6 +2289,11 @@ public final class Ui {
             VBox box = new VBox(9, titleLabel, bar, foot);
             box.setFillWidth(true);
             getChildren().add(box);
+            // 脱离场景即停表，页面切走后节点才能回收
+            sceneProperty().addListener((o, oldScene, newScene) -> {
+                if (newScene == null) stopLoop();
+                else if (indeterminate) startLoop();
+            });
             startLoop();
         }
 
@@ -2297,10 +2303,12 @@ public final class Ui {
 
         public void setProgress(double value) {
             if (value < 0) {
+                indeterminate = true;
                 startLoop();
                 pctLabel.setText("");
                 return;
             }
+            indeterminate = false;
             stopLoop();
             double v = Math.max(0, Math.min(1, value));
             fill.setTranslateX(0);
@@ -2310,6 +2318,7 @@ public final class Ui {
 
         private void startLoop() {
             stopLoop();
+            indeterminate = true;
             fill.setWidth(70);
             Timeline t = new Timeline(
                     new KeyFrame(Duration.ZERO, new KeyValue(fill.translateXProperty(), -70)),

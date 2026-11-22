@@ -412,6 +412,10 @@ public final class Http {
                     return Fetch.readAll(body, 20_000, 8L * 1024 * 1024);
                 }
             }
+            try {
+                resp.body().close();
+            } catch (IOException ignored) {
+            }
             if (!retryable(code)) throw new IOException("HTTP " + code);
             last = new IOException("HTTP " + code);
         }

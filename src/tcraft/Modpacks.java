@@ -471,9 +471,9 @@ public final class Modpacks {
                 contentDirs.add(base + ".minecraft");
             } else if (index != null) {
                 parseModrinth(readJson(zip, index), info);
-                // 与 HMCL 一致：client-overrides 优先于 overrides
-                contentDirs.add(base + "client-overrides");
+                // 与 HMCL 一致：client-overrides 优先于 overrides，后拷贝的覆盖先拷贝的
                 contentDirs.add(base + "overrides");
+                contentDirs.add(base + "client-overrides");
             } else if (manifest != null) {
                 java.util.Map<String, Object> json = readJson(zip, manifest);
                 if (Json.obj(json.get("addons")).isEmpty()) {
@@ -698,7 +698,10 @@ public final class Modpacks {
             }
             List<String> urls = new ArrayList<>();
             for (Object u : Json.arr(f.get("downloads"))) urls.add(String.valueOf(u));
-            if (!urls.isEmpty() && !Files.isRegularFile(target)) {
+            if (!Files.isRegularFile(target)) {
+                if (urls.isEmpty()) {
+                    throw new java.io.IOException(Lang.tf("整合包缺少文件下载地址：%s", relPath));
+                }
                 Files.createDirectories(target.getParent());
                 tryDownload(task, urls, target, sha1);
             }
@@ -756,12 +759,20 @@ public final class Modpacks {
         }
         int total = Math.max(1, installFiles.size());
         int done = 0;
+        int noUrl = 0;
         java.util.Map<Long, Integer> classCache = new java.util.HashMap<>();
         for (Object o : installFiles) {
             if (task.canceled) throw new java.io.IOException("已取消");
             java.util.Map<String, Object> f = Json.obj(o);
             ResourceVersion rv = ResourceVersion.fromCurseForgeJson(f, "mod");
-            if (rv.downloadUrls.isEmpty() || rv.fileName.isEmpty()) continue;
+            if (rv.fileName.isEmpty()) continue;
+            if (rv.downloadUrls.isEmpty()) {
+                // 作者禁止第三方分发时 CurseForge 不返回下载地址，只能提示用户手动补齐
+                noUrl++;
+                logSkipped("整合包内容没有下载地址：" + rv.fileName);
+                done++;
+                continue;
+            }
             List<String> modules = new ArrayList<>();
             for (Object m : Json.arr(f.get("modules"))) {
                 modules.add(Json.str(Json.obj(m), "name", ""));
@@ -807,6 +818,11 @@ public final class Modpacks {
             task.remainingFiles = total - done;
             Tasks.INSTANCE.changed();
         }
+        if (noUrl > 0 && win != null) {
+            final int n = noUrl;
+            javafx.application.Platform.runLater(() -> win.toast("整合包内容缺失",
+                    Lang.tf("有 %d 个文件没有下载地址，已跳过，请在安装后手动补齐", n), 4));
+        }
     }
 
     private static void downloadMcbbsContent(MainWindow win, java.util.Map<String, Object> json, Path versionFolder, Tasks.Task task) throws Exception {
@@ -819,7 +835,7 @@ public final class Modpacks {
             java.util.Map<String, Object> source = Json.obj(f.get("source"));
             String url = Json.str(source, "url", "");
             String relPath = Json.str(f, "target", "");
-            if (url.isEmpty() || relPath.isEmpty()) continue;
+            if (relPath.isEmpty()) continue;
             var hashes = Json.obj(source.get("hashes"));
             Path target = versionFolder.resolve(relPath).normalize();
             if (!target.startsWith(versionFolder)) continue;
@@ -829,6 +845,9 @@ public final class Modpacks {
                 continue;
             }
             if (!Files.isRegularFile(target)) {
+                if (url.isEmpty()) {
+                    throw new java.io.IOException(Lang.tf("整合包缺少文件下载地址：%s", relPath));
+                }
                 Files.createDirectories(target.getParent());
                 tryDownload(task, List.of(url), target, Json.str(hashes, "sha1", ""));
             }
@@ -867,7 +886,42 @@ public final class Modpacks {
     private static boolean askInBackground(MainWindow win, String title, String message) {
         CountDownLatch latch = new CountDownLatch(1);
         AtomicBoolean ok = new AtomicBoolean(false);
+        AtomicBoolean alive = new AtomicBoolean(true);
+        // 更新进度卡等不可关闭的模态占用时延迟 3 秒重试一次，仍占用则按取消放行后台线程
+        showAsk(win, latch, ok, alive, title, message, 1);
+        try {
+            // 十分钟超时按取消处理
+            if (!latch.await(10, java.util.concurrent.TimeUnit.MINUTES)) {
+                alive.set(false);
+                Platform.runLater(() -> win.setModalCloseHook(null));
+                return false;
+            }
+        } catch (InterruptedException e) {
+            alive.set(false);
+            Thread.currentThread().interrupt();
+            return false;
+        }
+        return ok.get();
+    }
+
+    private static void showAsk(MainWindow win, CountDownLatch latch, AtomicBoolean ok,
+                                AtomicBoolean alive, String title, String message, int attempt) {
         Platform.runLater(() -> {
+            if (!alive.get()) {
+                latch.countDown();
+                return;
+            }
+            if (win.hasOpenModal()) {
+                if (attempt <= 0) {
+                    latch.countDown();
+                    return;
+                }
+                javafx.animation.PauseTransition retry =
+                        new javafx.animation.PauseTransition(javafx.util.Duration.seconds(3));
+                retry.setOnFinished(e -> showAsk(win, latch, ok, alive, title, message, attempt - 1));
+                retry.play();
+                return;
+            }
             VBox card = new VBox(12);
             card.setPadding(new Insets(20, 22, 16, 22));
             card.setPrefWidth(430);
@@ -889,21 +943,10 @@ public final class Modpacks {
                         latch.countDown();
                     }));
             card.getChildren().addAll(Ui.bold(title, 17, Theme.text), body, actions);
-            // 关窗时放行后台线程
-            win.setModalCloseHook(latch::countDown);
             win.showModal(card, false);
+            // hook 必须在 showModal 之后设置：showModal 会先消费既有 hook（放行被顶掉的旧弹窗）
+            win.setModalCloseHook(latch::countDown);
         });
-        try {
-            // 十分钟超时按取消处理
-            if (!latch.await(10, java.util.concurrent.TimeUnit.MINUTES)) {
-                Platform.runLater(() -> win.setModalCloseHook(null));
-                return false;
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return false;
-        }
-        return ok.get();
     }
 
     private static String baseFolder(ZipFile zip) {
@@ -980,8 +1023,21 @@ public final class Modpacks {
     }
 
     private static void extractZip(ZipFile zip, Path targetDir) throws java.io.IOException {
-        for (java.util.Enumeration<? extends ZipEntry> entries = zip.entries(); entries.hasMoreElements(); ) {
-            ZipEntry e = entries.nextElement();
+        // 条目数与解压总量设上限，防压缩炸弹写满磁盘
+        long totalBytes = 0;
+        int entries = 0;
+        for (java.util.Enumeration<? extends ZipEntry> it = zip.entries(); it.hasMoreElements(); ) {
+            ZipEntry e = it.nextElement();
+            if (++entries > MAX_ZIP_ENTRIES) {
+                throw new java.io.IOException(Lang.t("整合包条目过多，已中止解压"));
+            }
+            long size = e.getSize();
+            if (size > 0) {
+                totalBytes += size;
+                if (totalBytes > MAX_ZIP_BYTES) {
+                    throw new java.io.IOException(Lang.t("整合包解压后体积过大，已中止解压"));
+                }
+            }
             Path out = targetDir.resolve(e.getName().replace('\\', '/')).normalize();
             if (!out.startsWith(targetDir)) continue;
             if (e.isDirectory()) {
@@ -989,11 +1045,21 @@ public final class Modpacks {
             } else {
                 Files.createDirectories(out.getParent());
                 try (InputStream in = zip.getInputStream(e); OutputStream outStream = Files.newOutputStream(out)) {
-                    in.transferTo(outStream);
+                    long copied = in.transferTo(outStream);
+                    // 流式条目没有声明尺寸，按实际写入量补算
+                    if (size <= 0) {
+                        totalBytes += copied;
+                        if (totalBytes > MAX_ZIP_BYTES) {
+                            throw new java.io.IOException(Lang.t("整合包解压后体积过大，已中止解压"));
+                        }
+                    }
                 }
             }
         }
     }
+
+    private static final int MAX_ZIP_ENTRIES = 200_000;
+    private static final long MAX_ZIP_BYTES = 16L * 1024 * 1024 * 1024;
 
     private static void copyDirectory(Path from, Path to) throws java.io.IOException {
         copyDirectory(from, to, rel -> false);

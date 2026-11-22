@@ -127,8 +127,16 @@ public final class Servers {
             w.writeByte(0);
         }
         w.writeByte(0);
-        try (OutputStream fs = new GZIPOutputStream(Files.newOutputStream(file))) {
+        // tmp + 原子替换：写一半崩溃/断电不会丢掉整个服务器列表（对齐 Data.save 范式）
+        Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
+        try (OutputStream fs = new GZIPOutputStream(Files.newOutputStream(tmp))) {
             fs.write(buf.toByteArray());
+        }
+        try {
+            Files.move(tmp, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                    java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+        } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+            Files.move(tmp, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         }
     }
 

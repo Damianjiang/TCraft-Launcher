@@ -199,6 +199,7 @@ Mod	Mod	Mod
 正在加载版本列表，请稍候	Loading version list, please wait	正在載入版本清單，請稍候	
 正在启动游戏	Starting Game	正在啟動遊戲	
 启动游戏	Play	啟動遊戲	
+启动当前实例	Launch current instance	啟動目前實例	
 未找到可用的游戏版本	No usable game version found	未找到可用的遊戲版本	
 正在加载中，请稍候	Loading, please wait	載入中，請稍候	
 游戏用户名	Game username	遊戲使用者名稱	
@@ -2848,6 +2849,7 @@ Mod 更新失败	Mod update failed	Mod 更新失敗
 统一通行证登录失败	Unified Pass sign-in failed	統一通行證登入失敗	
 玩家名 / 角色名	Player / character name	玩家名 / 角色名	
 获取皮肤	Fetch skin	取得面板	
+更换皮肤	Change skin	更換皮膚	
 还没有可用的皮肤预览	No skin preview yet	還沒有可用的面板預覽	
 皮肤已更换	Skin changed	面板已更換	
 导入本地皮肤失败	Failed to import the local skin	匯入本機面板失敗	
@@ -2979,6 +2981,7 @@ JVM 参数	JVM arguments	JVM 參數
 已安装 Mod	Installed Mods	已安裝 Mod	
 这个实例的 mods 文件夹是空的。\n点击「安装 Mod」选择文件，或把 .jar 放入 mods 文件夹后点击刷新。	This instance's mods folder is empty.\nClick Install Mod to pick files, or drop .jar files into the mods folder and click Refresh.	這個實例的 mods 資料夾是空的。\n點擊「安裝 Mod」選擇檔案，或把 .jar 放入 mods 資料夾後點擊重新整理。	
 检查更新	Check for updates	檢查更新	
+启动器更新	Launcher updates	啟動器更新	
 选择要安装的 Mod	Choose the Mod to install	選擇要安裝的 Mod	
 Mod 文件	Mod file	Mod 檔案	
 大小：	Size:	大小：	
@@ -3634,6 +3637,18 @@ TCraft Launcher 是用 JavaFX 写的开源 Minecraft 启动器，支持微软正
 当前版本：v%s	Current version: v%s	目前版本：v%s	
 该版本未填写更新日志。	No release notes were provided for this version.	該版本未填寫更新日誌。	
 前往下载	Download Now	前往下載	
+立即更新	Update Now	立即更新	
+忽略此版本	Skip This Version	忽略此版本	
+已忽略	Skipped	已忽略	
+v%s 之后不再自动提示	No more prompts until v%s	v%s 之後不再自動提示	
+正在下载更新	Downloading Update	正在下載更新	
+下载源：%s	Source: %s	下載源：%s	
+更新包下载失败：	Update download failed: 	更新套件下載失敗：	
+无法启动安装进程，请前往下载手动更新。	Couldn't launch the installer, please download and update manually.	無法啟動安裝程序，請前往下載手動更新。	
+更新下载已取消	Update download canceled	更新下載已取消	
+此安装方式暂不支持一键更新，请前往下载手动替换，升级一次后即可一键更新。	One-click update isn't available for this install. Please download and replace manually; one-click works after one manual upgrade.	此安裝方式暫不支援一鍵更新，請前往下載手動替換，升級一次後即可一鍵更新。	
+定位启动器本体失败，请手动下载更新。	Couldn't locate the launcher file. Please download the update manually.	無法定位啟動器本體，請手動下載更新。	
+选中的更新源连不上，可在 设置 → 网络 里换一个源再试。	The selected update source is unreachable. Switch sources under Settings → Network.	選中的更新源連不上，可在 設置 → 網絡 裡換一個源再試。	
 稍后	Later	稍後	
 无法检查更新	Unable to check for updates	無法檢查更新	
 GitHub 可能连接不稳定，你可以使用瓦特工具箱等工具开个加速或来个 VPN。	GitHub may be unstable. Try an accelerator such as Watt Toolkit, or use a VPN.	GitHub 可能連線不穩定，你可以使用瓦特工具箱等工具開個加速或來個 VPN。	
@@ -4231,3 +4246,24 @@ Mod文件	Mod file	Mod 檔案
 更新源	Update source	更新來源
 自动测速选最快	Auto: fastest mirror	自動測速選最快
 自定义地址	Custom URL	自訂位址
+正在加载 %s 列表	Loading %s list	正在載入 %s 清單
+正在加载第 %d 页	Loading page %d	正在載入第 %d 頁
+把下面的联机码整段发给朋友，让他们在「加入房间」里粘贴即可。\n%s	Send your friends the whole link code below, and have them paste it in Join Room.\n%s	把下面的聯機碼整段發給朋友，讓他們在「加入房間」裡貼上即可。\n%s
+在 TCL 启动器「联机 → 加入房间」中粘贴下面的联机码，即可加入房间：\n%s	Paste the link code below in TCL Launcher → Join Room to join the room:\n%s	在 TCL 啟動器「聯機 → 加入房間」中貼上下面的聯機碼，即可加入房間：\n%s
+联机码解析失败：%s	Failed to parse link code: %s	聯機碼解析失敗：%s
+ · 连接中…	 · Connecting…	 · 連接中…
+ · 已下载 	 · Downloaded 	 · 已下載
+官方源	Official	官方來源
+下载更新 v%s	Downloading update v%s	下載更新 v%s
+\n\n…更早版本请到 Releases 查看	\n\n…for older releases, see the Releases page	\n\n…較早版本請到 Releases 查看
+\n\n…内容过长已截断	\n\n…truncated for length	\n\n…內容過長已截斷
+正在校验…	Verifying…	正在驗證…
+上次更新未完成	Last update didn't finish	上次更新未完成
+未获取到更新包校验值，请到下载页手动更新。	Couldn't obtain the checksum; please download the update manually.	未取得更新套件校驗值，請到下載頁手動更新。
+将删除游戏目录与实例目录下的崩溃报告和日志文件。\n此操作不可撤销，是否继续？	This will delete crash reports and logs under the game and instance folders.\nThis cannot be undone. Continue?	將刪除遊戲目錄與實例目錄下的崩潰報告和日誌檔案。\n此操作不可撤銷，是否繼續？
+下载内容不是有效的 jar：	The downloaded file is not a valid jar:	下載內容不是有效的 jar：	
+整合包条目过多，已中止解压	Too many entries in the modpack; extraction aborted	整合包項目過多，已中止解壓	
+整合包解压后体积过大，已中止解压	The modpack is too large after extraction; aborted	整合包解壓後體積過大，已中止解壓	
+整合包缺少文件下载地址：%s	The modpack is missing a download URL: %s	整合包缺少檔案下載位址：%s	
+有 %d 个文件没有下载地址，已跳过，请在安装后手动补齐	%d files have no download URL and were skipped; add them manually after installation	有 %d 個檔案沒有下載位址，已跳過，請在安裝後手動補齊	
+启动器已在运行，请切换到已打开的窗口。	The launcher is already running. Switch to the open window.	啟動器已在執行，請切換到已開啟的視窗。	

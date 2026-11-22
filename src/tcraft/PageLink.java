@@ -268,7 +268,7 @@ public class PageLink implements Page {
         EasyTier.stopAsync();
         loadingError = null;
         state = State.SELECT;
-        win.reloadPage();
+        win.reloadPageIf("link");
     }
 
     private Node buildFinish() {
@@ -527,7 +527,7 @@ public class PageLink implements Page {
         hintSlot = null;
         pingLabel = null;
         peopleLabel = null;
-        win.reloadPage();
+        win.reloadPageIf("link");
     }
 
     private void createRoom() {
@@ -766,7 +766,7 @@ public class PageLink implements Page {
         hintSlot = null;
         pingLabel = null;
         peopleLabel = null;
-        win.reloadPage();
+        win.reloadPageIf("link");
         worker = new Thread(this::runLink, "TCL-Link");
         worker.setDaemon(true);
         worker.start();
@@ -788,7 +788,7 @@ public class PageLink implements Page {
                         new javafx.animation.KeyFrame(javafx.util.Duration.millis(200),
                                 new javafx.animation.KeyValue(loadingProgress, to, Ui.EASE_OUT_FLUENT))).play();
             } else {
-                win.reloadPage();
+                win.reloadPageIf("link");
             }
         });
     }
@@ -853,7 +853,7 @@ public class PageLink implements Page {
                 if (state != State.LOADING) return;
                 state = State.FINISH;
                 javafx.application.Platform.runLater(() -> {
-                    win.reloadPage();
+                    win.reloadPageIf("link");
                     if (serverSide) copyCode();
                     else win.toast("已加入房间", clientAddress, 1);
                 });
@@ -868,7 +868,7 @@ public class PageLink implements Page {
                     if (gen != peerGeneration || state == State.SELECT) return;
                     loadingError = msg;
                     state = State.LOADING;
-                    win.reloadPage();
+                    win.reloadPageIf("link");
                 });
                 // 页内错误态只说状态，真实原因交给弹窗
                 Errors.panic("无法建立联机", e);
@@ -883,7 +883,7 @@ public class PageLink implements Page {
                 if (gen != peerGeneration || state == State.SELECT) return;
                 loadingError = msg;
                 state = State.LOADING;
-                win.reloadPage();
+                win.reloadPageIf("link");
             });
             // 页内错误态只说状态，真实原因交给弹窗
             Errors.panic("无法建立联机", e);
@@ -1144,6 +1144,15 @@ public class PageLink implements Page {
 
     private interface InputHandler {
         boolean apply(String value);
+    }
+
+    // 离开页面后不再持有页面节点；联机线程继续跑，回来时按静态 state 重建
+    @Override
+    public void onHide() {
+        loadingDescLabel = null;
+        hintSlot = null;
+        pingLabel = null;
+        peopleLabel = null;
     }
 
     private void showInput(String title, String message, String hint, TextField field, InputHandler onOk) {

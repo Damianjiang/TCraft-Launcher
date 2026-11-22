@@ -55,13 +55,15 @@ public final class Dialogs {
                     onOk.run();
                 }
                 : () -> {
-                    // 顺序反了会被关闭钩子当成取消
+                    // 先清钩子，closeModal 不再把确定当成取消
+                    win.setModalCloseHook(null);
                     onOk.run();
                     win.closeModal();
                 };
         actions.getChildren().addAll(
                 Ui.button("确定", warn ? Ui.BTN_RED : Ui.BTN_HIGHLIGHT, ok),
                 Ui.button("取消", Ui.BTN_NORMAL, () -> {
+                    win.setModalCloseHook(null);
                     win.closeModal();
                     if (onCancel != null) onCancel.run();
                 }));
@@ -823,9 +825,9 @@ public final class Dialogs {
         type[0] = sourceOf(account);
         for (int i = 0; i < items.length; i++) items[i].setSelected(i == type[0]);
 
-        // ESC / 点蒙层 / 被链式弹窗顶掉时也要停掉 3D 预览的自转
-        win.setModalCloseHook(viewer::dispose);
         win.showModal(card);
+        // 蒙层/ESC/被链式弹窗顶掉时停掉 3D 自转；hook 须在 showModal 后设置
+        win.setModalCloseHook(viewer::dispose);
     }
 
     private static int sourceOf(Data.Account account) {

@@ -207,8 +207,9 @@ public final class Downloader {
             String rel = Json.str(art, "path", "");
             String url = Json.str(art, "url", "");
             String sha1 = Json.str(art, "sha1", "");
-            if (!rel.isEmpty() && !url.isEmpty()) {
-                libFiles.add(new Object[]{url, game.resolve("libraries").resolve(rel), sha1});
+            Path libPath = libraryPath(game, rel);
+            if (libPath != null && !url.isEmpty()) {
+                libFiles.add(new Object[]{url, libPath, sha1});
             }
             // 旧版 natives 格式，只下当前平台的
             Map<String, Object> nativesMap = Json.obj(lib.get("natives"));
@@ -219,8 +220,9 @@ public final class Downloader {
                 String nrel = Json.str(nat, "path", "");
                 String nurl = Json.str(nat, "url", "");
                 String nsha1 = Json.str(nat, "sha1", "");
-                if (!nrel.isEmpty() && !nurl.isEmpty()) {
-                    libFiles.add(new Object[]{nurl, game.resolve("libraries").resolve(nrel), nsha1});
+                Path nativePath = libraryPath(game, nrel);
+                if (nativePath != null && !nurl.isEmpty()) {
+                    libFiles.add(new Object[]{nurl, nativePath, nsha1});
                 }
             }
         }
@@ -243,7 +245,7 @@ public final class Downloader {
                     libFutures.add(libPool.submit(() -> {
                         if (task.canceled) return;
                         try {
-                            downloadFile(null, (String) f[0], (Path) f[1], 0, 0,
+                            downloadFile(task, (String) f[0], (Path) f[1], 0, 0,
                                     ((Path) f[1]).getFileName().toString(), (String) f[2]);
                         } catch (Exception e) {
                             libError.compareAndSet(null, e);
@@ -314,12 +316,12 @@ public final class Downloader {
                                     ? "https://resources.download.minecraft.net/" + hash.substring(0, 2) + "/" + hash
                                     : bmcl() + "/assets/" + hash.substring(0, 2) + "/" + hash;
                             try {
-                                downloadFile(null, assetUrl, target, 0, 0, hash, hash);
+                                downloadFile(task, assetUrl, target, 0, 0, hash, hash);
                             } catch (Exception first) {
                                 // 并发大时 CDN 偶尔拒连，退避后重试一次
                                 Thread.sleep(600);
                                 Files.deleteIfExists(target);
-                                downloadFile(null, assetUrl, target, 0, 0, hash, hash);
+                                downloadFile(task, assetUrl, target, 0, 0, hash, hash);
                             }
                             if (!assetReady(target, expectedSize, hash)) throw new IOException("文件不完整");
                         }
@@ -360,7 +362,7 @@ public final class Downloader {
                         "https://resources.download.minecraft.net/" + h[0].substring(0, 2) + "/" + h[0]}) {
                     try {
                         Files.deleteIfExists(target);
-                        downloadFile(null, url, target, 0, 0, h[0], h[0]);
+                        downloadFile(task, url, target, 0, 0, h[0], h[0]);
                         if (assetReady(target, expectedSize, h[0])) {
                             ok++;
                             break;
@@ -601,6 +603,13 @@ public final class Downloader {
                             last = new IOException("文件校验失败（SHA-1 不匹配）");
                             continue;
                         }
+                    }
+                    // 无哈希时只认 zip 魔数，防镜像错误页被存成 jar
+                    if (sha1 == null && !jarLooksValid(part, target)) {
+                        Files.deleteIfExists(part);
+                        done = 0;
+                        last = new IOException(Lang.t("下载内容不是有效的 jar：") + target.getFileName());
+                        continue;
                     }
                     Files.move(part, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                     return;
@@ -1079,7 +1088,8 @@ public final class Downloader {
                 if (!mavenBase.endsWith("/")) mavenBase += "/";
                 url = mavenBase + rel;
             }
-            downloadFile(task, url, game.resolve("libraries").resolve(rel), 0.95, 0.99, name, libSha1);
+            Path libTarget = libraryPath(game, rel);
+            if (libTarget != null) downloadFile(task, url, libTarget, 0.95, 0.99, name, libSha1);
         }
         return id;
     }
@@ -1162,6 +1172,27 @@ public final class Downloader {
         String artifact = parts[1];
         String version = parts[2];
         return group + "/" + artifact + "/" + version + "/" + artifact + "-" + version + ".jar";
+    }
+
+    // 库路径来自版本 JSON，必须落在 libraries 内，绝对路径或 ../ 一律拒绝
+    static Path libraryPath(Path game, String rel) {
+        if (rel == null || rel.isEmpty()) return null;
+        Path root = game.resolve("libraries").toAbsolutePath().normalize();
+        Path out = root.resolve(rel).normalize();
+        return out.startsWith(root) ? out : null;
+    }
+
+    static boolean jarLooksValid(Path part, Path target) {
+        String name = target.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
+        if (!name.endsWith(".jar") && !name.endsWith(".litemod")) return true;
+        try (InputStream in = Files.newInputStream(part)) {
+            byte[] m = in.readNBytes(4);
+            return m.length == 4 && m[0] == 'P' && m[1] == 'K'
+                    && (m[2] == 3 || m[2] == 5 || m[2] == 7)
+                    && (m[3] == 4 || m[3] == 6 || m[3] == 8);
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private static void sub(Tasks.Task task, int index, Tasks.State state) {
@@ -1411,26 +1442,14 @@ public final class Downloader {
         throw new IOException(last == null ? "网络请求失败" : last.getMessage());
     }
 
+    private static final long TEXT_LIMIT = 32L * 1024 * 1024;
+
     private static String readText(String url, java.util.function.DoubleConsumer progress) throws IOException {
         try (Http.Body body = Http.open(url, java.time.Duration.ofSeconds(25))) {
-            long total = body.length;
-            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream(
-                    total > 0 && total < Integer.MAX_VALUE ? (int) total : 8192);
-            byte[] buf = new byte[65536];
-            long done = 0;
-            long lastPush = 0;
-            int n;
-            while ((n = body.in.read(buf)) >= 0) {
-                out.write(buf, 0, n);
-                done += n;
-                long now = System.currentTimeMillis();
-                if (progress != null && total > 0 && now - lastPush > 80) {
-                    lastPush = now;
-                    progress.accept(Math.min(1.0, done / (double) total));
-                }
-            }
+            // 响应体读取也要有空闲超时和上限，否则镜像卡住会把线程永久挂死
+            byte[] bytes = Fetch.readAll(body.in, 20_000, TEXT_LIMIT);
             if (progress != null) progress.accept(1.0);
-            return out.toString(java.nio.charset.StandardCharsets.UTF_8);
+            return new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
         }
     }
 

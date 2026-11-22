@@ -760,7 +760,11 @@ public final class MainWindow {
             CrashAnalyzer.Result r = CrashAnalyzer.analyzeInstance(run, 600);
             if (!r.found()) return;
             Platform.runLater(() -> {
-                if (closing) return;
+                // 更新进度卡等占用模态时不顶掉，崩溃报告留在日志里
+                if (closing || hasOpenModal()) {
+                    data.log("游戏异常退出，但弹窗被占用，崩溃报告已写入 latest.log");
+                    return;
+                }
                 PageInstanceSetup.showCrashReport(this, r);
             });
         }, "TCL-CrashAnalyze");
@@ -1586,6 +1590,12 @@ public final class MainWindow {
         String key = currentKey;
         currentKey = "__reload__";
         openPage(key, true);
+    }
+
+    // 页面已切走时不再重建当前页，避免后台回调把用户的页面刷新掉
+    public void reloadPageIf(String key) {
+        if (pageHost == null || key == null || !key.equals(currentKey)) return;
+        reloadPage();
     }
 
     private void rebuildQuiet() {
@@ -2616,6 +2626,11 @@ public final class MainWindow {
         showModal(card, true);
     }
 
+    // 自动弹窗（如发现更新）不顶掉用户正在看的模态
+    public boolean hasOpenModal() {
+        return modalContent != null;
+    }
+
     public void showModal(Node card, boolean dismissable) {
         showModal(card, dismissable, null);
     }
@@ -2834,26 +2849,37 @@ public final class MainWindow {
         StackPane.setMargin(card, new Insets(70, 0, 0, 0));
 
         List<Object[]> entries = new ArrayList<>();
-        // 6 列：标题/副题/图标/动作 + 译文两列
-        entries.add(searchEntry("启动", "主页", "play", (Runnable) () -> openPage("launch", true)));
-        entries.add(searchEntry("版本选择", "启动 → 版本选择", "layers", (Runnable) () -> openPage("versions", true)));
-        entries.add(searchEntry("实例", "实例管理", "box", (Runnable) () -> openPage("instance", true)));
-        entries.add(searchEntry("下载", "原版游戏与社区资源", "download", (Runnable) () -> openPage("download", true)));
-        entries.add(searchEntry("联机", "EasyTier 虚拟局域网", "globe", (Runnable) () -> openPage("link", true)));
-        entries.add(searchEntry("更多", "关于、新闻与实用工具", "layers", (Runnable) () -> openPage("other", true)));
-        String[][] setup = {{"启动", "launch"}, {"联机", "link"}, {"个性化", "ui"}, {"系统", "system"},
-                {"Java", "java"}, {"日志", "log"}, {"存储与清理", "cache"}, {"网络", "network"}, {"更多", "more"}};
-        if (!data.getBool("UiHiddenPageSetup", false)) {
-            for (String[] s : setup) {
-                // 拼接标题整串查表必失败，前后片段各自 Lang.t
-                entries.add(new Object[]{"设置 - " + s[0], "设置", "settings", (Runnable) () -> {
-                    pendingSetupSection = s[1];
-                    openPage("setup", true);
-                }, Lang.t("设置 - ") + Lang.t(s[0]), Lang.t("设置")});
-            }
+        // 6 列：标题/副题/图标/动作 + 译文两列；页面与分区跟随各自的隐藏开关
+        if (!pageHidden("launch")) entries.add(searchEntry("启动", "主页", "play", (Runnable) () -> openPage("launch", true)));
+        if (!data.getBool("UiHiddenFunctionSelect", false)) entries.add(searchEntry("版本选择", "启动 → 版本选择", "layers", (Runnable) () -> openPage("versions", true)));
+        if (!pageHidden("instance")) entries.add(searchEntry("实例", "实例管理", "box", (Runnable) () -> openPage("instance", true)));
+        if (!pageHidden("download")) entries.add(searchEntry("下载", "原版游戏与社区资源", "download", (Runnable) () -> openPage("download", true)));
+        if (!pageHidden("link")) entries.add(searchEntry("联机", "EasyTier 虚拟局域网", "globe", (Runnable) () -> openPage("link", true)));
+        if (!pageHidden("other")) entries.add(searchEntry("更多", "关于、新闻与实用工具", "layers", (Runnable) () -> openPage("other", true)));
+        entries.add(searchEntry("启动游戏", "启动当前实例", "play", (Runnable) this::launchGame));
+        entries.add(searchEntry("检查更新", "启动器更新", "refresh-cw", (Runnable) () -> Updates.check(this, true)));
+        if (!pageHidden("link")) {
+            entries.add(searchEntry("创建房间", "联机", "create-room", (Runnable) () -> openPage("link", true)));
+            entries.add(searchEntry("加入房间", "联机", "join-room", (Runnable) () -> openPage("link", true)));
         }
+        if (!pageHidden("instance")) {
+            entries.add(searchEntry("导入整合包", "实例", "package-plus", (Runnable) () -> openPage("instance", true)));
+            entries.add(searchEntry("添加游戏目录", "实例", "folder-plus", (Runnable) () -> openPage("instance", true)));
+        }
+        entries.add(searchEntry("更换皮肤", "账户管理", "shirt", (Runnable) this::showAccountDialog));
         entries.add(searchEntry("账户管理", "添加或切换账户", "user", (Runnable) this::showAccountDialog));
         entries.add(searchEntry("任务管理", "下载与安装任务", "layout-list", (Runnable) () -> openPage("tasks", true)));
+        if (!pageHidden("other")) {
+            entries.add(searchEntry("新闻", "更多", "newspaper", (Runnable) () -> openPage("other", true)));
+            entries.add(searchEntry("实用工具", "更多", "tool-case", (Runnable) () -> openPage("other", true)));
+            entries.add(searchEntry("今日人品", "实用工具", "coffee", (Runnable) () -> openPage("other", true)));
+            if (!data.getBool("UiHiddenOtherAbout", false)) {
+                entries.add(searchEntry("关于", "更多", "info", (Runnable) () -> openPage("other", true)));
+                entries.add(searchEntry("法律声明", "关于", "scroll", (Runnable) () -> openPage("other", true)));
+                entries.add(searchEntry("开源地址", "关于", "git-pull-request-arrow", (Runnable) () -> openPage("other", true)));
+                entries.add(searchEntry("参考与致谢", "关于", "heart", (Runnable) () -> openPage("other", true)));
+            }
+        }
         for (Data.Instance ins : data.instances) {
             final Data.Instance target = ins;
             // 实例名是用户数据不能查表，译文列原样放名字
@@ -2864,9 +2890,21 @@ public final class MainWindow {
                 else openPage("instanceSetup", true);
             }, ins.name, Lang.t("实例 · ") + ins.version});
         }
+        String[][] setup = {{"启动", "launch"}, {"联机", "link"}, {"个性化", "ui"}, {"系统", "system"},
+                {"Java", "java"}, {"日志", "log"}, {"存储与清理", "cache"}, {"网络", "network"}, {"更多", "more"}};
+        if (!data.getBool("UiHiddenPageSetup", false)) {
+            for (String[] s : setup) {
+                if (setupHidden(s[1])) continue;
+                // 拼接标题整串查表必失败，前后片段各自 Lang.t
+                entries.add(new Object[]{"设置 - " + s[0], "设置", "settings", (Runnable) () -> {
+                    pendingSetupSection = s[1];
+                    openPage("setup", true);
+                }, Lang.t("设置 - ") + Lang.t(s[0]), Lang.t("设置")});
+            }
+        }
         String[][] settingNames = {
                 {"启动选项", "launch"}, {"默认版本隔离", "launch"}, {"游戏窗口标题", "launch"}, {"内存分配", "launch"},
-                {"联机设置", "link"}, {"主题", "ui"}, {"背景", "ui"}, {"动画速度", "ui"}, {"窗口圆角", "ui"},
+                {"联机设置", "link"}, {"主题", "ui"}, {"背景", "ui"}, {"背景音乐", "ui"}, {"动画速度", "ui"}, {"窗口圆角", "ui"},
                 {"文件下载源", "system"}, {"HTTP 代理", "system"}, {"语言", "system"},
                 {"Java 运行时", "java"}, {"启动日志", "log"}, {"存储与清理", "cache"},
                 {"下载源测速", "network"}, {"社区", "more"}
@@ -2874,6 +2912,7 @@ public final class MainWindow {
         if (!data.getBool("UiHiddenPageSetup", false)) {
             for (String[] s : settingNames) {
                 String label = s[0], section = s[1];
+                if (setupHidden(section)) continue;
                 if (entries.stream().anyMatch(o -> label.equals(o[0]))) continue;
                 entries.add(new Object[]{"设置 - " + label, "设置", "settings", (Runnable) () -> {
                     pendingSetupSection = section;
@@ -2960,6 +2999,18 @@ public final class MainWindow {
         return new Object[]{title, sub, icon, action, Lang.t(title), Lang.t(sub)};
     }
 
+    // 隐藏的设置分区连带其下的条目一起不进搜索
+    private boolean setupHidden(String section) {
+        String gate = switch (section) {
+            case "launch" -> "UiHiddenSetupLaunch";
+            case "link" -> "UiHiddenSetupLink";
+            case "ui" -> "UiHiddenSetupUi";
+            case "system" -> "UiHiddenSetupSystem";
+            default -> null;
+        };
+        return gate != null && data.getBool(gate, false);
+    }
+
     private void closeSearch() {
         if (searchLayer == null || !searchLayer.isVisible()) return;
         FadeTransition ft = new FadeTransition(Duration.millis(120), searchLayer);
@@ -2996,21 +3047,46 @@ public final class MainWindow {
         langPopup = Ui.menuCard(anchor, rows);
     }
 
-    // 字体族在代码里按系统选（Theme.fontFamily），CSS 里写死只对 Windows 有效
+    // 字体族按系统选，CSS 写死只对 Windows 有效
     private void applyRootFont() {
         root.setStyle("-fx-background-color: transparent; -fx-font-family: '" + Theme.fontFamily() + "';");
     }
 
     public void rebuildUi() {
+        // 启动面板与线程在重建中会失联，等本次启动收尾后再重建
+        if (launching) {
+            pendingRebuild = true;
+            return;
+        }
         java.util.List<double[]> scrolls = captureScrolls();
         javafx.scene.image.WritableImage snap = snapshotRoot();
         String keep = currentKey;
         hidePage(currentPage);
         rightPendingHide = null;
         lastHiddenPage = null;
+        // modalLayer 随 buildFrame 整体重建；先放行错误队列和等待方，再清模态状态
+        boolean hadModal = modalContent != null;
+        Runnable staleHook = modalCloseHook;
+        modalContent = null;
+        modalCloseHook = null;
+        maskFade = null;
+        modalExit = null;
+        modalEnter = null;
+        modalRotate = null;
+        if (hadModal) {
+            Errors.onModalDismissed();
+            if (staleHook != null) {
+                try {
+                    staleHook.run();
+                } catch (Throwable ignored) {
+                }
+            }
+        }
         // 播放器不重建，只摘画面再挂回
         detachVideoView();
         root.getChildren().clear();
+        // 新 toastList 的边距要按新的悬浮按钮数量重算
+        extraShown = -1;
         loadThemeFromSettings();
         applyRootFont();
         buildFrame();
@@ -3151,6 +3227,9 @@ public final class MainWindow {
     private Rectangle launchMask;
     private Ui.Loading launchLoading;
     private boolean launching;
+    // 每次启动递增，旧线程与旧收尾动画凭 token 判断自己是否已过期
+    private volatile int launchToken;
+    private boolean pendingRebuild;
 
     private String launchServerIp;
 
@@ -3408,6 +3487,7 @@ public final class MainWindow {
     }
 
     private void runLaunchProgress(Data.Instance ins) {
+        final int token = ++launchToken;
         launchTimeline = null;
         launchCancelled = false;
         if (ins == null) {
@@ -3420,7 +3500,7 @@ public final class MainWindow {
             try {
                 data.launchLog.clear();
                 launchStepText("检查版本文件", 0.08);
-                if (launchCancelled) return;
+                if (stale(token)) return;
                 // 版本 JSON 在基础目录，游戏目录可能是隔离后的 versions/
                 java.nio.file.Path json = Isolation.base(ins).resolve("versions")
                         .resolve(ins.version).resolve(ins.version + ".json");
@@ -3431,7 +3511,7 @@ public final class MainWindow {
                 data.launchLog("游戏目录：" + Isolation.run(ins) + (Isolation.on(ins) ? "（已隔离）" : "（共用）"));
                 hintIsolation(ins);
                 launchStepText("校验资源完整性", 0.3);
-                if (launchCancelled) return;
+                if (stale(token)) return;
                 java.util.List<GameLauncher.MissingFile> missing = GameLauncher.scanMissing(ins);
                 if (!missing.isEmpty()) {
                     data.launchLog("启动前补全：" + missing.size() + " 个缺失文件");
@@ -3443,6 +3523,7 @@ public final class MainWindow {
                         if (p < 1 && now - lastPush[0] < 100) return;
                         lastPush[0] = now;
                         Platform.runLater(() -> {
+                            if (stale(token)) return;
                             setLaunchProgress(0.35 + p * 0.2);
                             int done = (int) Math.round(p * missing.size());
                             if (launchStep != null) {
@@ -3450,31 +3531,33 @@ public final class MainWindow {
                                         Math.min(done + 1, missing.size()), missing.size()));
                             }
                         });
-                    }, () -> launchCancelled);
+                    }, () -> stale(token));
                 }
                 launchStepText("检查游戏需要的 Java", 0.58);
-                if (launchCancelled) return;
+                if (stale(token)) return;
                 String resolvedJava = GameLauncher.resolveJava(ins,
                         s -> {
                             data.launchLog(s);
                             Platform.runLater(() -> {
-                                if (launchStep != null) launchStep.setText(s);
+                                if (launchStep != null && !stale(token)) launchStep.setText(s);
                             });
                         },
-                        () -> launchCancelled,
-                        p -> Platform.runLater(() -> setLaunchProgress(0.58 + p * 0.18)));
+                        () -> stale(token),
+                        p -> Platform.runLater(() -> {
+                            if (!stale(token)) setLaunchProgress(0.58 + p * 0.18);
+                        }));
                 data.launchLog("Java：" + resolvedJava);
                 launchStepText("构建启动参数", 0.8);
-                if (launchCancelled) return;
+                if (stale(token)) return;
                 launchStepText("启动游戏", 0.88);
                 Process process = GameLauncher.launch(ins, launchServerIp, resolvedJava);
                 launchServerIp = null;
                 data.launchLog("游戏已启动：" + ins.name);
                 Platform.runLater(() -> {
-                    if (launchCancelled) return;
+                    if (stale(token)) return;
                     setLaunchProgress(1);
-                    launchStep.setText(Lang.t("启动完成"));
-                    launchPercent.setText("100 %");
+                    if (launchStep != null) launchStep.setText(Lang.t("启动完成"));
+                    if (launchPercent != null) launchPercent.setText("100 %");
                     if (launchInfoBox != null) launchInfoBox.setVisible(false);
                     if (launchHintBox != null) {
                         launchHintBox.setVisible(true);
@@ -3491,13 +3574,14 @@ public final class MainWindow {
                 });
             } catch (Exception ex) {
                 // 取消不报错
-                if (ex instanceof java.util.concurrent.CancellationException || launchCancelled) return;
+                if (ex instanceof java.util.concurrent.CancellationException || stale(token)) return;
                 String msg = ex.getMessage() == null ? "未知错误" : ex.getMessage();
                 data.launchLog("启动失败：" + msg);
                 Errors.alert("Minecraft 启动失败", ex);
                 Platform.runLater(() -> {
-                    launchStep.setText(Lang.t("启动失败"));
-                    launchPercent.setText("");
+                    if (stale(token)) return;
+                    if (launchStep != null) launchStep.setText(Lang.t("启动失败"));
+                    if (launchPercent != null) launchPercent.setText("");
                     PauseTransition wait = new PauseTransition(Duration.millis(1800));
                     wait.setOnFinished(ev -> closeLaunchPanel());
                     wait.play();
@@ -3506,6 +3590,11 @@ public final class MainWindow {
         }, "TCL-Launch");
         thread.setDaemon(true);
         thread.start();
+    }
+
+    // 取消或已开始新一轮时，旧线程不再回写界面
+    private boolean stale(int token) {
+        return launchCancelled || token != launchToken;
     }
 
     private final java.util.Set<String> isolationHinted = new java.util.HashSet<>();
@@ -3525,6 +3614,7 @@ public final class MainWindow {
     private void launchStepText(String step, double progress) {
         final String display = Lang.t(step);
         Platform.runLater(() -> {
+            if (launchStep == null) return;
             launchStep.setText(display);
             setLaunchProgress(progress);
             data.launchLog(display);
@@ -3535,7 +3625,7 @@ public final class MainWindow {
     private double lastLaunchProgressValue = -1;
 
     private void setLaunchProgress(double value) {
-        if (launchProgressFill == null) return;
+        if (launchProgressFill == null || launchInner == null) return;
         long now = System.currentTimeMillis();
         // 节流，防频繁建 Timeline 卡 FX
         if (value < 1 && now - lastLaunchProgressAt < 120) {
@@ -3554,6 +3644,8 @@ public final class MainWindow {
 
     public void cancelLaunch() {
         launchCancelled = true;
+        // 让在跑的启动线程立即过期，避免它在新一轮启动里继续回写
+        launchToken++;
         if (launchTimeline != null) launchTimeline.stop();
         data.log("已取消启动");
         toast("已取消启动", "启动进程已停止", 0);
@@ -3568,8 +3660,11 @@ public final class MainWindow {
         }
         if (launchPanel == null) {
             launchLayer.setVisible(false);
+            flushPendingRebuild();
             return;
         }
+        final int token = launchToken;
+        final BorderPane closing = launchPanel;
         FadeTransition maskOut = new FadeTransition(Duration.millis(180), launchMask);
         maskOut.setToValue(0);
         maskOut.play();
@@ -3585,12 +3680,21 @@ public final class MainWindow {
                 new KeyFrame(Duration.millis(240), new KeyValue(launchPanel.maxWidthProperty(), 0,
                         Interpolator.EASE_IN)));
         close.setOnFinished(e -> {
+            // 收尾期间已开始新一轮启动，不能清掉新面板
+            if (launchPanel != closing || token != launchToken) return;
             launchLayer.getChildren().clear();
             launchLayer.setVisible(false);
             launchPanel = null;
             launchInner = null;
+            flushPendingRebuild();
         });
         close.play();
+    }
+
+    private void flushPendingRebuild() {
+        if (!pendingRebuild) return;
+        pendingRebuild = false;
+        rebuildUi();
     }
 
     public void closeWindow() {

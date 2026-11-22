@@ -19,6 +19,13 @@ public final class Sources {
     private static final long TTL_MS = 10 * 60 * 1000L;
     private static final int PROBE_BYTES = 128 * 1024;
     private static final long PROBE_READ_CAP = 256 * 1024;
+    // 探测独立线程池，避免与下载/搜索共用 Http.pool 造成排队互等
+    private static final java.util.concurrent.ExecutorService PROBE_POOL =
+            java.util.concurrent.Executors.newCachedThreadPool(r -> {
+                Thread t = new Thread(r, "TCL-SourceProbe");
+                t.setDaemon(true);
+                return t;
+            });
 
     public static List<String> rank(List<String> urls) {
         if (urls == null || urls.size() < 2) return urls;
@@ -37,7 +44,7 @@ public final class Sources {
             final String h = e.getKey();
             final String url = e.getValue();
             try {
-                jobs.put(h, INFLIGHT.computeIfAbsent(h, k -> Http.pool().submit(() -> {
+                jobs.put(h, INFLIGHT.computeIfAbsent(h, k -> PROBE_POOL.submit(() -> {
                     try {
                         double kbps = probe(url);
                         // 失败也入缓存防重复探测

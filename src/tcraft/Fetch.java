@@ -49,7 +49,15 @@ public final class Fetch {
             }
 
             for (int attempt = 0; attempt <= DEFAULT_RETRY; attempt++) {
-                if (attempt > 0) sleep(BACKOFF_MS[Math.min(attempt - 1, BACKOFF_MS.length - 1)]);
+                if (attempt > 0) {
+                    // 退避分段睡眠，取消立即可见
+                    long left = BACKOFF_MS[Math.min(attempt - 1, BACKOFF_MS.length - 1)];
+                    while (left > 0) {
+                        if (task != null && task.canceled) throw new IOException("已取消");
+                        sleep(Math.min(200, left));
+                        left -= 200;
+                    }
+                }
                 if (task != null && task.canceled) throw new IOException("已取消");
                 try {
                     transfer(task, url, part, done, digest, from, to);
@@ -62,6 +70,13 @@ public final class Fetch {
                             last = new IOException("文件校验失败（SHA-1 不匹配）");
                             continue;
                         }
+                    }
+                    // 无哈希时只认 zip 魔数，防镜像错误页被存成 jar
+                    if (expect == null && !Downloader.jarLooksValid(part, target)) {
+                        Files.deleteIfExists(part);
+                        done = 0;
+                        last = new IOException(Lang.t("下载内容不是有效的 jar：") + target.getFileName());
+                        continue;
                     }
                 } catch (IOException e) {
                     if (task != null && task.canceled) throw e;
@@ -128,7 +143,8 @@ public final class Fetch {
                     long now = System.currentTimeMillis();
                     if (task != null && now - lastTick > 400) {
                         task.speed = speed((written - lastBytes) * 1000 / Math.max(1, now - lastTick));
-                        if (total > 0) {
+                        // from==to 表示调用方自己维护进度，这里不回写
+                        if (total > 0 && to > from) {
                             task.progress = from + (to - from) * Math.min(1.0, (done + written) / (double) total);
                         }
                         lastTick = now;

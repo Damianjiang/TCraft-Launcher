@@ -276,6 +276,57 @@ public final class Resources {
         }
     }
 
+    // 自更新后直接带运行库拉起新本体，判据与 stub 一致，省掉 bootstrap 的二次跳转
+    static List<String> directLaunchCommand(Path app, String... appArgs) throws IOException {
+        String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
+        String exe = os.contains("win") ? "javaw.exe" : "java";
+        List<String> cmd = new ArrayList<>();
+        cmd.add(Paths.get(System.getProperty("java.home"), "bin", exe).toString());
+        cmd.add("-Dfile.encoding=UTF-8");
+        cmd.add("-Dtcraft.dir=" + home());
+        String self = System.getProperty("tcraft.exe", "");
+        if (!self.isEmpty()) cmd.add("-Dtcraft.exe=" + self);
+        if (os.contains("mac")) cmd.add("-Xdock:name=TCraft Launcher");
+        String plat = platform();
+        Path deps = home().resolve("dependencies").resolve(plat).resolve("openjfx");
+        boolean builtinFx = Files.isRegularFile(
+                Paths.get(System.getProperty("java.home"), "lib", "javafx.properties"));
+        // .ready 只代表下载完成过；pin 版本的 4 个 jar 缺失（下载中断）时走 bootstrap 自修复
+        boolean depsReady = Files.isRegularFile(deps.resolve(".ready"));
+        if (depsReady) {
+            for (String module : JFX_MODULES) {
+                if (!Files.isRegularFile(deps.resolve(jarName(module, plat, JFX_VERSION)))) {
+                    depsReady = false;
+                    break;
+                }
+            }
+        }
+        String cp = Files.isRegularFile(webpJar())
+                ? app + File.pathSeparator + webpJar()
+                : app.toString();
+        if (builtinFx) {
+            cmd.add("--add-modules=" + MODULES);
+            cmd.add("--add-exports=javafx.graphics/com.sun.prism=ALL-UNNAMED");
+            cmd.add("-cp");
+            cmd.add(cp);
+            cmd.add("tcraft.Boot");
+        } else if (depsReady) {
+            cmd.add("-Djava.library.path=" + deps);
+            cmd.add("--module-path=" + modulePath(deps, plat));
+            cmd.add("--add-modules=" + MODULES);
+            cmd.add("--add-exports=javafx.graphics/com.sun.prism=ALL-UNNAMED");
+            cmd.add("-cp");
+            cmd.add(cp);
+            cmd.add("tcraft.Boot");
+        } else {
+            // 运行库未就绪，交给 bootstrap 引导
+            cmd.add("-jar");
+            cmd.add(app.toAbsolutePath().toString());
+        }
+        for (String a : appArgs) cmd.add(a);
+        return cmd;
+    }
+
     private static Path ensureJavaFx(StartupWindow ui) throws Exception {
         ui.setStatus("检查 JavaFX 运行库…", 15);
         String plat = platform();
@@ -499,7 +550,8 @@ public final class Resources {
                 String name = en.getName();
                 if (en.isDirectory() || name.contains("/")) continue;
                 String low = name.toLowerCase(java.util.Locale.ROOT);
-                if (!low.endsWith(".dll") && !low.endsWith(".dylib") && !low.endsWith(".so")) continue;
+                if (!low.endsWith(".dll") && !low.endsWith(".dylib") && !low.endsWith(".so")
+                        && !low.endsWith(".jnilib")) continue;
                 Path out = dir.resolve(name);
                 // 同名 DLL 一律覆盖，防 17/21 本地库混配
                 try (InputStream in = jf.getInputStream(en)) {
@@ -534,7 +586,9 @@ public final class Resources {
         cmd.add("-Dtcl.runtime=" + plat);
         cmd.add("-Dtcl.quietStart=true");
         cmd.add("-Dtcraft.dir=" + home());
-        if (os.contains("mac")) cmd.add("-Dapple.application.name=TCraft Launcher");
+        String self = System.getProperty("tcraft.exe", "");
+        if (!self.isEmpty()) cmd.add("-Dtcraft.exe=" + self);
+        if (os.contains("mac")) cmd.add("-Xdock:name=TCraft Launcher");
         cmd.add("-Dfile.encoding=UTF-8");
         cmd.add("-Djava.library.path=" + rt);
         cmd.add("--module-path=" + modulePath(rt, plat));

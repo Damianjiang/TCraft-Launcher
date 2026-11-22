@@ -70,7 +70,10 @@ public final class Shell {
         String home = System.getProperty("user.home", "");
         if (isLinux()) {
             try {
-                java.nio.file.Path cfg = java.nio.file.Paths.get(home, ".config", "user-dirs.dirs");
+                String cfgHome = System.getenv("XDG_CONFIG_HOME");
+                java.nio.file.Path cfg = cfgHome != null && !cfgHome.isBlank()
+                        ? java.nio.file.Paths.get(cfgHome, "user-dirs.dirs")
+                        : java.nio.file.Paths.get(home, ".config", "user-dirs.dirs");
                 if (java.nio.file.Files.isRegularFile(cfg)) {
                     for (String line : java.nio.file.Files.readAllLines(cfg)) {
                         if (!line.startsWith("XDG_DESKTOP_DIR=")) continue;
@@ -144,6 +147,39 @@ public final class Shell {
 
     private static void runHidden(String... cmd) throws java.io.IOException {
         runHidden(10, cmd);
+    }
+
+    // macOS 无 Swing/JavaFX 可用时的系统级提示，避免从 Finder 启动失败时完全静默
+    public static void macAlert(String title, String message) {
+        if (!isMac()) return;
+        try {
+            String text = message == null ? "" : message;
+            if (text.length() > 1800) text = text.substring(0, 1800) + "…";
+            String esc = text.replace("\\", "\\\\").replace("\"", "\\\"")
+                    .replace("\r", "").replace("\n", "\\n");
+            String head = (title == null ? "TCraft Launcher" : title)
+                    .replace("\\", "\\\\").replace("\"", "\\\"");
+            Process p = new ProcessBuilder("osascript", "-e", "display dialog \"" + esc
+                    + "\" with title \"" + head + "\" buttons {\"好\"} default button 1 with icon stop")
+                    .redirectErrorStream(true)
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+            if (!p.waitFor(30, java.util.concurrent.TimeUnit.SECONDS)) p.destroyForcibly();
+        } catch (Throwable ignored) {
+        }
+    }
+
+    // Linux 桌面通知，notify-send 不存在时静默跳过
+    public static void linuxNotify(String title, String message) {
+        if (!isLinux()) return;
+        try {
+            Process p = new ProcessBuilder("notify-send",
+                    title == null ? "TCraft Launcher" : title,
+                    message == null ? "" : message)
+                    .redirectErrorStream(true)
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+            if (!p.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)) p.destroyForcibly();
+        } catch (Throwable ignored) {
+        }
     }
 
     public static boolean openUrl(String url) {

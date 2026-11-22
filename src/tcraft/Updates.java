@@ -6,6 +6,7 @@ import javafx.animation.Timeline;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
@@ -17,12 +18,19 @@ import org.xml.sax.InputSource;
 
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.StringReader;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -83,6 +91,20 @@ public final class Updates {
     }
 
     public static void checkOnStartup(MainWindow win) {
+        // 上次自更新失败时 apply 进程留下的标记：无条件先告诉用户
+        try {
+            Path marker = Resources.home().resolve("update").resolve("last-apply-error.txt");
+            if (Files.isRegularFile(marker)) {
+                String msg = Files.readString(marker).strip();
+                Files.deleteIfExists(marker);
+                if (!msg.isEmpty()) {
+                    PauseTransition notify = new PauseTransition(Duration.seconds(1));
+                    notify.setOnFinished(e -> win.toast("上次更新未完成", msg, 2));
+                    notify.play();
+                }
+            }
+        } catch (Exception ignored) {
+        }
         if (!Data.get().getBool("CheckUpdateOnStartup", true)) return;
         if (!Data.get().getBool("ToolUpdateRelease", true)
                 && !Data.get().getBool("ToolUpdateSnapshot", false)) return;
@@ -121,19 +143,26 @@ public final class Updates {
         if (manual) win.toast("正在检查更新", "正在读取 GitHub Releases…", 0);
         if (hint != null) hint.setText(Lang.t("正在检查…"));
 
-        Thread thread = new Thread(() -> {
-            Release release = null;
-            Exception error = null;
-            try {
-                release = mergeChangelog(fetchLatest());
-            } catch (Exception e) {
-                error = e;
-            }
-            if (generation != GENERATION.get()) return;
-            pendingRelease = release;
-            pendingError = error;
-            pendingGen = generation;
-        }, "TCL-Update");
+        Thread thread;
+        try {
+            thread = new Thread(() -> {
+                Release release = null;
+                Exception error = null;
+                try {
+                    release = mergeChangelog(fetchLatest());
+                } catch (Throwable e) {
+                    error = e instanceof Exception ex ? ex : new IOException(String.valueOf(e));
+                }
+                if (generation != GENERATION.get()) return;
+                pendingRelease = release;
+                pendingError = error;
+                pendingGen = generation;
+            }, "TCL-Update");
+        } catch (Throwable t) {
+            // 线程创建失败时必须复位，否则自动检查从此全部被拦
+            checking = false;
+            throw t;
+        }
         thread.setDaemon(true);
         thread.start();
 
@@ -142,8 +171,8 @@ public final class Updates {
             if (pendingGen == generation) return;
             pendingError = new IOException("连接超时");
             pendingGen = generation;
-            Data.get().log("检查更新超时：12 秒没有返回");
-        }, 12, java.util.concurrent.TimeUnit.SECONDS);
+            Data.get().log("检查更新超时：25 秒没有返回");
+        }, 25, java.util.concurrent.TimeUnit.SECONDS);
 
         stopPoller();
         poller = new Timeline(new KeyFrame(Duration.millis(120), e -> poll(generation, win, manual, hint)));
@@ -228,6 +257,9 @@ public final class Updates {
         if (msg.contains("超时") || low.contains("timed out") || low.contains("timeout")) {
             return Lang.t("连接 GitHub 超时，请检查网络后再试。");
         }
+        if (Data.get().getInt("SystemUpdateMirrorMode", 0) >= 2) {
+            return Lang.t("选中的更新源连不上，可在 设置 → 网络 里换一个源再试。");
+        }
         return Lang.t("GitHub 可能连接不稳定，你可以使用瓦特工具箱等工具开个加速或来个 VPN。");
     }
 
@@ -237,6 +269,7 @@ public final class Updates {
 
     private static volatile java.util.List<Release> releaseCache;
     private static volatile long releaseCacheAt;
+    private static volatile String releaseCacheBase;
 
     private static Release mergeChangelog(Release latest) {
         String current = Build.VERSION == null ? "" : Build.VERSION.trim();
@@ -245,7 +278,7 @@ public final class Updates {
             return latest;
         }
         try {
-            java.util.List<Release> all = releaseList();
+            java.util.List<Release> all = releaseList(latest.source);
             java.util.List<Release> between = new java.util.ArrayList<>();
             for (Release r : all) {
                 if (!isComparable(r.tag) || !tagAllowed(r.tag)) continue;
@@ -264,21 +297,23 @@ public final class Updates {
                 String body = r.changelog == null ? "" : r.changelog.trim();
                 sb.append(body.isEmpty() ? "该版本未填写更新日志。" : body);
             }
-            if (between.size() > limit) sb.append("\n\n…更早版本请到 Releases 查看");
+            if (between.size() > limit) sb.append(Lang.t("\n\n…更早版本请到 Releases 查看"));
             String text = sb.toString();
-            if (text.length() > 20000) text = text.substring(0, 20000) + "\n\n…内容过长已截断";
-            return new Release(latest.tag, text, between.size());
+            if (text.length() > 20000) text = text.substring(0, 20000) + Lang.t("\n\n…内容过长已截断");
+            return new Release(latest.tag, text, between.size(), latest.sha256, latest.source);
         } catch (Exception e) {
             Data.get().log("合并更新日志失败：" + Log.describe(e));
             return latest;
         }
     }
 
-    private static synchronized java.util.List<Release> releaseList() throws Exception {
+    private static synchronized java.util.List<Release> releaseList(String base) throws Exception {
         long now = System.currentTimeMillis();
         java.util.List<Release> cached = releaseCache;
-        if (cached != null && now - releaseCacheAt < 300_000L) return cached;
-        String json = fetch(LIST_URL, "application/vnd.github+json");
+        String usedBase = releaseCacheBase == null ? "" : releaseCacheBase;
+        String wantBase = base == null ? "" : base;
+        if (cached != null && now - releaseCacheAt < 300_000L && usedBase.equals(wantBase)) return cached;
+        String json = fetch(wantBase + LIST_URL, "application/vnd.github+json");
         java.util.List<Release> out = new java.util.ArrayList<>();
         for (Object o : Json.arr(Json.parse(json))) {
             Map<String, Object> m = Json.obj(o);
@@ -290,6 +325,7 @@ public final class Updates {
         if (!out.isEmpty()) {
             releaseCache = out;
             releaseCacheAt = now;
+            releaseCacheBase = wantBase;
         }
         return out;
     }
@@ -319,10 +355,19 @@ public final class Updates {
             }
             return;
         }
+        if (!manual && clean(latest).equals(Data.get().get("UpdateIgnored", ""))) {
+            Data.get().log("v" + clean(latest) + " 已被忽略，跳过提示");
+            return;
+        }
         showUpdate(win, release);
     }
 
     private static void showUpdate(MainWindow win, Release release) {
+        if (win.hasOpenModal()) {
+            // 用户正开着别的弹窗，更新提示延后到下次检查，不顶掉当前内容
+            Data.get().log("发现更新但当前有弹窗，跳过提示");
+            return;
+        }
         VBox card = Dialogs.msgCard("发现更新");
         card.setPrefWidth(520);
         card.setMinWidth(480);
@@ -348,86 +393,353 @@ public final class Updates {
         HBox actions = new HBox(12);
         actions.setAlignment(Pos.CENTER_RIGHT);
         actions.setPadding(new Insets(15, 7, 0, 7));
-        actions.getChildren().addAll(
-                Ui.button("前往下载", Ui.BTN_HIGHLIGHT, () -> {
-                    win.closeModal();
-                    if (!Shell.openUrl(DOWNLOAD_URL)) {
-                        win.toast("打开链接失败", DOWNLOAD_URL, 3);
-                    }
-                }),
-                Ui.button("稍后", Ui.BTN_NORMAL, win::closeModal));
+        Path self = SelfUpdate.target();
+        if (self != null) {
+            actions.getChildren().addAll(
+                    Ui.button("立即更新", Ui.BTN_HIGHLIGHT, () -> startSelfUpdate(win, release)),
+                    Ui.button("忽略此版本", Ui.BTN_NORMAL, () -> {
+                        Data.get().set("UpdateIgnored", clean(release.tag));
+                        win.closeModal();
+                        win.toast("已忽略", Lang.tf("v%s 之后不再自动提示", clean(release.tag)), 1);
+                    }),
+                    Ui.button("前往下载", Ui.BTN_NORMAL, () -> {
+                        win.closeModal();
+                        if (!Shell.openUrl(DOWNLOAD_URL)) {
+                            win.toast("打开链接失败", DOWNLOAD_URL, 3);
+                        }
+                    }));
+        } else {
+            // exe 外壳未传自身路径（旧版外壳），替换目标定位不到，只能手动下载
+            body.getChildren().add(Ui.label(
+                    Lang.t("此安装方式暂不支持一键更新，请前往下载手动替换，升级一次后即可一键更新。"), 12, Theme.gray2));
+            actions.getChildren().addAll(
+                    Ui.button("忽略此版本", Ui.BTN_NORMAL, () -> {
+                        Data.get().set("UpdateIgnored", clean(release.tag));
+                        win.closeModal();
+                        win.toast("已忽略", Lang.tf("v%s 之后不再自动提示", clean(release.tag)), 1);
+                    }),
+                    Ui.button("前往下载", Ui.BTN_HIGHLIGHT, () -> {
+                        win.closeModal();
+                        if (!Shell.openUrl(DOWNLOAD_URL)) {
+                            win.toast("打开链接失败", DOWNLOAD_URL, 3);
+                        }
+                    }));
+        }
 
         body.getChildren().addAll(latest, now, logTitle, logScroll);
         card.getChildren().addAll(body, actions);
         win.showModal(card, true);
     }
 
-    private static Release fetchLatest() throws Exception {
+    private static volatile boolean updating;
+
+    // tag 只保留能安全出现在文件名与 URL 里的字符
+    private static String safeTag(String tag) {
+        return (tag == null ? "" : tag.trim()).replaceAll("[^A-Za-z0-9._+-]", "");
+    }
+
+    private static void startSelfUpdate(MainWindow win, Release release) {
+        if (updating) return;
+        updating = true;
+        String tag = safeTag(release.tag);
+        String ver = clean(release.tag);
+        Path file = Resources.home().resolve("update").resolve("TCraftLauncher-" + ver + ".jar");
+
+        VBox card = Dialogs.msgCard("正在下载更新");
+        card.setPrefWidth(460);
+        card.setMinWidth(420);
+        VBox body = new VBox(10);
+        body.setPadding(new Insets(14, 7, 0, 7));
+        Label sourceLabel = Ui.label("", 12.5, Theme.text);
+        ProgressBar bar = new ProgressBar(0);
+        bar.setPrefWidth(430);
+        Label pct = Ui.label("", 12, Theme.gray2);
+        body.getChildren().addAll(sourceLabel, bar, pct);
+        HBox actions = new HBox(12);
+        actions.setAlignment(Pos.CENTER_RIGHT);
+        actions.setPadding(new Insets(15, 7, 0, 7));
+        card.getChildren().addAll(body, actions);
+
+        Tasks.Task task = new Tasks.Task("下载更新 v" + ver);
+
+        // 进度条由 task.progress 驱动，Fetch 下载时持续写入
+        Timeline poller = new Timeline(new KeyFrame(Duration.millis(120), e -> {
+            bar.setProgress(Math.max(0, Math.min(1, task.progress)));
+            pct.setText((int) Math.round(task.progress * 100) + "%"
+                    + (task.speed.isEmpty() ? "" : "　" + task.speed));
+        }));
+        poller.setCycleCount(Timeline.INDEFINITE);
+
+        task.onCancel = () -> {
+            poller.stop();
+            task.state = Tasks.State.CANCELED;
+            win.closeModal();
+            updating = false;
+        };
+        actions.getChildren().add(Ui.button("取消", Ui.BTN_NORMAL, task::cancel));
+        win.showModal(card, false);
+        Tasks.INSTANCE.add(task);
+        poller.play();
+
+        Thread worker = new Thread(() -> {
+            try {
+                Path target = SelfUpdate.target();
+                if (target == null) throw new IOException(Lang.t("定位启动器本体失败，请手动下载更新。"));
+                // 清掉上次更新残留的安装包
+                try {
+                    Path updateDir = Resources.home().resolve("update");
+                    if (Files.isDirectory(updateDir)) {
+                        try (var old = Files.list(updateDir)) {
+                            for (Path p : old.toArray(Path[]::new)) {
+                                try {
+                                    Files.deleteIfExists(p);
+                                } catch (IOException ignored) {
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception ignored) {
+                }
+                IOException last = null;
+                List<String> bases = downloadBases(release.source);
+                if (bases.isEmpty()) {
+                    throw new IOException(Lang.t("选中的更新源连不上，可在 设置 → 网络 里换一个源再试。"));
+                }
+                for (String base : bases) {
+                    if (task.canceled) break;
+                    String name = base.isEmpty() ? Lang.t("官方源") : base;
+                    task.stage = name;
+                    javafx.application.Platform.runLater(() ->
+                            sourceLabel.setText(Lang.tf("下载源：%s", name)));
+                    try {
+                        Fetch.file(task, base + RELEASES_URL + "/download/" + tag
+                                + "/TCraftLauncher-" + ver + ".jar", file, null, 0, 1);
+                        last = null;
+                        break;
+                    } catch (IOException e) {
+                        if (task.canceled) break;
+                        last = e;
+                        Data.get().log("下载源 " + name + " 失败：" + Log.describe(e));
+                    }
+                }
+                if (!task.canceled && last == null && Files.size(file) > 512L * 1024 * 1024) {
+                    Files.deleteIfExists(file);
+                    throw new IOException("更新包体积异常");
+                }
+                if (task.canceled) return;
+                if (last != null) throw last;
+                task.stage = Lang.t("正在校验…");
+                verify(file, release, release.source, () -> task.canceled);
+                if (task.canceled) return;
+                task.state = Tasks.State.DONE;
+                // 窗口已被用户关掉时 FX 退场后 runLater 会被丢弃，直接在 worker 里安装
+                if (!windowAlive(win)) {
+                    Data.get().save();
+                    Boot.releaseInstanceLock();
+                    SelfUpdate.spawn(SelfUpdate.buildCommand(file,
+                            "--apply-to", target.toAbsolutePath().toString()));
+                    Data.get().log("已下载 v" + ver + "，窗口已关闭，后台安装更新");
+                    System.exit(0);
+                }
+                javafx.application.Platform.runLater(() -> {
+                    try {
+                        if (task.canceled) return;
+                        poller.stop();
+                        win.closeModal();
+                        Data.get().save();
+                        // 命令先构建（失败不释放锁），再释放实例锁让新版本立即拿锁启动
+                        java.util.List<String> installCmd;
+                        try {
+                            installCmd = SelfUpdate.buildCommand(file,
+                                    "--apply-to", target.toAbsolutePath().toString());
+                        } catch (IOException e) {
+                            updating = false;
+                            Data.get().log("拉起更新进程失败：" + Log.describe(e));
+                            win.toast("更新失败", Lang.t("无法启动安装进程，请前往下载手动更新。"), 3);
+                            return;
+                        }
+                        Boot.releaseInstanceLock();
+                        try {
+                            SelfUpdate.spawn(installCmd);
+                            Data.get().log("已下载 v" + ver + "，正在安装更新并重启");
+                            // 给 Application.stop（EasyTier 停止）留 teardown 时间，再硬退出
+                            javafx.application.Platform.exit();
+                            Thread killer = new Thread(() -> {
+                                try {
+                                    Thread.sleep(350);
+                                } catch (InterruptedException ignored) {
+                                }
+                                System.exit(0);
+                            }, "TCL-Update-Exit");
+                            killer.setDaemon(true);
+                            killer.start();
+                        } catch (Exception e) {
+                            updating = false;
+                            Data.get().log("拉起更新进程失败：" + Log.describe(e));
+                            win.toast("更新失败", Lang.t("无法启动安装进程，请前往下载手动更新。"), 3);
+                        }
+                    } catch (Throwable t) {
+                        // FX 线程兜底：任何意外都不能让 updating 卡死
+                        updating = false;
+                        Data.get().log("安装收尾失败：" + Log.describe(t));
+                    }
+                });
+            } catch (Throwable e) {
+                javafx.application.Platform.runLater(() -> {
+                    poller.stop();
+                    updating = false;
+                    win.closeModal();
+                    if (task.canceled) {
+                        win.toast("已取消", Lang.t("更新下载已取消"), 1);
+                        return;
+                    }
+                    task.state = Tasks.State.FAILED;
+                    task.error = String.valueOf(e);
+                    Data.get().log("更新下载失败：" + Log.describe(e));
+                    // 窗口已被用户关掉时不弹失败框，日志里留痕
+                    if (windowAlive(win)) {
+                        showFailure(win, Lang.t("更新包下载失败：") + Log.describe(e));
+                    }
+                });
+            }
+        }, "TCL-Update-Dl");
+        worker.setDaemon(true);
+        worker.start();
+    }
+
+    // 下载源严格跟随「TCL 更新服务」的当前选中项：指定节点/自定义只按选中源，官方只走官方；测速模式胜出源优先
+    // source 是检查时的快照，用户中途换源时以当前设置为准
+    static List<String> downloadBases(String source) {
+        List<String> out = new ArrayList<>();
         int mode = Data.get().getInt("SystemUpdateMirrorMode", 0);
         if (mode == 1) {
-            try {
-                return fetchFastest();
-            } catch (Exception e) {
-                Data.get().log("自动测速失败，回退顺序尝试：" + Log.describe(e));
-            }
+            out.add(source == null ? "" : source);
+            if (!out.contains("")) out.add("");
+            for (String m : MIRRORS) if (!out.contains(m)) out.add(m);
+            return out;
         }
-        Exception apiError = null;
         if (mode >= 2) {
-            for (String base : apiBases()) {
+            out.addAll(apiBases());
+            return out;
+        }
+        out.add("");
+        return out;
+    }
+
+    private static void verify(Path file, Release release, String source,
+                               java.util.function.BooleanSupplier canceled) throws IOException {
+        String ver = clean(release.tag);
+        String tag = safeTag(release.tag);
+        String expect = release.sha256 == null ? "" : release.sha256.trim().toLowerCase(java.util.Locale.ROOT);
+        if (expect.isEmpty()) {
+            for (String base : downloadBases(source)) {
+                if (canceled.getAsBoolean()) throw new IOException("已取消");
                 try {
-                    Release r = fetchApi(base);
-                    Data.get().log("更新信息通过指定节点获取：" + base);
-                    return r;
-                } catch (Exception e) {
-                    apiError = e;
+                    String text = fetch(base + RELEASES_URL + "/download/" + tag
+                            + "/TCraftLauncher-" + ver + ".jar.sha256", "text/plain");
+                    String candidate = text.trim().split("\\s+")[0].toLowerCase(java.util.Locale.ROOT);
+                    // 镜像对错误页也可能返回 200，非 64 位十六进制视为该源失败
+                    if (candidate.matches("[0-9a-f]{64}")) {
+                        expect = candidate;
+                        break;
+                    }
+                } catch (Exception ignored) {
                 }
             }
         }
+        // 两条校验腿都拿不到值时宁可放弃更新，也不能把未校验的包写进本体
+        if (expect.isEmpty() || !expect.matches("[0-9a-f]{64}")) {
+            Files.deleteIfExists(file);
+            throw new IOException(Lang.t("未获取到更新包校验值，请到下载页手动更新。"));
+        }
+        if (canceled.getAsBoolean()) throw new IOException("已取消");
+        String actual = sha256Hex(file);
+        if (!actual.equals(expect)) {
+            Files.deleteIfExists(file);
+            throw new IOException("SHA-256 校验失败");
+        }
+    }
+
+    private static String sha256Hex(Path file) throws IOException {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            try (InputStream in = Files.newInputStream(file)) {
+                byte[] buf = new byte[65536];
+                int n;
+                while ((n = in.read(buf)) >= 0) digest.update(buf, 0, n);
+            }
+            return HexFormat.of().formatHex(digest.digest());
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IOException("SHA-256 不可用", e);
+        }
+    }
+
+    // 检查更新严格按「TCL 更新服务」选中源：官方只走官方族，指定节点/自定义只走选中源，测速竞速取最快
+    static Release fetchLatest() throws Exception {
+        int mode = Data.get().getInt("SystemUpdateMirrorMode", 0);
+        if (mode == 1) return fetchFastest();
+        if (mode >= 2) {
+            Exception last = null;
+            for (String base : apiBases()) {
+                try {
+                    Release r = fetchApi(base);
+                    Data.get().log("更新信息通过选中源获取：" + base);
+                    return r;
+                } catch (Exception e) {
+                    last = e;
+                }
+            }
+            throw last != null ? last : new IOException("选中的更新源不可用");
+        }
         try {
             return fetchApi("");
-        } catch (Exception e) {
-            apiError = e;
-        }
-
-        Exception atomError = null;
-        try {
-            return fetchAtom();
-        } catch (Exception e) {
-            atomError = e;
-        }
-        try {
-            return fetchPage();
-        } catch (Exception e) {
-            if (apiError != null) e.addSuppressed(apiError);
-            if (atomError != null) e.addSuppressed(atomError);
-            throw e;
+        } catch (Exception apiError) {
+            try {
+                return fetchAtom();
+            } catch (Exception atomError) {
+                atomError.addSuppressed(apiError);
+                try {
+                    return fetchPage();
+                } catch (Exception pageError) {
+                    pageError.addSuppressed(atomError);
+                    throw pageError;
+                }
+            }
         }
     }
 
     private static Release fetchFastest() throws Exception {
-        java.util.List<String> bases = new java.util.ArrayList<>();
+        List<String> bases = new ArrayList<>();
         bases.add("");
         bases.addAll(java.util.Arrays.asList(MIRRORS));
-        java.util.concurrent.CompletableFuture<Release> winner = new java.util.concurrent.CompletableFuture<>();
-        java.util.concurrent.atomic.AtomicInteger left =
-                new java.util.concurrent.atomic.AtomicInteger(bases.size());
-        for (String base : bases) {
-            Http.pool().execute(() -> {
-                try {
-                    Release r = fetchApi(base);
-                    winner.complete(r);
-                } catch (Exception ignored) {
-                } finally {
-                    left.decrementAndGet();
-                }
-            });
-        }
+        // 共享池被下载任务占满时竞速会假超时，竞速用自己的临时池
+        java.util.concurrent.ExecutorService race = java.util.concurrent.Executors.newFixedThreadPool(
+                bases.size(), r -> {
+                    Thread t = new Thread(r, "TCL-Update-Race");
+                    t.setDaemon(true);
+                    return t;
+                });
         try {
-            Release r = winner.get(10, java.util.concurrent.TimeUnit.SECONDS);
-            Data.get().log("更新源自动选择完成");
-            return r;
-        } catch (Exception e) {
-            throw new IOException("所有更新源都没有响应");
+            java.util.concurrent.CompletableFuture<Release> winner = new java.util.concurrent.CompletableFuture<>();
+            for (String base : bases) {
+                race.execute(() -> {
+                    try {
+                        Release r = fetchApi(base);
+                        // complete 只成功一次，谁先到谁赢
+                        winner.complete(r);
+                    } catch (Exception ignored) {
+                    }
+                });
+            }
+            try {
+                Release r = winner.get(10, java.util.concurrent.TimeUnit.SECONDS);
+                Data.get().log("更新源自动选择完成：" + r.source);
+                return r;
+            } catch (Exception e) {
+                throw new IOException("所有更新源都没有响应");
+            }
+        } finally {
+            race.shutdownNow();
         }
     }
 
@@ -474,10 +786,13 @@ public final class Updates {
                 : Data.get().getBool("ToolUpdateRelease", true);
     }
 
-    private static boolean isSnapshotTag(String tag) {
+    private static final java.util.regex.Pattern PRE_RELEASE =
+            java.util.regex.Pattern.compile("(^|[._-])(rc|dev|beta|alpha)([._-]|\\d|$)");
+
+    static boolean isSnapshotTag(String tag) {
         String t = tag.toLowerCase(java.util.Locale.ROOT);
-        return t.contains("snapshot") || t.contains("beta") || t.contains("alpha")
-                || t.contains("rc") || t.contains("dev");
+        // [._-] 的 - 放类尾，避免被当成范围
+        return t.contains("snapshot") || PRE_RELEASE.matcher(t).find();
     }
 
     private static String tagOf(Element entry) {
@@ -503,7 +818,17 @@ public final class Updates {
             throw new IOException("API 返回的 " + tag + " 不在当前测试版开关允许范围内");
         }
         String body = Json.str(obj, "body", "");
-        return new Release(tag, body == null ? "" : body.trim());
+        // GitHub API 的 digest 是权威校验值；镜像路径拿不到就回退 .sha256 资产
+        String want = "TCraftLauncher-" + clean(tag) + ".jar";
+        String sha = "";
+        for (Object o : Json.arr(obj, "assets")) {
+            Map<String, Object> a = Json.obj(o);
+            if (!want.equals(Json.str(a, "name", ""))) continue;
+            String digest = Json.str(a, "digest", "");
+            if (digest.startsWith("sha256:")) sha = digest.substring(7).toLowerCase(java.util.Locale.ROOT);
+            break;
+        }
+        return new Release(tag, body == null ? "" : body.trim(), 1, sha, base);
     }
 
     private static Release fetchPage() throws Exception {
@@ -631,19 +956,28 @@ public final class Updates {
         }
     }
 
-    private static final class Release {
+    static final class Release {
         final String tag;
         final String changelog;
         final int versions;
+        final String sha256;
+        // 来源源前缀（"" = 官方），下载与日志合并都跟随它
+        final String source;
 
         Release(String tag, String changelog) {
             this(tag, changelog, 1);
         }
 
         Release(String tag, String changelog, int versions) {
+            this(tag, changelog, versions, "", "");
+        }
+
+        Release(String tag, String changelog, int versions, String sha256, String source) {
             this.tag = tag;
             this.changelog = changelog;
             this.versions = versions;
+            this.sha256 = sha256 == null ? "" : sha256;
+            this.source = source == null ? "" : source;
         }
     }
 }

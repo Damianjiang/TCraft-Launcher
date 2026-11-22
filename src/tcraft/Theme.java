@@ -817,13 +817,28 @@ public final class Theme {
         if (img == null) return;
         // 取色扫描放后台；解码未完不取色
         if (img.getProgress() < 1) {
-            img.widthProperty().addListener(new javafx.beans.value.ChangeListener<Number>() {
-                @Override
-                public void changed(javafx.beans.value.ObservableValue<? extends Number> o, Number a, Number b) {
-                    img.widthProperty().removeListener(this);
-                    if (b.doubleValue() > 0) extractAccentInBackground(img);
-                }
-            });
+            javafx.beans.value.ChangeListener<Boolean> onError =
+                    new javafx.beans.value.ChangeListener<>() {
+                        @Override
+                        public void changed(javafx.beans.value.ObservableValue<? extends Boolean> o,
+                                            Boolean a, Boolean b) {
+                            if (!Boolean.TRUE.equals(b)) return;
+                            img.errorProperty().removeListener(this);
+                        }
+                    };
+            javafx.beans.value.ChangeListener<Number> onWidth =
+                    new javafx.beans.value.ChangeListener<>() {
+                        @Override
+                        public void changed(javafx.beans.value.ObservableValue<? extends Number> o,
+                                            Number a, Number b) {
+                            img.widthProperty().removeListener(this);
+                            img.errorProperty().removeListener(onError);
+                            if (b.doubleValue() > 0) extractAccentInBackground(img);
+                        }
+                    };
+            img.widthProperty().addListener(onWidth);
+            // 图片加载失败时移除监听，避免每次挂壁纸都累积
+            img.errorProperty().addListener(onError);
             return;
         }
         extractAccentInBackground(img);

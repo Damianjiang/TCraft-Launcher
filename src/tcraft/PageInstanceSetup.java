@@ -2222,6 +2222,7 @@ public class PageInstanceSetup implements Page {
                             javafx.application.Platform.runLater(() -> applyPing(label, r));
                         } catch (Exception e) {
                             javafx.application.Platform.runLater(() -> {
+                                if (label.getScene() == null) return;
                                 label.setText("离线（查询异常）");
                                 label.setTextFill(Theme.gray3);
                                 label.setOpacity(0.8);
@@ -2244,6 +2245,8 @@ public class PageInstanceSetup implements Page {
     }
 
     private void applyPing(Label status, Servers.PingResult r) {
+        // 页面已重建时旧标签脱离场景，不再回写
+        if (status.getScene() == null) return;
         if (r.online) {
             status.setText("在线 · " + r.players + "/" + r.maxPlayers + " · " + r.latency + "ms · "
                     + r.version + "  " + (r.motd == null ? "" : r.motd));

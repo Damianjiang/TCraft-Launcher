@@ -21,6 +21,7 @@ public class PageTasks implements Page {
 
     private static final Pattern RUN_WITH_LOG = Pattern.compile("^运行 (.+) 安装器：(.+)$");
     private static final Pattern RUN_WITH_TIME = Pattern.compile("^运行 (.+) 安装器（(\\d+) 秒，下载依赖较慢请稍候）$");
+    private static final Pattern DL_UPDATE = Pattern.compile("^下载更新 v(.+)$");
     private static final String[] COUNT_PREFIXES = {
             "下载依赖库", "下载资源文件", "补抓失败文件", "下载整合包内容", "正在压缩", "正在复制", "正在备份"
     };
@@ -280,6 +281,8 @@ public class PageTasks implements Page {
         m = RUN_WITH_TIME.matcher(s);
         if (m.matches()) return Lang.tf("运行 %s 安装器（%d 秒，下载依赖较慢请稍候）",
                 m.group(1), Integer.parseInt(m.group(2)));
+        m = DL_UPDATE.matcher(s);
+        if (m.matches()) return Lang.tf("下载更新 v%s", m.group(1));
 
         if (s.startsWith("下载 ") && s.endsWith(" 安装器")) {
             return Lang.t("下载 ") + s.substring(3, s.length() - 4) + Lang.t(" 安装器");

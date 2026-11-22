@@ -119,7 +119,12 @@ public final class Errors {
     }
 
     public static void onModalDismissed() {
-        if (internalClose || !showing) return;
+        if (internalClose) return;
+        if (!showing) {
+            // 模态关闭后补一次 drain，处理占用期间入队的错误
+            scheduleDrain();
+            return;
+        }
         showing = false;
         scheduleDrain();
     }
@@ -133,21 +138,29 @@ public final class Errors {
             lastKey = key;
             lastShownAt = now;
             QUEUE.addLast(r);
+            // 队列有上限：模态占用期间错误风暴不至于无限堆积
+            while (QUEUE.size() > 20) QUEUE.pollFirst();
         }
         onFx(Errors::drain);
     }
 
     private static void drain() {
         if (showing) return;
+        MainWindow w = window;
+        if (w == null || w.stage == null || !w.stage.isShowing() || w.modalLayer == null) {
+            Report r;
+            synchronized (QUEUE) {
+                r = QUEUE.pollFirst();
+            }
+            if (r != null) fallback(r);
+            return;
+        }
+        // 不可关闭的模态占着时，错误留队列等下次 drain
+        if (w.hasOpenModal()) return;
         Report r;
         synchronized (QUEUE) {
             if (QUEUE.isEmpty()) return;
             r = QUEUE.pollFirst();
-        }
-        MainWindow w = window;
-        if (w == null || w.stage == null || !w.stage.isShowing() || w.modalLayer == null) {
-            fallback(r);
-            return;
         }
         showing = true;
         try {

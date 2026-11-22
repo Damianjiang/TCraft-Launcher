@@ -445,5 +445,7 @@ public class PageLaunch implements Page {
     @Override
     public void onHide() {
         stopAprilEscape();
+        if (menuPopup != null && menuPopup.isShowing()) menuPopup.hide();
+        menuPopup = null;
     }
 }

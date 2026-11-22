@@ -70,7 +70,9 @@ public class ResourceVersion {
                 }
             }
             if (rawLoaders.contains("datapack")) r.resourceType = "datapack";
-            if (!r.loaders.isEmpty() && !"plugin".equals(r.resourceType)) r.resourceType = "mod";
+            if (!r.loaders.isEmpty() && !"plugin".equals(r.resourceType) && !"datapack".equals(r.resourceType)) {
+                r.resourceType = "mod";
+            }
         } else {
             r.resourceType = expectedType;
         }

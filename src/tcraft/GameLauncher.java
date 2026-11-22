@@ -205,10 +205,10 @@ public final class GameLauncher {
                         url = base + path;
                     }
                 }
-                if (!path.isEmpty() && !url.isEmpty()
-                        && !Files.isRegularFile(game.resolve("libraries").resolve(path))) {
-                    out.putIfAbsent(game.resolve("libraries").resolve(path).toAbsolutePath().normalize(),
-                            new MissingFile(url, game.resolve("libraries").resolve(path),
+                Path libFile = Downloader.libraryPath(game, path);
+                if (libFile != null && !url.isEmpty() && !Files.isRegularFile(libFile)) {
+                    out.putIfAbsent(libFile.toAbsolutePath().normalize(),
+                            new MissingFile(url, libFile,
                                     (long) parseNum(Json.str(artifact, "size", "0"), 0), "依赖库 " + path,
                                     Json.str(artifact, "sha1", "")));
                 }
@@ -220,10 +220,11 @@ public final class GameLauncher {
                         Map<String, Object> nat = Json.obj(
                                 Json.obj(downloads.get("classifiers")).get(classifier));
                         String rel = Json.str(nat, "path", "");
-                        if (!rel.isEmpty() && !Files.isRegularFile(game.resolve("libraries").resolve(rel))) {
+                        Path nativeFile = Downloader.libraryPath(game, rel);
+                        if (nativeFile != null && !Files.isRegularFile(nativeFile)) {
                             String nativeUrl = Json.str(nat, "url", "");
-                            out.putIfAbsent(game.resolve("libraries").resolve(rel).toAbsolutePath().normalize(),
-                                    new MissingFile(nativeUrl, game.resolve("libraries").resolve(rel),
+                            out.putIfAbsent(nativeFile.toAbsolutePath().normalize(),
+                                    new MissingFile(nativeUrl, nativeFile,
                                             (long) parseNum(Json.str(nat, "size", "0"), 0), "依赖库 " + rel,
                                             Json.str(nat, "sha1", "")));
                         }
@@ -335,7 +336,7 @@ public final class GameLauncher {
         return launch(instance, serverIp, resolveJava(instance, null, null, null));
     }
 
-    // 旧版 MC（≤1.12）按系统 ANSI 写 options.txt，UTF-8 硬读会乱码
+    // 旧版 MC（≤1.12）options.txt 是系统 ANSI 编码
     static java.nio.charset.Charset optionsCharset(Path options) {
         try {
             byte[] raw = Files.readAllBytes(options);
@@ -460,8 +461,8 @@ public final class GameLauncher {
             Map<String, Object> nativesMap = Json.obj(lib.get("natives"));
             if (path.isEmpty() && nativesMap.isEmpty()) path = nameToPath(libName);
             if (!path.isEmpty()) {
-                Path jar = game.resolve("libraries").resolve(path);
-                if (Files.isRegularFile(jar)) {
+                Path jar = Downloader.libraryPath(game, path);
+                if (jar != null && Files.isRegularFile(jar)) {
                     classpath.add(jar);
                 } else if (!artifactUrl.isEmpty() || !Json.str(lib, "url", "").isEmpty()) {
                     missingLibs.add(path);
@@ -475,11 +476,9 @@ public final class GameLauncher {
                     Map<String, Object> classifiers = Json.obj(downloads.get("classifiers"));
                     Map<String, Object> nat = Json.obj(classifiers.get(classifier));
                     String rel = Json.str(nat, "path", "");
-                    if (!rel.isEmpty()) {
-                        Path jar = game.resolve("libraries").resolve(rel);
-                        if (Files.isRegularFile(jar)) legacyNatives.add(jar);
-                        else if (!Json.str(nat, "url", "").isEmpty()) missingLibs.add(rel);
-                    }
+                    Path jar = Downloader.libraryPath(game, rel);
+                    if (jar != null && Files.isRegularFile(jar)) legacyNatives.add(jar);
+                    else if (jar != null && !Json.str(nat, "url", "").isEmpty()) missingLibs.add(rel);
                 }
             }
         }
@@ -638,8 +637,8 @@ public final class GameLauncher {
         int xms = lockMemory ? ram : (initialRam > 0 ? Math.min(initialRam, ram) : Math.max(256, ram / 4));
         List<String> cmd = new ArrayList<>();
         cmd.add(javaExe);
-        // macOS 上 GLFW 必须运行在进程主线程
-        if ("osx".equals(osName())) cmd.add("-XstartOnFirstThread");
+        // macOS 上 LWJGL3 必须运行在进程主线程；LWJGL2 的 AWT 路径反而冲突
+        if ("osx".equals(osName()) && needsFirstThread(libs)) cmd.add("-XstartOnFirstThread");
         int renderer = data.getInstanceInt("Renderer", -1);
         if (renderer < 0) renderer = data.getInt("LaunchAdvanceRenderer", 0);
         if (Shell.windows() && renderer > 0) {
@@ -909,6 +908,16 @@ public final class GameLauncher {
         return !"x86".equals(osArch());
     }
 
+    private static boolean needsFirstThread(Map<String, Map<String, Object>> libs) {
+        boolean lwjgl2 = false;
+        boolean lwjgl3 = false;
+        for (String name : libs.keySet()) {
+            if (name.startsWith("org.lwjgl.lwjgl:")) lwjgl2 = true;
+            else if (name.startsWith("org.lwjgl:")) lwjgl3 = true;
+        }
+        return !lwjgl2 || lwjgl3;
+    }
+
     private static List<String> resolveArgs(List<Object> list, Map<String, String> vars) {
         return resolveArgs(list, vars, java.util.Collections.emptyMap());
     }
@@ -1047,7 +1056,8 @@ public final class GameLauncher {
                 if (entry.isDirectory()) continue;
                 String name = entry.getName();
                 if (name.contains("/") || name.contains("\\")) continue;
-                if (!name.endsWith(".dll") && !name.endsWith(".so") && !name.endsWith(".dylib")) continue;
+                if (!name.endsWith(".dll") && !name.endsWith(".so") && !name.endsWith(".dylib")
+                        && !name.endsWith(".jnilib")) continue;
                 Path out = dir.resolve(name).normalize();
                 if (!out.startsWith(dir)) throw new Exception("natives 压缩包含非法路径：" + name);
                 Files.copy(zip, out, java.nio.file.StandardCopyOption.REPLACE_EXISTING);

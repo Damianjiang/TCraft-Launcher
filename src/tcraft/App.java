@@ -284,7 +284,7 @@ public class App extends Application {
 
     @Override
     public void stop() {
-        // 同步等 easytier 会卡退出
-        EasyTier.stopAsync();
+        // 退出前同步回收联机子进程，避免残留
+        EasyTier.stop();
     }
 }

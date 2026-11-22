@@ -728,6 +728,14 @@ public class PageInstance implements Page {
                             + "Terminal=false\nCategories=Game;\n";
                     java.nio.file.Files.writeString(link, entry, java.nio.charset.StandardCharsets.UTF_8);
                     link.toFile().setExecutable(true);
+                    // GNOME 42+ 需要 trusted 标记，双击才不会提示「不受信任」
+                    try {
+                        Process gio = new ProcessBuilder("gio", "set", link.toString(),
+                                "metadata::trusted", "true").redirectErrorStream(true)
+                                .redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+                        gio.waitFor(3, java.util.concurrent.TimeUnit.SECONDS);
+                    } catch (Exception ignored) {
+                    }
                 }
                 javafx.application.Platform.runLater(() -> win.toast("快捷方式已创建", link.toString(), 1));
             } catch (Exception e) {

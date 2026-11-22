@@ -499,6 +499,8 @@ public final class EasyTier {
         stop();
         Path exe = corePath();
         if (!Files.isRegularFile(exe)) throw new Exception(Lang.t("联机模块未安装"));
+        // 从压缩包/U 盘拷入时可能丢失执行位
+        if (!isWindows()) markExecutable();
         List<String> cmd = new ArrayList<>();
         cmd.add(exe.toString());
         cmd.addAll(Shell.splitArgs(argument));

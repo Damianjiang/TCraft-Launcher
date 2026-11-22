@@ -138,10 +138,6 @@ public final class JavaInstaller {
                                     Files.createDirectories(dst.getParent());
                                     String sha1 = Json.str(raw, "sha1", "");
                                     Downloader.downloadFileTo(null, url, dst, rel, sha1);
-                                    if (!sha1.isEmpty() && !sha1.equalsIgnoreCase(sha1(dst))) {
-                                        Files.deleteIfExists(dst);
-                                        throw new IOException(Lang.t("Java 文件校验失败：") + rel);
-                                    }
                                     if (Boolean.parseBoolean(String.valueOf(file.get("executable")))) {
                                         dst.toFile().setExecutable(true, false);
                                     }
@@ -216,20 +212,6 @@ public final class JavaInstaller {
                 }
             }
             throw e;
-        }
-    }
-
-    private static String sha1(Path file) throws IOException {
-        try {
-            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-1");
-            try (java.io.InputStream in = Files.newInputStream(file)) {
-                byte[] buf = new byte[65536];
-                int n;
-                while ((n = in.read(buf)) > 0) md.update(buf, 0, n);
-            }
-            return java.util.HexFormat.of().formatHex(md.digest());
-        } catch (java.security.NoSuchAlgorithmException e) {
-            throw new IOException("SHA-1 不可用", e);
         }
     }
 

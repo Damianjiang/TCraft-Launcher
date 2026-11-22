@@ -339,6 +339,8 @@ public final class MsAuth {
         account.expiresAt = r.expiresAt;
         if (!r.uuid.isEmpty()) account.uuid = r.uuid;
         if (!r.name.isEmpty()) account.name = r.name;
+        // 新令牌立即落盘，皮肤获取失败也不会丢
+        Data.get().save();
         if (r.skinUrl.isEmpty()) throw new Exception("该账户当前没有皮肤");
         return Skins.download(account.name, r.skinUrl);
     }

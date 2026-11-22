@@ -5,6 +5,7 @@ import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 
 public final class Boot {
@@ -19,6 +20,31 @@ public final class Boot {
     }
 
     public static void main(String[] args) {
+        // 更新进程在碰配置和实例锁之前只做文件替换，然后拉起新版本
+        if (args.length == 2 && args[0].equals("--apply-to")) {
+            Path oldFile = Paths.get(args[1]);
+            try {
+                SelfUpdate.applyUpdate(oldFile);
+            } catch (Throwable t) {
+                // javaw 链上 stderr 不可见，失败必须落进日志文件并留下用户可见的标记
+                System.err.println("[TCL] 应用更新失败：" + t);
+                t.printStackTrace();
+                try {
+                    Log.error("应用更新失败：" + t);
+                    Log.error(Log.describe(t));
+                    Files.writeString(Resources.home().resolve("update").resolve("last-apply-error.txt"),
+                            String.valueOf(t));
+                } catch (Throwable ignored) {
+                }
+                try {
+                    // 本体在失败路径下保持完好，把旧版本拉回来，不让用户失去界面
+                    SelfUpdate.startJava(oldFile);
+                } catch (Throwable ignored) {
+                }
+                System.exit(1);
+            }
+            return;
+        }
         // 语言先于一切 UI
         applySystemProperties();
         if (Runtime.version().feature() < 17) {
@@ -29,6 +55,8 @@ public final class Boot {
         }
         if (!acquireInstanceLock()) {
             System.err.println("[TCL] 已有实例在运行，本次启动退出");
+            Shell.macAlert("TCraft Launcher", Lang.t("启动器已在运行，请切换到已打开的窗口。"));
+            Shell.linuxNotify("TCraft Launcher", Lang.t("启动器已在运行，请切换到已打开的窗口。"));
             return;
         }
         // 仅缺 JavaFX/需下载时显示进度窗
@@ -156,8 +184,9 @@ public final class Boot {
         String full = text + (crash == null ? "" : Lang.t("\n\n详细堆栈已写入：\n") + crash)
                 + Lang.t("\n\n请不要发送截图，点「导出错误报告」保存日志，再把文件发到 TCL 交流群（1131373915）。");
         if (Shell.mac()) {
-            // 已带 JavaFX 勿再起 Swing：落日志并打开日志目录
+            // 已带 JavaFX 勿再起 Swing：用系统对话框提示，再打开日志目录
             System.err.println(full);
+            Shell.macAlert(Lang.t("TCraft Launcher 启动失败"), full);
             try {
                 Shell.openFolder(Resources.logDir().toString());
             } catch (Throwable ignored) {

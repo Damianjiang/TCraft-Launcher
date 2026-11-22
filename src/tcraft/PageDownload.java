@@ -913,8 +913,6 @@ public class PageDownload implements Page {
         ComboBox<String> sourceCombo = Ui.combo(new String[]{"全部", "CurseForge", "Modrinth"},
                 Math.max(0, Math.min(2, Data.get().getInt("ToolDownloadMod", 0))));
         sourceCombo.setMaxWidth(Double.MAX_VALUE);
-        sourceCombo.setOnAction(e -> Data.get().set("ToolDownloadMod",
-                sourceCombo.getSelectionModel().getSelectedIndex()));
 
         Label verLabel = Ui.label("版本", 13, Theme.text);
         ComboBox<String> versionCombo = new ComboBox<>();
@@ -1023,7 +1021,11 @@ public class PageDownload implements Page {
             resourcePage = 0;
             fetchRef[0].run();
         };
-        sourceCombo.setOnAction(e -> searchAction.run());
+        sourceCombo.setOnAction(e -> {
+            // 同一个 ComboBox 只能挂一个回调，保存与搜索合并
+            Data.get().set("ToolDownloadMod", sourceCombo.getSelectionModel().getSelectedIndex());
+            searchAction.run();
+        });
         tagCombo.setOnAction(e -> searchAction.run());
         loaderCombo.setOnAction(e -> {
             updateLoaderVisibility.run();

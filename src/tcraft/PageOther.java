@@ -451,7 +451,9 @@ public class PageOther implements Page {
         FlowPane flow = new FlowPane(15, 15);
         flow.setPadding(new Insets(4, 0, 0, 0));
         flow.getChildren().addAll(
-                Ui.button("清理垃圾", Ui.BTN_NORMAL, this::cleanJunk),
+                Ui.button("清理垃圾", Ui.BTN_NORMAL, () -> Dialogs.confirm(win,
+                        "清理垃圾", "将删除游戏目录与实例目录下的崩溃报告和日志文件。\n"
+                                + "此操作不可撤销，是否继续？", this::cleanJunk, true)),
                 Ui.button("今日人品", Ui.BTN_NORMAL, this::showLuck));
         utilCard.add(flow);
         page.getChildren().add(utilCard);
