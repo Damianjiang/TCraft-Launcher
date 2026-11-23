@@ -301,8 +301,6 @@ public final class MainWindow {
         double minH = Math.min(470, maxH);
         if (Math.abs(stage.getMinWidth() - minW) > 1) stage.setMinWidth(minW);
         if (Math.abs(stage.getMinHeight() - minH) > 1) stage.setMinHeight(minH);
-        if (Math.abs(stage.getMaxWidth() - maxW) > 1) stage.setMaxWidth(maxW);
-        if (Math.abs(stage.getMaxHeight() - maxH) > 1) stage.setMaxHeight(maxH);
         double nw = Math.min(Math.max(w, minW), maxW);
         double nh = Math.min(Math.max(h, minH), maxH);
         boolean resized = Math.abs(nw - w) > 1 || Math.abs(nh - h) > 1;
