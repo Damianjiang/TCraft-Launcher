@@ -107,7 +107,19 @@ public class PageInstance implements Page {
         HBox.setHgrow(search, Priority.ALWAYS);
         search.setMinWidth(120);
         search.setPrefWidth(260);
-        toolbar.getChildren().addAll(search, sort, toolIcons);
+        boolean narrow = win.stage.getWidth() < 760;
+        javafx.scene.layout.Region toolbarRoot = toolbar;
+        if (narrow) {
+            toolbar.getChildren().addAll(search, sort);
+            HBox toolsRow = new HBox(8, toolIcons);
+            toolsRow.setAlignment(Pos.CENTER_LEFT);
+            toolsRow.setPadding(new Insets(0, 25, 2, 25));
+            VBox toolbarBox = new VBox(2, toolbar, toolsRow);
+            toolbarBox.setMaxWidth(Double.MAX_VALUE);
+            toolbarRoot = toolbarBox;
+        } else {
+            toolbar.getChildren().addAll(search, sort, toolIcons);
+        }
 
         collectionChips = new HBox(6);
         collectionChips.setAlignment(Pos.CENTER_LEFT);
@@ -128,7 +140,7 @@ public class PageInstance implements Page {
         VBox.setVgrow(scroll, Priority.ALWAYS);
         VBox.setMargin(scroll, new Insets(4, 25, 14, 25));
 
-        page.getChildren().addAll(toolbar, collectionBar, scroll);
+        page.getChildren().addAll(toolbarRoot, collectionBar, scroll);
         this.refreshRunner = () -> {
             refreshCollectionBar();
             StackPane back = new StackPane();

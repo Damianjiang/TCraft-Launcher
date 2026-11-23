@@ -10,10 +10,6 @@
 </head>
 <body>
 
-    <div class="loader" id="loader">
-        <div class="loading-223"></div>
-    </div>
-
     <header class="header">
         <div class="header-inner">
             <a class="brand" href="#top">
@@ -166,16 +162,6 @@
     <script src="markdown.js"></script>
     <script src="download.js"></script>
     <script>
-        const loader = document.getElementById('loader');
-
-        function hideLoader() {
-            loader.classList.add('hidden');
-            setTimeout(() => loader.remove(), 400);
-        }
-
-        window.addEventListener('load', hideLoader);
-        setTimeout(hideLoader, 6000);
-
         const lightbox = document.getElementById('lightbox');
         const preview = lightbox.querySelector('img');
 

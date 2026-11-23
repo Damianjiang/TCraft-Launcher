@@ -13,49 +13,6 @@ body {
 img { max-width: 100%; height: auto; }
 a { color: #2f6fa8; }
 
-.loader {
-    position: fixed;
-    inset: 0;
-    z-index: 9999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #fff;
-    transition: opacity .35s, visibility .35s;
-}
-
-.loader.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
-
-.loading-223 {
-    --w: 10ch;
-    width: var(--w);
-    overflow: hidden;
-    white-space: nowrap;
-    color: #0000;
-    font-family: monospace;
-    font-size: 14px;
-    font-weight: bold;
-    line-height: 1.4em;
-    letter-spacing: var(--w);
-    text-shadow: calc(0 * var(--w)) 0 #0694cd, calc(-1 * var(--w)) 0 #0694cd, calc(-2 * var(--w)) 0 #0694cd, calc(-3 * var(--w)) 0 #0694cd, calc(-4 * var(--w)) 0 #0694cd, calc(-5 * var(--w)) 0 #0694cd, calc(-6 * var(--w)) 0 #0694cd, calc(-7 * var(--w)) 0 #0694cd, calc(-8 * var(--w)) 0 #0694cd, calc(-9 * var(--w)) 0 #0694cd;
-    animation: loading-223 2s infinite linear;
-}
-
-.loading-223:before { content: "载入中..."; }
-
-@keyframes loading-223 {
-    9.09% { text-shadow: calc(0 * var(--w)) -10px #0694cd, calc(-1 * var(--w)) 0 #0694cd, calc(-2 * var(--w)) 0 #0694cd, calc(-3 * var(--w)) 0 #0694cd, calc(-4 * var(--w)) 0 #0694cd, calc(-5 * var(--w)) 0 #0694cd, calc(-6 * var(--w)) 0 #0694cd, calc(-7 * var(--w)) 0 #0694cd, calc(-8 * var(--w)) 0 #0694cd, calc(-9 * var(--w)) 0 #0694cd; }
-    18.18% { text-shadow: calc(0 * var(--w)) 0 #0694cd, calc(-1 * var(--w)) -10px #0694cd, calc(-2 * var(--w)) 0 #0694cd, calc(-3 * var(--w)) 0 #0694cd, calc(-4 * var(--w)) 0 #0694cd, calc(-5 * var(--w)) 0 #0694cd, calc(-6 * var(--w)) 0 #0694cd, calc(-7 * var(--w)) 0 #0694cd, calc(-8 * var(--w)) 0 #0694cd, calc(-9 * var(--w)) 0 #0694cd; }
-    27.27% { text-shadow: calc(0 * var(--w)) 0 #0694cd, calc(-1 * var(--w)) 0 #0694cd, calc(-2 * var(--w)) -10px #0694cd, calc(-3 * var(--w)) 0 #0694cd, calc(-4 * var(--w)) 0 #0694cd, calc(-5 * var(--w)) 0 #0694cd, calc(-6 * var(--w)) 0 #0694cd, calc(-7 * var(--w)) 0 #0694cd, calc(-8 * var(--w)) 0 #0694cd, calc(-9 * var(--w)) 0 #0694cd; }
-    36.36% { text-shadow: calc(0 * var(--w)) 0 #0694cd, calc(-1 * var(--w)) 0 #0694cd, calc(-2 * var(--w)) 0 #0694cd, calc(-3 * var(--w)) -10px #0694cd, calc(-4 * var(--w)) 0 #0694cd, calc(-5 * var(--w)) 0 #0694cd, calc(-6 * var(--w)) 0 #0694cd, calc(-7 * var(--w)) 0 #0694cd, calc(-8 * var(--w)) 0 #0694cd, calc(-9 * var(--w)) 0 #0694cd; }
-    45.45% { text-shadow: calc(0 * var(--w)) 0 #0694cd, calc(-1 * var(--w)) 0 #0694cd, calc(-2 * var(--w)) 0 #0694cd, calc(-3 * var(--w)) 0 #0694cd, calc(-4 * var(--w)) -10px #0694cd, calc(-5 * var(--w)) 0 #0694cd, calc(-6 * var(--w)) 0 #0694cd, calc(-7 * var(--w)) 0 #0694cd, calc(-8 * var(--w)) 0 #0694cd, calc(-9 * var(--w)) 0 #0694cd; }
-    54.54% { text-shadow: calc(0 * var(--w)) 0 #0694cd, calc(-1 * var(--w)) 0 #0694cd, calc(-2 * var(--w)) 0 #0694cd, calc(-3 * var(--w)) 0 #0694cd, calc(-4 * var(--w)) 0 #0694cd, calc(-5 * var(--w)) -10px #0694cd, calc(-6 * var(--w)) 0 #0694cd, calc(-7 * var(--w)) 0 #0694cd, calc(-8 * var(--w)) 0 #0694cd, calc(-9 * var(--w)) 0 #0694cd; }
-    63.63% { text-shadow: calc(0 * var(--w)) 0 #0694cd, calc(-1 * var(--w)) 0 #0694cd, calc(-2 * var(--w)) 0 #0694cd, calc(-3 * var(--w)) 0 #0694cd, calc(-4 * var(--w)) 0 #0694cd, calc(-5 * var(--w)) 0 #0694cd, calc(-6 * var(--w)) -10px #0694cd, calc(-7 * var(--w)) 0 #0694cd, calc(-8 * var(--w)) 0 #0694cd, calc(-9 * var(--w)) 0 #0694cd; }
-    72.72% { text-shadow: calc(0 * var(--w)) 0 #0694cd, calc(-1 * var(--w)) 0 #0694cd, calc(-2 * var(--w)) 0 #0694cd, calc(-3 * var(--w)) 0 #0694cd, calc(-4 * var(--w)) 0 #0694cd, calc(-5 * var(--w)) 0 #0694cd, calc(-6 * var(--w)) 0 #0694cd, calc(-7 * var(--w)) -10px #0694cd, calc(-8 * var(--w)) 0 #0694cd, calc(-9 * var(--w)) 0 #0694cd; }
-    81.81% { text-shadow: calc(0 * var(--w)) 0 #0694cd, calc(-1 * var(--w)) 0 #0694cd, calc(-2 * var(--w)) 0 #0694cd, calc(-3 * var(--w)) 0 #0694cd, calc(-4 * var(--w)) 0 #0694cd, calc(-5 * var(--w)) 0 #0694cd, calc(-6 * var(--w)) 0 #0694cd, calc(-7 * var(--w)) 0 #0694cd, calc(-8 * var(--w)) -10px #0694cd, calc(-9 * var(--w)) 0 #0694cd; }
-    90.90% { text-shadow: calc(0 * var(--w)) 0 #0694cd, calc(-1 * var(--w)) 0 #0694cd, calc(-2 * var(--w)) 0 #0694cd, calc(-3 * var(--w)) 0 #0694cd, calc(-4 * var(--w)) 0 #0694cd, calc(-5 * var(--w)) 0 #0694cd, calc(-6 * var(--w)) 0 #0694cd, calc(-7 * var(--w)) 0 #0694cd, calc(-8 * var(--w)) 0 #0694cd, calc(-9 * var(--w)) -10px #0694cd; }
-}
-
 .header {
     position: sticky;
     top: 0;

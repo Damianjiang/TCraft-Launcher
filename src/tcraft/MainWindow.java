@@ -109,6 +109,7 @@ public final class MainWindow {
     private int switchToken;
     private boolean closing;
 
+    private String lastScreenSignature;
     private double baseOpacity = 1;
     private boolean introPrepared;
     private boolean introRunning;
@@ -215,6 +216,7 @@ public final class MainWindow {
         stage.setMinHeight(470);
         stage.setAlwaysOnTop(false);
         restoreWindowBounds();
+        lastScreenSignature = screenSignature();
         installResize(scene);
         installDropTarget(scene);
         scene.addEventFilter(KeyEvent.KEY_PRESSED, e -> {
@@ -276,6 +278,7 @@ public final class MainWindow {
         double h = parseDouble(data.get("Window.Height", ""), 500);
         w = Math.min(Math.max(minW, w), Math.max(minW, vb.getWidth() - 8));
         h = Math.min(Math.max(minH, h), Math.max(minH, vb.getHeight() - 8));
+        root.setPrefSize(w, h);
         stage.setWidth(w);
         stage.setHeight(h);
         if (!Double.isNaN(px) && !Double.isNaN(py)) {
@@ -285,6 +288,66 @@ public final class MainWindow {
             stage.setX(vb.getMinX() + Math.max(0, (vb.getWidth() - w) / 2));
             stage.setY(vb.getMinY() + Math.max(0, (vb.getHeight() - h) / 2));
         }
+    }
+
+    private void fitWindowToScreen(boolean forceVisible) {
+        if (!stage.isShowing() || stage.isIconified() || stage.isMaximized() || stage.isFullScreen()) return;
+        double x = stage.getX(), y = stage.getY(), w = stage.getWidth(), h = stage.getHeight();
+        if (w <= 0 || h <= 0) return;
+        javafx.geometry.Rectangle2D vb = screenForWindow(x, y, w, h);
+        double maxW = Math.max(320, vb.getWidth() - 8);
+        double maxH = Math.max(240, vb.getHeight() - 8);
+        double minW = Math.min(810, maxW);
+        double minH = Math.min(470, maxH);
+        if (Math.abs(stage.getMinWidth() - minW) > 1) stage.setMinWidth(minW);
+        if (Math.abs(stage.getMinHeight() - minH) > 1) stage.setMinHeight(minH);
+        if (Math.abs(stage.getMaxWidth() - maxW) > 1) stage.setMaxWidth(maxW);
+        if (Math.abs(stage.getMaxHeight() - maxH) > 1) stage.setMaxHeight(maxH);
+        double nw = Math.min(Math.max(w, minW), maxW);
+        double nh = Math.min(Math.max(h, minH), maxH);
+        boolean resized = Math.abs(nw - w) > 1 || Math.abs(nh - h) > 1;
+        if (Math.abs(nw - w) > 1) {
+            root.setPrefWidth(nw);
+            stage.setWidth(nw);
+        }
+        if (Math.abs(nh - h) > 1) {
+            root.setPrefHeight(nh);
+            stage.setHeight(nh);
+        }
+        if (!forceVisible && !resized) return;
+        double nx = clamp(x, vb.getMinX(), Math.max(vb.getMinX(), vb.getMaxX() - nw));
+        double ny = clamp(y, vb.getMinY(), Math.max(vb.getMinY(), vb.getMaxY() - nh));
+        if (Math.abs(nx - x) > 1) stage.setX(nx);
+        if (Math.abs(ny - y) > 1) stage.setY(ny);
+    }
+
+    private static String screenSignature() {
+        List<String> parts = new ArrayList<>();
+        for (javafx.stage.Screen s : javafx.stage.Screen.getScreens()) {
+            javafx.geometry.Rectangle2D b = s.getVisualBounds();
+            parts.add((int) b.getMinX() + "," + (int) b.getMinY() + ","
+                    + (int) b.getWidth() + "," + (int) b.getHeight());
+        }
+        java.util.Collections.sort(parts);
+        return String.join("|", parts);
+    }
+
+    private static javafx.geometry.Rectangle2D screenForWindow(double x, double y, double w, double h) {
+        List<javafx.stage.Screen> screens =
+                javafx.stage.Screen.getScreensForRectangle(x, y, w, h);
+        if (screens.isEmpty()) return javafx.stage.Screen.getPrimary().getVisualBounds();
+        javafx.stage.Screen best = screens.get(0);
+        double bestArea = -1;
+        for (javafx.stage.Screen s : screens) {
+            javafx.geometry.Rectangle2D b = s.getVisualBounds();
+            double ow = Math.max(0, Math.min(x + w, b.getMaxX()) - Math.max(x, b.getMinX()));
+            double oh = Math.max(0, Math.min(y + h, b.getMaxY()) - Math.max(y, b.getMinY()));
+            if (ow * oh > bestArea) {
+                bestArea = ow * oh;
+                best = s;
+            }
+        }
+        return best.getVisualBounds();
     }
 
     private static double clamp(double v, double min, double max) {
@@ -325,6 +388,10 @@ public final class MainWindow {
     }
 
     private void updateExtras() {
+        String sig = screenSignature();
+        boolean screenChanged = !sig.equals(lastScreenSignature);
+        lastScreenSignature = sig;
+        fitWindowToScreen(screenChanged);
         if (extraLayer == null) return;
         boolean taskVisible = Tasks.INSTANCE.hasActive() && !"tasks".equals(currentKey);
         if (btnExtraTask != null) {
@@ -866,6 +933,7 @@ public final class MainWindow {
         frame = new StackPane();
         frame.setMaxWidth(Double.MAX_VALUE);
         frame.setMaxHeight(Double.MAX_VALUE);
+        frame.setMinSize(0, 0);
         Region shadowPlate = new Region();
         frameShadowPlate = shadowPlate;
         shadowPlate.setBackground(Ui.fill(Color.WHITE, windowRadius()));
@@ -873,6 +941,7 @@ public final class MainWindow {
         shadowPlate.setMouseTransparent(true);
         frame.getChildren().add(shadowPlate);
         VBox frameBox = new VBox();
+        frameBox.setMinSize(0, 0);
         frameBox.setBackground(null);
         Rectangle clip = new Rectangle();
         frameClip = clip;
@@ -1093,6 +1162,7 @@ public final class MainWindow {
 
     private StackPane buildTitleBar() {
         StackPane bar = new StackPane();
+        bar.setMinWidth(0);
         double barHeight = titleBarHeight();
         bar.setPrefHeight(barHeight);
         bar.setMinHeight(barHeight);
@@ -1100,6 +1170,7 @@ public final class MainWindow {
         bar.setBackground(new Background(new BackgroundFill(titleBarGradient(), CornerRadii.EMPTY, Insets.EMPTY)));
 
         HBox left = new HBox(14);
+        left.setMinWidth(0);
         left.setAlignment(Pos.CENTER_LEFT);
         left.setPadding(new Insets(0, 0, 0, 19));
         left.setPickOnBounds(false);
@@ -1116,6 +1187,7 @@ public final class MainWindow {
         });
 
         navBox = new HBox(10);
+        navBox.setMinWidth(0);
         navBox.setAlignment(Pos.CENTER);
         navBox.setPickOnBounds(false);
         navTabs.clear();
@@ -1126,6 +1198,7 @@ public final class MainWindow {
         if (!pageHidden("other")) addNav("更多", "grid-2x2", "other");
 
         HBox right = new HBox(4);
+        right.setMinWidth(0);
         right.setAlignment(Pos.CENTER_RIGHT);
         right.setPadding(new Insets(0, 12, 0, 0));
         right.setPickOnBounds(false);
@@ -1228,10 +1301,23 @@ public final class MainWindow {
         try {
             double barW = titleBar.getWidth() > 1 ? titleBar.getWidth() : stage.getWidth();
             if (barW <= 1) return;
-            for (NavTab t : navTabs) t.setCompact(13, false);
+            for (NavTab t : navTabs) {
+                t.setIconOnly(false);
+                t.setCompact(13, false);
+            }
             double natural = navBox.prefWidth(-1);
             double leftUsed = 78 + (badgeBox != null && badgeBox.isVisible() ? badgeBox.getWidth() : 0);
             double available = barW - leftUsed - 152 - 2 * 24;
+            boolean iconOnly = available < 280 && natural > available;
+            if (badgeName != null) {
+                badgeName.setVisible(!iconOnly);
+                badgeName.setManaged(!iconOnly);
+            }
+            for (NavTab t : navTabs) t.setIconOnly(iconOnly);
+            if (iconOnly) {
+                navBox.setSpacing(6);
+                return;
+            }
             double fs = natural > 0 && natural > available ? Math.max(9, 13 * available / natural) : 13;
             boolean tight = fs < 13 - 0.4;
             for (NavTab t : navTabs) t.setCompact(fs, tight);
@@ -1376,6 +1462,7 @@ public final class MainWindow {
             HBox.setMargin(iconNode, new Insets(0, 0, 0, 10));
             HBox.setMargin(label, new Insets(0, 10, 0, 0));
             getChildren().addAll(iconNode, label);
+            Ui.tooltip(this, text);
             addEventHandler(MouseEvent.MOUSE_ENTERED, e -> {
                 if (!checked) animateTo(HOVER_PILL, Color.WHITE, 90);
             });
@@ -1422,15 +1509,25 @@ public final class MainWindow {
 
         void setCompact(double fontSize, boolean tight) {
             label.setFont(Theme.font(fontSize));
-            if (!tight) {
-                HBox.setMargin(iconNode, new Insets(0, 0, 0, 10));
-                HBox.setMargin(label, new Insets(0, 10, 0, 0));
-                return;
+            if (label.isVisible()) {
+                if (!tight) {
+                    HBox.setMargin(iconNode, new Insets(0, 0, 0, 10));
+                    HBox.setMargin(label, new Insets(0, 10, 0, 0));
+                } else {
+                    double f = Math.max(0.6, fontSize / 13.0);
+                    double gap = Math.max(4, 10 * f);
+                    HBox.setMargin(iconNode, new Insets(0, 0, 0, gap));
+                    HBox.setMargin(label, new Insets(0, gap, 0, 0));
+                }
+            } else {
+                HBox.setMargin(iconNode, new Insets(0, 7, 0, 7));
             }
-            double f = Math.max(0.6, fontSize / 13.0);
-            double gap = Math.max(4, 10 * f);
-            HBox.setMargin(iconNode, new Insets(0, 0, 0, gap));
-            HBox.setMargin(label, new Insets(0, gap, 0, 0));
+        }
+
+        void setIconOnly(boolean iconOnly) {
+            label.setVisible(!iconOnly);
+            label.setManaged(!iconOnly);
+            HBox.setMargin(iconNode, new Insets(0, iconOnly ? 7 : 0, 0, iconOnly ? 7 : 10));
         }
 
         void setChecked(boolean value) {
@@ -1443,6 +1540,7 @@ public final class MainWindow {
 
     private StackPane buildBody() {
         StackPane b = new StackPane();
+        b.setMinSize(0, 0);
         b.setAlignment(Pos.TOP_LEFT);
         bgRect = new Rectangle();
         bgRect.setManaged(false);
@@ -1960,6 +2058,10 @@ public final class MainWindow {
         Node left = page.left();
         Node right = page.right();
         double w = page.leftWidth();
+        if (w > 0) {
+            // 窄窗口给右侧留出可读宽度
+            w = Math.min(w, Math.max(180, stage.getWidth() - 320));
+        }
         leftHost.getChildren().clear();
         rightHost.getChildren().clear();
         if (left != null) leftHost.getChildren().add(left);
