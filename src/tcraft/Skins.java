@@ -50,7 +50,7 @@ public final class Skins {
         return save(accountName, Http.getBytes(url));
     }
 
-    // 只解析签名与 IHDR，不解码整图
+    // 只读签名与 IHDR
     private static int[] pngSize(byte[] data) {
         if (data == null || data.length < 24) return null;
         if ((data[0] & 0xFF) != 0x89 || data[1] != 'P' || data[2] != 'N' || data[3] != 'G') return null;

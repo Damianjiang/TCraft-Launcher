@@ -19,7 +19,7 @@ public final class Sources {
     private static final long TTL_MS = 10 * 60 * 1000L;
     private static final int PROBE_BYTES = 128 * 1024;
     private static final long PROBE_READ_CAP = 256 * 1024;
-    // 探测独立线程池，避免与下载/搜索共用 Http.pool 造成排队互等
+    // 探测用独立线程池
     private static final java.util.concurrent.ExecutorService PROBE_POOL =
             java.util.concurrent.Executors.newCachedThreadPool(r -> {
                 Thread t = new Thread(r, "TCL-SourceProbe");
@@ -47,7 +47,7 @@ public final class Sources {
                 jobs.put(h, INFLIGHT.computeIfAbsent(h, k -> PROBE_POOL.submit(() -> {
                     try {
                         double kbps = probe(url);
-                        // 失败也入缓存防重复探测
+                        // 失败也缓存
                         SPEED.put(h, new double[]{kbps, System.currentTimeMillis()});
                         return kbps;
                     } finally {
@@ -64,12 +64,12 @@ public final class Sources {
             try {
                 e.getValue().get(left, TimeUnit.MILLISECONDS);
             } catch (Exception ignored) {
-                // 慢源/超时，交给排序时的 -1 处理
+                // 慢源按 -1 排序
             }
         }
 
         List<String> out = new ArrayList<>(urls);
-        // TTL 到期使比较器前后不一致，TimSort 会抛异常；先取快照
+        // 先取快照 防 TimSort 异常
         java.util.Map<String, Double> speeds = new java.util.HashMap<>();
         for (String u : out) speeds.putIfAbsent(host(u), speedOf(u));
         out.sort((a, b) -> Double.compare(speeds.get(host(b)), speeds.get(host(a))));
@@ -95,7 +95,7 @@ public final class Sources {
     private static double probe(String url) {
         long t = System.nanoTime();
         try (Http.Body body = Http.open(url, Duration.ofSeconds(4), 0, PROBE_BYTES - 1)) {
-            // 对端可无视 Range 灌整文件，读满上限即停
+            // 对端无视 Range 读满即停
             byte[] data = Fetch.readAll(body.in, 3000, PROBE_READ_CAP);
             long ms = Math.max(1, (System.nanoTime() - t) / 1_000_000);
             if (data.length <= 0) return -1;

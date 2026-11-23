@@ -37,11 +37,11 @@ public final class Music {
         } catch (Exception ignored) {
         }
         available = !FILES.isEmpty();
-        // 列表变短时 index 归零防越界
+        // 列表变短时 index 归零
         if (index >= FILES.size()) index = 0;
     }
 
-    // MediaPlayer 只能 FX 线程建，调用方保证
+    // MediaPlayer 只能 FX 线程建 调用方保证
     public static synchronized void autoStart() {
         if (!available() || !Data.get().getBool("UiMusicAuto", false)) return;
         stopPlayer();
@@ -58,13 +58,13 @@ public final class Music {
         return Paths.get(gameDir, "TCL", "Music");
     }
 
-    // 设置页「刷新背景音乐」入口
+    // 设置页刷新背景音乐入口
     public static synchronized void reload(String gameDir) {
         init(gameDir);
         autoStart();
     }
 
-    // 设置页「清空背景音乐」入口
+    // 设置页清空背景音乐入口
     public static synchronized void clear() {
         if (player != null) {
             try {
@@ -182,7 +182,7 @@ public final class Music {
         try {
             Media media = new Media(FILES.get(i).toUri().toString());
             player = new MediaPlayer(media);
-            // 时长异步解析，构造后 getDuration 恒 UNKNOWN
+            // 时长异步解析
             totalTime = null;
             player.totalDurationProperty().addListener((o, was, now) -> totalTime = now);
             boolean multiple = FILES.size() > 1;
@@ -190,14 +190,14 @@ public final class Music {
             player.setVolume(volumePercent() / 100.0);
             player.play();
             paused = false;
-            // 播 1.5s 才清零连败计数
+            // 播 1.5s 后清零连败
             player.currentTimeProperty().addListener((o, was, now) -> {
                 if (now != null && now.toMillis() > 1500) errorStreak = 0;
             });
-            // 不挂 onError 连播会静默停住
+            // 必须挂 onError
             final MediaPlayer mp = player;
             player.setOnError(() -> javafx.application.Platform.runLater(() -> {
-                // 已被切走的旧播放器的迟到回调不计数
+                // 旧播放器回调不计数
                 if (player != mp) return;
                 errorStreak++;
                 if (errorStreak >= FILES.size()) {
@@ -207,12 +207,12 @@ public final class Music {
                 }
                 Music.next();
             }));
-            // 直接 dispose 有重入风险，挪下一帧
+            // dispose 延后一帧
             if (multiple) player.setOnEndOfMedia(() -> javafx.application.Platform.runLater(Music::next));
         } catch (Exception e) {
             player = null;
             paused = true;
-            // 构造期失败也走同一熔断
+            // 构造失败同熔断
             errorStreak++;
             if (errorStreak < FILES.size()) {
                 javafx.application.Platform.runLater(Music::next);
@@ -224,7 +224,7 @@ public final class Music {
         if (player != null) player.setVolume(Math.max(0, Math.min(1, percent / 100.0)));
     }
 
-    // 当前曲目播放进度 0..1，不可用时返回 -1
+    // 播放进度 不可用 -1
     public static double progress() {
         if (player == null || !available() || totalTime == null) return -1;
         try {

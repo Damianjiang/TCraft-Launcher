@@ -6,7 +6,7 @@ import javafx.scene.layout.VBox;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextFlow;
 
-// 极简 Markdown：标题、列表、粗体、行内代码
+// 极简 Markdown 标题 列表 粗体 行内代码
 public final class Md {
 
     private Md() {

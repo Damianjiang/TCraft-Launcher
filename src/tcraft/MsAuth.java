@@ -172,7 +172,7 @@ public final class MsAuth {
     private static Result authenticate(String msToken, String refreshToken,
                                        Consumer<String> stage) throws Exception {
         if (stage != null) stage.accept("正在验证 Xbox 账户…");
-        // Live Connect 的是 opaque RPS ticket，不能加 d= 前缀
+        // Live Connect 的 RPS ticket 不能加 d= 前缀
         String rps = LEGACY ? msToken : "d=" + msToken;
         String xblBody = "{\"Properties\":{\"AuthMethod\":\"RPS\",\"SiteName\":\"user.auth.xboxlive.com\","
                 + "\"RpsTicket\":\"" + esc(rps) + "\"},"
@@ -339,7 +339,7 @@ public final class MsAuth {
         account.expiresAt = r.expiresAt;
         if (!r.uuid.isEmpty()) account.uuid = r.uuid;
         if (!r.name.isEmpty()) account.name = r.name;
-        // 新令牌立即落盘，皮肤获取失败也不会丢
+        // 新令牌立即落盘
         Data.get().save();
         if (r.skinUrl.isEmpty()) throw new Exception("该账户当前没有皮肤");
         return Skins.download(account.name, r.skinUrl);
@@ -398,7 +398,7 @@ public final class MsAuth {
     }
 
     private static String errorText(Resp r) {
-        // 兜底值会拼进「Minecraft 登录失败：%s」，先译好再拼
+        // 兜底文案先翻译再拼接
         if (r == null) return Lang.t("未知错误");
         Map<String, Object> m = lenientParse(r.body);
         String why = Json.str(m, "error_description", "");

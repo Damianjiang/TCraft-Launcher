@@ -20,7 +20,7 @@ public final class Fetch {
     private static final long[] BACKOFF_MS = {200, 500, 1000, 2000, 3000};
     private static final long IDLE_TIMEOUT_MS = 20_000;
 
-    // 与 Downloader 共写 .part，锁须共用
+    // 与 Downloader 共写 .part 锁须共用
     static final java.util.concurrent.ConcurrentHashMap<String, Object> PART_LOCKS =
             new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -37,20 +37,20 @@ public final class Fetch {
         if (PART_LOCKS.putIfAbsent(lockKey, lock) != null) {
             throw new IOException(Lang.t("该文件已在下载中：") + target.getFileName());
         }
-        // 无哈希不能续传，删除重下
+        // 无哈希不能续传 删除重下
         if (expect == null) Files.deleteIfExists(part);
         IOException last = null;
         try {
             long done = 0;
             if (Files.isRegularFile(part)) {
                 done = Files.size(part);
-                // 重放续算摘要
+                // 续算摘要
                 if (digest != null && done > 0) replay(part, digest);
             }
 
             for (int attempt = 0; attempt <= DEFAULT_RETRY; attempt++) {
                 if (attempt > 0) {
-                    // 退避分段睡眠，取消立即可见
+                    // 分段退避 可取消
                     long left = BACKOFF_MS[Math.min(attempt - 1, BACKOFF_MS.length - 1)];
                     while (left > 0) {
                         if (task != null && task.canceled) throw new IOException("已取消");
@@ -71,7 +71,7 @@ public final class Fetch {
                             continue;
                         }
                     }
-                    // 无哈希时只认 zip 魔数，防镜像错误页被存成 jar
+                    // 无哈希只认 zip 魔数
                     if (expect == null && !Downloader.jarLooksValid(part, target)) {
                         Files.deleteIfExists(part);
                         done = 0;
@@ -143,7 +143,7 @@ public final class Fetch {
                     long now = System.currentTimeMillis();
                     if (task != null && now - lastTick > 400) {
                         task.speed = speed((written - lastBytes) * 1000 / Math.max(1, now - lastTick));
-                        // from==to 表示调用方自己维护进度，这里不回写
+                        // from==to 时调用方自管进度
                         if (total > 0 && to > from) {
                             task.progress = from + (to - from) * Math.min(1.0, (done + written) / (double) total);
                         }
@@ -154,7 +154,7 @@ public final class Fetch {
             } finally {
                 out.close();
             }
-            // 长度不符=连接被掐断，交外层重试
+            // 长度不符交给外层重试
             if (body.length >= 0 && written != body.length) {
                 throw new IOException(Lang.t("下载不完整：") + written + " / " + body.length);
             }
@@ -179,7 +179,7 @@ public final class Fetch {
                 int take = (int) Math.min(n, maxBytes - out.size());
                 if (take > 0) out.write(buffer, 0, take);
                 if (out.size() >= maxBytes) {
-                    // 超限报错，不给半截
+                    // 超限报错 不给半截
                     if (in.read() != -1) throw new java.io.IOException("响应超过大小上限");
                     break;
                 }
@@ -239,7 +239,7 @@ public final class Fetch {
             int n;
             while ((n = in.read(buffer)) >= 0) digest.update(buffer, 0, n);
         } catch (Exception e) {
-            // 重放失败就重置摘要，外层会从头下
+            // 重放失败重置摘要
             digest.reset();
         }
     }

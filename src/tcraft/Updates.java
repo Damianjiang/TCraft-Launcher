@@ -39,7 +39,7 @@ public final class Updates {
 
     public static final String RELEASES_URL =
             "https://github.com/Damianjiang/TCraft-Launcher/releases";
-    // 下载统一走官网，用户可在弹窗里自行选节点
+    // 下载走官网 弹窗内选节点
     public static final String DOWNLOAD_URL =
             "https://damianjiang.github.io/TCraft-Launcher/?download=mirror#download";
 
@@ -65,7 +65,7 @@ public final class Updates {
         return url + "/";
     }
 
-    // 0 官方 / 1 自动测速 / 2..6 指定内置节点 / 7 自定义
+    // 0 官方 / 1 测速 / 2..6 节点 / 7 自定义
     private static java.util.List<String> apiBases() {
         java.util.List<String> out = new java.util.ArrayList<>();
         int mode = Data.get().getInt("SystemUpdateMirrorMode", 0);
@@ -91,7 +91,7 @@ public final class Updates {
     }
 
     public static void checkOnStartup(MainWindow win) {
-        // 上次自更新失败时 apply 进程留下的标记：无条件先告诉用户
+        // apply 失败标记先告知用户
         try {
             Path marker = Resources.home().resolve("update").resolve("last-apply-error.txt");
             if (Files.isRegularFile(marker)) {
@@ -159,7 +159,7 @@ public final class Updates {
                 pendingGen = generation;
             }, "TCL-Update");
         } catch (Throwable t) {
-            // 线程创建失败时必须复位，否则自动检查从此全部被拦
+            // 线程创建失败须复位
             checking = false;
             throw t;
         }
@@ -364,7 +364,7 @@ public final class Updates {
 
     private static void showUpdate(MainWindow win, Release release) {
         if (win.hasOpenModal()) {
-            // 用户正开着别的弹窗，更新提示延后到下次检查，不顶掉当前内容
+            // 有弹窗时延后更新提示
             Data.get().log("发现更新但当前有弹窗，跳过提示");
             return;
         }
@@ -409,7 +409,7 @@ public final class Updates {
                         }
                     }));
         } else {
-            // exe 外壳未传自身路径（旧版外壳），替换目标定位不到，只能手动下载
+            // 旧外壳定位不到本体 只能手动下载
             body.getChildren().add(Ui.label(
                     Lang.t("此安装方式暂不支持一键更新，请前往下载手动替换，升级一次后即可一键更新。"), 12, Theme.gray2));
             actions.getChildren().addAll(
@@ -433,7 +433,7 @@ public final class Updates {
 
     private static volatile boolean updating;
 
-    // tag 只保留能安全出现在文件名与 URL 里的字符
+    // tag 只留安全字符
     private static String safeTag(String tag) {
         return (tag == null ? "" : tag.trim()).replaceAll("[^A-Za-z0-9._+-]", "");
     }
@@ -462,7 +462,7 @@ public final class Updates {
 
         Tasks.Task task = new Tasks.Task("下载更新 v" + ver);
 
-        // 进度条由 task.progress 驱动，Fetch 下载时持续写入
+        // 进度由 task.progress 驱动
         Timeline poller = new Timeline(new KeyFrame(Duration.millis(120), e -> {
             bar.setProgress(Math.max(0, Math.min(1, task.progress)));
             pct.setText((int) Math.round(task.progress * 100) + "%"
@@ -532,7 +532,7 @@ public final class Updates {
                 verify(file, release, release.source, () -> task.canceled);
                 if (task.canceled) return;
                 task.state = Tasks.State.DONE;
-                // 窗口已被用户关掉时 FX 退场后 runLater 会被丢弃，直接在 worker 里安装
+                // 窗口关闭时在 worker 安装
                 if (!windowAlive(win)) {
                     Data.get().save();
                     Boot.releaseInstanceLock();
@@ -547,7 +547,7 @@ public final class Updates {
                         poller.stop();
                         win.closeModal();
                         Data.get().save();
-                        // 命令先构建（失败不释放锁），再释放实例锁让新版本立即拿锁启动
+                        // 先构建命令 再释放锁
                         java.util.List<String> installCmd;
                         try {
                             installCmd = SelfUpdate.buildCommand(file,
@@ -562,7 +562,7 @@ public final class Updates {
                         try {
                             SelfUpdate.spawn(installCmd);
                             Data.get().log("已下载 v" + ver + "，正在安装更新并重启");
-                            // 给 Application.stop（EasyTier 停止）留 teardown 时间，再硬退出
+                            // 留 teardown 时间再退出
                             javafx.application.Platform.exit();
                             Thread killer = new Thread(() -> {
                                 try {
@@ -579,7 +579,7 @@ public final class Updates {
                             win.toast("更新失败", Lang.t("无法启动安装进程，请前往下载手动更新。"), 3);
                         }
                     } catch (Throwable t) {
-                        // FX 线程兜底：任何意外都不能让 updating 卡死
+                        // 兜底复位 updating
                         updating = false;
                         Data.get().log("安装收尾失败：" + Log.describe(t));
                     }
@@ -596,7 +596,7 @@ public final class Updates {
                     task.state = Tasks.State.FAILED;
                     task.error = String.valueOf(e);
                     Data.get().log("更新下载失败：" + Log.describe(e));
-                    // 窗口已被用户关掉时不弹失败框，日志里留痕
+                    // 窗口已被用户关掉时不弹失败框 日志里留痕
                     if (windowAlive(win)) {
                         showFailure(win, Lang.t("更新包下载失败：") + Log.describe(e));
                     }
@@ -607,8 +607,8 @@ public final class Updates {
         worker.start();
     }
 
-    // 下载源严格跟随「TCL 更新服务」的当前选中项：指定节点/自定义只按选中源，官方只走官方；测速模式胜出源优先
-    // source 是检查时的快照，用户中途换源时以当前设置为准
+    // 严格跟随当前更新源
+    // 换源后以当前设置为准
     static List<String> downloadBases(String source) {
         List<String> out = new ArrayList<>();
         int mode = Data.get().getInt("SystemUpdateMirrorMode", 0);
@@ -638,7 +638,7 @@ public final class Updates {
                     String text = fetch(base + RELEASES_URL + "/download/" + tag
                             + "/TCraftLauncher-" + ver + ".jar.sha256", "text/plain");
                     String candidate = text.trim().split("\\s+")[0].toLowerCase(java.util.Locale.ROOT);
-                    // 镜像对错误页也可能返回 200，非 64 位十六进制视为该源失败
+                    // 非 64 位 hex 视为源失败
                     if (candidate.matches("[0-9a-f]{64}")) {
                         expect = candidate;
                         break;
@@ -647,7 +647,7 @@ public final class Updates {
                 }
             }
         }
-        // 两条校验腿都拿不到值时宁可放弃更新，也不能把未校验的包写进本体
+        // 无校验值则放弃更新
         if (expect.isEmpty() || !expect.matches("[0-9a-f]{64}")) {
             Files.deleteIfExists(file);
             throw new IOException(Lang.t("未获取到更新包校验值，请到下载页手动更新。"));
@@ -674,7 +674,7 @@ public final class Updates {
         }
     }
 
-    // 检查更新严格按「TCL 更新服务」选中源：官方只走官方族，指定节点/自定义只走选中源，测速竞速取最快
+    // 检查更新跟随选中源
     static Release fetchLatest() throws Exception {
         int mode = Data.get().getInt("SystemUpdateMirrorMode", 0);
         if (mode == 1) return fetchFastest();
@@ -712,7 +712,7 @@ public final class Updates {
         List<String> bases = new ArrayList<>();
         bases.add("");
         bases.addAll(java.util.Arrays.asList(MIRRORS));
-        // 共享池被下载任务占满时竞速会假超时，竞速用自己的临时池
+        // 竞速用临时池
         java.util.concurrent.ExecutorService race = java.util.concurrent.Executors.newFixedThreadPool(
                 bases.size(), r -> {
                     Thread t = new Thread(r, "TCL-Update-Race");
@@ -725,7 +725,7 @@ public final class Updates {
                 race.execute(() -> {
                     try {
                         Release r = fetchApi(base);
-                        // complete 只成功一次，谁先到谁赢
+                        // complete 只成功一次 谁先到谁赢
                         winner.complete(r);
                     } catch (Exception ignored) {
                     }
@@ -749,7 +749,7 @@ public final class Updates {
 
     static Release parseAtom(String xml) throws Exception {
         if (xml != null && !xml.isEmpty() && xml.charAt(0) == '\uFEFF') {
-            xml = xml.substring(1); // 有的源带 BOM，String 解析会报 prolog 错误
+            xml = xml.substring(1); // 有的源带 BOM String 解析会报 prolog 错误
         }
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         factory.setNamespaceAware(false);
@@ -791,7 +791,7 @@ public final class Updates {
 
     static boolean isSnapshotTag(String tag) {
         String t = tag.toLowerCase(java.util.Locale.ROOT);
-        // [._-] 的 - 放类尾，避免被当成范围
+        // [._-] 的 - 放类尾 避免被当成范围
         return t.contains("snapshot") || PRE_RELEASE.matcher(t).find();
     }
 
@@ -818,7 +818,7 @@ public final class Updates {
             throw new IOException("API 返回的 " + tag + " 不在当前测试版开关允许范围内");
         }
         String body = Json.str(obj, "body", "");
-        // GitHub API 的 digest 是权威校验值；镜像路径拿不到就回退 .sha256 资产
+        // digest 优先 回退 .sha256
         String want = "TCraftLauncher-" + clean(tag) + ".jar";
         String sha = "";
         for (Object o : Json.arr(obj, "assets")) {
@@ -854,7 +854,7 @@ public final class Updates {
                 .build();
         HttpResponse<String> response;
         try {
-            // orTimeout 自带定时器，DNS 卡住也能断
+            // orTimeout 自带定时器 DNS 卡住也能断
             response = Http.client().sendAsync(request,
                             HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
                     .orTimeout(6, java.util.concurrent.TimeUnit.SECONDS)
@@ -961,7 +961,7 @@ public final class Updates {
         final String changelog;
         final int versions;
         final String sha256;
-        // 来源源前缀（"" = 官方），下载与日志合并都跟随它
+        // 源前缀跟随更新源
         final String source;
 
         Release(String tag, String changelog) {

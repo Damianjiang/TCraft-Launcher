@@ -27,6 +27,7 @@ import javafx.scene.shape.Rectangle;
 import javafx.scene.text.FontWeight;
 import javafx.util.Duration;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public final class Ui {
@@ -40,7 +41,7 @@ public final class Ui {
     private Ui() {
     }
 
-    // SPLINE 控制点须在 [0,1]，越界会崩在类初始化
+    // SPLINE 控制点须在 [0,1]
     public static Interpolator fluentOut(final double p) {
         return new Interpolator() {
             @Override
@@ -106,6 +107,70 @@ public final class Ui {
         HBox.setHgrow(r, Priority.ALWAYS);
         VBox.setVgrow(r, Priority.ALWAYS);
         return r;
+    }
+
+    // 通用分页条
+    public static HBox pager(int page, int totalPages, int totalItems,
+                             java.util.function.IntConsumer onPage) {
+        int pages = Math.max(1, totalPages);
+        int cur = Math.max(0, Math.min(page, pages - 1));
+        HBox bar = new HBox(8);
+        bar.setAlignment(Pos.CENTER_RIGHT);
+        bar.setMaxWidth(Double.MAX_VALUE);
+        bar.setPadding(new Insets(8, 6, 2, 6));
+        Label info = label("第 " + (cur + 1) + " / " + pages + " 页 · 共 " + totalItems + " 项", 11.5, Theme.gray2);
+        StackPane prev = button("上一页", BTN_NORMAL, () -> {
+            if (cur > 0) onPage.accept(cur - 1);
+        });
+        StackPane next = button("下一页", BTN_NORMAL, () -> {
+            if (cur + 1 < pages) onPage.accept(cur + 1);
+        });
+        if (cur <= 0) {
+            prev.setOpacity(0.4);
+            prev.setMouseTransparent(true);
+        }
+        if (cur + 1 >= pages) {
+            next.setOpacity(0.4);
+            next.setMouseTransparent(true);
+        }
+        bar.getChildren().addAll(info, spacer(), prev, next);
+        return bar;
+    }
+
+    public static ComboBox<String> pageSizeBox(int current) {
+        int[] sizes = {10, 15, 20, 30, 50, 100};
+        int selected = 0;
+        for (int i = 0; i < sizes.length; i++) {
+            if (sizes[i] == current) selected = i;
+        }
+        ComboBox<String> cb = combo(new String[]{"10", "15", "20", "30", "50", "100"}, selected);
+        cb.setPrefWidth(68);
+        cb.setMinWidth(68);
+        cb.setMaxWidth(68);
+        cb.setPrefHeight(28);
+        return cb;
+    }
+
+    public static void dropFiles(Node node, java.util.function.Consumer<List<java.nio.file.Path>> action) {
+        node.setOnDragOver(e -> {
+            if (e.getDragboard().hasFiles()) {
+                e.acceptTransferModes(javafx.scene.input.TransferMode.COPY);
+            }
+            e.consume();
+        });
+        node.setOnDragDropped(e -> {
+            boolean done = false;
+            if (e.getDragboard().hasFiles()) {
+                List<java.nio.file.Path> paths = new ArrayList<>();
+                for (java.io.File file : e.getDragboard().getFiles()) paths.add(file.toPath());
+                if (!paths.isEmpty()) {
+                    done = true;
+                    action.accept(paths);
+                }
+            }
+            e.setDropCompleted(done);
+            e.consume();
+        });
     }
 
     public static HBox row(double spacing, Node... nodes) {
@@ -187,7 +252,7 @@ public final class Ui {
                 });
             }
 
-            // 悬停阴影用 color alpha 插值，DropShadow 无 opacity
+            // DropShadow 无 opacity 用 alpha
             addEventHandler(javafx.scene.input.MouseEvent.MOUSE_ENTERED, e -> {
                 animateGlow(true);
                 titleLabel.setTextFill(Theme.accentDark);
@@ -275,7 +340,7 @@ public final class Ui {
             boolean builtNow = lazyContent != null && !lazyBuilt;
             ensureContent();
             if (builtNow) {
-                // 先让布局跑一帧，否则动画卡首帧
+                // 布局一帧后再动画
                 javafx.application.Platform.runLater(this::runToggle);
             } else {
                 runToggle();
@@ -294,7 +359,7 @@ public final class Ui {
             if (collapse) {
                 double height = content.getHeight() > 0 ? content.getHeight() : expandedHeight;
                 if (height > 600) {
-                    // 长内容只动裁剪防重排
+                    // 只改裁剪 避免重排
                     javafx.scene.shape.Rectangle clip = new javafx.scene.shape.Rectangle();
                     clip.widthProperty().bind(content.widthProperty());
                     clip.setHeight(height);
@@ -514,7 +579,7 @@ public final class Ui {
         animateBg(region, from, to, ms, null);
     }
 
-    // 同槽位先停旧动画，防拽回
+    // 先停旧动画
     static void startExclusive(Node owner, Object slot, javafx.animation.Animation t) {
         Object old = owner.getProperties().put(slot, t);
         if (old instanceof javafx.animation.Animation running) running.stop();
@@ -627,7 +692,7 @@ public final class Ui {
             return new MenuRow(title, icon, action, false, false);
         }
 
-        // 二级菜单入口：原地换内容，不关卡片
+        // 原地换内容
         public static MenuRow submenu(String title, String icon, Runnable action) {
             return new MenuRow(title, icon, action, false, true);
         }
@@ -637,14 +702,14 @@ public final class Ui {
         }
     }
 
-    // 二级菜单靠它拿到同一张卡片
+    // 二级菜单复用卡片
     private static javafx.stage.Popup activeMenu;
 
     public static javafx.stage.Popup activeMenu() {
         return activeMenu;
     }
 
-    // 不含外壳，二级菜单换内容时复用
+    // 换内容时复用
     public static VBox menuRows(MenuRow... rows) {
         VBox box = new VBox(0);
         for (MenuRow row : rows) {
@@ -657,7 +722,7 @@ public final class Ui {
                 box.getChildren().add(sep);
                 continue;
             }
-            // 弹层在页面树外，localize 够不到，创建处直接查表
+            // 弹层创建处翻译
             ListItem item = new ListItem(Theme.icon(row.icon, 16, Theme.text), Lang.t(row.title), null, 34);
             item.setOnMouseClicked(e -> {
                 if (!row.keepOpen) closeMenuCard(activeMenu);
@@ -674,7 +739,7 @@ public final class Ui {
         return showMenuCard(anchor, card);
     }
 
-    // 卡片给投影留的白边
+    // 投影留白
     private static final double MENU_SHADOW_PAD = 14;
 
     private static VBox menuCardShell(double width) {
@@ -692,13 +757,13 @@ public final class Ui {
         int pct = Data.get().getInt("UiMenuOpacity", 100);
         pct = Math.max(0, Math.min(100, pct));
         Color base = Theme.cardBg;
-        // 底色固化 0.85：弹层叠壁纸须有底板，组件不能跟着透
+        // 弹层底色 0.85
         double alpha = Math.max(base.getOpacity(), 0.85) * pct / 100.0;
         if (pct > 0) alpha = Math.max(alpha, 0.30);
         return Color.color(base.getRed(), base.getGreen(), base.getBlue(), alpha);
     }
 
-    // 可用区域=主窗与屏幕交集，取不到退回屏幕
+    // 可用区取窗口与屏幕交集
     private static javafx.geometry.Rectangle2D menuArea(javafx.stage.Window owner,
                                                        javafx.geometry.Rectangle2D screen) {
         if (owner instanceof javafx.stage.Stage) {
@@ -722,7 +787,7 @@ public final class Ui {
         double below = area.getMaxY() - ab.getMaxY() - 16;
         double above = ab.getMinY() - area.getMinY() - 16;
         double usable = Math.max(below, above);
-        if (usable < 200) usable = area.getHeight() - 32;      // 坐标异常时退化成整块区域可用
+        if (usable < 200) usable = area.getHeight() - 32; // 坐标异常时退化成整块区域可用
         return Math.max(160, Math.min(usable - 48, area.getHeight() - 80));
     }
 
@@ -759,7 +824,7 @@ public final class Ui {
         return popup;
     }
 
-    // 二级菜单：同卡换内容，不关窗不重播动画
+    // 同卡换内容
     public static void swapMenuCard(javafx.stage.Popup popup, javafx.scene.Node content, double width) {
         if (popup == null || !popup.isShowing() || popup.getContent().isEmpty()) return;
         javafx.scene.Node old = popup.getContent().get(0);
@@ -779,7 +844,7 @@ public final class Ui {
         box.visual.setOpacity(0);
         box.visual.getProperties().put("menuAnchor", anchor);
 
-        // Popup 显示中改宽无效，须原位重开
+        // 改宽须重开 Popup
         boolean widthChanged = Math.abs(popup.getWidth() - box.vw) > 1;
         popup.getContent().set(0, box.visual);
         popup.setHeight(box.vh);
@@ -802,7 +867,7 @@ public final class Ui {
         in.play();
     }
 
-    // 排版结果：内容节点 + 弹窗整体尺寸（含投影留白）
+    // 内容节点与弹窗尺寸
     private static final class MenuBox {
         javafx.scene.layout.Pane visual;
         double w;
@@ -812,7 +877,7 @@ public final class Ui {
 
     private static MenuBox layoutMenu(VBox card, javafx.geometry.Bounds ab,
                                      javafx.geometry.Rectangle2D area) {
-        // prefWidth 不含 minWidth，兜底加内容最小宽
+        // prefWidth 不含 minWidth
         card.setMinWidth(Region.USE_COMPUTED_SIZE);
         double naturalMin = card.minWidth(-1);
         double w = Math.max(210, Math.max(naturalMin, card.prefWidth(-1)));
@@ -828,7 +893,7 @@ public final class Ui {
         box.w = w;
         box.vw = w + MENU_SHADOW_PAD * 2;
         box.vh = panelH + MENU_SHADOW_PAD * 2;
-        // 统一走滚动壳，放得下时不显滚动条
+        // 放得下时不显示滚动条
         box.visual = scrollShell(card, w, panelH, contentH);
         return box;
     }
@@ -836,7 +901,7 @@ public final class Ui {
     private static double[] placeMenu(MenuBox box, javafx.geometry.Bounds ab,
                                       javafx.geometry.Rectangle2D area) {
         double pad = MENU_SHADOW_PAD;
-        // 候选位置：右/左 × 下/上，取第一个放得下
+        // 取第一个放得下的位置
         double xRight = ab.getMaxX() - box.w - pad;
         double xLeft = ab.getMinX() - pad;
         double yBelow = ab.getMaxY() + 2 - pad;
@@ -855,7 +920,7 @@ public final class Ui {
     }
 
     private static void attachThemeCss(javafx.scene.Node visual) {
-        // Popup 有独立 scene，不继承主窗样式表；手动挂主题 CSS
+        // Popup 独立 scene 手动挂 CSS
         try {
             if (visual.getScene() != null && Theme.css() != null) {
                 visual.getScene().getStylesheets().setAll(Theme.css().toExternalForm());
@@ -864,7 +929,7 @@ public final class Ui {
         }
     }
 
-    // 滚动壳：外层卡尺寸内层裁圆角；不用 ScrollPane（裁背景）
+    // 滚动壳自绘 避免 ScrollPane 裁背景
     private static javafx.scene.layout.Pane scrollShell(VBox card, double w, double viewH, double contentH) {
         final double pad = MENU_SHADOW_PAD;
         final double vw = w + pad * 2;
@@ -886,7 +951,7 @@ public final class Ui {
         clip.setArcHeight(20);
         view.setClip(clip);
 
-        // 视口会裁阴影，投影单独垫一层
+        // 投影单独垫层
         javafx.scene.layout.Region back = new javafx.scene.layout.Region();
         back.setManaged(false);
         back.resizeRelocate(pad, pad, w, viewH);
@@ -899,7 +964,7 @@ public final class Ui {
         card.setLayoutX(0);
         card.setLayoutY(0);
         card.setPrefHeight(contentH);
-        card.setEffect(null);          // 阴影已由底板负责，卡片再画一次会被裁出硬边
+        card.setEffect(null); // 阴影已由底板负责 卡片再画一次会被裁出硬边
         view.getChildren().add(card);
 
         final double barW = 5;
@@ -1011,7 +1076,7 @@ public final class Ui {
         out.play();
     }
 
-    // 列表行内按钮：点击不冒泡到整行
+    // 行内按钮不冒泡
     public static StackPane listAction(String icon, double size, double iconSize, String tooltip, Runnable action) {
         StackPane pane = iconButton(icon, size, iconSize, tooltip, action);
         pane.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED,
@@ -1513,7 +1578,7 @@ public final class Ui {
         private boolean pressed;
         private Color textColor = Theme.text;
         private Runnable onAction;
-        // 停掉上一段动画，不然旧动画会把勾拉回去
+        // 先停旧动画
         private javafx.animation.Animation checkAnim;
         private javafx.animation.Animation boxAnim;
 
@@ -1788,7 +1853,7 @@ public final class Ui {
             back.setMouseTransparent(true);
             fore.setMouseTransparent(true);
             dot.setMouseTransparent(true);
-            // Pane 按 pref 重排 managed 子节点，滑条需自行定位
+            // 滑条自行定位
             back.setManaged(false);
             fore.setManaged(false);
             dot.setManaged(false);
@@ -2058,6 +2123,21 @@ public final class Ui {
         return iv;
     }
 
+    public static ImageView image(Image img, double w, double h, boolean rounded) {
+        ImageView iv = new ImageView(img);
+        iv.setFitWidth(w);
+        iv.setFitHeight(h);
+        iv.setPreserveRatio(false);
+        iv.setSmooth(true);
+        if (rounded) {
+            Rectangle clip = new Rectangle(w, h);
+            clip.setArcWidth(10);
+            clip.setArcHeight(10);
+            iv.setClip(clip);
+        }
+        return iv;
+    }
+
     public static StackPane avatar(Data.Account account, double size) {
         StackPane box = new StackPane();
         box.setPrefSize(size, size);
@@ -2104,7 +2184,7 @@ public final class Ui {
             glyph.setStroke(Theme.accent);
             javafx.geometry.Bounds b = glyph.getLayoutBounds();
             double gs = 35.0 / b.getHeight();
-            glyph.setStrokeWidth(2 / gs); // 原始路径 963×948，缩放后补回 2px 线宽
+            glyph.setStrokeWidth(2 / gs); // 原始路径 963×948 缩放后补回 2px 线宽
             double gw = b.getWidth() * gs;
             glyph.setScaleX(gs);
             glyph.setScaleY(gs);
@@ -2252,7 +2332,7 @@ public final class Ui {
         return pill;
     }
 
-    // 带标题、阶段和百分比的加载卡片
+    // 加载卡片
     public static final class LoadCard extends StackPane {
         private static final double BAR_W = 300;
         private final Label titleLabel;
@@ -2289,7 +2369,7 @@ public final class Ui {
             VBox box = new VBox(9, titleLabel, bar, foot);
             box.setFillWidth(true);
             getChildren().add(box);
-            // 脱离场景即停表，页面切走后节点才能回收
+            // 脱离场景即停表
             sceneProperty().addListener((o, oldScene, newScene) -> {
                 if (newScene == null) stopLoop();
                 else if (indeterminate) startLoop();

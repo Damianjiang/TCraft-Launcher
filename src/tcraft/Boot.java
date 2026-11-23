@@ -20,13 +20,13 @@ public final class Boot {
     }
 
     public static void main(String[] args) {
-        // 更新进程在碰配置和实例锁之前只做文件替换，然后拉起新版本
+        // 更新进程先替换文件 再拉起新版本
         if (args.length == 2 && args[0].equals("--apply-to")) {
             Path oldFile = Paths.get(args[1]);
             try {
                 SelfUpdate.applyUpdate(oldFile);
             } catch (Throwable t) {
-                // javaw 链上 stderr 不可见，失败必须落进日志文件并留下用户可见的标记
+                // javaw 无 stderr 失败落盘并留标记
                 System.err.println("[TCL] 应用更新失败：" + t);
                 t.printStackTrace();
                 try {
@@ -37,7 +37,7 @@ public final class Boot {
                 } catch (Throwable ignored) {
                 }
                 try {
-                    // 本体在失败路径下保持完好，把旧版本拉回来，不让用户失去界面
+                    // 失败时保留本体并回滚旧版
                     SelfUpdate.startJava(oldFile);
                 } catch (Throwable ignored) {
                 }
@@ -88,7 +88,7 @@ public final class Boot {
     }
 
     private static boolean acquireInstanceLock() {
-        // stub 互斥量已失效，长期单实例靠此文件锁
+        // stub 互斥量已失效 长期单实例靠此文件锁
         Path lockFile = Resources.home().resolve("launcher.lock");
         for (int attempt = 0; attempt < 20; attempt++) {
             try {
@@ -146,7 +146,7 @@ public final class Boot {
                 System.setProperty("prism.targetvblank", String.valueOf(fps));
             }
             if ("true".equalsIgnoreCase(p.getProperty("SystemDisableHardwareAcceleration", "false"))) {
-                // 关闭 GPU 管线，兼容老显卡与远程桌面
+                // 关闭 GPU 管线 兼容老显卡与远程桌面
                 System.setProperty("prism.order", "sw");
                 System.setProperty("prism.forceGPU", "false");
                 System.setProperty("prism.vsync", "false");
@@ -154,7 +154,7 @@ public final class Boot {
             if ("true".equalsIgnoreCase(p.getProperty("SystemDebugMode", "false"))) {
                 System.setProperty("prism.verbose", "true");
             }
-            // Data.get() 前的语言读取点；0简/1英/2繁/3随系统
+            // Data.get() 前读语言 0简/1英/2繁/3系统
             Lang.setMode(parseInt(p.getProperty("SystemLanguage", "0")));
         } catch (Throwable ignored) {
             // 配置损坏按默认启动
@@ -184,7 +184,7 @@ public final class Boot {
         String full = text + (crash == null ? "" : Lang.t("\n\n详细堆栈已写入：\n") + crash)
                 + Lang.t("\n\n请不要发送截图，点「导出错误报告」保存日志，再把文件发到 TCL 交流群（1131373915）。");
         if (Shell.mac()) {
-            // 已带 JavaFX 勿再起 Swing：用系统对话框提示，再打开日志目录
+            // 已带 JavaFX 时用系统对话框 不再起 Swing
             System.err.println(full);
             Shell.macAlert(Lang.t("TCraft Launcher 启动失败"), full);
             try {
@@ -195,7 +195,7 @@ public final class Boot {
         }
         System.err.println(full);
         try {
-            // 「退出」是联机语境，程序退出用「退出程序」
+            // 退出是联机语境 程序退出用退出程序
             Object[] options = {Lang.t("导出错误报告"), Lang.t("退出程序")};
             int res = javax.swing.JOptionPane.showOptionDialog(null, full, Lang.t("TCraft Launcher 启动失败"),
                     javax.swing.JOptionPane.DEFAULT_OPTION, javax.swing.JOptionPane.ERROR_MESSAGE,
@@ -234,7 +234,7 @@ public final class Boot {
             sb.append("\n===== 完整日志 =====\n");
             String dump = Log.exportAll();
             sb.append(dump.isEmpty() ? "（暂无日志）\n" : dump);
-            // 带 BOM，记事本/QQ 打开不乱码
+            // UTF-8 BOM 记事本/QQ 不乱码
             Files.writeString(file, "\uFEFF" + Redact.apply(sb.toString()), java.nio.charset.StandardCharsets.UTF_8);
             try {
                 Shell.openFolder(dir.toString());
@@ -244,7 +244,7 @@ public final class Boot {
         }
     }
 
-    // 日志可能几十 MB，只留尾部
+    // 日志可能几十 MB 只留尾部
     static Path writeCrash(Throwable t) {
         return Log.crash(t);
     }

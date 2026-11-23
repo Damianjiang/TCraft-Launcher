@@ -17,11 +17,11 @@ import java.util.regex.Pattern;
 
 public final class SelfUpdate {
 
-    // jar 内置外壳：按本体后缀取新外壳，修复随更新传播
+    // jar 内置外壳 按后缀取用
     private static final String WIN_STUB = "/res/launcher/win.exe";
     private static final String SH_HEADER = "/res/launcher/linux.sh";
 
-    // 仅还原旧文件名里的版本号；桌面上不带版本号的名字不动
+    // 只还原文件名版本号
     private static final Pattern VERSIONED = Pattern.compile(
             "^(TCraftLauncher-)(\\d+(?:\\.\\d+)*)(-win\\.exe|\\.exe|\\.jar|\\.sh|-linux\\.sh|\\.command)$",
             Pattern.CASE_INSENSITIVE);
@@ -37,7 +37,7 @@ public final class SelfUpdate {
         }
     }
 
-    // 本次更新要替换的本体；null 表示定位不到，只能手动下载
+    // 待替换本体 null 表示定位失败
     public static Path target() {
         String prop = System.getProperty("tcraft.exe", "").trim();
         if (!prop.isEmpty()) {
@@ -54,12 +54,12 @@ public final class SelfUpdate {
         if (dir.isEmpty() || !jar.toAbsolutePath().startsWith(Paths.get(dir).toAbsolutePath())) {
             return jar;
         }
-        // exe 外壳把 jar 解到 .tcl 里运行，本体是 .tcl 上级目录里内容一致的 exe
+        // 本体是 .tcl 上级目录中的 exe
         Path parent = Paths.get(dir).toAbsolutePath().getParent();
         return parent == null ? null : scanLauncher(parent, jar);
     }
 
-    // 旧外壳不传自身路径，按「外壳长度 + 内容哈希与运行中 jar 一致」锁定本体；多命中时优先规范命名
+    // 旧外壳按长度与哈希定位本体
     static Path scanLauncher(Path dir, Path runningJar) {
         try {
             byte[] jarHash = fileHash(runningJar);
@@ -87,7 +87,7 @@ public final class SelfUpdate {
         return null;
     }
 
-    // Boot --apply-to <本体>：把本体替换成自己，再拉起新版本
+    // Boot --apply-to 替换本体并拉起新版
     public static void applyUpdate(Path oldFile) throws IOException {
         Path self = selfJar();
         if (oldFile.toAbsolutePath().equals(self.toAbsolutePath())) return;
@@ -97,7 +97,7 @@ public final class SelfUpdate {
         try {
             startJava(next);
         } catch (IOException e) {
-            // 拉起失败：把名字改回去，Boot 的兜底才能把旧版本拉起来
+            // 拉起失败改回名字
             if (!next.equals(oldFile)) {
                 try {
                     Files.move(next, oldFile, StandardCopyOption.REPLACE_EXISTING);
@@ -108,7 +108,7 @@ public final class SelfUpdate {
         }
     }
 
-    // 本体须为本启动器三形态之一（stub+jar / sh+jar / 纯 jar），防 --apply-to 指错文件
+    // 只接受三种本体形态
     private static void validateLauncher(Path oldFile) throws IOException {
         try (java.util.jar.JarFile jf = new java.util.jar.JarFile(oldFile.toFile())) {
             var attrs = jf.getManifest() == null ? null : jf.getManifest().getMainAttributes();
@@ -122,8 +122,8 @@ public final class SelfUpdate {
         }
     }
 
-    // 外壳优先用新 jar 内置资源（本体后缀决定用哪个），缺失才沿用旧文件的外壳
-    // 先写临时文件并校验，再原子覆盖本体；任何失败路径下本体都保持完好
+    // 优先用新 jar 内置外壳
+    // 临时文件校验后原子覆盖
     static void replace(Path oldFile, Path newJar) throws IOException {
         byte[] head = newHeaderFor(oldFile);
         Path tmp = oldFile.resolveSibling(oldFile.getFileName() + ".update-tmp");
@@ -143,7 +143,7 @@ public final class SelfUpdate {
                 throw new IOException("更新包写入校验失败");
             }
             copyPermissions(oldFile, tmp);
-            // Windows 下旧进程句柄会占住本体，共享冲突是 FileSystemException 而非 AccessDeniedException
+            // 旧进程占用时是 FileSystemException
             for (int attempt = 0; attempt < 50; attempt++) {
                 try {
                     Files.move(tmp, oldFile, StandardCopyOption.REPLACE_EXISTING);
@@ -165,7 +165,7 @@ public final class SelfUpdate {
         }
     }
 
-    // 保留本体 POSIX 权限（.sh 执行位）；Windows 跳过
+    // 保留 POSIX 执行位
     private static void copyPermissions(Path from, Path to) {
         try {
             Files.setPosixFilePermissions(to, Files.getPosixFilePermissions(from));
@@ -182,7 +182,7 @@ public final class SelfUpdate {
         try (InputStream in = SelfUpdate.class.getResourceAsStream(res)) {
             if (in != null) return in.readAllBytes();
         }
-        // 过渡构建没内置外壳，沿用旧文件的外壳
+        // 过渡构建没内置外壳 沿用旧文件的外壳
         int header = headerLength(oldFile);
         byte[] head = new byte[header];
         try (InputStream in = Files.newInputStream(oldFile)) {
@@ -196,7 +196,7 @@ public final class SelfUpdate {
         return head;
     }
 
-    // InputStream.skip 不保证一次跳满，循环跳到目标位置
+    // InputStream.skip 不保证一次跳满 循环跳到目标位置
     private static void skipFully(InputStream in, long n) throws IOException {
         long skipped = 0;
         while (skipped < n) {
@@ -210,7 +210,7 @@ public final class SelfUpdate {
         }
     }
 
-    // 与 launcher.c 的 jar_offset 同一公式：eocd - 目录大小 - 目录偏移
+    // 与 launcher.c 同一 jar_offset 公式
     static int headerLength(Path file) throws IOException {
         long size = Files.size(file);
         if (size < 100) throw new IOException("文件过小：" + file.getFileName());
@@ -285,11 +285,11 @@ public final class SelfUpdate {
         spawn(buildCommand(file, appArgs));
     }
 
-    // 先构建命令再 spawn：构建失败不释放锁
+    // 先构建命令再 spawn 构建失败不释放锁
     static java.util.List<String> buildCommand(Path file, String... appArgs) throws IOException {
         java.util.List<String> cmd;
         try {
-            // 运行库就绪时直连模块路径，否则走 bootstrap 引导
+            // 运行库就绪时直连模块路径 否则走 bootstrap 引导
             cmd = Resources.directLaunchCommand(file.toAbsolutePath(), appArgs);
         } catch (Throwable ignored) {
             cmd = null;

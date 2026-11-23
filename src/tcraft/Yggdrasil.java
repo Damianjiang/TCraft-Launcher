@@ -30,7 +30,7 @@ public final class Yggdrasil {
     public static final class Profile {
         public final String id;
         public final String name;
-        // textures 为签名后的 base64 皮肤数据
+        // 签名后的 base64 皮肤数据
         public final Map<String, String> properties = new java.util.LinkedHashMap<>();
 
         Profile(String id, String name) {
@@ -213,7 +213,7 @@ public final class Yggdrasil {
         }
     }
 
-    // 统一通行证只存服务器码，还原完整 API 地址
+    // 只存服务器码 还原 API 地址
     public static Server accountServer(Data.Account account) {
         if (account == null) return null;
         if ("nide".equals(account.userType)) {
@@ -234,7 +234,7 @@ public final class Yggdrasil {
             URI uri = URI.create(server.apiRoot);
             if ("https".equalsIgnoreCase(uri.getScheme())) return;
             String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(java.util.Locale.ROOT);
-            // IPv6 字面量会连方括号一起返回，[::1] 要先剥壳再比
+            // IPv6 返回值可能带方括号
             if (host.startsWith("[") && host.endsWith("]")) host = host.substring(1, host.length() - 1);
             if ("localhost".equals(host) || "127.0.0.1".equals(host)
                     || "::1".equals(host) || "0:0:0:0:0:0:0:1".equals(host)) return;

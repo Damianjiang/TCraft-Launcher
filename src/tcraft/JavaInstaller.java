@@ -32,7 +32,7 @@ public final class JavaInstaller {
         boolean x86 = arch.equals("x86") || arch.equals("i386");
         if (os.contains("win")) return arm ? "windows-arm64" : x86 ? "windows-x86" : "windows-x64";
         if (os.contains("mac") || os.contains("darwin")) return arm ? "mac-os-arm64" : "mac-os";
-        // Mojang 没有发布 Linux ARM64 运行时，走手动安装
+        // Mojang 没有发布 Linux ARM64 运行时 走手动安装
         if (arm) return "";
         if (x86) return "linux-i386";
         return "linux";
@@ -48,7 +48,7 @@ public final class JavaInstaller {
                                java.util.function.DoubleConsumer progress) throws Exception {
         String key = platformKey();
         if (key.isEmpty()) throw new IOException(Lang.t("当前平台不受 Mojang Java 运行时支持"));
-        // source 同 Downloader.mirrors：1=仅官方
+        // source 同 Downloader.mirrors
         String text = Data.get().getInt("SystemDownloadSource", 0) == 1
                 ? Downloader.getText(ALL_JSON)
                 : Downloader.getText(ALL_JSON_BMCL, ALL_JSON);
@@ -84,7 +84,7 @@ public final class JavaInstaller {
                 String rel = e.getKey();
                 Map<String, Object> file = Json.obj(e.getValue());
                 String type = Json.str(file, "type", "file");
-                // 清单路径不可信，../ 会越出临时目录
+                // 清单路径须限制在临时目录
                 Path dst = temp.resolve(rel).normalize();
                 if (!dst.startsWith(temp)) throw new IOException(Lang.t("清单包含非法路径：") + rel);
                 if ("directory".equals(type)) {
@@ -94,7 +94,7 @@ public final class JavaInstaller {
                     String linkTarget = Json.str(file, "target", "");
                     if (linkTarget.startsWith("/") || linkTarget.startsWith("\\")) continue;
                     try {
-                        // 相对链接允许 ../，但须仍落在临时目录内
+                        // 相对链接不得越出临时目录
                         Path resolved = dst.getParent().resolve(linkTarget).normalize();
                         if (!resolved.startsWith(temp)) continue;
                         Files.createDirectories(dst.getParent());
@@ -189,7 +189,7 @@ public final class JavaInstaller {
             }
             Path exe = target.resolve("bin").resolve(Shell.windows() ? "java.exe" : "java");
             if (!Files.isRegularFile(exe) && Shell.mac()) {
-                // macOS 的 JRE 通常在 jre.bundle/Contents/Home 下
+                // macOS JRE 在 Contents/Home
                 Path bundled = target.resolve("jre.bundle").resolve("Contents").resolve("Home")
                         .resolve("bin").resolve("java");
                 if (Files.isRegularFile(bundled)) exe = bundled;

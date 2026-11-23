@@ -3,7 +3,7 @@ package tcraft;
 import java.util.ArrayList;
 import java.util.List;
 
-// 加速镜像：路径与官方一致，默认关闭，选镜像后优先走镜像、失败回退官方
+// 加速镜像 默认关闭 失败回退官方
 public final class Mirrors {
 
     public static final String PRESET = "https://mod.mcimirror.top";

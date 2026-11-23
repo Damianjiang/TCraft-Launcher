@@ -121,7 +121,7 @@ public class PageInstanceSetup implements Page {
             item.addAction(reset);
         }
         if ("mods".equals(key) || "saves".equals(key) || "screenshots".equals(key)) {
-            StackPane refresh = Ui.iconButton("refresh-cw", 22, 13, "刷新", () -> win.refreshRight());
+            StackPane refresh = Ui.iconButton("refresh-cw", 22, 13, "刷新", () -> win.refreshRightWithLoading());
             refresh.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED, e -> e.consume());
             item.addAction(refresh);
         }
@@ -334,7 +334,7 @@ public class PageInstanceSetup implements Page {
                 st.filter(Files::isRegularFile)
                         .sorted(java.util.Comparator.comparingLong((Path p) -> p.toFile().lastModified()).reversed())
                         .limit(12)
-                        // 下拉项是拼接串，localize 只翻译整项文本，须创建时翻译
+                        // 下拉项创建处翻译
                         .forEach(p -> diagAddSource(Lang.tf("崩溃报告 · %s", p.getFileName()), p));
             } catch (Exception ignored) {
             }
@@ -431,7 +431,7 @@ public class PageInstanceSetup implements Page {
         diagDisplay.clear();
         int index = diagSourceCombo == null ? -1 : diagSourceCombo.getSelectionModel().getSelectedIndex();
         if (index < 0 || index >= diagSourcePaths.size()) {
-            // runLater/异步回调后 localize 不经过，状态文本创建处翻译
+            // 异步状态文本创建处翻译
             diagStatus.setText(Lang.t("没有可用的日志来源。"));
             diagPath.setText("");
             diagApplyFilter();
@@ -440,7 +440,7 @@ public class PageInstanceSetup implements Page {
         Path target = diagSourcePaths.get(index);
         diagPath.setText(target.toString());
         diagStatus.setText(Lang.t("正在读取…"));
-        // 代次计数，防旧异步结果覆盖
+        // 代次防旧结果覆盖
         final int gen = ++diagLoadGen;
         Thread t = new Thread(() -> {
             java.util.List<String[]> result = new ArrayList<>();
@@ -847,7 +847,7 @@ public class PageInstanceSetup implements Page {
                     optionDirty = true;
                     win.closeModal();
                     win.openSetup("options");
-                    // toast 只查整串，拼接串创建时翻译
+                    // toast 拼接串创建处翻译
                     win.toast(Lang.t("已套用预设「") + preset.getFileName().toString().replace(".json", "") + Lang.t("」"),
                             Lang.t("共 ") + applied + Lang.t("项。记得点「保存修改」写入 options.txt。"), 1);
                 } catch (Exception ex) {
@@ -1045,7 +1045,7 @@ public class PageInstanceSetup implements Page {
         }
         java.util.List<String> javaOpts = new ArrayList<>();
         java.util.List<String> javaPaths = new ArrayList<>();
-        // 下拉项是拼接串，localize 只查整串，创建时翻译
+        // 下拉项创建处翻译
         String followLabel = Lang.tf("跟随全局设置（%s）", data.javaPath.isEmpty() ? Lang.t("未找到 Java")
                 : Paths.get(data.javaPath).getFileName());
         javaOpts.add(followLabel);
@@ -1161,43 +1161,77 @@ public class PageInstanceSetup implements Page {
                     data.downloadCategory = "Mod";
                     win.openPage("download", true);
                 }),
-                Ui.button("刷新", Ui.BTN_NORMAL, () -> win.refreshRight()));
+                Ui.button("刷新", Ui.BTN_NORMAL, () -> win.refreshRightWithLoading()));
         page.getChildren().add(actions);
         VBox.setMargin(page.getChildren().get(page.getChildren().size() - 1), new Insets(0, 0, 12, 0));
         Ui.Card card = addCard(page, "已安装 Mod");
         if (mods.isEmpty()) {
-            card.add(Ui.label("这个实例的 mods 文件夹是空的。\n点击「安装 Mod」选择文件，或把 .jar 放入 mods 文件夹后点击刷新。", 12.5, Theme.gray2));
+            Label empty = Ui.label("这个实例的 mods 文件夹是空的。\n点击「安装 Mod」选择文件，或把 .jar 直接拖进来。", 12.5, Theme.gray2);
+            empty.setWrapText(true);
+            card.add(empty);
         } else {
             String[] filter = {"0"};
+            int[] pageNo = {0};
+            int[] pageSize = {pageSize("UiPageSizeMods", 20)};
             HBox filterRow = new HBox(6);
-            Runnable[] renderRef = new Runnable[1];
-            renderRef[0] = () -> {
-                filterRow.getChildren().clear();
-                long en = mods.stream().filter(p -> !isDisabledPack(p)).count();
-                String[] opts = {"全部", "启用 (" + en + ")", "禁用 (" + (mods.size() - en) + ")"};
-                for (int i = 0; i < opts.length; i++) {
-                    String label = opts[i];
-                    int idx = i;
-                    boolean active = filter[0].equals(String.valueOf(idx));
-                    filterRow.getChildren().add(Ui.button(label, active ? Ui.BTN_THEME : Ui.BTN_NORMAL, () -> {
-                        filter[0] = String.valueOf(idx);
-                        renderRef[0].run();
-                    }));
-                }
-            };
-            renderRef[0].run();
+            VBox rows = new VBox(0);
+            ComboBox<String> sizeBox = Ui.pageSizeBox(pageSize[0]);
+            sizeBox.setOnAction(e -> {
+                pageSize[0] = Integer.parseInt(sizeBox.getValue());
+                data.set("UiPageSizeMods", pageSize[0]);
+                pageNo[0] = 0;
+                renderModList(page, mods, filter, pageNo, pageSize, filterRow, rows, modsDir);
+            });
+            HBox sizeRow = new HBox(6, Ui.label("每页", 11.5, Theme.gray2), sizeBox);
+            renderModList(page, mods, filter, pageNo, pageSize, filterRow, rows, modsDir);
             card.add(filterRow);
             VBox.setMargin(filterRow, new Insets(0, 0, 6, 0));
-            VBox rows = new VBox(0);
+            card.add(sizeRow);
             card.add(rows);
-            int f = Integer.parseInt(filter[0]);
-            for (Path mod : mods) {
-                boolean enabled = !isDisabledPack(mod);
-                if (f == 1 && !enabled) continue;
-                if (f == 2 && enabled) continue;
-                rows.getChildren().add(modRow(modsDir, mod));
-            }
         }
+        Ui.dropFiles(page, files -> importMods(modsDir, files));
+    }
+
+    private void renderModList(VBox page, List<Path> mods, String[] filter, int[] pageNo, int[] pageSize,
+                               HBox filterRow, VBox rows, Path modsDir) {
+        filterRow.getChildren().clear();
+        long en = mods.stream().filter(p -> !isDisabledPack(p)).count();
+        String[] opts = {"全部 (" + mods.size() + ")", "启用 (" + en + ")", "禁用 (" + (mods.size() - en) + ")"};
+        for (int i = 0; i < opts.length; i++) {
+            String label = opts[i];
+            int idx = i;
+            boolean active = filter[0].equals(String.valueOf(idx));
+            filterRow.getChildren().add(Ui.button(label, active ? Ui.BTN_THEME : Ui.BTN_NORMAL, () -> {
+                filter[0] = String.valueOf(idx);
+                pageNo[0] = 0;
+                renderModList(page, mods, filter, pageNo, pageSize, filterRow, rows, modsDir);
+            }));
+        }
+        List<Path> visible = new java.util.ArrayList<>();
+        int f = Integer.parseInt(filter[0]);
+        for (Path mod : mods) {
+            boolean enabled = !isDisabledPack(mod);
+            if (f == 1 && !enabled) continue;
+            if (f == 2 && enabled) continue;
+            visible.add(mod);
+        }
+        int pages = Math.max(1, (visible.size() + pageSize[0] - 1) / pageSize[0]);
+        pageNo[0] = Math.min(pageNo[0], pages - 1);
+        int from = pageNo[0] * pageSize[0];
+        int to = Math.min(from + pageSize[0], visible.size());
+        rows.getChildren().clear();
+        for (int i = from; i < to; i++) rows.getChildren().add(modRow(modsDir, visible.get(i)));
+        if (pages > 1) {
+            rows.getChildren().add(Ui.pager(pageNo[0], pages, visible.size(), targetPage -> {
+                pageNo[0] = targetPage;
+                renderModList(page, mods, filter, pageNo, pageSize, filterRow, rows, modsDir);
+            }));
+        }
+    }
+
+    private int pageSize(String key, int fallback) {
+        int value = data.getInt(key, fallback);
+        return value > 0 && value <= 100 ? value : fallback;
     }
 
     private Node modRow(Path modsDir, Path mod) {
@@ -1237,7 +1271,7 @@ public class PageInstanceSetup implements Page {
         return item;
     }
 
-    // 读盘操作，须在后台线程调用；不读缓存
+    // 读盘须后台 不读缓存
     private static String readLocalModName(Path mod) {
         String found = "";
         try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(mod.toFile())) {
@@ -1298,22 +1332,14 @@ public class PageInstanceSetup implements Page {
                 "*.jar", "*.litemod", "*.zip", "*.disabled"));
         List<File> files = chooser.showOpenMultipleDialog(win.stage);
         if (files == null || files.isEmpty()) return;
-        try {
-            Files.createDirectories(modsDir);
-            for (File f : files) {
-                String enabledName = f.getName();
-                if (enabledName.toLowerCase(java.util.Locale.ROOT).endsWith(".disabled")) {
-                    enabledName = enabledName.substring(0, enabledName.length() - ".disabled".length());
-                }
-                if (!enabledName.contains(".")) enabledName += ".jar";
-                Path target = modsDir.resolve(enabledName);
-                Files.copy(f.toPath(), target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-            }
-            win.toast(Lang.tf("已安装 %d 个 Mod", files.size()), "", 1);
-            win.refreshRight();
-        } catch (Exception e) {
-            win.toast("安装失败", e.getMessage(), 3);
-        }
+        importMods(modsDir, files.stream().map(File::toPath).toList());
+    }
+
+    private void importMods(Path modsDir, List<Path> files) {
+        if (files == null || files.isEmpty()) return;
+        Imports.run(win, "正在导入 Mod", "mods", modsDir, files, name ->
+                name.endsWith(".jar") || name.endsWith(".litemod") || name.endsWith(".zip"),
+                false, () -> win.refreshRight());
     }
 
     private void toggleMod(Path mod, boolean disabled) {
@@ -1392,7 +1418,7 @@ public class PageInstanceSetup implements Page {
 
     private void deleteFile(Path file, String kind) {
         Dialogs.confirm(win, Lang.tf("删除%s", Lang.t(kind)), Lang.tf("确定要删除 %s 吗？文件将移入回收站。", file.getFileName()), () -> {
-            // 回收站要等 PowerShell 进程，不能放 FX 线程
+            // 回收站等待 PS 勿占 FX
             Thread worker = new Thread(() -> {
                 boolean ok = Shell.deleteToRecycleBin(file.toString());
                 javafx.application.Platform.runLater(() -> {
@@ -1433,7 +1459,7 @@ public class PageInstanceSetup implements Page {
                             win.toast("已是最新版本", display + " · " + cur[1], 1));
                     return;
                 }
-                // 四段拼接整串查不到表，合并成单个完整键在创建处格式化
+                // 四段拼接用完整键
                 javafx.application.Platform.runLater(() -> Dialogs.confirm(win, "发现更新",
                         Lang.tf("%s 有新版本：%s\n新文件：%s\n\n新版本 Mod 可能不兼容旧存档或者其他 Mod，这可能导致游戏崩溃，甚至永久损坏存档。"
                                 + "\n如果你在游玩整合包，请千万不要自行更新 Mod。更新前请先备份存档。"
@@ -1463,7 +1489,7 @@ public class PageInstanceSetup implements Page {
             try {
                 task.subs.get(0).state = Tasks.State.RUNNING;
                 task.stage = "下载 " + fileName;
-                // 同名时先挪开旧文件，否则回收站会连新文件一起删
+                // 同名先挪旧文件
                 if (Files.exists(oldMod) && target.equals(oldMod.toAbsolutePath().normalize())) {
                     backup[0] = modsDir.resolve(oldMod.getFileName() + ".tcl-old");
                     Files.move(oldMod, backup[0], java.nio.file.StandardCopyOption.REPLACE_EXISTING);
@@ -1527,48 +1553,95 @@ public class PageInstanceSetup implements Page {
                         win.toast("无法打开", e.getMessage(), 3);
                     }
                 }),
-                Ui.button("刷新", Ui.BTN_NORMAL, () -> win.refreshRight()));
+                Ui.button("导入 " + label, Ui.BTN_NORMAL, () -> installPacks(dir, label)),
+                Ui.button("刷新", Ui.BTN_NORMAL, () -> win.refreshRightWithLoading()));
         page.getChildren().add(actions);
         VBox.setMargin(page.getChildren().get(page.getChildren().size() - 1), new Insets(0, 0, 12, 0));
         Ui.Card card = addCard(page, Lang.tf("%s列表", Lang.t(label)));
         if (packs.isEmpty()) {
-            Label empty = Ui.label(Lang.tf("这个文件夹是空的。把 %s 的 .zip 或文件夹放入 %s 后点击刷新。",
-                    Lang.t(label), folder), 12.5, Theme.gray2);
+            Label empty = Ui.label(Lang.tf("这个文件夹是空的。把 %s 的 .zip 直接拖进来，或点「导入 %s」。",
+                    Lang.t(label), Lang.t(label)), 12.5, Theme.gray2);
             empty.setWrapText(true);
             card.add(empty);
         } else {
-            for (Path pack : packs) {
-                String name = pack.getFileName().toString();
-                boolean disabled = isDisabledPack(pack);
-                boolean isFolderPack = Files.isDirectory(pack);
-                String display = disabled ? name.substring(0, name.length() - ".disabled".length()) : name;
-                String info = disabled ? "已禁用" : isFolderPack ? "文件夹包" : sizeOf(pack);
-                Ui.ListItem item = new Ui.ListItem(Theme.icon(disabled ? "link-2-off" : isFolderPack ? "folder" : "image", 16,
-                        disabled ? Theme.gray4 : Theme.accent), display, info, 40);
-                StackPane toggle = Ui.listAction("power", 26, 15, disabled ? "启用" : "禁用",
-                        () -> togglePack(pack, disabled, folder));
-                item.addAction(toggle);
-                if (isShader && !disabled) {
-                    StackPane use = Ui.listAction("circle-check", 26, 15, "设为当前使用", () -> {
-                        Threads.start("TCL-ShaderUse", () -> {
-                            writeOption(root, "shaderPack", display);
-                            javafx.application.Platform.runLater(() -> {
-                                win.toast("已设为当前光影包", display, 1);
-                                win.refreshRight();
-                            });
+            int[] pageNo = {0};
+            int[] pageSize = {pageSize("UiPageSizePacks", 20)};
+            VBox rows = new VBox(0);
+            ComboBox<String> sizeBox = Ui.pageSizeBox(pageSize[0]);
+            sizeBox.setOnAction(e -> {
+                pageSize[0] = Integer.parseInt(sizeBox.getValue());
+                data.set("UiPageSizePacks", pageSize[0]);
+                pageNo[0] = 0;
+                renderPacks(root, dir, folder, label, isShader, packs, pageNo, pageSize, rows);
+            });
+            HBox sizeRow = new HBox(6, Ui.label("每页", 11.5, Theme.gray2), sizeBox);
+            card.add(sizeRow);
+            card.add(rows);
+            renderPacks(root, dir, folder, label, isShader, packs, pageNo, pageSize, rows);
+        }
+        Ui.dropFiles(page, files -> importPacks(dir, label, files));
+    }
+
+    private void renderPacks(Path root, Path dir, String folder, String label, boolean isShader,
+                              List<Path> packs, int[] pageNo, int[] pageSize, VBox rows) {
+        int pages = Math.max(1, (packs.size() + pageSize[0] - 1) / pageSize[0]);
+        pageNo[0] = Math.min(pageNo[0], pages - 1);
+        int from = pageNo[0] * pageSize[0];
+        int to = Math.min(from + pageSize[0], packs.size());
+        rows.getChildren().clear();
+        for (int i = from; i < to; i++) {
+            Path pack = packs.get(i);
+            String name = pack.getFileName().toString();
+            boolean disabled = isDisabledPack(pack);
+            boolean isFolderPack = Files.isDirectory(pack);
+            String display = disabled ? name.substring(0, name.length() - ".disabled".length()) : name;
+            String info = disabled ? "已禁用" : isFolderPack ? "文件夹包" : sizeOf(pack);
+            Ui.ListItem item = new Ui.ListItem(Theme.icon(disabled ? "link-2-off" : isFolderPack ? "folder" : "image", 16,
+                    disabled ? Theme.gray4 : Theme.accent), display, info, 40);
+            StackPane toggle = Ui.listAction("power", 26, 15, disabled ? "启用" : "禁用",
+                    () -> togglePack(pack, disabled, folder));
+            item.addAction(toggle);
+            if (isShader && !disabled) {
+                StackPane use = Ui.listAction("circle-check", 26, 15, "设为当前使用", () -> {
+                    Threads.start("TCL-ShaderUse", () -> {
+                        writeOption(root, "shaderPack", display);
+                        javafx.application.Platform.runLater(() -> {
+                            win.toast("已设为当前光影包", display, 1);
+                            win.refreshRight();
                         });
                     });
-                    item.addAction(use);
-                }
-                StackPane open = Ui.listAction("folder-open", 26, 15, "打开文件位置", () -> openFolder(dir.toString()));
-                item.addAction(open);
-                if (!isFolderPack) {
-                    StackPane delete = Ui.listAction("trash-2", 26, 15, "删除", () -> deleteFile(pack, label));
-                    item.addAction(delete);
-                }
-                card.add(item);
+                });
+                item.addAction(use);
             }
+            StackPane open = Ui.listAction("folder-open", 26, 15, "打开文件位置", () -> openFolder(dir.toString()));
+            item.addAction(open);
+            if (!isFolderPack) {
+                StackPane delete = Ui.listAction("trash-2", 26, 15, "删除", () -> deleteFile(pack, label));
+                item.addAction(delete);
+            }
+            rows.getChildren().add(item);
         }
+        if (pages > 1) {
+            rows.getChildren().add(Ui.pager(pageNo[0], pages, packs.size(), targetPage -> {
+                pageNo[0] = targetPage;
+                renderPacks(root, dir, folder, label, isShader, packs, pageNo, pageSize, rows);
+            }));
+        }
+    }
+
+    private void installPacks(Path dir, String label) {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle(Lang.t("选择要导入的 ") + label);
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(Lang.t("Zip 压缩包"), "*.zip"));
+        List<File> files = chooser.showOpenMultipleDialog(win.stage);
+        if (files == null || files.isEmpty()) return;
+        importPacks(dir, label, files.stream().map(File::toPath).toList());
+    }
+
+    private void importPacks(Path dir, String label, List<Path> files) {
+        if (files == null || files.isEmpty()) return;
+        Imports.run(win, "正在导入 " + label, label, dir, files, name -> name.endsWith(".zip"),
+                true, () -> win.refreshRight());
     }
 
     private List<Path> listPacks(Path dir) {
@@ -1595,7 +1668,9 @@ public class PageInstanceSetup implements Page {
                 try (var stream = Files.list(dir)) {
                     stream.filter(Files::isRegularFile).filter(p -> {
                         String n = p.getFileName().toString().toLowerCase();
-                        return n.endsWith(".jar") || n.endsWith(".zip") || n.endsWith(".litemod");
+                        return n.endsWith(".jar") || n.endsWith(".jar.disabled")
+                                || n.endsWith(".zip") || n.endsWith(".zip.disabled")
+                                || n.endsWith(".litemod") || n.endsWith(".litemod.disabled");
                     }).forEach(out::add);
                 }
             }
@@ -1897,7 +1972,7 @@ public class PageInstanceSetup implements Page {
                         win.toast("无法打开", e.getMessage(), 3);
                     }
                 }),
-                Ui.button("刷新", Ui.BTN_NORMAL, () -> win.refreshRight()));
+                Ui.button("刷新", Ui.BTN_NORMAL, () -> win.refreshRightWithLoading()));
         page.getChildren().add(actions);
         VBox.setMargin(page.getChildren().get(page.getChildren().size() - 1), new Insets(0, 0, 12, 0));
         Ui.Card card = addCard(page, "世界列表");
@@ -1905,26 +1980,55 @@ public class PageInstanceSetup implements Page {
             card.add(Ui.label("还没有存档。在游戏中创建世界后，这里会显示你的存档。", 12.5, Theme.gray2));
         } else {
             DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm");
-            for (Path save : saves) {
-                String time = "";
-                try {
-                    time = Files.getLastModifiedTime(save).toInstant().atZone(ZoneId.systemDefault()).format(fmt);
-                } catch (Exception ignored) {
-                }
-                String fTime = time;
-                Ui.ListItem item = new Ui.ListItem(Theme.icon("map", 16, Theme.text), save.getFileName().toString(), "最后修改 " + time, 40);
-                StackPane open = Ui.listAction("folder-open", 26, 15, "打开存档文件夹", () -> openFolder(save.toString()));
-                StackPane rename = Ui.listAction("pencil", 26, 15, "重命名存档", () -> renameSave(save));
-                StackPane export = Ui.listAction("upload", 26, 15, "导出为 .zip", () -> exportSave(save));
-                StackPane delete = Ui.listAction("trash-2", 26, 15, "删除存档", () -> deleteSave(save));
-                item.addAction(open);
-                item.addAction(rename);
-                item.addAction(export);
-                item.addAction(delete);
-                item.setOnMouseClicked(e -> openFolder(save.toString()));
-                item.getProperties().put("time", fTime);
-                card.add(item);
+            int[] pageSize = {pageSize("UiPageSizeSaves", 20)};
+            int[] pageNo = {0};
+            VBox rows = new VBox(1);
+            ComboBox<String> sizeBox = Ui.pageSizeBox(pageSize[0]);
+            sizeBox.setOnAction(e -> {
+                pageSize[0] = Integer.parseInt(sizeBox.getValue());
+                data.set("UiPageSizeSaves", pageSize[0]);
+                pageNo[0] = 0;
+                renderSaves(saves, fmt, pageNo, pageSize, rows);
+            });
+            HBox sizeRow = new HBox(6, Ui.label("每页", 11.5, Theme.gray2), sizeBox);
+            card.add(sizeRow);
+            card.add(rows);
+            renderSaves(saves, fmt, pageNo, pageSize, rows);
+        }
+    }
+
+    private void renderSaves(List<Path> saves, DateTimeFormatter fmt, int[] pageNo, int[] pageSize, VBox rows) {
+        int pages = Math.max(1, (saves.size() + pageSize[0] - 1) / pageSize[0]);
+        pageNo[0] = Math.min(pageNo[0], pages - 1);
+        int from = pageNo[0] * pageSize[0];
+        int to = Math.min(from + pageSize[0], saves.size());
+        rows.getChildren().clear();
+        for (int i = from; i < to; i++) {
+            Path save = saves.get(i);
+            String time = "";
+            try {
+                time = Files.getLastModifiedTime(save).toInstant().atZone(ZoneId.systemDefault()).format(fmt);
+            } catch (Exception ignored) {
             }
+            String fTime = time;
+            Ui.ListItem item = new Ui.ListItem(Theme.icon("map", 16, Theme.text), save.getFileName().toString(), "最后修改 " + time, 40);
+            StackPane open = Ui.listAction("folder-open", 26, 15, "打开存档文件夹", () -> openFolder(save.toString()));
+            StackPane rename = Ui.listAction("pencil", 26, 15, "重命名存档", () -> renameSave(save));
+            StackPane export = Ui.listAction("upload", 26, 15, "导出为 .zip", () -> exportSave(save));
+            StackPane delete = Ui.listAction("trash-2", 26, 15, "删除存档", () -> deleteSave(save));
+            item.addAction(open);
+            item.addAction(rename);
+            item.addAction(export);
+            item.addAction(delete);
+            item.setOnMouseClicked(e -> openFolder(save.toString()));
+            item.getProperties().put("time", fTime);
+            rows.getChildren().add(item);
+        }
+        if (pages > 1) {
+            rows.getChildren().add(Ui.pager(pageNo[0], pages, saves.size(), targetPage -> {
+                pageNo[0] = targetPage;
+                renderSaves(saves, fmt, pageNo, pageSize, rows);
+            }));
         }
     }
 
@@ -1942,7 +2046,7 @@ public class PageInstanceSetup implements Page {
                         win.toast("无法打开", e.getMessage(), 3);
                     }
                 }),
-                Ui.button("刷新", Ui.BTN_NORMAL, () -> win.refreshRight()));
+                Ui.button("刷新", Ui.BTN_NORMAL, () -> win.refreshRightWithLoading()));
         page.getChildren().add(actions);
         VBox.setMargin(page.getChildren().get(page.getChildren().size() - 1), new Insets(0, 0, 12, 0));
         if (shots.isEmpty()) {
@@ -1950,41 +2054,69 @@ public class PageInstanceSetup implements Page {
             card.add(Ui.label("还没有截图。在游戏中按 F2 截图后会显示在这里。", 12.5, Theme.gray2));
             return;
         }
-        FlowPane flow = new FlowPane(12, 12);
-        flow.setPadding(new Insets(4));
-        for (Path shot : shots) {
-            VBox box = new VBox(5);
-            box.setPrefWidth(180);
-            try {
-                ImageView iv = new ImageView(cachedScreenshot(shot));
-                iv.setFitWidth(170);
-                iv.setFitHeight(96);
-                Rectangle clip = new Rectangle(170, 96);
-                clip.setArcWidth(8);
-                clip.setArcHeight(8);
-                iv.setClip(clip);
-                box.getChildren().add(iv);
-            } catch (Exception ignored) {
-            }
-            Label name = Ui.label(shot.getFileName().toString(), 11, Theme.gray2);
-            name.setMaxWidth(170);
-            box.getChildren().add(name);
-            box.setCursor(javafx.scene.Cursor.HAND);
-            StackPane rowBtns = new StackPane();
-            HBox btns = new HBox(6);
-            btns.setAlignment(Pos.CENTER);
-            StackPane open = Ui.listAction("folder-open", 24, 14, "打开图片", () -> openFolder(shot.toString()));
-            StackPane del = Ui.listAction("trash-2", 24, 14, "删除截图", () -> deleteFile(shot, "截图"));
-            btns.getChildren().addAll(open, del);
-            rowBtns.getChildren().add(btns);
-            box.getChildren().add(rowBtns);
-            box.setOnMouseClicked(e -> openFolder(shot.toString()));
-            box.setPadding(new Insets(6));
-            box.setBackground(Ui.fill(Theme.cardBg, 8));
-            flow.getChildren().add(box);
-        }
         Ui.Card card = addCard(page, "截图列表");
-        card.add(flow);
+        int[] pageSize = {pageSize("UiPageSizeShots", 20)};
+        VBox content = new VBox(6);
+        ComboBox<String> sizeBox = Ui.pageSizeBox(pageSize[0]);
+        HBox sizeRow = new HBox(6, Ui.label("每页", 11.5, Theme.gray2), sizeBox);
+        card.add(sizeRow);
+        card.add(content);
+        int[] pageNo = {0};
+        Runnable[] render = new Runnable[1];
+        sizeBox.setOnAction(e -> {
+            pageSize[0] = Integer.parseInt(sizeBox.getValue());
+            data.set("UiPageSizeShots", pageSize[0]);
+            pageNo[0] = 0;
+            render[0].run();
+        });
+        render[0] = () -> {
+            int pages = Math.max(1, (shots.size() + pageSize[0] - 1) / pageSize[0]);
+            pageNo[0] = Math.min(pageNo[0], pages - 1);
+            int from = pageNo[0] * pageSize[0];
+            int to = Math.min(from + pageSize[0], shots.size());
+            FlowPane flow = new FlowPane(12, 12);
+            flow.setPadding(new Insets(4));
+            for (int i = from; i < to; i++) {
+                Path shot = shots.get(i);
+                VBox box = new VBox(5);
+                box.setPrefWidth(180);
+                try {
+                    ImageView iv = new ImageView(cachedScreenshot(shot));
+                    iv.setFitWidth(170);
+                    iv.setFitHeight(96);
+                    Rectangle clip = new Rectangle(170, 96);
+                    clip.setArcWidth(8);
+                    clip.setArcHeight(8);
+                    iv.setClip(clip);
+                    box.getChildren().add(iv);
+                } catch (Exception ignored) {
+                }
+                Label name = Ui.label(shot.getFileName().toString(), 11, Theme.gray2);
+                name.setMaxWidth(170);
+                box.getChildren().add(name);
+                box.setCursor(javafx.scene.Cursor.HAND);
+                StackPane rowBtns = new StackPane();
+                HBox btns = new HBox(6);
+                btns.setAlignment(Pos.CENTER);
+                StackPane open = Ui.listAction("folder-open", 24, 14, "打开图片", () -> openFolder(shot.toString()));
+                StackPane del = Ui.listAction("trash-2", 24, 14, "删除截图", () -> deleteFile(shot, "截图"));
+                btns.getChildren().addAll(open, del);
+                rowBtns.getChildren().add(btns);
+                box.getChildren().add(rowBtns);
+                box.setOnMouseClicked(e -> openFolder(shot.toString()));
+                box.setPadding(new Insets(6));
+                box.setBackground(Ui.fill(Theme.cardBg, 8));
+                flow.getChildren().add(box);
+            }
+            content.getChildren().setAll(flow);
+            if (pages > 1) {
+                content.getChildren().add(Ui.pager(pageNo[0], pages, shots.size(), targetPage -> {
+                    pageNo[0] = targetPage;
+                    render[0].run();
+                }));
+            }
+        };
+        render[0].run();
     }
 
     private static final java.util.LinkedHashMap<String, javafx.scene.image.Image> SCREENSHOT_CACHE =
@@ -2194,7 +2326,7 @@ public class PageInstanceSetup implements Page {
         });
     }
 
-    // 固定 8 线程，防挤占公共池/limit 丢条目
+    // 固定 8 线程
     private static final java.util.concurrent.ExecutorService PING_POOL =
             java.util.concurrent.Executors.newFixedThreadPool(8, r -> {
                 Thread t = new Thread(r, "TCL-Ping");
@@ -2245,7 +2377,7 @@ public class PageInstanceSetup implements Page {
     }
 
     private void applyPing(Label status, Servers.PingResult r) {
-        // 页面已重建时旧标签脱离场景，不再回写
+        // 旧标签脱场景后不回写
         if (status.getScene() == null) return;
         if (r.online) {
             status.setText("在线 · " + r.players + "/" + r.maxPlayers + " · " + r.latency + "ms · "
@@ -2296,17 +2428,46 @@ public class PageInstanceSetup implements Page {
         HBox actions = new HBox(10);
         actions.getChildren().addAll(
                 Ui.button("打开存档文件夹", Ui.BTN_NORMAL, () -> openFolder(instanceRoot().resolve("saves").toString())),
-                Ui.button("刷新", Ui.BTN_NORMAL, () -> win.refreshRight()));
+                Ui.button("刷新", Ui.BTN_NORMAL, () -> win.refreshRightWithLoading()));
         page.getChildren().add(actions);
         VBox.setMargin(page.getChildren().get(page.getChildren().size() - 1), new Insets(0, 0, 12, 0));
         Ui.Card card = addCard(page, "数据包列表");
         if (packs.isEmpty()) {
             card.add(Ui.label("还没有数据包。把数据包放到存档的 datapacks 文件夹中即可。", 12.5, Theme.gray2));
         } else {
-            for (Path p : packs) {
-                Ui.ListItem item = new Ui.ListItem(Theme.icon("file-box", 16, Theme.text), p.getFileName().toString(), null, 40);
-                card.add(item);
-            }
+            int[] pageSize = {pageSize("UiPageSizeDatapacks", 20)};
+            int[] pageNo = {0};
+            VBox rows = new VBox(0);
+            ComboBox<String> sizeBox = Ui.pageSizeBox(pageSize[0]);
+            sizeBox.setOnAction(e -> {
+                pageSize[0] = Integer.parseInt(sizeBox.getValue());
+                data.set("UiPageSizeDatapacks", pageSize[0]);
+                pageNo[0] = 0;
+                renderDatapacks(packs, pageNo, pageSize, rows);
+            });
+            HBox sizeRow = new HBox(6, Ui.label("每页", 11.5, Theme.gray2), sizeBox);
+            card.add(sizeRow);
+            card.add(rows);
+            renderDatapacks(packs, pageNo, pageSize, rows);
+        }
+    }
+
+    private void renderDatapacks(List<Path> packs, int[] pageNo, int[] pageSize, VBox rows) {
+        int pages = Math.max(1, (packs.size() + pageSize[0] - 1) / pageSize[0]);
+        pageNo[0] = Math.min(pageNo[0], pages - 1);
+        int from = pageNo[0] * pageSize[0];
+        int to = Math.min(from + pageSize[0], packs.size());
+        rows.getChildren().clear();
+        for (int i = from; i < to; i++) {
+            Path p = packs.get(i);
+            rows.getChildren().add(new Ui.ListItem(Theme.icon("file-box", 16, Theme.text),
+                    p.getFileName().toString(), null, 40));
+        }
+        if (pages > 1) {
+            rows.getChildren().add(Ui.pager(pageNo[0], pages, packs.size(), targetPage -> {
+                pageNo[0] = targetPage;
+                renderDatapacks(packs, pageNo, pageSize, rows);
+            }));
         }
     }
 
@@ -2456,7 +2617,7 @@ public class PageInstanceSetup implements Page {
             String lower = url.toLowerCase(java.util.Locale.ROOT);
             if (!lower.startsWith("https://")) {
                 Dialogs.confirm(win, "不安全的下载地址",
-                        // 两个完整句各自成键，三元选整句再翻译，半句拼接查不到表
+                        // 整句成键 半句拼接查不到
                         Lang.t(lower.startsWith("http://")
                                 ? "这个文件的下载地址是 http 明文链接，下载内容可能被中途篡改。\n\n仍要继续下载吗？"
                                 : "这个文件的下载地址不是 https，下载内容可能被中途篡改。\n\n仍要继续下载吗？"),
@@ -2522,7 +2683,7 @@ public class PageInstanceSetup implements Page {
         jijCombo = new ComboBox<>();
         for (Path p : modJars) jijCombo.getItems().add(p.getFileName().toString());
         jijCombo.setPrefWidth(340);
-        // 程序化 select 也会触发 onAction，先 select 再挂监听，只加载一次
+        // 先 select 再挂监听
         jijCombo.getSelectionModel().select(0);
         jijCombo.setOnAction(e -> {
             int idx = jijCombo.getSelectionModel().getSelectedIndex();
@@ -2588,7 +2749,7 @@ public class PageInstanceSetup implements Page {
     }
 
     private void jijApplyJars(Path modPath, String error, List<String[]> jars) {
-        // 入口比对，防旧读取结果覆盖
+        // 入口比对防旧结果
         if (modPath != jijCurrentMod) return;
         if (error != null) {
             jijTip.setText("读取失败：" + error);
@@ -2837,7 +2998,7 @@ public class PageInstanceSetup implements Page {
         Ui.Card options = addCard(page, "导出内容列表");
         exportChecked.clear();
         for (ExportOption opt : EXPORT_OPTIONS) {
-            if (opt.hidden()) continue; // 游戏本体始终包含，不能取消
+            if (opt.hidden()) continue; // 游戏本体始终包含 不能取消
             boolean hasLoader = hasModLoader(ins);
             if (opt.requireModLoader() && !hasLoader) continue;
             if (opt.requireOptiFine() && !hasOptiFine(ins)) continue;
@@ -2953,7 +3114,7 @@ public class PageInstanceSetup implements Page {
             if (r.isEmpty() || r.startsWith("#")) continue;
             boolean revert = r.startsWith("!");
             if (revert) r = r.substring(1);
-            // 目录规则按前缀匹配整个目录，全串匹配会落空
+            // 目录规则按前缀匹配
             String pattern = r.endsWith("/") ? globToRegex(r) + ".*" : globToRegex(r);
             if (lower.matches(pattern)) keep = !revert;
         }
@@ -2999,7 +3160,7 @@ public class PageInstanceSetup implements Page {
             rules.add("");
         }
         for (String ex : EXPORT_EXCLUDES) rules.add(ex);
-        // 字段值走 2 参重载，此处判断会无限递归
+        // 2 参重载防无限递归
         if (ruleOverride != null) {
             rules = new ArrayList<>(ruleOverride);
         }
@@ -3112,7 +3273,7 @@ public class PageInstanceSetup implements Page {
                             if (!url.isEmpty()) downloadUrls.put(e.getValue(), url);
                         }
                     } catch (Exception e) {
-                        // 取消须放行等待线程，不能挂满 5 分钟
+                        // 取消也放行等待线程
                         final Exception fe = e;
                         final boolean[] proceed = {false};
                         CountDownLatch latch = new CountDownLatch(1);
@@ -3432,7 +3593,7 @@ public class PageInstanceSetup implements Page {
             if (segments.length > 2) {
                 for (String line : segments[2].split("\r?\n")) extraFiles.add(line);
             }
-            // PackPath 可写任意盘位，外部输入须先确认再生效
+            // 外部输入先确认再生效
             StringBuilder warn = new StringBuilder();
             if (!packPath.isEmpty()) {
                 warn.append(Lang.t("· 导出位置被固定为：")).append(packPath).append('\n');

@@ -139,7 +139,7 @@ public class ResourceVersion {
             String direct = url.replace("://media.", "://edge.");
             if (!r.downloadUrls.contains(direct)) r.downloadUrls.add(direct);
         }
-        // relationType 3 是依赖，排除 Fabric 和 Quilt API
+        // relationType 3 是依赖
         for (Object d : Json.arr(data.get("dependencies"))) {
             Map<String, Object> dep = Json.obj(d);
             if ((int) Json.num(dep, "relationType", 0) != 3) continue;
@@ -171,7 +171,7 @@ public class ResourceVersion {
     }
 
     public String infoLine(boolean useFileNameTitle) {
-        // 整行是拼接串，localize 查不到：逐段查表，分隔符也过表
+        // 拼接行逐段翻译
         List<String> parts = new ArrayList<>();
         if (!loaders.isEmpty()) parts.add(displayLoaders(loaders));
         if (!fileName.isEmpty() && !fileName.equals(display)) {
@@ -189,7 +189,7 @@ public class ResourceVersion {
         }
         if (allNonStandard) parts.add(Lang.t("游戏版本 ") + String.join("、", gameVersions));
         if (downloadCount > 0) {
-            // 英文的 k 是千位，沿用中文的除以一万会差十倍
+            // 英文 k 为千位
             parts.add(Lang.t("下载 ") + (downloadCount > 100000
                     ? (Lang.mode == 1 ? Math.round(downloadCount / 1000d) + "k"
                     : Math.round(downloadCount / 10000d) + Lang.t(" 万")) : downloadCount + " ") + Lang.t("次"));
@@ -269,7 +269,7 @@ public class ResourceVersion {
             boolean na = xa.chars().allMatch(Character::isDigit) && !xa.isEmpty();
             boolean nb = xb.chars().allMatch(Character::isDigit) && !xb.isEmpty();
             if (na && nb) {
-                // 超长数字溢出 long，按相等防排序崩
+                // 防 long 溢出
                 long va, vb;
                 try {
                     va = Long.parseLong(xa);

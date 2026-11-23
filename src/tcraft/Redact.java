@@ -4,7 +4,7 @@ import java.util.regex.Pattern;
 
 final class Redact {
 
-    // 先匹配键值对再兜底 token:，防值留半截
+    // 先匹配键值对 再兜底裸 token
     private static final Pattern[] SECRETS = {
             Pattern.compile("(?i)(access[_-]?token[\"'\\s:=]{0,5})[A-Za-z0-9._~+/=-]{8,}"),
             Pattern.compile("(?i)(refresh[_-]?token[\"'\\s:=]{0,5})[A-Za-z0-9._~+/=-]{8,}"),
@@ -13,11 +13,11 @@ final class Redact {
             Pattern.compile("(?i)(SystemProxyPass\\s*=\\s*)[^\\s&]+"),
             Pattern.compile("(?i)(systemcursekey\\s*=\\s*)\\S+"),
             Pattern.compile("(?i)(Bearer\\s+)[A-Za-z0-9._~+/=-]{8,}"),
-            // 旧版启动参数 --session token:<accessToken>:<uuid>
+            // 旧参数 --session token 两段 UUID
             Pattern.compile("(?i)(--session\\s+)[^\\s\"']+"),
             Pattern.compile("(?i)(auth[_-]?session[\"']?\\s*[:=]\\s*[\"']?)[^\\s\"',}]+"),
             Pattern.compile("(?i)(--accessToken\\s+)[^\\s\"']+"),
-            // 兜底：日志里任何残留的 token:xxxx:yyyy 形式
+            // 兜底裸 token 两段 UUID
             Pattern.compile("(?i)(\\btoken:)[^\\s\"',}]+"),
             Pattern.compile("(?i)((?:secret|api)[_-]?key[\"'\\s:=]{0,5})[A-Za-z0-9._~+/=-]{8,}")
     };
@@ -27,12 +27,12 @@ final class Redact {
 
     static String apply(String text) {
         if (text == null || text.isEmpty()) return "";
-        // 先过关键词再跑正则
+        // 关键词预过滤
         String lower = text.toLowerCase(java.util.Locale.ROOT);
         if (!lower.contains("token") && !lower.contains("password")
                 && !lower.contains("bearer") && !lower.contains("proxypass")
                 && !lower.contains("session") && !lower.contains("secret")
-                // 兜底正则覆盖 api 键的三种分隔形态，预过滤须一致
+                // 三种分隔形态 预过滤须一致
                 && !lower.contains("api_key") && !lower.contains("apikey")
                 && !lower.contains("api-key") && !lower.contains("cursekey")) {
             return text;

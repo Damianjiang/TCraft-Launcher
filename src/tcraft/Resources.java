@@ -54,7 +54,7 @@ public final class Resources {
         return logDir().resolve("errors.log");
     }
 
-    // 只清旧版残留的临时输出，launcher/errors 日志必须保留
+    // 只清旧临时输出 日志保留
     public static void cleanupNoiseLogs() {
         try {
             Path dir = logDir();
@@ -74,14 +74,14 @@ public final class Resources {
             Path dst = logDir.resolve(name);
             if (!Files.isRegularFile(src)) continue;
             try {
-                // 目标已存在即新日志已开写，删旧防两套
+                // 新日志已开写时删旧
                 if (Files.exists(dst)) {
                     Files.deleteIfExists(src);
                     continue;
                 }
                 Files.move(src, dst, StandardCopyOption.REPLACE_EXISTING);
             } catch (Exception ignored) {
-                // 文件正被 stub 占用时下次启动再搬
+                // stub 占用时下次再搬
             }
         }
     }
@@ -192,7 +192,7 @@ public final class Resources {
         return home().resolve("dependencies").resolve("libs").resolve(WEBP_JAR);
     }
 
-    // 首启随 JavaFX 补 WebP 库，失败不拦启动
+    // 首启补 WebP 库 失败不拦启动
     private static boolean ensureWebp(StartupWindow ui) {
         Path target = webpJar();
         try {
@@ -276,7 +276,7 @@ public final class Resources {
         }
     }
 
-    // 自更新后直接带运行库拉起新本体，判据与 stub 一致，省掉 bootstrap 的二次跳转
+    // 自更新后直接带运行库拉起
     static List<String> directLaunchCommand(Path app, String... appArgs) throws IOException {
         String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
         String exe = os.contains("win") ? "javaw.exe" : "java";
@@ -291,7 +291,7 @@ public final class Resources {
         Path deps = home().resolve("dependencies").resolve(plat).resolve("openjfx");
         boolean builtinFx = Files.isRegularFile(
                 Paths.get(System.getProperty("java.home"), "lib", "javafx.properties"));
-        // .ready 只代表下载完成过；pin 版本的 4 个 jar 缺失（下载中断）时走 bootstrap 自修复
+        // .ready 不可信 缺 jar 时走 bootstrap
         boolean depsReady = Files.isRegularFile(deps.resolve(".ready"));
         if (depsReady) {
             for (String module : JFX_MODULES) {
@@ -319,7 +319,7 @@ public final class Resources {
             cmd.add(cp);
             cmd.add("tcraft.Boot");
         } else {
-            // 运行库未就绪，交给 bootstrap 引导
+            // 运行库未就绪 交给 bootstrap 引导
             cmd.add("-jar");
             cmd.add(app.toAbsolutePath().toString());
         }
@@ -335,7 +335,7 @@ public final class Resources {
             case "mac" -> "mac";
             case "mac-aarch64" -> "mac-aarch64";
             case "linux" -> "linux";
-            // 异常消息直接展示给用户，整串查表必失败，片段各自 Lang.t
+            // 异常文案分段翻译
             case "win-arm64" -> throw new IOException(
                     Lang.t("OpenJFX 17 没有 Windows ARM64 原生包。请使用 x64 版 Java 运行启动器（Windows 会自动模拟），")
                             + Lang.t("或把 JavaFX 17 放到 ") + home().resolve("dependencies").resolve("win-arm64").resolve("openjfx"));
@@ -354,7 +354,7 @@ public final class Resources {
         Path ready = dir.resolve(".ready");
         // 同名模块多版本会让启动失败
         removeStaleJfxJars(dir, classifier, version);
-        // .ready 不可信，按 javafx.properties 校验
+        // 按 javafx.properties 校验
         boolean jarsPresent = true;
         for (String module : JFX_MODULES) {
             if (!Files.isRegularFile(dir.resolve(jarName(module, classifier, version)))) {
@@ -464,7 +464,7 @@ public final class Resources {
     private static void download(String url, Path target, StartupWindow ui, String label,
                                  int base, int span) throws Exception {
         Path tmp = target.resolveSibling(target.getFileName() + ".part");
-        // 连接阶段无进度，先切不确定态
+        // 连接阶段无进度 先切不确定态
         ui.setIndeterminate(label + Lang.t(" · 连接中…"));
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         c.setConnectTimeout(12000);
@@ -497,7 +497,7 @@ public final class Resources {
                     }
                 }
             }
-            // 无 .sha1 视为坏源换仓；无校验不落盘
+            // 无 .sha1 视为坏源换仓 无校验不落盘
             String expected = fetchText(url + ".sha1");
             if (expected == null) throw new IOException("拿不到 .sha1 校验值：" + url);
             String actual = sha1(tmp);
@@ -553,7 +553,7 @@ public final class Resources {
                 if (!low.endsWith(".dll") && !low.endsWith(".dylib") && !low.endsWith(".so")
                         && !low.endsWith(".jnilib")) continue;
                 Path out = dir.resolve(name);
-                // 同名 DLL 一律覆盖，防 17/21 本地库混配
+                // 同名 DLL 覆盖
                 try (InputStream in = jf.getInputStream(en)) {
                     Files.copy(in, out, StandardCopyOption.REPLACE_EXISTING);
                 }
@@ -593,7 +593,7 @@ public final class Resources {
         cmd.add("-Djava.library.path=" + rt);
         cmd.add("--module-path=" + modulePath(rt, plat));
         cmd.add("--add-modules=" + MODULES);
-        // MainWindow 反射查 GraphicsPipeline，需要开放 com.sun.prism
+        // 反射需开放 com.sun.prism
         cmd.add("--add-exports=javafx.graphics/com.sun.prism=ALL-UNNAMED");
         cmd.add("-cp");
         Path webp = webpJar();
@@ -606,16 +606,16 @@ public final class Resources {
         Path log = logDir().resolve("launch.log");
         Path ready = logDir().resolve(".window-ready");
         Files.deleteIfExists(ready);
-        // 新 JVM 要取实例锁，旧进程须先释放，否则新进程启动即退出
+        // 新 JVM 取锁前须释放旧进程
         Boot.releaseInstanceLock();
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.redirectErrorStream(true);
         pb.redirectInput(ProcessBuilder.Redirect.from(
                 new File(os.contains("win") ? "NUL:" : "/dev/null")));
-        // 早期诊断输出追加写，重启不覆盖
+        // 诊断输出追加
         pb.redirectOutput(ProcessBuilder.Redirect.appendTo(log.toFile()));
         pb.start();
-        // 旧进程启动窗留到主界面出现，防弹两次
+        // 启动窗留到主界面出现
         long until = System.currentTimeMillis() + 8000;
         while (System.currentTimeMillis() < until) {
             if (Files.isRegularFile(ready)) break;

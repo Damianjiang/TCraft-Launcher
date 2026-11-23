@@ -138,6 +138,7 @@ public class PageDownload implements Page {
     private VBox hintBox;
     private final java.util.List<LoaderCard> loaderCardList = new java.util.ArrayList<>();
     private final Map<String, String> sel = new java.util.HashMap<>();
+    private final Map<String, Integer> versionPages = new java.util.HashMap<>();
     private StackPane startLayer;
     private StackPane startButton;
 
@@ -153,11 +154,11 @@ public class PageDownload implements Page {
         StackPane clearBtn;
         StackPane restoreBtn;
         VBox list;
-        String error;  // 错误文案，null 表示正常
+        String error; // 错误文案 null 表示正常
         boolean available = true;
         java.util.List<String> versions;
         boolean fetched;
-        int buildToken;
+        int pageNo;
     }
 
     private void buildVanilla(VBox page) {
@@ -220,9 +221,9 @@ public class PageDownload implements Page {
             if (list.isEmpty()) continue;
             Ui.Card card = Ui.card(group);
             card.setContentPadding(new Insets(0, 12, 10, 12));
-            card.setLazyContent(() -> {
-                for (Data.McVersion v : list) card.add(versionRow(v, false));
-            });
+            VBox rows = new VBox(0);
+            card.add(rows);
+            card.setLazyContent(() -> renderVanillaGroup(rows, group, list));
             card.setCollapsed(true);
             VBox.setMargin(card, new Insets(0, 0, 15, 0));
             vanillaBox.getChildren().add(card);
@@ -235,6 +236,23 @@ public class PageDownload implements Page {
         StackPane.setAlignment(selectBox, Pos.TOP_LEFT);
         pagesOverlap.setMaxWidth(Double.MAX_VALUE);
         page.getChildren().add(pagesOverlap);
+    }
+
+    private void renderVanillaGroup(VBox rows, String group, List<Data.McVersion> list) {
+        rows.getChildren().clear();
+        final int pageSize = 12;
+        int pages = Math.max(1, (list.size() + pageSize - 1) / pageSize);
+        int page = Math.max(0, Math.min(versionPages.getOrDefault(group, 0), pages - 1));
+        versionPages.put(group, page);
+        int from = page * pageSize;
+        int to = Math.min(from + pageSize, list.size());
+        for (int i = from; i < to; i++) rows.getChildren().add(versionRow(list.get(i), false));
+        if (pages > 1) {
+            rows.getChildren().add(Ui.pager(page, pages, list.size(), p -> {
+                versionPages.put(group, p);
+                renderVanillaGroup(rows, group, list);
+            }));
+        }
     }
 
 
@@ -336,7 +354,7 @@ public class PageDownload implements Page {
         card.header.setPrefHeight(40);
         card.header.setMaxHeight(40);
         Label t = card.titleLabel();
-        // 标题列 112 对齐，长标题不截断
+        // 标题列 112 对齐 长标题不截断
         t.setMinWidth(112);
         t.setMaxWidth(Region.USE_PREF_SIZE);
         lc.statusIcon = Ui.image(blockImg, 18, 18, true);
@@ -383,7 +401,7 @@ public class PageDownload implements Page {
             try {
                 java.util.List<String> v = Loaders.versions(lc.loaderKey, mc);
                 javafx.application.Platform.runLater(() -> {
-                    // 用户已切走 MC 版本时丢弃旧结果
+                    // 切走版本后丢弃旧结果
                     String now = selectVersion == null ? "" : selectVersion.id;
                     if (!now.equals(mc)) return;
                     lc.versions = v;
@@ -397,7 +415,7 @@ public class PageDownload implements Page {
                 javafx.application.Platform.runLater(() -> {
                     String now = selectVersion == null ? "" : selectVersion.id;
                     if (!now.equals(mc)) return;
-                    lc.versions = null;  // 下次展开时重试
+                    lc.versions = null; // 下次展开时重试
                     lc.error = e.getMessage() == null ? "获取失败" : e.getMessage();
                     lc.fetched = false;
                     lc.list.getChildren().setAll(Ui.hint(lc.title + Lang.t(" 版本列表获取失败：") + lc.error, 2));
@@ -415,6 +433,12 @@ public class PageDownload implements Page {
 
     private void rebuildList(LoaderCard lc) {
         if (lc.list == null) return;
+        lc.pageNo = 0;
+        renderLoaderPage(lc);
+    }
+
+    private void renderLoaderPage(LoaderCard lc) {
+        if (lc.list == null) return;
         lc.list.getChildren().clear();
         if (lc.versions == null) {
             lc.list.getChildren().add(loaderLoading(lc));
@@ -428,19 +452,21 @@ public class PageDownload implements Page {
             }
             return;
         }
-        buildChunk(lc, lc.versions, 0, ++lc.buildToken);
-    }
-
-    private void buildChunk(LoaderCard lc, java.util.List<String> versions, int from, int token) {
-        if (token != lc.buildToken || lc.list == null) return;
-        int end = Math.min(from + 30, versions.size());
-        for (int i = from; i < end; i++) {
-            String v = versions.get(i);
+        final int pageSize = 10;
+        int pages = Math.max(1, (lc.versions.size() + pageSize - 1) / pageSize);
+        lc.pageNo = Math.max(0, Math.min(lc.pageNo, pages - 1));
+        int from = lc.pageNo * pageSize;
+        int to = Math.min(from + pageSize, lc.versions.size());
+        for (int i = from; i < to; i++) {
+            String v = lc.versions.get(i);
             String info = lc.installerOnly ? installerRowInfo(lc, v) : null;
-            addVersionRow(lc, v, info);
+            addVersionRow(lc, v, info, lc.list);
         }
-        if (end < versions.size()) {
-            javafx.application.Platform.runLater(() -> buildChunk(lc, versions, end, token));
+        if (pages > 1) {
+            lc.list.getChildren().add(Ui.pager(lc.pageNo, pages, lc.versions.size(), page -> {
+                lc.pageNo = page;
+                renderLoaderPage(lc);
+            }));
         }
     }
 
@@ -451,7 +477,7 @@ public class PageDownload implements Page {
         return "GitHub Releases（安装器）";
     }
 
-    private void addVersionRow(LoaderCard lc, String version, String info) {
+    private void addVersionRow(LoaderCard lc, String version, String info, VBox target) {
         boolean installerOnly = lc.installerOnly;
         Ui.ListItem row = new Ui.ListItem(Ui.image(lc.blockImg, 22, 22, true), version, info, 40);
         String chosen = sel.getOrDefault(lc.key, "");
@@ -465,7 +491,7 @@ public class PageDownload implements Page {
                 else selectVersionFor(lc, version);
             }
         });
-        lc.list.getChildren().add(row);
+        target.getChildren().add(row);
     }
 
     private void selectVersionFor(LoaderCard lc, String version) {
@@ -548,7 +574,7 @@ public class PageDownload implements Page {
             case Loaders.FABRIC: return drop > 130;
             case Loaders.LITELOADER: return !mc.isEmpty() && drop < 130;
             case Loaders.LEGACYFABRIC:
-                // 确认没有可用版本才折叠，获取中或失败仍显示
+                // 无可用版本才折叠
                 return !(lc.versions != null && lc.versions.isEmpty() && lc.error == null);
             case Loaders.FABRICAPI: return !sel.getOrDefault(Loaders.FABRIC, "").isEmpty();
             case Loaders.OPTIFABRIC:
@@ -726,7 +752,7 @@ public class PageDownload implements Page {
         vanillaBox.setTranslateX(0);
         selectBox.setOpacity(0);
         selectBox.setTranslateX(40);
-        // KeyFrame 是绝对时间点，须补保持帧
+        // KeyFrame 是绝对时间 补保持帧
         Timeline t = new Timeline(
                 new KeyFrame(Duration.millis(10),
                         new KeyValue(vanillaBox.opacityProperty(), 1),
@@ -983,7 +1009,7 @@ public class PageDownload implements Page {
         status.setVisible(false);
         status.setManaged(false);
         hintError = Ui.hint("", 1);
-        // Ui.hint 子节点顺序是图标、文字
+        // hint 子节点 图标 文字
         hintErrorText = (Label) hintError.getChildren().get(1);
         hintError.setVisible(false);
         hintError.setManaged(false);
@@ -1022,7 +1048,7 @@ public class PageDownload implements Page {
             fetchRef[0].run();
         };
         sourceCombo.setOnAction(e -> {
-            // 同一个 ComboBox 只能挂一个回调，保存与搜索合并
+            // 一个 ComboBox 只挂一个回调
             Data.get().set("ToolDownloadMod", sourceCombo.getSelectionModel().getSelectedIndex());
             searchAction.run();
         });
@@ -1094,7 +1120,7 @@ public class PageDownload implements Page {
         };
     }
 
-    // 请求代次：仅最后一次请求可写界面
+    // 仅最后一次请求可写界面
     private int resourceRequestGen;
 
     private void fetchResources(String q, String category, String projectType, int classId,
@@ -1125,14 +1151,14 @@ public class PageDownload implements Page {
             host.getChildren().remove(resourceLoadingHost);
         }
         final int gen = ++resourceRequestGen;
-        // loadingCard 节点是异步替换的，localize 不经过，创建处翻译
+        // 异步节点创建处翻译
         Ui.LoadCard searchLoad = new Ui.LoadCard(
                 resourcePage == 0 ? Lang.t("正在搜索") : Lang.tf("正在加载第 %d 页", resourcePage + 1),
                 source.equals("全部") ? "Modrinth · CurseForge" : source);
         rows.getChildren().setAll(searchLoad);
         javafx.application.Platform.runLater(() -> searchLoad.setStage(
                 source.equals("全部") ? "并发请求 Modrinth 与 CurseForge…" : "请求 " + source + "…"));
-        // 请求期间禁用翻页，连点会重复请求
+        // 请求期间禁用翻页
         prev.setDisable(true);
         next.setDisable(true);
         Thread worker = new Thread(() -> {
@@ -1188,7 +1214,7 @@ public class PageDownload implements Page {
                 });
             }
             try {
-                // 有上限等待，超时也放行界面
+                // 限时等待 超时放行
                 if (!latch.await(25, java.util.concurrent.TimeUnit.SECONDS)) {
                     if (err[0] == null) err[0] = "请求超时";
                     if (err[1] == null) err[1] = "请求超时";
@@ -1198,7 +1224,7 @@ public class PageDownload implements Page {
             }
             String mrError = err[0];
             String cfError = err[1];
-            // 迟到的 addAll 无迭代保护，先落快照再排序
+            // 先快照再排序
             List<Resource> fList;
             synchronized (list) {
                 fList = new ArrayList<>(list);
@@ -1231,7 +1257,7 @@ public class PageDownload implements Page {
                     VBox.setMargin(hintError, new Insets(0, 0, show ? 12 : 0, 0));
                 }
                 if (fList.isEmpty()) {
-                    // fError 可能是表内词或原始错误，查表回退
+                    // fError 查表回退
                     status.setText(fError == null
                             ? Lang.t(resourcePage == 0 ? "该分类暂无资源" : "没有更多结果")
                             : Lang.tf("无法获取%s列表：", Lang.t(category)) + Lang.t(fError));
@@ -1315,7 +1341,7 @@ public class PageDownload implements Page {
         if (!url.startsWith("http")) {
             return Ui.image(url.isEmpty() ? "NoIcon.png" : url, size, size, true);
         }
-        // 远程图统一走 RemoteImages 单一通道
+        // 远程图走 RemoteImages
         StackPane box = new StackPane();
         box.setPrefSize(size, size);
         box.setMinSize(size, size);

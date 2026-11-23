@@ -59,7 +59,7 @@ public final class Http {
                 // 跨洋握手 6s
                 .connectTimeout(Duration.ofSeconds(6))
                 .followRedirects(redirects)
-                // 服务端不支持 h2 时自动回落 HTTP/1.1
+                // h2 不支持时回落 1.1
                 .version(HttpClient.Version.HTTP_2)
                 .executor(ASYNC);
         try {
@@ -72,7 +72,7 @@ public final class Http {
             }
         }
         try {
-            // 带账号密码的代理要显式挂 authenticator
+            // 代理认证显式挂 authenticator
             final String user = Data.get().get("SystemProxyUser", "");
             final String pass = Data.get().get("SystemProxyPass", "");
             if (!user.isEmpty() || !pass.isEmpty()) {
@@ -90,7 +90,7 @@ public final class Http {
     }
 
     public static void rebuild() {
-        // 先建好再落 volatile，不留下新旧并存的间隙
+        // 建好再落 volatile
         HttpClient redirect = build();
         HttpClient noRedirect = build(HttpClient.Redirect.NEVER);
         clientNoRedirect = noRedirect;
@@ -155,7 +155,7 @@ public final class Http {
         return get(url, Map.of());
     }
 
-    // 单次请求，镜像候选按序切换，不做退避重试
+    // 单次请求 候选按序切换
     public static String getOnce(String url, int timeoutSec) throws IOException {
         return getOnce(url, Map.of(), timeoutSec);
     }
@@ -171,7 +171,7 @@ public final class Http {
 
     public static String get(String url, Map<String, String> headers) throws IOException {
         if (hasCredentialHeader(headers)) {
-            // 自动重定向会原样带走凭证头，改手动跟，跨域时剥掉
+            // 手动重定向 跨域剥凭证
             return sendRedirectAware("GET", url, null, Duration.ofSeconds(20), headers, null, true);
         }
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(url))
@@ -294,7 +294,7 @@ public final class Http {
                     hdrs = stripCredentials(hdrs);
                 }
                 if ("POST".equals(m) && code <= 303) {
-                    // 301/302/303 按 RFC 惯例转 GET，body 不重放
+                    // 301/302/303 转 GET
                     m = "GET";
                     b = null;
                 }
@@ -302,7 +302,7 @@ public final class Http {
                 continue;
             }
             if (code < 200 || code >= 300) {
-                // 先关响应体，防重试时连接泄漏
+                // 先关响应体
                 try {
                     resp.body().close();
                 } catch (IOException ignored) {
@@ -340,10 +340,10 @@ public final class Http {
                     resp.body().close();
                 } catch (IOException ignored) {
                 }
-                // 4xx 除了 408 / 429 重试没意义
+                // 4xx 仅 408/429 重试
                 if (!retryable(code)) throw new IOException("HTTP " + code);
                 last = new IOException("HTTP " + code);
-                // 按 Retry-After 等待，最多 10 秒
+                // Retry-After 最多 10s
                 nextDelay = retryAfter > 0 ? Math.min(retryAfter, 10_000)
                         : BACKOFF_MS[Math.min(attempt, BACKOFF_MS.length - 1)];
                 continue;
@@ -358,19 +358,19 @@ public final class Http {
         throw last == null ? new IOException(Lang.t("请求失败：") + url) : last;
     }
 
-    // 解压上限，防大压缩比打满内存
+    // 限制解压后大小
     private static final long TEXT_MAX_BYTES = 20L * 1024 * 1024;
 
     private static String readText(InputStream raw, HttpResponse<?> resp) throws IOException {
         String encoding = resp.headers().firstValue("content-encoding").orElse("");
         byte[] bytes;
         if (encoding.toLowerCase(java.util.Locale.ROOT).contains("gzip")) {
-            // gzip 流要显式关，释放 inflater 的本地内存
+            // gzip 流要显式关 释放 inflater 的本地内存
             try (InputStream in = new java.util.zip.GZIPInputStream(raw)) {
                 bytes = Fetch.readAll(in, 20_000, TEXT_MAX_BYTES);
             }
         } else {
-            // 20 秒无新数据视为假死，交给外层重试
+            // 20s 无数据断开
             bytes = Fetch.readAll(raw, 20_000, TEXT_MAX_BYTES);
         }
         String type = resp.headers().firstValue("content-type").orElse("");
@@ -454,7 +454,7 @@ public final class Http {
                 .handle((resp, err) -> {
                     if (err != null) throw new CompletionException(unwrap(err));
                     int code = resp.statusCode();
-                    // 同 getBytes 的 8MB 上限
+                    // 同 8MB 上限
                     try (java.io.InputStream body = resp.body()) {
                         if (code >= 200 && code < 300) return Fetch.readAll(body, 20_000, 8L * 1024 * 1024);
                         long retryAfter = retryAfterMs(resp);
@@ -563,7 +563,7 @@ public final class Http {
                 resp.body().close();
             } catch (IOException ignored) {
             }
-            // Fetch 靠类型识别 416（Range 起点超出文件末尾）
+            // Fetch 按类型识别 416
             if (!retryable(code)) throw new StatusException(code, 0, url);
             last = new IOException("HTTP " + code);
         }

@@ -35,7 +35,7 @@ public final class Modpacks {
         public String readError = "";
     }
 
-    // readError 供调用方区分文案，须恒等比较
+    // readError 供调用方区分文案 须恒等比较
     static String unrecognizedError() {
         return Lang.t("无法识别整合包格式（压缩包里没有清单文件）");
     }
@@ -97,7 +97,7 @@ public final class Modpacks {
             normalizeLoaderVersion(info);
             info.valid = !info.mcVersion.isEmpty();
         } catch (Exception e) {
-            // readError 经 PageInstance 弹窗展示，整串查不到表，创建处翻译
+            // readError 创建处翻译
             info.readError = Lang.tf("压缩包损坏或读取失败：%s", e.getMessage() == null ? e.toString() : e.getMessage());
             Data.get().log("预读整合包失败：" + Log.describe(e));
         }
@@ -251,7 +251,7 @@ public final class Modpacks {
                 info.mcVersion = jar.isEmpty() ? Json.str(json, "id", "").trim() : jar;
             }
             if (!info.loader.isEmpty()) return;
-            // 先看 libraries，HMCL 导出包会把加载器写进依赖
+            // 先查 libraries
             for (Object o : Json.arr(json.get("libraries"))) {
                 String name = Json.str(Json.obj(o), "name", "");
                 int at = name.indexOf('@');
@@ -471,7 +471,7 @@ public final class Modpacks {
                 contentDirs.add(base + ".minecraft");
             } else if (index != null) {
                 parseModrinth(readJson(zip, index), info);
-                // 与 HMCL 一致：client-overrides 优先于 overrides，后拷贝的覆盖先拷贝的
+                // client-overrides 优先于 overrides
                 contentDirs.add(base + "overrides");
                 contentDirs.add(base + "client-overrides");
             } else if (manifest != null) {
@@ -502,7 +502,7 @@ public final class Modpacks {
             task.progress = 0.05;
             Tasks.INSTANCE.changed();
             extractContent(zip, tempDir, versionFolder, base, info, contentDirs);
-            // 清掉包内自带设置里的危险项（PreCommand 只认本机配置）
+            // 清包内危险设置
             sanitizeImportedInstanceSettings(versionFolder);
 
             if (index != null) {
@@ -515,7 +515,7 @@ public final class Modpacks {
             } else if (manifest != null) {
                 downloadCurseForgeContent(win, readJson(zip, manifest), versionFolder, task);
             }
-            // 下载阶段也可能写 TCL/，装完再清一遍
+            // 装完再清 TCL/
             sanitizeImportedInstanceSettings(versionFolder);
 
             task.stage = "整理文件";
@@ -590,7 +590,7 @@ public final class Modpacks {
             task.progress = 0.92;
             Tasks.INSTANCE.changed();
 
-            // 防启动时找不到版本 json
+            // 确保版本 json 存在
             String loader = info.loader.isEmpty() ? "原版" : info.loader;
             String actual;
             try {
@@ -602,7 +602,7 @@ public final class Modpacks {
                     task.stage = "已取消";
                     return;
                 }
-                // 内容已解压，不删实例目录
+                // 内容已解压 不删实例目录
                 task.state = Tasks.State.FAILED;
                 task.error = Lang.tf("整合包内容已解压，但游戏版本安装失败：%s",
                         e.getMessage() == null ? Lang.t("网络错误") : e.getMessage());
@@ -636,7 +636,7 @@ public final class Modpacks {
         }
     }
 
-    // 包内自带的命令与附加参数只允许本机填写，一律清除
+    // 清除包内命令与附加参数
     private static void sanitizeImportedInstanceSettings(Path versionFolder) {
         try {
             Path ini = versionFolder.resolve("TCL").resolve("Setup.ini");
@@ -665,7 +665,7 @@ public final class Modpacks {
         }
     }
 
-    // 只接受纯文件名，../、斜杠和 UNC 一律不要
+    // 仅接受纯文件名
     private static String safeIconName(String raw) {
         String name = raw == null ? "" : raw.trim();
         if (name.isEmpty()) return "";
@@ -691,7 +691,7 @@ public final class Modpacks {
             String sha1 = Json.str(hashes, "sha1", "");
             Path target = versionFolder.resolve(relPath).normalize();
             if (!target.startsWith(versionFolder)) continue; // 别写穿
-            // TCL/ 是配置目录，-javaagent 会挂进 JVM
+            // TCL/ 是配置目录 禁止 javaagent
             if (target.startsWith(versionFolder.resolve("TCL"))) {
                 logSkipped("跳过写向 TCL 目录的整合包内容：" + relPath);
                 continue;
@@ -767,7 +767,7 @@ public final class Modpacks {
             ResourceVersion rv = ResourceVersion.fromCurseForgeJson(f, "mod");
             if (rv.fileName.isEmpty()) continue;
             if (rv.downloadUrls.isEmpty()) {
-                // 作者禁止第三方分发时 CurseForge 不返回下载地址，只能提示用户手动补齐
+                // 作者禁止分发时不返回下载地址
                 noUrl++;
                 logSkipped("整合包内容没有下载地址：" + rv.fileName);
                 done++;
@@ -782,7 +782,7 @@ public final class Modpacks {
             if (!lower.endsWith(".jar") && !lower.endsWith(".litemod")) {
                 long modId = (long) Json.num(f, "modId", 0);
                 if (modId > 0) {
-                    // 分类查不到就中止，不能把材质包装进 mods
+                    // 分类未知则中止
                     int classId;
                     try {
                         classId = classCache.computeIfAbsent(modId, id -> {
@@ -794,7 +794,7 @@ public final class Modpacks {
                         });
                     } catch (RuntimeException re) {
                         Throwable cause = re.getCause() != null ? re.getCause() : re;
-                        // 消息最终进 task.error 展示，创建处翻译
+                        // task.error 创建处翻译
                         throw new java.io.IOException(Lang.tf("项目分类获取失败（id=%s）：%s", modId,
                                 cause.getMessage() == null ? Lang.t("网络错误") : cause.getMessage()), cause);
                     }
@@ -803,7 +803,7 @@ public final class Modpacks {
             }
             Path target = versionFolder.resolve(sub).resolve(rv.fileName).normalize();
             if (!target.startsWith(versionFolder)) continue; // 别写穿目录
-            // TCL/ 是配置目录，不允许被写穿
+            // TCL/ 不可写穿
             if (target.startsWith(versionFolder.resolve("TCL"))) {
                 logSkipped("跳过写向 TCL 目录的整合包内容：" + target.getFileName());
                 continue;
@@ -839,7 +839,7 @@ public final class Modpacks {
             var hashes = Json.obj(source.get("hashes"));
             Path target = versionFolder.resolve(relPath).normalize();
             if (!target.startsWith(versionFolder)) continue;
-            // TCL/ 是配置目录，不允许被写穿
+            // TCL/ 不可写穿
             if (target.startsWith(versionFolder.resolve("TCL"))) {
                 logSkipped("跳过写向 TCL 目录的整合包内容：" + relPath);
                 continue;
@@ -860,7 +860,7 @@ public final class Modpacks {
 
     static String inferModuleTarget(List<String> modules, String fileName) {
         String lower = fileName == null ? "" : fileName.toLowerCase();
-        // jar 优先按 mod 归类，内部 assets/data 模块名会误判
+        // jar 优先归 mod
         if (lower.endsWith(".jar") || lower.endsWith(".litemod")) return "mods";
         if (lower.endsWith(".mrpack")) return "modpacks";
         for (String m : modules) {
@@ -887,10 +887,10 @@ public final class Modpacks {
         CountDownLatch latch = new CountDownLatch(1);
         AtomicBoolean ok = new AtomicBoolean(false);
         AtomicBoolean alive = new AtomicBoolean(true);
-        // 更新进度卡等不可关闭的模态占用时延迟 3 秒重试一次，仍占用则按取消放行后台线程
+        // 模态占用时 3s 后重试 仍占用按取消
         showAsk(win, latch, ok, alive, title, message, 1);
         try {
-            // 十分钟超时按取消处理
+            // 10 分钟超时按取消
             if (!latch.await(10, java.util.concurrent.TimeUnit.MINUTES)) {
                 alive.set(false);
                 Platform.runLater(() -> win.setModalCloseHook(null));
@@ -944,7 +944,7 @@ public final class Modpacks {
                     }));
             card.getChildren().addAll(Ui.bold(title, 17, Theme.text), body, actions);
             win.showModal(card, false);
-            // hook 必须在 showModal 之后设置：showModal 会先消费既有 hook（放行被顶掉的旧弹窗）
+            // hook 在 showModal 后设
             win.setModalCloseHook(latch::countDown);
         });
     }
@@ -987,7 +987,7 @@ public final class Modpacks {
         try (InputStream in = zip.getInputStream(entry)) {
             byte[] bytes = in.readNBytes(10 * 1024 * 1024 + 1);
             if (bytes.length > 10 * 1024 * 1024) {
-                // 流式条目 getSize 可能是 -1，用实际读到的长度
+                // getSize 可能 -1 按实读长度
                 throw new java.io.IOException(Lang.tf("整合包清单文件过大：%s（%d 字节）",
                         entry.getName(), bytes.length));
             }
@@ -1014,7 +1014,7 @@ public final class Modpacks {
             }
             if (!Files.isDirectory(overrideHome)) continue;
             if ("HMCL".equals(info.typeName)) {
-                // pack.json 是版本清单，不是实例内容
+                // pack.json 是清单 不是实例内容
                 copyDirectory(overrideHome, versionFolder, rel -> rel.equalsIgnoreCase("pack.json"));
             } else {
                 copyDirectory(overrideHome, versionFolder);
@@ -1023,7 +1023,7 @@ public final class Modpacks {
     }
 
     private static void extractZip(ZipFile zip, Path targetDir) throws java.io.IOException {
-        // 条目数与解压总量设上限，防压缩炸弹写满磁盘
+        // 限制条目数与解压总量
         long totalBytes = 0;
         int entries = 0;
         for (java.util.Enumeration<? extends ZipEntry> it = zip.entries(); it.hasMoreElements(); ) {
@@ -1046,7 +1046,7 @@ public final class Modpacks {
                 Files.createDirectories(out.getParent());
                 try (InputStream in = zip.getInputStream(e); OutputStream outStream = Files.newOutputStream(out)) {
                     long copied = in.transferTo(outStream);
-                    // 流式条目没有声明尺寸，按实际写入量补算
+                    // 无尺寸条目按实写补算
                     if (size <= 0) {
                         totalBytes += copied;
                         if (totalBytes > MAX_ZIP_BYTES) {

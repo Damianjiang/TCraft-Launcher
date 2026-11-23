@@ -86,7 +86,7 @@ public final class Json {
 
     private Object value(int depth) {
         if (depth > MAX_DEPTH) throw new MalformedException("JSON 嵌套超过 " + MAX_DEPTH + " 层");
-        ws(); // 先跳空白，否则空格会被当数字
+        ws(); // 先跳空白 否则空格会被当数字
         if (i >= s.length()) throw new MalformedException("JSON 意外结束");
         char c = s.charAt(i);
         switch (c) {

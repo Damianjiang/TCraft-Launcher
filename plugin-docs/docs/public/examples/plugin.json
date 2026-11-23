@@ -1,0 +1,11 @@
+{
+  "id": "dev.hello",
+  "name": "Hello 插件",
+  "version": "1.0.0",
+  "author": "TCraft",
+  "description": "插件系统联调示例：页面、按钮、命令、弹窗、存储与事件。",
+  "icon": "puzzle",
+  "main": "HelloPlugin",
+  "api": 1,
+  "onInstall": ["hello.say"]
+}

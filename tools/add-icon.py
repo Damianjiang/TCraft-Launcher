@@ -51,7 +51,7 @@ def build_rsrc_section(images):
         RT_GROUP_ICON: {1: {LANG_ZH: ("group", grp)}},
     }
 
-    # 先排目录，再排数据项，最后放数据本身
+    # 先排目录 再排数据项 最后放数据本身
     dirs = []
     datas = []
 
@@ -89,7 +89,7 @@ def build_rsrc_section(images):
 
     buf = bytearray(total)
 
-    # 写目录：子目录写树内偏移，叶子先留空
+    # 写目录 子目录写树内偏移 叶子先留空
     for base, entries, count in dirs:
         struct.pack_into("<IIHHHH", buf, base, 0, 0, 0, 0, 0, count)
         off = base + 16
@@ -154,7 +154,7 @@ def inject(src, dst, ico_path):
     raw_off = align(len(data), filealign)
     raw_size = align(len(rsrc), filealign)
 
-    # 数据项里的 OffsetToData 必须是 RVA：节内偏移 + new_va
+    # 数据项里的 OffsetToData 必须是 RVA 节内偏移 + new_va
     fixed = bytearray(rsrc)
     for i in range(len(blobs)):
         pos = de_base + i * 16
@@ -176,7 +176,7 @@ def inject(src, dst, ico_path):
     init_data = struct.unpack_from("<I", data, opt + 8)[0]
     struct.pack_into("<I", data, opt + 8, init_data + raw_size)
 
-    # 资源目录项（第 3 个）
+    # 资源目录项 第 3 个
     dd = opt + 96 + 2 * 8
     struct.pack_into("<II", data, dd, new_va, len(fixed))
 

@@ -94,7 +94,7 @@ public final class Errors {
     public static void panic(String brief, Throwable ex) {
         String head = briefText(brief, ex);
         String detail = detailText(brief, ex);
-        // 标题是拼接串，localize 查不到，两段分别查表
+        // 标题拼接串 两段分别翻译
         enqueue(new Report(Lang.t("联机出错：") + (brief == null ? "" : Lang.t(brief)), head, detail,
                 Behavior.ALERT, true, false));
     }
@@ -108,7 +108,7 @@ public final class Errors {
     }
 
     public static void uncaught(Thread thread, Throwable ex, boolean fxThread) {
-        // brief 带着 @线程名，整串查不到表，先译前缀再拼
+        // brief 含线程名 先译前缀
         String brief = Lang.t(fxThread ? "界面线程未捕获异常" : "后台线程未捕获异常")
                 + (thread == null ? "" : " @" + thread.getName());
         if (!fxThread) {
@@ -121,7 +121,7 @@ public final class Errors {
     public static void onModalDismissed() {
         if (internalClose) return;
         if (!showing) {
-            // 模态关闭后补一次 drain，处理占用期间入队的错误
+            // 模态关闭后补 drain
             scheduleDrain();
             return;
         }
@@ -138,7 +138,7 @@ public final class Errors {
             lastKey = key;
             lastShownAt = now;
             QUEUE.addLast(r);
-            // 队列有上限：模态占用期间错误风暴不至于无限堆积
+            // 队列有上限
             while (QUEUE.size() > 20) QUEUE.pollFirst();
         }
         onFx(Errors::drain);
@@ -155,7 +155,7 @@ public final class Errors {
             if (r != null) fallback(r);
             return;
         }
-        // 不可关闭的模态占着时，错误留队列等下次 drain
+        // 不可关闭模态占用时留队列
         if (w.hasOpenModal()) return;
         Report r;
         synchronized (QUEUE) {
@@ -315,7 +315,7 @@ public final class Errors {
             String stamp = LocalDateTime.now()
                     .format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS"));
             file = dir.resolve("TCraft-错误报告-" + stamp + ".log");
-            // 带 BOM，记事本和 QQ 里直接看不会乱码
+            // UTF-8 BOM 记事本/QQ 不乱码
             Files.writeString(file, "\uFEFF" + exportText(r), StandardCharsets.UTF_8);
         } catch (Throwable t) {
             logOnly("导出错误报告失败", t);
@@ -552,7 +552,7 @@ public final class Errors {
     }
 
     private static String briefText(String brief, Throwable ex) {
-        // headline 是拼接串，brief/分隔符分别翻译；异常原文不译
+        // headline 分段翻译 异常原文不译
         String b = brief == null ? Lang.t("发生错误") : Lang.t(brief);
         String m = briefOf(ex);
         return sanitize(b + Lang.t("：") + m);
@@ -579,7 +579,7 @@ public final class Errors {
         String entry = sanitize("[" + LocalDateTime.now().withNano(0) + "] " + title + " — " + headline
                 + " @ " + Thread.currentThread().getName());
         try {
-            // 错误进 errors.log 与 launcher.log，带完整堆栈
+            // 写 errors.log 与 launcher.log
             Data.get().log.add(entry);
             if (Data.get().getBool("SystemDebugMode", false)) System.out.println("[TCL] " + entry);
         } catch (Throwable ignored) {
@@ -592,7 +592,7 @@ public final class Errors {
             if (Platform.isFxApplicationThread()) r.run();
             else Platform.runLater(r);
         } catch (Throwable t) {
-            // JavaFX 没初始化或已关闭，直接跑
+            // FX 未初始化或已关闭时直接跑
             try {
                 r.run();
             } catch (Throwable ignored) {

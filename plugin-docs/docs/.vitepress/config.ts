@@ -1,0 +1,178 @@
+import { defineConfig } from 'vitepress'
+import { defineTeekConfig } from 'vitepress-theme-teek/config'
+
+const teekConfig = defineTeekConfig({
+  teekTheme: true,
+  teekHome: false,
+  vpHome: true,
+
+  viewTransition: {
+    enabled: true,
+    mode: 'out-in',
+    duration: 300,
+    easing: 'ease-in'
+  },
+
+  codeBlock: {
+    enabled: true,
+    collapseHeight: 700
+  },
+
+  backTop: {
+    enabled: true,
+    content: 'progress'
+  },
+
+  themeEnhance: {
+    enabled: true,
+    position: 'top'
+  },
+
+  toComment: { enabled: false },
+  notice: { enabled: false },
+  articleBanner: { enabled: false },
+  articleUpdate: { enabled: false },
+  articleAnalyze: { enabled: false },
+  breadcrumb: { enabled: false },
+
+  loading: '页面加载中...',
+
+  vitePlugins: {
+    sidebar: false,
+    permalink: false,
+    mdH1: false,
+    docAnalysis: false
+  }
+})
+
+const base = process.env.BASE_PATH || '/TCraft-Launcher/wiki/'
+
+export default defineConfig({
+  extends: teekConfig,
+  lang: 'zh-CN',
+  title: 'TCraft Launcher 开发者文档',
+  description: 'TCraft Launcher 插件开发文档：清单、API、界面扩展、命令、弹窗与完整示例。',
+  base,
+  // 文档成品直接放进官网目录 部署后从 /wiki/ 访问
+  outDir: '../../website/wiki',
+
+  head: [
+    ['link', { rel: 'icon', href: base + 'logo.png' }],
+    ['meta', { property: 'og:type', content: 'website' }],
+    ['meta', { property: 'og:title', content: 'TCraft Launcher 开发者文档' }],
+    ['meta', { property: 'og:description', content: '用 Java + JavaFX 扩展 TCraft Launcher：页面、按钮、命令、弹窗与任意布局。' }],
+    ['link', { rel: 'preconnect', href: 'https://tcraft.pages.dev' }],
+    ['link', { rel: 'dns-prefetch', href: 'https://tcraft.pages.dev' }]
+  ],
+
+  lastUpdated: true,
+  cleanUrls: true,
+  appearance: 'dark',
+  ignoreDeadLinks: true,
+
+  vite: {
+    build: {
+      chunkSizeWarningLimit: 1000,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('vitepress-theme-teek')) return 'teek'
+            if (id.includes('node_modules/vue') || id.includes('node_modules/@vue')) return 'vue-vendor'
+            if (id.includes('node_modules/medium-zoom') || id.includes('node_modules/nprogress')) return 'utils'
+          }
+        }
+      }
+    }
+  },
+
+  themeConfig: {
+    siteTitle: 'TCL 开发者文档',
+    logo: '/logo.png',
+
+    nav: [
+      { text: '首页', link: '/' },
+      { text: '快速开始', link: '/guide' },
+      { text: 'API', link: '/api' },
+      { text: '示例', link: '/examples' },
+      { text: '进阶参考', link: '/references' },
+      { text: '官方网站', link: 'https://tcraft.pages.dev' }
+    ],
+
+    sidebar: [
+      {
+        text: '开始',
+        items: [
+          { text: '插件系统概览', link: '/overview' },
+          { text: '五分钟写出第一个插件', link: '/guide' }
+        ]
+      },
+      {
+        text: '参考',
+        items: [
+          { text: 'plugin.json 清单', link: '/manifest' },
+          { text: 'API 参考', link: '/api' },
+          { text: '界面与布局扩展', link: '/ui' },
+          { text: '命令、弹窗与事件', link: '/commands' }
+        ]
+      },
+      {
+        text: '实践',
+        items: [
+          { text: '完整示例与模板', link: '/examples' },
+          { text: '进阶与参考资料', link: '/references' },
+          { text: '常见问题', link: '/faq' }
+        ]
+      },
+      {
+        text: '链接',
+        items: [
+          { text: 'TCraft 官方网站', link: 'https://tcraft.pages.dev' },
+          { text: 'TCWiki 服务器文档', link: 'https://tcwiki.pages.dev' },
+          { text: '下载启动器', link: 'https://github.com/Damianjiang/TCraft-Launcher/releases/latest' },
+          { text: '源码仓库', link: 'https://github.com/Damianjiang/TCraft-Launcher' }
+        ]
+      }
+    ],
+
+    search: {
+      provider: 'local',
+      options: {
+        translations: {
+          button: { buttonText: '搜索文档', buttonAriaLabel: '搜索文档' },
+          modal: {
+            displayDetails: '显示详情',
+            resetButtonTitle: '清除查询条件',
+            backButtonTitle: '返回',
+            noResultsText: '未找到相关内容',
+            footer: {
+              selectText: '选择',
+              navigateText: '切换',
+              closeText: '关闭'
+            }
+          }
+        }
+      }
+    },
+
+    outline: {
+      level: [2, 3],
+      label: '本页目录'
+    },
+
+    docFooter: {
+      prev: '上一篇',
+      next: '下一篇'
+    },
+
+    footer: {
+      message: 'TCraft Launcher 插件文档 · API v1',
+      copyright: '© 2026 TCraft Launcher'
+    },
+
+    returnToTopLabel: '返回顶部',
+    darkModeSwitchLabel: '主题',
+    sidebarMenuLabel: '菜单',
+    darkModeSwitchTitle: '切换深色模式',
+    lightModeSwitchTitle: '切换浅色模式'
+  }
+})

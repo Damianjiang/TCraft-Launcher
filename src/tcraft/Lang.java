@@ -8,7 +8,7 @@ public final class Lang {
 
     public static volatile int mode = 0;
     public static volatile int setting = 0;
-    // 整体换表，读不到半张
+    // 整体换表 读不到半张
     private static volatile Map<String, String[]> TABLE = Map.of();
 
     static {
@@ -41,13 +41,13 @@ public final class Lang {
         TABLE = fresh;
     }
 
-    // JavaFX 前读表，不能经 Theme（会 NoClassDefFoundError）
+    // JavaFX 前读表 不能经 Theme 会 NoClassDefFoundError
     private static String loadTableText() {
         try {
             Path code = java.nio.file.Paths.get(
                     Lang.class.getProtectionDomain().getCodeSource().getLocation().toURI());
             if (java.nio.file.Files.isRegularFile(code)) {
-                // 单文件版：res 打包在 jar 内
+                // 单文件版从 jar 读 res
                 try (java.util.jar.JarFile jf = new java.util.jar.JarFile(code.toFile())) {
                     var entries = jf.entries();
                     while (entries.hasMoreElements()) {
@@ -71,7 +71,7 @@ public final class Lang {
             }
         } catch (Throwable ignored) {
         }
-        // 兜底走 classpath，不会初始化 Theme
+        // 兜底走 classpath
         try (var in = Lang.class.getResourceAsStream("/res/LangTables.txt")) {
             if (in != null) {
                 return new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
@@ -116,7 +116,7 @@ public final class Lang {
             String s = tx.getText();
             if (s != null && !s.isEmpty()) tx.setText(t(s));
         }
-        // ComboBox 选项不是 Labeled，须单独翻译
+        // ComboBox 选项非 Labeled 单独翻译
         if (node instanceof javafx.scene.control.ComboBox<?> combo) {
             javafx.collections.ObservableList items = combo.getItems();
             for (int i = 0; i < items.size(); i++) {

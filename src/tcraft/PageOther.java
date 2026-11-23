@@ -20,6 +20,11 @@ public class PageOther implements Page {
         this.win = win;
         if (this.data.otherSection == null || this.data.otherSection.isEmpty()
                 || "help".equals(this.data.otherSection)) this.data.otherSection = "about";
+        if (this.data.otherSection.startsWith("plugin:")
+                && Plugins.get().pluginPage(this.data.otherSection) == null
+                && !Plugins.get().list().isEmpty()) {
+            this.data.otherSection = "plugins";
+        }
     }
 
     public PageOther(MainWindow win, String section) {
@@ -48,7 +53,21 @@ public class PageOther implements Page {
         if (!hideAbout) panel.getChildren().add(nav("关于", "info", "about"));
         panel.getChildren().addAll(
                 nav("实用工具", "wrench", "tools"),
-                nav("Minecraft 新闻", "newspaper", "news"));
+                nav("插件", "puzzle", "plugins"));
+        for (Plugins.PageEntry entry : Plugins.get().pluginPages()) {
+            Ui.ListItem item = new Ui.ListItem(
+                    Plugins.get().icon(entry.owner, entry.icon, 17, Theme.text), entry.title, null, 36);
+            String key = "plugin:" + entry.key;
+            item.setUserData(key);
+            item.setSelected(key.equals(data.otherSection));
+            item.setOnMouseClicked(e -> {
+                if (key.equals(data.otherSection)) return;
+                data.otherSection = key;
+                win.refreshRight(true);
+            });
+            panel.getChildren().add(item);
+        }
+        panel.getChildren().add(nav("Minecraft 新闻", "newspaper", "news"));
         if (!data.getBool("UiHiddenPageSetup", false)) {
             Ui.ListItem setup = new Ui.ListItem(Theme.icon("settings", 17, Theme.text), "设置", null, 36);
             VBox.setMargin(setup, new Insets(8, 0, 0, 0));
@@ -64,6 +83,14 @@ public class PageOther implements Page {
         item.setSelected(key.equals(data.otherSection));
         if ("news".equals(key)) {
             StackPane refresh = Ui.iconButton("refresh-cw", 22, 13, "刷新新闻", this::refreshNews);
+            refresh.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED, e -> e.consume());
+            item.addAction(refresh);
+        }
+        if ("plugins".equals(key)) {
+            StackPane refresh = Ui.iconButton("refresh-cw", 22, 13, "刷新插件", () -> {
+                data.otherSection = "plugins";
+                PluginsPage.sidebarRefresh(win);
+            });
             refresh.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED, e -> e.consume());
             item.addAction(refresh);
         }
@@ -125,7 +152,14 @@ public class PageOther implements Page {
         switch (data.otherSection) {
             case "news" -> buildNews(page);
             case "tools" -> buildTools(page);
-            default -> buildAbout(page);
+            case "plugins" -> PluginsPage.build(win, page);
+            default -> {
+                if (data.otherSection != null && data.otherSection.startsWith("plugin:")) {
+                    Plugins.get().buildPluginPage(data.otherSection, page);
+                } else {
+                    buildAbout(page);
+                }
+            }
         }
         return scroll;
     }
@@ -222,7 +256,7 @@ public class PageOther implements Page {
         return l;
     }
 
-    // 30 分钟缓存，切页不重拉
+    // 30 分钟缓存 切页不重拉
     private VBox newsPage;
     private final java.util.List<Node> newsNodes = new java.util.ArrayList<>();
     private boolean newsLoading;
@@ -249,11 +283,11 @@ public class PageOther implements Page {
         page.getChildren().addAll(skeletons);
         Thread thread = new Thread(() -> {
             try {
-                // news.json 1MB+，解析留后台
+                // news.json 解析留后台
                 String body = Http.get("https://launchercontent.mojang.com/v2/news.json");
                 java.util.List<Object> entries = Json.arr(Json.obj(Json.parse(body)), "entries");
                 javafx.application.Platform.runLater(() -> {
-                    // 页面重进后旧请求收尾直接丢弃
+                    // 重进后丢弃旧请求
                     if (gen != newsGen) return;
                     newsCache = entries;
                     newsCacheAt = System.currentTimeMillis();
@@ -289,7 +323,7 @@ public class PageOther implements Page {
             String text = Json.str(n, "text", Json.str(n, "shortText", ""));
             String link = Json.str(n, "readMoreLink", "");
             Ui.Card card = Ui.card(title);
-            // 配图为相对路径，拼域名异步加载
+            // 配图相对路径 异步拼域名
             String imgPath = Json.str(Json.obj(n, "newsPageImage"), "url", "");
             if (imgPath.isEmpty()) imgPath = Json.str(Json.obj(n, "playPageImage"), "url", "");
             if (!imgPath.isEmpty()) {
@@ -328,7 +362,7 @@ public class PageOther implements Page {
         }
     }
 
-    // 骨架屏：标题条+镐子动画+文字条呼吸闪烁
+    // 骨架屏动画
     private List<Node> newsSkeletons(int count) {
         List<Node> out = new ArrayList<>();
         for (int i = 0; i < count; i++) {
@@ -352,7 +386,7 @@ public class PageOther implements Page {
             pulseNodes.add(card);
             out.add(card);
         }
-        // 骨架条与图片底统一呼吸闪烁，离场自停
+        // 骨架呼吸闪烁 离场自停
         javafx.animation.Timeline pulse = new javafx.animation.Timeline(
                 new javafx.animation.KeyFrame(javafx.util.Duration.ZERO,
                         new javafx.animation.KeyValue(skeletonOpacity, 1.0)),
@@ -420,7 +454,7 @@ public class PageOther implements Page {
         return box;
     }
 
-    // UniformToFill：取大缩放，居中裁切+圆角
+    // UniformToFill
     private void showNewsImage(StackPane box, javafx.scene.image.Image img, double h) {
         javafx.scene.image.ImageView iv = new javafx.scene.image.ImageView(img);
         iv.setPreserveRatio(true);
@@ -455,6 +489,7 @@ public class PageOther implements Page {
                         "清理垃圾", "将删除游戏目录与实例目录下的崩溃报告和日志文件。\n"
                                 + "此操作不可撤销，是否继续？", this::cleanJunk, true)),
                 Ui.button("今日人品", Ui.BTN_NORMAL, this::showLuck));
+        flow.getChildren().addAll(Plugins.get().toolButtons());
         utilCard.add(flow);
         page.getChildren().add(utilCard);
     }

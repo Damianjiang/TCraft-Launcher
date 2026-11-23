@@ -45,7 +45,7 @@ public final class Theme {
     public static Color fieldBg = Color.web("#ffffff", Math.min(1, (245 * 0.5 + 25) / 255));
     public static Color listHoverBg = Color.web("#e0eafd", 190 * 0.5 / 255);
     public static Color semiTransparent = Color.web("#eaf2fe", 1 / 255.0);
-    // 显式给 alpha，8 位 hex 会被当 RRGGBBAA 解析
+    // 显式 alpha 避免 RRGGBBAA
     public static Color halfWhite = Color.color(1, 1, 1, 0x55 / 255.0);
     public static Color brush7 = Color.web("#e0eafd");
     public static Color redBack = Color.color(251 / 255.0, 221 / 255.0, 221 / 255.0, 0x80 / 255.0);
@@ -78,7 +78,7 @@ public final class Theme {
             "#0e6b7a", "#5d7a3a", "#8a7b2f", "#d97a45", "#a85757", "#a273b8", "#2b5f52", "#55606e", "#c9b52a", "#6f8fb8"
     };
 
-    // 每 99 次启动按序解锁一个隐藏主题
+    // 每 99 次启动解锁主题
     public static final int[] HIDDEN_THEMES = {
             6,
             7,
@@ -92,9 +92,9 @@ public final class Theme {
     public static volatile Image wallpaper;
     public static Font baseFont;
 
-    // 壁纸就绪后在 FX 线程回调刷背景/主题色
+    // 壁纸就绪后回调刷色
     public static volatile Runnable onWallpaperReady;
-    // 壁纸取色完成且颜色确实变化时回调
+    // 取色变化时回调
     public static volatile Runnable onAccentApplied;
 
     private Theme() {
@@ -316,7 +316,7 @@ public final class Theme {
                 stream.filter(Files::isRegularFile).filter(Theme::isWallpaperImage).forEach(images::add);
             }
             if (images.isEmpty()) return false;
-            // 与启动取色选同一张图，否则随机
+            // 与启动取色同一张图
             Path pick = pendingWallpaper != null && Files.isRegularFile(pendingWallpaper)
                     ? pendingWallpaper
                     : images.get((int) (Math.random() * images.size()));
@@ -326,7 +326,7 @@ public final class Theme {
             if (img.isError()) return false;
             final int gen = wallpaperGen.incrementAndGet();
             final Image loaded = img;
-            // 监听列表仅 FX 线程可改；此方法会被后台线程调
+            // 监听列表仅 FX 可改
             javafx.application.Platform.runLater(() -> img.errorProperty().addListener((o, was, now) -> {
                 if (Boolean.TRUE.equals(now) && wallpaper == loaded) {
                     javafx.application.Platform.runLater(Theme::resetWallpaper);
@@ -334,7 +334,7 @@ public final class Theme {
             }));
             javafx.application.Platform.runLater(() -> {
                 if (wallpaperGen.get() != gen) return;
-                // 解码失败可能抢在监听挂上之前
+                // 解码失败可能早于监听
                 if (loaded.isError()) {
                     resetWallpaper();
                     return;
@@ -365,7 +365,7 @@ public final class Theme {
             if (old != null) imageCacheBytes -= imageBytes(old);
             imageCacheBytes += imageBytes(img);
             var it = IMAGE_CACHE.entrySet().iterator();
-            // 解码失败的图计不了字节，条数兜底
+            // 失败图按条数兜底
             while ((imageCacheBytes > IMAGE_CACHE_BUDGET || IMAGE_CACHE.size() > 512)
                     && IMAGE_CACHE.size() > 1 && it.hasNext()) {
                 var e = it.next();
@@ -459,7 +459,7 @@ public final class Theme {
         }
     }
 
-    // 固化当前 accent，关跟随壁纸时保留取色
+    // 关闭跟随时固化 accent
     public static void saveCurrentAsCustom(Data d) {
         Color c = accent;
         double hue = c.getHue();
@@ -484,7 +484,7 @@ public final class Theme {
         titleBar = hsl(hue + delta, sat, Math.max(14, light - 22));
     }
 
-    // 启动先用上次壁纸取色结果
+    // 启动用上次取色
     public static boolean applyCachedAccent() {
         try {
             Data d = Data.get();
@@ -546,7 +546,7 @@ public final class Theme {
                 return;
             }
             if (applyCachedAccent()) {
-                // 沿用上次取色的那张壁纸
+                // 沿用上次取色壁纸
                 try {
                     String name = d.get("UiAccentCacheWallpaper", "");
                     if (!name.isBlank() && pictures != null) {
@@ -558,7 +558,7 @@ public final class Theme {
                 skipInitialAccentExtract = true;
                 return;
             }
-            // 无缓存时用缩小图取色
+            // 无缓存用缩图取色
             Image small = loadAccentPreview(pictures);
             if (small != null) {
                 Color c = extractAccent(small);
@@ -737,7 +737,7 @@ public final class Theme {
             css = css.replace("#4890f5", hex(accentLight))
                     .replace("#1370f3", hex(accent))
                     .replace("#eaf2fe", hex(accentPale3));
-            // StyleManager 按 URL 缓存，文件名带代次与进程号
+            // CSS 文件名带代次与进程号
             Path out = Paths.get(System.getProperty("java.io.tmpdir"),
                     cssOwnPrefix() + Long.toHexString(System.currentTimeMillis()) + "-" + cssGen++ + ".css");
             Files.writeString(out, css, StandardCharsets.UTF_8);
@@ -753,7 +753,7 @@ public final class Theme {
         return "tcraft-theme-" + ProcessHandle.current().pid() + "-";
     }
 
-    // 本进程只留当前代；别的实例的文件放一天再扫
+    // 仅留当前代 旧文件延迟清理
     private static void sweepThemeCss(Path keep) {
         String own = cssOwnPrefix();
         try (var stream = Files.list(Paths.get(System.getProperty("java.io.tmpdir")))) {
@@ -808,14 +808,14 @@ public final class Theme {
     }
 
     public static void applyWallpaperTheme() {
-        // 启动已定过色，首次挂载壁纸不重复取色
+        // 首挂壁纸不重复取色
         if (skipInitialAccentExtract) {
             skipInitialAccentExtract = false;
             return;
         }
         Image img = wallpaper;
         if (img == null) return;
-        // 取色扫描放后台；解码未完不取色
+        // 取色放后台
         if (img.getProgress() < 1) {
             javafx.beans.value.ChangeListener<Boolean> onError =
                     new javafx.beans.value.ChangeListener<>() {
@@ -837,7 +837,7 @@ public final class Theme {
                         }
                     };
             img.widthProperty().addListener(onWidth);
-            // 图片加载失败时移除监听，避免每次挂壁纸都累积
+            // 加载失败移除监听
             img.errorProperty().addListener(onError);
             return;
         }
@@ -846,7 +846,7 @@ public final class Theme {
 
     private static void extractAccentInBackground(Image img) {
         Threads.start("TCL-Accent", () -> {
-            // PixelReader 未就绪会抛，静默跳过取色
+            // PixelReader 未就绪则跳过
             if (img.getProgress() < 1) return;
             Color c = extractAccent(img);
             cacheAccent(c);
@@ -928,7 +928,7 @@ public final class Theme {
             styleShape(c, color);
             group.getChildren().add(c);
         }
-        // viewBox 支持任意底；null 按默认 24
+        // viewBox 支持任意底 null 按默认 24
         double vbx = 24;
         if (svg != null) {
             int rootStart = svg.indexOf("<svg");
@@ -1041,7 +1041,7 @@ public final class Theme {
         int scale = Math.max(1, (int) Math.floor(skin.getWidth() / 64.0));
         int tex = 8 * scale;
         int s = (int) Math.round(size);
-        // 点采样预渲染成 1:1 位图，绕开 ImageView 缩放的双线性
+        // 预渲染 1:1 位图
         WritableImage out = new WritableImage(s, s);
         PixelReader pr = skin.getPixelReader();
         javafx.scene.image.PixelWriter pw = out.getPixelWriter();

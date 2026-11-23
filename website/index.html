@@ -46,8 +46,7 @@
             <div class="feature-row">
                 <div class="copy">
                     <h2>联机房间</h2>
-                    <p>基于 EasyTier 虚拟局域网，不用公网 IP。</p>
-                    <p>创建房间，把联机码发给朋友就能直连。</p>
+                    <p>EasyTier 用户态组网，不用公网 IP；发联机码即可直连。</p>
                 </div>
                 <img src="assets/screenshots/06-link.jpg" alt="联机房间" width="1100" height="604">
             </div>
@@ -58,8 +57,7 @@
                 <img src="assets/screenshots/09-ui.jpg" alt="个性化设置" width="1100" height="604">
                 <div class="copy">
                     <h2>个性化主题</h2>
-                    <p>Win11 风格半透明界面。</p>
-                    <p>壁纸、背景音乐、主题色都能换。</p>
+                    <p>Win11 风格；壁纸、音乐、主题色可换。</p>
                 </div>
             </div>
         </section>
@@ -68,9 +66,8 @@
             <div class="feature-row">
                 <div class="copy">
                     <h2>整合包导入</h2>
-                    <p>支持 CurseForge、Modrinth、HMCL 整合包。</p>
-                    <p>内置 Forge、NeoForge、Fabric、OptiFine 下载。</p>
-                    <p>多实例隔离，存档与模组互不干扰。</p>
+                    <p>支持 CurseForge / Modrinth / HMCL，内置 Forge / NeoForge / Fabric / OptiFine。</p>
+                    <p>实例隔离，存档与模组互不影响。</p>
                 </div>
                 <img src="assets/screenshots/05-download.jpg" alt="游戏下载" width="1100" height="604">
             </div>
@@ -88,8 +85,7 @@
 
         <section class="opensource">
             <h2>开放源代码</h2>
-            <p>用 JavaFX 编写，按 MIT 协议开源。</p>
-            <p>源码、构建方式与发布包都公开在 <a href="https://github.com/Damianjiang/TCraft-Launcher" target="_blank" rel="noopener">GitHub</a>。</p>
+            <p>JavaFX 编写，MIT 开源；源码与发布包见 <a href="https://github.com/Damianjiang/TCraft-Launcher" target="_blank" rel="noopener">GitHub</a>。</p>
             <p class="badges">
                 <img src="https://img.shields.io/github/v/release/Damianjiang/TCraft-Launcher?style=flat-square" alt="最新版本">
                 <img src="https://img.shields.io/github/downloads/Damianjiang/TCraft-Launcher/total?style=flat-square" alt="Downloads">
@@ -99,7 +95,10 @@
 
         <section class="download" id="download">
             <h2>下载</h2>
-            <a class="btn-download" href="https://github.com/Damianjiang/TCraft-Launcher/releases" target="_blank" rel="noopener">下载 TCraft Launcher</a>
+            <div class="download-actions">
+                <a class="btn-download" href="https://github.com/Damianjiang/TCraft-Launcher/releases" target="_blank" rel="noopener">下载 TCraft Launcher</a>
+                <a class="btn-docs" href="https://damianjiang.github.io/TCraft-Launcher/wiki/">开发者文档</a>
+            </div>
             <p>绿色单文件，无需安装。Windows / macOS / Linux。</p>
         </section>
 
@@ -109,7 +108,8 @@
         <p>© 2026 TCraft团队 · MIT</p>
         <p><a href="https://qm.qq.com/q/MlGDa2BqUc" target="_blank" rel="noopener">点击链接加入群聊【TCraft Launcher启动器交流群】</a></p>
         <p><a href="https://github.com/Damianjiang/TCraft-Launcher/issues" target="_blank" rel="noopener">反馈问题</a></p>
-        <p class="notice">启动器仍在开发中。TCraft Launcher 与 Mojang Studios、Microsoft 及其在中国大陆的代理公司无任何从属或关联，是非官方 Minecraft 启动器。</p>
+        <p><a href="https://damianjiang.github.io/TCraft-Launcher/wiki/">开发者文档</a></p>
+        <p class="notice">开发中。与 Mojang Studios、Microsoft 及其中国大陆代理无关联，非官方 Minecraft 启动器。</p>
     </footer>
 
 
@@ -119,20 +119,20 @@
 
             <div class="dl-step" id="dlStep1">
                 <h3>下载 TCraft Launcher</h3>
-                <p class="dl-hint">选择下载方式，镜像不可用时可随时切换节点。</p>
+                <p class="dl-hint">选择下载方式。</p>
                 <button class="dl-choice" id="dlMirror" type="button">
                     <strong>国内镜像加速</strong>
-                    <small>自动读取最新版本，可选加速节点并测速</small>
+                    <small>读取最新版，可选节点测速</small>
                 </button>
                 <button class="dl-choice" id="dlGithub" type="button">
                     <strong>前往 GitHub Releases</strong>
-                    <small>直接打开官方发布页，自己选择文件</small>
+                    <small>打开 GitHub Releases</small>
                 </button>
             </div>
 
             <div class="dl-step" id="dlStep2" hidden>
                 <h3>选择加速节点</h3>
-                <p class="dl-hint">点节点即可读取最新版本；「测速」会各拉一个小文件比较耗时。</p>
+                <p class="dl-hint">点节点读取版本；测速会比较延迟。</p>
                 <div class="dl-nodes" id="dlNodes"></div>
                 <div class="dl-row">
                     <button class="dl-link" id="dlBack" type="button">返回</button>

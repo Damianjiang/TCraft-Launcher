@@ -84,6 +84,16 @@ public class PageLaunch implements Page {
             logCard.add(lines);
             panMain.getChildren().add(logCard);
         }
+        java.util.List<Node> pluginButtons = Plugins.get().launchButtons();
+        if (!pluginButtons.isEmpty()) {
+            Ui.Card pluginCard = Ui.card("插件扩展");
+            pluginCard.setMaxWidth(Double.MAX_VALUE);
+            FlowPane flow = new FlowPane(10, 10);
+            flow.setPadding(new Insets(0, 15, 13, 15));
+            flow.getChildren().addAll(pluginButtons);
+            pluginCard.add(flow);
+            panMain.getChildren().add(pluginCard);
+        }
         root.getChildren().add(scroll);
 
         VBox bottom = new VBox(10);
@@ -218,7 +228,7 @@ public class PageLaunch implements Page {
     private void openLaunchMenu(Node anchor) {
         Data.Instance instance = data.instance();
         boolean hasInstance = instance != null;
-        // 连点兜底：上一张还挂着就先收掉
+        // 连点时先收上一张
         if (menuPopup != null && menuPopup.isShowing()) menuPopup.hide();
         Popup popup = new Popup();
         popup.setAutoHide(true);
@@ -306,7 +316,7 @@ public class PageLaunch implements Page {
             });
             return;
         }
-        // 页面反复重建会重复挂 handler
+        // 重建会重复挂 handler
         if (aprilScene != null && aprilScene.getRoot() != null) aprilScene.getRoot().setOnMouseMoved(null);
         aprilScene = scene;
         scene.getRoot().setOnMouseMoved(e -> {
@@ -435,7 +445,7 @@ public class PageLaunch implements Page {
             aprilTimer.stop();
             aprilTimer = null;
         }
-        // handler 捕获页面实例，不清会常驻窗口
+        // 清 handler 防页面常驻
         if (aprilScene != null) {
             if (aprilScene.getRoot() != null) aprilScene.getRoot().setOnMouseMoved(null);
             aprilScene = null;

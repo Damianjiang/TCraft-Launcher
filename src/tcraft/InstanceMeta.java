@@ -109,7 +109,7 @@ public final class InstanceMeta {
             Files.write(file, out, StandardCharsets.UTF_8);
             INI_CACHE.remove(file.toAbsolutePath().toString());
         } catch (Exception e) {
-            // brief 会被二次 Lang.t，先译无害
+            // brief 会被二次 Lang.t 先译无害
             Errors.error(Lang.t("保存实例设置失败：") + ins.name + " / " + key, e);
         }
     }

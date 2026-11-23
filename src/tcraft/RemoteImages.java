@@ -44,7 +44,7 @@ public final class RemoteImages {
         return img;
     }
 
-    // 切源后清失败记录，下次重新走候选
+    // 切源后清失败记录
     public static void clearFailures() {
         FAILED.clear();
     }
@@ -75,7 +75,7 @@ public final class RemoteImages {
         }
         // 重建页面允许重试
         if (failed(url)) FAILED.remove(url);
-        // compute 保证登记与首例判定原子
+        // compute 保证原子
         List<Consumer<Image>> waiters = WAITERS.compute(k, (kk, list) -> {
             if (list == null) list = new CopyOnWriteArrayList<>();
             list.add(callback);
@@ -135,7 +135,7 @@ public final class RemoteImages {
                             } catch (Exception ignored) {
                             }
                         }
-                        // 缺解码库时不重试，直接占位
+                        // 缺库直接占位
                         boolean noDecoder = bytes != null && isWebp(bytes) && webpUnavailable;
                         boolean permanent = Http.isPermanentFailure(err)
                                 || (bytes == null && err == null);
@@ -148,7 +148,7 @@ public final class RemoteImages {
                                     .execute(() -> attemptLoad(url, key, px, attempt + 1));
                             return;
                         }
-                        // 4xx 永久失败，其余冷却 30 秒
+                        // 4xx 永久失败 其余冷却 30s
                         FAILED.put(url, permanent ? Long.MAX_VALUE
                                 : System.currentTimeMillis() + RETRY_AFTER_MS);
                     } else {
@@ -199,7 +199,7 @@ public final class RemoteImages {
     private static void trimCache() {
         int target = MEMORY_LIMIT * 3 / 4;
         if (CACHE.size() <= target) return;
-        // 按最近访问时间从旧到新淘汰
+        // 按最近访问淘汰
         List<String> keys = new java.util.ArrayList<>(CACHE.keySet());
         keys.sort(java.util.Comparator.comparingLong(k -> ACCESSED.getOrDefault(k, 0L)));
         for (String k : keys) {
@@ -239,7 +239,7 @@ public final class RemoteImages {
         }
     }
 
-    // 缓存按内容 SHA-1 命名，只删 40 位十六进制
+    // 缓存按 SHA-1 命名
     private static final java.util.regex.Pattern SHA1_NAME = java.util.regex.Pattern.compile("[0-9a-f]{40}");
 
     private static void prune(Path d) {
@@ -247,7 +247,7 @@ public final class RemoteImages {
         try {
             Http.pool().execute(() -> {
                 try {
-                    // 缓存根无标记文件即非本启动器目录，整目录拒绝删除
+                    // 无标记目录拒绝删除
                     if (!Data.hasCacheMarker(d.getParent())) return;
                     try (Stream<Path> s = Files.list(d)) {
                         List<Path> files = s.filter(Files::isRegularFile)
@@ -287,13 +287,19 @@ public final class RemoteImages {
 
     private static Image decode(byte[] bytes, int px) {
         try {
-            // JavaFX 不支持 WebP，缺库静默降级
+            // 缺 WebP 库时静默降级
             if (isWebp(bytes)) return decodeWebp(bytes, px);
             Image img = new Image(new ByteArrayInputStream(bytes), px, px, true, true);
             return img.isError() ? null : img;
         } catch (Throwable e) {
             return null;
         }
+    }
+
+    // 本地字节流复用 PNG/WebP 解码
+    public static Image decodeBytes(byte[] bytes, double size) {
+        if (bytes == null || bytes.length == 0) return null;
+        return decode(bytes, decodePx(size));
     }
 
     private static java.lang.reflect.Method webpRead;

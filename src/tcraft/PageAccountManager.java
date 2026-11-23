@@ -29,7 +29,7 @@ public class PageAccountManager implements Page {
 
     private final java.util.Set<Data.Account> refreshing =
             java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
-    // 每次启动只自动补拉一次
+    // 每次启动补拉一次
     private static final java.util.Set<String> autoChecked =
             java.util.concurrent.ConcurrentHashMap.newKeySet();
     private static final java.util.concurrent.ThreadPoolExecutor skinPool =
@@ -319,7 +319,7 @@ public class PageAccountManager implements Page {
 
     private String rowInfo(int index, boolean current) {
         Data.Account a = data.accounts.get(index);
-        // 拼接串查不到整键，两处调用点均创建时翻译
+        // 拼接串创建处翻译
         return Lang.t(loginType(a)) + (current ? Lang.t(" · 当前账户") : "");
     }
 

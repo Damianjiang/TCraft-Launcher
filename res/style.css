@@ -77,7 +77,7 @@
 .text-area {
     -fx-background-color: transparent;
     -fx-border-color: transparent;
-    /* 只清背景不给颜色时，TextArea 会推导出白色，浅色卡片上日志不可见 */
+    /* 只清背景时 TextArea 会推导白色 */
     -fx-text-fill: #343d4a;
 }
 

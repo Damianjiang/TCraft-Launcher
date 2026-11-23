@@ -1,4 +1,4 @@
-// jar 追加 exe 尾，运行时解到 .tcl 用系统 Java 启动
+// jar 追加到 exe 尾 运行时解包并启动
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <stdio.h>
@@ -8,13 +8,13 @@
 
 #define APP_NAME "TCraft Launcher"
 #define JAR_NAME L"TCraftLauncher.jar"
-// 数据固定在 exe 同目录 .tcl，不用 TEMP
+// 数据固定在 exe 同目录 .tcl 不用 TEMP
 #define HOME_SUB L".tcl"
 #define CFG_NAME L"launcher.cfg"
 
 #define MAX_PATH_LEN 4096
 
-// TCC 的 windows.h 缺 winnls.h，手动声明
+// TCC 的 windows.h 缺 winnls.h 手动声明
 #ifndef CP_UTF8
 #define CP_UTF8 65001
 #endif
@@ -31,7 +31,7 @@ static wchar_t cfg_java[MAX_PATH_LEN]; // .tcl\launcher.cfg 里记住的 java �
 static int first_run;
 static HANDLE instance_mutex;
 
-// 中文按 UTF-8 转宽字符，再交给 MessageBoxW
+// 中文按 UTF-8 转宽字符 再交给 MessageBoxW
 static void alert(const char *utf8) {
     wchar_t wide[1024];
     MultiByteToWideChar(CP_UTF8, 0, utf8, -1, wide, 1024);
@@ -85,7 +85,7 @@ static int create_dirs(const wchar_t *path) {
     return 1;
 }
 
-// 目录是否可写，拿临时文件试写
+// 临时文件试写判断可写
 static int dir_writable(const wchar_t *dir) {
     wchar_t probe[MAX_PATH_LEN];
     HANDLE h;
@@ -99,7 +99,7 @@ static int dir_writable(const wchar_t *dir) {
     return 1;
 }
 
-// 工作目录固定为 exe 同目录的 .tcl，不回退到别处
+// 工作目录固定为 exe 同目录的 .tcl 不回退到别处
 static int init_home(void) {
     wchar_t exe_dir[MAX_PATH_LEN];
 
@@ -135,7 +135,7 @@ static void stub_log(const char *line) {
     CloseHandle(h);
 }
 
-// 二次启动：提窗静默退出，不叠窗
+// 二次启动提窗后退出
 static void activate_existing_window(void) {
     int i;
     for (i = 0; i < 10; i++) {
@@ -149,7 +149,7 @@ static void activate_existing_window(void) {
     }
 }
 
-// 互斥量守 stub，Java 侧文件锁接管
+// 互斥量守 stub Java 侧文件锁接管
 static int acquire_instance(void) {
     wchar_t name[MAX_PATH_LEN];
     wchar_t hexw[40];
@@ -175,7 +175,7 @@ static int acquire_instance(void) {
     return 0;
 }
 
-// 递归删目录（失败就跳过，不弹任何东西）
+// 递归删目录 失败跳过
 static void remove_tree(const wchar_t *path, int depth) {
     WIN32_FIND_DATAW data;
     wchar_t pattern[MAX_PATH_LEN];
@@ -206,7 +206,7 @@ static void remove_tree(const wchar_t *path, int depth) {
     RemoveDirectoryW(path);
 }
 
-// 清老版残留目录（固定路径，失败忽略）
+// 清旧残留目录 失败忽略
 static void cleanup_legacy_home(void) {
     wchar_t alt[MAX_PATH_LEN];
     wchar_t old[MAX_PATH_LEN];
@@ -214,7 +214,7 @@ static void cleanup_legacy_home(void) {
     if (!GetEnvironmentVariableW(L"LOCALAPPDATA", alt, MAX_PATH_LEN) || !alt[0]) return;
     copy_str(old, alt, MAX_PATH_LEN);
     cat_str(old, L"\\TCraftLauncher", MAX_PATH_LEN);
-    if (wcscmp(old, home_dir) == 0) return; /* 路径相同则跳过 */
+    if (wcscmp(old, home_dir) == 0) return; // 路径相同则跳过
     if (GetFileAttributesW(old) == INVALID_FILE_ATTRIBUTES) return;
     remove_tree(old, 0);
 }
@@ -236,7 +236,7 @@ static int read_file(const wchar_t *path, char *buf, int cap) {
     return (int)got;
 }
 
-// 读上次选定的 java，失效时重新扫描
+// 读上次 Java 失效重扫
 static void load_cfg(void) {
     wchar_t p[MAX_PATH_LEN];
     char buf[2048];
@@ -245,7 +245,7 @@ static void load_cfg(void) {
     cfg_java[0] = 0;
     cfg_path(p, MAX_PATH_LEN);
     got = read_file(p, buf, sizeof(buf));
-    first_run = (got <= 0); // 没有 launcher.cfg：首次运行，必须给用户一个可见窗口
+    first_run = (got <= 0); // 没有 launcher.cfg 首次运行 必须给用户一个可见窗口
     if (got <= 0) return;
     buf[got] = 0;
     if (MultiByteToWideChar(CP_UTF8, 0, buf, -1, cfg_java, MAX_PATH_LEN) <= 0) {
@@ -306,8 +306,8 @@ static unsigned long long jar_offset(const wchar_t *exe, unsigned long long *siz
             return 0;
         }
     }
-    // EOCD 就在末尾附近，从后往前扫；EOCD 最短 22 字节，起点保证 i+19 不越界
-    // 候选算出的 offset 处必须是 PK\x03\x04（伪签名/改坏时继续向前扫），与 Java 侧 headerLength 对齐
+    // 从尾部扫 EOCD 最短 22 字节
+    // 候选处须为 PK\x03\x04 与 headerLength 对齐
     for (i = tail_len - 22; ; i--) {
         if (tail[i] == 0x50 && tail[i + 1] == 0x4b && tail[i + 2] == 0x05 && tail[i + 3] == 0x06) {
             unsigned long long cd_size = (unsigned long long)tail[i + 12]
@@ -385,7 +385,7 @@ static int parse_major(const char *s) {
     return atoi(s);
 }
 
-// 读 release 判定位数，不起进程
+// 读 release 判定位数 不起进程
 static int java_is64(const wchar_t *java) {
     wchar_t home[MAX_PATH_LEN];
     wchar_t rel[MAX_PATH_LEN];
@@ -404,7 +404,7 @@ static int java_is64(const wchar_t *java) {
         if (strstr(buf, "OS_ARCH=\"x86_64\"") || strstr(buf, "OS_ARCH=\"amd64\"")
                 || strstr(buf, "OS_ARCH=\"aarch64\"")) return 1;
     }
-    return 1; // 读不到按 64 位处理，32 位 JRE 启动时会报错
+    return 1; // 读不到按 64 位处理 32 位 JRE 启动时会报错
 }
 
 static int java_feature(const wchar_t *java) {
@@ -425,7 +425,7 @@ static int java_feature(const wchar_t *java) {
     hit = strstr(buf, "JAVA_VERSION=\"");
     return hit ? parse_major(hit + 14) : 0;
 }
-// 去引号、去结尾反斜杠（PATH 里偶尔写成 "C:\xx\bin\"）
+// 去引号与结尾反斜杠
 static void strip_path_entry(const wchar_t *in, wchar_t *out, int cap) {
     int i = 0, len;
 
@@ -448,7 +448,7 @@ static void cand_add(const wchar_t *path) {
 
     if (cand_count >= MAX_CAND) return;
     if (!file_exists(path)) return;
-    // Oracle 的 javapath 是转发目录，探测会拿到别的版本，直接跳过
+    // javapath 是转发目录 跳过
     if (wcsstr(path, L"\\Oracle\\Java")) return;
     if (wcsstr(path, L"\\WindowsApps\\")) return;
     for (i = 0; i < cand_count; i++) {
@@ -458,7 +458,7 @@ static void cand_add(const wchar_t *path) {
     cand_count++;
 }
 
-// 在 home 下找 bin\java(w).exe，兼容 JAVA_HOME 直接指向 bin
+// home 下找 bin/java 兼容 JAVA_HOME 指向 bin
 static void cand_add_home(const wchar_t *home_in) {
     wchar_t home[MAX_PATH_LEN];
     wchar_t p[MAX_PATH_LEN];
@@ -475,7 +475,7 @@ static void cand_add_home(const wchar_t *home_in) {
     }
 }
 
-// 在某个安装根目录下往下 depth 层找 JDK
+// 安装根目录向下 depth 层找 JDK
 static void scan_tree(const wchar_t *root, int depth) {
     WIN32_FIND_DATAW data;
     wchar_t pattern[MAX_PATH_LEN];
@@ -528,7 +528,7 @@ static void scan_path(void) {
     }
 }
 
-// 常规安装位置：厂商目录下再往下两层找 JDK
+// 常规位置向下两层找 JDK
 static void scan_common_dirs(void) {
     static const wchar_t *bases[] = {
         L"ProgramW6432", L"ProgramFiles", L"ProgramFiles(x86)", NULL
@@ -555,7 +555,7 @@ static void scan_common_dirs(void) {
     scan_env_root(L"APPDATA", L"\\.minecraft\\runtime", 2);
 }
 
-// 候选：上次记录/自带 Java/JAVA_HOME/PATH/常见目录
+// 候选 上次记录/自带 Java/JAVA_HOME/PATH/常见目录
 static void collect_candidates(void) {
     wchar_t jh[MAX_PATH_LEN];
     wchar_t tcl_java[MAX_PATH_LEN];
@@ -587,7 +587,7 @@ static void consider_candidate(int i, int *best, int *best_major) {
     }
 }
 
-// 候选一次性收齐，找不到交给自动下载
+// 候选一次性收齐 找不到交给自动下载
 static int pick_best_java(wchar_t *out, int cap) {
     int i, best = -1, best_major = 0;
 
@@ -610,7 +610,7 @@ static int pick_best_java(wchar_t *out, int cap) {
     }
     return 0;
 }
-// 取 exe 后的参数，保留引号传 main
+// 取 exe 后参数 保留引号
 static void capture_args(void) {
     wchar_t *p = GetCommandLineW();
     if (!p) return;
@@ -647,7 +647,7 @@ static int java_has_builtin_fx(const wchar_t *java) {
     return file_exists(prop);
 }
 
-// 2.5s 内观察进程：0=没起来 1=正常退出 2=秒退（退出码非 0）
+// 2.5s 观察 0 未起 / 1 正常退出 / 2 秒退
 static int run(const wchar_t *java, DWORD *exit_code) {
     wchar_t cmd[MAX_PATH_LEN * 2];
     wchar_t logp[MAX_PATH_LEN];
@@ -661,7 +661,7 @@ static int run(const wchar_t *java, DWORD *exit_code) {
 
     copy_str(cmd, L"\"", MAX_PATH_LEN * 2);
     cat_str(cmd, java, MAX_PATH_LEN * 2);
-    // 向 Java 侧传入启动器目录与 exe 自身路径（自更新要替换的文件）
+    // 向 Java 侧传入启动器目录与 exe 自身路径 自更新要替换的文件
     cat_str(cmd, L"\" -Dfile.encoding=UTF-8 -Dtcraft.dir=\"", MAX_PATH_LEN * 2);
     cat_str(cmd, home_dir, MAX_PATH_LEN * 2);
     cat_str(cmd, L"\" -Dtcraft.exe=\"", MAX_PATH_LEN * 2);
@@ -675,7 +675,7 @@ static int run(const wchar_t *java, DWORD *exit_code) {
         copy_str(check, deps, MAX_PATH_LEN);
         cat_str(check, L"\\.ready", MAX_PATH_LEN);
         if (java_has_builtin_fx(java)) {
-            // 自带 JavaFX 的 Java 17 直接用内置模块，Win7 不找外置原生库
+            // 自带 JavaFX 的 Java 17 直接用内置模块 Win7 不找外置原生库
             cat_str(cmd, L"\" --add-modules=javafx.controls,javafx.graphics,javafx.base,javafx.media,javafx.web,javafx.swing,javafx.fxml",
                     MAX_PATH_LEN * 2);
             cat_str(cmd, L" --add-exports=javafx.graphics/com.sun.prism=ALL-UNNAMED -cp \"",
@@ -706,7 +706,7 @@ static int run(const wchar_t *java, DWORD *exit_code) {
         cat_str(cmd, g_args, MAX_PATH_LEN * 2);
     }
 
-    // javaw 无控制台，输出落 java-error.log
+    // javaw 无控制台 输出写 java-error.log
     copy_str(logp, log_dir[0] ? log_dir : home_dir, MAX_PATH_LEN);
     cat_str(logp, L"\\java-error.log", MAX_PATH_LEN);
     sa.nLength = sizeof(sa);
@@ -743,7 +743,7 @@ static int run(const wchar_t *java, DWORD *exit_code) {
     return 1;
 }
 
-// Java 选择窗口：扫描 / 浏览 / 下载
+// Java 选择窗口 扫描 / 浏览 / 下载
 
 #define IDC_JAVA_PATH    1001
 #define IDC_JAVA_BROWSE  1002
@@ -755,7 +755,7 @@ static int run(const wchar_t *java, DWORD *exit_code) {
 #define IDC_JAVA_CANCEL  1008
 #define IDC_JAVA_STATUS  1010
 
-// 自定义控件消息号，不依赖缺失头文件宏
+// 自定义控件消息号 不依赖缺失头文件宏
 #define PBM_SETPOS_X     0x0402
 #define PBM_SETRANGE32_X 0x0406
 #define EM_SETSEL_X      0x00B1
@@ -764,7 +764,7 @@ static int run(const wchar_t *java, DWORD *exit_code) {
 #define TIMER_DOWNLOAD_ID 2
 #define TIMER_ACCEPT_ID  3
 
-// OPENFILENAMEW 自定义+动态取函数，避 TCC 头缺失
+// OPENFILENAMEW 自定义+动态取函数 避 TCC 头缺失
 typedef struct {
     unsigned long  lStructSize;
     void          *hwndOwner;
@@ -815,16 +815,16 @@ static void copy_bytes(char *dst, int cap, const char *src) {
     dst[i] = 0;
 }
 
-// Java17 自动安装；下载源按序尝试，404 跳下一源
+// Java 17 自动安装 404 换源
 #define JAVA17_URL_TUNA L"https://mirrors.tuna.tsinghua.edu.cn/Adoptium/17/jre/x64/windows/OpenJDK17U-jre_x64_windows_hotspot_17.0.21_9.zip"
-// 华为云 OpenJDK 17（约 186MB，地址固定）
+// 华为云 OpenJDK 17
 #define JAVA17_URL_HUAWEI L"https://mirrors.huaweicloud.com/openjdk/17.0.2/openjdk-17.0.2_windows-x64_bin.zip"
 #define JAVA17_URL L"https://api.adoptium.net/v3/binary/latest/17/ga/windows/x64/jre/hotspot/normal/eclipse"
-// Win7 用 Liberica 17（含 JavaFX）
+// Win7 用 Liberica 17
 #define JAVA17_URL_WIN7 L"https://download.bell-sw.com/java/17.0.20.1%2B1/bellsoft-jre17.0.20.1%2B1-windows-amd64-full.zip"
 #define TCL_UA L"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36 TCraftLauncher/1.0"
 static volatile LONG java_dl_phase;
-static volatile LONG java_dl_result;     // 0 未完成 / 1 成功 / -1 失败
+static volatile LONG java_dl_result; // 0 未完成 / 1 成功 / -1 失败
 static wchar_t java_dl_zip[MAX_PATH_LEN];
 static wchar_t java_dl_dest[MAX_PATH_LEN];
 static wchar_t java_dl_tmp[MAX_PATH_LEN];
@@ -837,21 +837,21 @@ static DWORD java_dl_start_tick;
 static char java_dl_error[512];
 static HANDLE java_dl_thread;
 static int java_dl_extract_logged;
-static volatile LONG java_dl_stalled;      // 20 秒没有新数据就放弃当前源
+static volatile LONG java_dl_stalled; // 20 秒没有新数据就放弃当前源
 static unsigned long java_dl_progress_bytes;
 static DWORD java_dl_progress_tick;
-static volatile LONG java_dl_retryable;    // 0 这个源没救了，直接换源
+static volatile LONG java_dl_retryable; // 0 这个源没救了 直接换源
 static volatile LONG java_dl_source_idx;
 static volatile LONG java_dl_attempt;
-static char java_dl_source[64];            // 当前源名字，给 tick 显示
-static volatile LONG java_dl_part_bytes;   // 分块下载已落盘字节（各线程累加）
-static volatile LONG java_dl_abort;        // 任一分块失败/卡死，通知其余线程退出
-static volatile LONG java_dl_parallel;     // 1=分块下载进行中，java_dl_bytes 走分片计数
+static char java_dl_source[64]; // 当前源名字 给 tick 显示
+static volatile LONG java_dl_part_bytes; // 分块下载已落盘字节 各线程累加
+static volatile LONG java_dl_abort; // 任一分块失败/卡死 通知其余线程退出
+static volatile LONG java_dl_parallel; // 1=分块下载进行中 java_dl_bytes 走分片计数
 
 static void java_dlg_accept(void);
 static void log_append(const char *utf8);
 
-// Win7 / Server 2008 R2 用 Liberica（Temurin 不支持 Win7）
+// Win7 用 Liberica Temurin 不支持
 static int window_version(int *major, int *minor) {
     DWORD v = GetVersion();
     *major = (int)(v & 0xff);
@@ -864,7 +864,7 @@ typedef struct {
     const char *label;
 } JavaSource;
 
-// 国内镜像优先；Win7 必须有内置 JavaFX，先走 Liberica
+// 国内镜像优先 Win7 走 Liberica
 static int java_sources(JavaSource *out, int max) {
     int major, minor, n = 0;
     int win7 = window_version(&major, &minor);
@@ -874,7 +874,7 @@ static int java_sources(JavaSource *out, int max) {
         out[n].url = JAVA17_URL_HUAWEI; out[n].label = "华为云"; n++;
         out[n].url = JAVA17_URL; out[n].label = "Adoptium"; n++;
     } else {
-        // 华为云地址固定；清华镜像体积小但挑客户端（403），放第二
+        // 清华镜像可能 403 置第二
         out[n].url = JAVA17_URL_HUAWEI; out[n].label = "华为云"; n++;
         out[n].url = JAVA17_URL_TUNA; out[n].label = "清华镜像"; n++;
         out[n].url = JAVA17_URL; out[n].label = "Adoptium"; n++;
@@ -938,7 +938,7 @@ static void prog_set(int pos, int total) {
     SendMessageW(ctl_prog, PBM_SETPOS_X, (WPARAM)pos, 0);
 }
 
-// 状态行：只显示一行，超长截断
+// 状态行单行 超长截断
 static void status_set(const char *utf8) {
     wchar_t line[256];
     int n, i;
@@ -959,7 +959,7 @@ static void log_append(const char *utf8) {
     status_set(utf8);
 }
 
-// Java 17 自动安装：下载、解压、保存路径
+// Java 17 安装 下载 解压 保存
 
 static unsigned long file_size_u(const wchar_t *path) {
     HANDLE h;
@@ -988,7 +988,7 @@ static int file_is_zip(const wchar_t *path) {
     return ok;
 }
 
-// 在安装目录中找 bin\java.exe，兼容 ZIP 里多一层顶层目录
+// 安装目录找 bin/java 兼容多一层
 static int find_java_exe(const wchar_t *root, wchar_t *out, int cap, int depth) {
     wchar_t p[MAX_PATH_LEN];
     wchar_t sub[MAX_PATH_LEN];
@@ -1025,7 +1025,7 @@ static int find_java_exe(const wchar_t *root, wchar_t *out, int cap, int depth) 
     return 0;
 }
 
-// 64 位 Windows 才下载 x64 JRE
+// 仅 64 位下载 x64 JRE
 static int java_install_supported(void) {
     char arch[128];
     arch[0] = 0;
@@ -1076,7 +1076,7 @@ static int write_ascii_file(const wchar_t *path, const char *text) {
     return (int)wrote == n;
 }
 
-// Win7 无 tar/Expand-Archive，走 Shell.Application
+// Win7 用 Shell.Application 解压
 static int extract_java_zip_vbs(void) {
     static const char vbs_text[] =
         "Option Explicit\r\n"
@@ -1157,7 +1157,7 @@ static int extract_java_zip(void) {
     remove_tree(java_dl_tmp, 0);
     create_dirs(java_dl_tmp);
 
-    // Windows 自带 bsdtar，解压更快
+    // 优先 bsdtar
     tar[0] = 0;
     if (GetEnvironmentVariableW(L"SystemRoot", tar, MAX_PATH_LEN) && tar[0]) {
         cat_str(tar, L"\\System32\\tar.exe", MAX_PATH_LEN);
@@ -1209,7 +1209,7 @@ static int extract_java_zip(void) {
         return 0;
     }
 
-    // 替换旧的 jre17（仅限启动器目录）
+    // 替换启动器目录内旧 jre17
     remove_tree(java_dl_dest, 0);
     if (!MoveFileW(java_dl_tmp, java_dl_dest)) {
         sprintf(java_dl_error, "移动 Java 目录失败（错误 %lu）", GetLastError());
@@ -1302,7 +1302,7 @@ static int download_url(const wchar_t *url, const char *source) {
     if (!req) {
         err = GetLastError();
         sprintf(java_dl_error, "%s 连接失败：%s", source, inet_reason(err));
-        // 证书/域名错误重试也没用，直接换源；超时和中断可以再试
+        // 证书错误换源 超时可重试
         java_dl_retryable = (err == 12002UL || err == 12030UL || err == 12031UL) ? 1 : 0;
         close_fn(inet);
         FreeLibrary(w);
@@ -1353,7 +1353,7 @@ static int download_url(const wchar_t *url, const char *source) {
     close_fn(req);
     close_fn(inet);
     FreeLibrary(w);
-    // Content-Length 已知时对账：提前 EOF（代理剥离长度/短连接）会被上面的循环当成功
+    // Content-Length 已知时对账 提前 EOF 判失败
     if (ok && java_dl_total_known && file_size_u(java_dl_zip) != java_dl_total) {
         sprintf(java_dl_error, "%s 下载不完整", source);
         java_dl_retryable = 1;
@@ -1366,12 +1366,12 @@ static int download_url(const wchar_t *url, const char *source) {
     return 1;
 }
 
-// 分块并发下载（4 连接拉满带宽）；任一失败外层回退单流
+// 4 连接分块下载 失败回退单流
 #define JAVA_DL_PARTS 4
 typedef struct {
     const wchar_t *url;
     unsigned long start;
-    unsigned long end;      // 含端点
+    unsigned long end; // 含端点
     int index;
 } JavaPart;
 
@@ -1428,7 +1428,7 @@ static DWORD WINAPI java_part_thread(void *arg)
                       0x80000000UL | 0x04000000UL | 0x00800000UL | 0x00400000UL);
     if (!req) goto done;
     sprintf(range_a, "Range: bytes=%lu-%lu\r\n", p->start, p->end);
-    /* w() 的共享池非线程安全，分块线程在栈上转换 */
+    // w() 共享池非线程安全 分块线程用栈上缓冲
     if (!MultiByteToWideChar(CP_UTF8, 0, range_a, -1, range_w, 128)) goto done;
     add_hdr_fn(req, range_w, (unsigned long)-1, 0xA0000000UL);
     if (!query_fn(req, 0x20000013UL, &status, &status_len, &status_idx) || status != 206UL) goto done;
@@ -1458,7 +1458,7 @@ done:
     return exit_code;
 }
 
-// 先探测 Range（206+Content-Range），不支持静默回退单流
+// 探测 Range 不支持则单流
 static int download_url_parallel(const wchar_t *url, const char *source)
 {
     typedef void * (WINAPI *OpenFn)(const wchar_t *, unsigned long, const wchar_t *, const wchar_t *, unsigned long);
@@ -1515,14 +1515,15 @@ static int download_url_parallel(const wchar_t *url, const char *source)
     if (!query_fn(req, 0x20000013UL, &status, &status_len, &status_idx) || status != 206UL) goto cleanup;
     crange_len = sizeof(crange);
     status_idx = 0;
-    if (!query_fn(req, 51UL /* HTTP_QUERY_CONTENT_RANGE */, crange, &crange_len, &status_idx)) goto cleanup;
+    // HTTP_QUERY_CONTENT_RANGE = 51
+    if (!query_fn(req, 51UL, crange, &crange_len, &status_idx)) goto cleanup;
     crange[159] = 0;
     {
         const wchar_t *slash = wcsrchr(crange, L'/');
         if (!slash) goto cleanup;
         total = (unsigned long)wcstoul(slash + 1, NULL, 10);
     }
-    if (total < 32UL * 1024UL * 1024UL) goto cleanup;   // 小文件单流更快
+    if (total < 32UL * 1024UL * 1024UL) goto cleanup; // 小文件单流更快
 
     chunk = total / JAVA_DL_PARTS;
     for (i = 0; i < JAVA_DL_PARTS; i++) {
@@ -1601,7 +1602,7 @@ cleanup:
 }
 
 static unsigned long java_dl_bytes(void) {
-    // 分块下载时进度来自各线程累加，zip 文件在拼接前一直是 0
+    // 分块进度累加 拼接前为 0
     if (java_dl_parallel) return (unsigned long)java_dl_part_bytes;
     return file_size_u(java_dl_zip);
 }
@@ -1617,7 +1618,7 @@ static DWORD WINAPI java_install_thread(void *unused) {
     DeleteFileW(java_dl_zip);
 
     count = java_sources(src, 4);
-    // 每个源最多 3 次，20 秒没有进度就换源；全失败才报错
+    // 每源 3 次 20s 无进度换源
     for (i = 0; i < count && !ok; i++) {
         for (attempt = 0; attempt < 3 && !ok; attempt++) {
             java_dl_source_idx = i;
@@ -1631,7 +1632,7 @@ static DWORD WINAPI java_install_thread(void *unused) {
             java_dl_progress_tick = GetTickCount();
             DeleteFileW(java_dl_zip);
             if (attempt > 0) Sleep(1200 * attempt);
-            // 先试分块并发（Range 不支持或失败时静默回退单流）
+            // 先分块 失败回退单流
             ok = download_url_parallel(src[i].url, src[i].label);
             if (!ok) {
                 java_dl_error[0] = 0;
@@ -1639,7 +1640,7 @@ static DWORD WINAPI java_install_thread(void *unused) {
                 ok = download_url(src[i].url, src[i].label);
             }
             if (!ok) stub_log(java_dl_error);
-            if (!ok && !java_dl_retryable) break;   // 这个源没救，直接换下一个
+            if (!ok && !java_dl_retryable) break; // 这个源没救 直接换下一个
         }
     }
     if (!ok) {
@@ -1671,7 +1672,7 @@ static void java_dl_tick(void) {
 
     if (java_dl_phase == 1) {
         bytes = java_dl_bytes();
-        // 20 秒没有新数据就判定卡死，交给下载线程换源
+        // 20s 无数据换源
         if (bytes > java_dl_progress_bytes) {
             java_dl_progress_bytes = bytes;
             java_dl_progress_tick = GetTickCount();
@@ -1723,7 +1724,7 @@ static void java_dl_tick(void) {
                      java_dl_total > 0 ? (int)java_dl_total : 1);
             SetWindowTextW(ctl_path, java_dl_java);
             log_append("Java 17 安装完成，路径已保存，正在启动…");
-            // 显示 100% 和路径后再自动确认
+            // 显示完成后自动确认
             SetTimer(java_dlg, TIMER_ACCEPT_ID, 700, NULL);
         } else {
             prog_set(0, 1);
@@ -1793,7 +1794,7 @@ static void java_dl_start(void) {
     java_dl_attempt = 0;
     java_dl_source[0] = 0;
     prog_set(0, 1);
-    // 立即给点击反馈
+    // 立即反馈点击
     status_set("正在连接下载服务器…");
 
     EnableWindow(GetDlgItem(java_dlg, IDC_JAVA_DOWN), FALSE);
@@ -1845,12 +1846,12 @@ static void scan_finish(void) {
         SetWindowTextW(ctl_path, scan_best);
         sprintf(scan_msg, "已找到 Java %d（64 位），正在启动…", scan_best_major);
         status_set(scan_msg);
-        // 自动扫描已经找到就直接用，无需再点「启动」
+        // 已找到 Java 直接使用
         SetTimer(java_dlg, TIMER_ACCEPT_ID, 600, NULL);
     } else {
         status_set("没有找到可用的 Java，正在自动下载 Java 17…");
         java_dl_start();
-        // 下载已启动，扫描/下载按钮保持禁用，避免扫描覆盖下载进度
+        // 下载中禁用扫描/下载按钮
         return;
     }
     EnableWindow(GetDlgItem(java_dlg, IDC_JAVA_SCAN), TRUE);
@@ -2054,7 +2055,7 @@ static LRESULT CALLBACK java_dlg_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             KillTimer(h, TIMER_ACCEPT_ID);
             java_dlg_accept();
             if (java_dlg_result != 1) {
-                // 自动确认被路径校验拦下时恢复按钮，不然界面卡死
+                // 路径校验失败时恢复按钮
                 EnableWindow(GetDlgItem(h, IDC_JAVA_DOWN), TRUE);
                 EnableWindow(GetDlgItem(h, IDC_JAVA_SCAN), TRUE);
                 EnableWindow(GetDlgItem(h, IDC_JAVA_BROWSE), TRUE);
@@ -2075,7 +2076,7 @@ static LRESULT CALLBACK java_dlg_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     return DefWindowProcW(h, msg, wp, lp);
 }
 
-// 返回 1 = 选中，0 = 取消，-1 = 窗口创建失败
+// 返回 1 = 选中 0 = 取消 -1 = 窗口创建失败
 static int java_dialog(wchar_t *out, int cap, const wchar_t *preset, int first) {
     WNDCLASSW wc;
     MSG msg;
@@ -2110,7 +2111,7 @@ static int java_dialog(wchar_t *out, int cap, const wchar_t *preset, int first) 
 
     ShowWindow(java_dlg, SW_SHOW);
     UpdateWindow(java_dlg);
-    // 取消置顶抢前台，防压住新启动的启动器
+    // 取消置顶 避免压住新窗口
     SetWindowPos(java_dlg, HWND_NOTOPMOST, 0, 0, 0, 0,
                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
     SetForegroundWindow(java_dlg);
@@ -2131,7 +2132,7 @@ static int java_dialog(wchar_t *out, int cap, const wchar_t *preset, int first) 
     return 0;
 }
 
-// 缺 Java 时给下载入口
+// 缺 Java 时显示下载入口
 static void offer_download(void) {
     wchar_t msg[1024];
     char utf8[1024];
@@ -2194,7 +2195,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR args, int show) {
         return 1;
     }
 
-    // 工作目录固定为 .tcl，不可写则提示换位置
+    // 工作目录固定为 .tcl 不可写则提示换位置
     if (!init_home()) {
         alert("无法在启动器所在目录创建 .tcl 文件夹。\n\n"
               "启动器的程序文件、配置和运行库都会放在这个 .tcl 里（跟着 exe 走）。\n"
@@ -2248,7 +2249,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR args, int show) {
             }
             save_cfg(java);
         } else if (first_run) {
-            // 自动找到的 Java 直接记住，免多点一次启动
+            // 自动找到的 Java 直接记住
             save_cfg(java);
         }
     }
@@ -2278,7 +2279,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR args, int show) {
             return 1;
         }
         if (r == 2) {
-            // 秒退：给出退出码和 java 日志路径
+            // 秒退时给出退出码与日志路径
             char detail[2000];
             char log8[MAX_PATH_LEN * 3];
             char head[800];
@@ -2291,8 +2292,8 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR args, int show) {
             cat_str(logp, L"\\java-error.log", MAX_PATH_LEN);
             got = read_file(logp, head, sizeof(head) / 3);
             if (got > 0) {
-                /* JDK 17/18 的 stderr 随 -Dfile.encoding 走 UTF-8，19+ 默认 ACP，
-                   先 UTF-8 严格解码（0x8=MB_ERR_INVALID_CHARS），失败再按 ACP */
+                // JDK 17/18 的 stderr 随 -Dfile.encoding 走 UTF-8 19+ 默认 ACP
+                // 先 UTF-8 严格解码 0x8=MB_ERR_INVALID_CHARS 失败再按 ACP
                 wchar_t wtmp[400];
                 int n = MultiByteToWideChar(CP_UTF8, 0x8, head, got, wtmp, 400);
                 if (n <= 0) n = MultiByteToWideChar(GetACP(), 0, head, got, wtmp, 400);

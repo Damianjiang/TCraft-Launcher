@@ -55,7 +55,7 @@ public final class GameLauncher {
         String current = version;
         java.util.Set<String> visited = new java.util.HashSet<>();
         while (current != null && !current.isEmpty()) {
-            // 版本 ID 直接拿来拼路径，带分隔符或 .. 的都当伪造版本处理
+            // 版本 ID 直接拿来拼路径 带分隔符或 .. 的都当伪造版本处理
             if (current.contains("\\") || current.contains("/") || current.contains("..")) {
                 throw new Exception(Lang.t("版本 ID 含非法字符：") + current);
             }
@@ -71,7 +71,7 @@ public final class GameLauncher {
         return chain;
     }
 
-    // 无 javaVersion 时按版本号猜最低可用 Java
+    // 无 javaVersion 时按版本猜 Java
     private static int guessJava(String version) {
         String v = version == null ? "" : version.toLowerCase(java.util.Locale.ROOT).trim();
         try {
@@ -93,7 +93,7 @@ public final class GameLauncher {
         return 17;
     }
 
-    // 版本 JSON 里写明的 Java 主版本；读不到就返回 0
+    // 读 JSON 的 Java 主版本 无则 0
     public static int requiredJava(Data.Instance instance) throws Exception {
         List<Map<String, Object>> chain = readChain(gameDirOf(instance), instance.version);
         int required = 0;
@@ -104,7 +104,7 @@ public final class GameLauncher {
         return required;
     }
 
-    // 组件代号：8=legacy 17=gamma 21=delta 25=epsilon
+    // 组件代号 8=legacy 17=gamma 21=delta 25=epsilon
     private static String componentFor(int required) {
         if (required <= 8) return "jre-legacy";
         if (required <= 17) return "java-runtime-gamma";
@@ -130,7 +130,7 @@ public final class GameLauncher {
         return nearest;
     }
 
-    // 选 Java：实例指定>本机同版>更高版，兜底下载
+    // 实例指定 > 同版 > 更高版 > 下载
     public static String resolveJava(Data.Instance instance, java.util.function.Consumer<String> status,
                                      java.util.function.BooleanSupplier cancelled,
                                      java.util.function.DoubleConsumer progress) throws Exception {
@@ -176,7 +176,7 @@ public final class GameLauncher {
 
     public static List<MissingFile> scanMissing(Data.Instance instance) throws Exception {
         Path game = gameDirOf(instance);
-        // 按 target 去重，防 downloadMissing 双写 .part
+        // 按 target 去重
         Map<Path, MissingFile> out = new java.util.LinkedHashMap<>();
         List<Map<String, Object>> chain = readChain(game, instance.version);
         if (chain.isEmpty()) throw new Exception("版本 JSON 无效或不存在：" + instance.version);
@@ -197,7 +197,7 @@ public final class GameLauncher {
                 String path = Json.str(artifact, "path", "");
                 String url = Json.str(artifact, "url", "");
                 if (path.isEmpty()) {
-                    // 旧式库按 maven 约定从 name+url 拼路径
+                    // 旧式库按 maven 拼路径
                     String base = Json.str(lib, "url", "");
                     if (!base.isEmpty() && !libName.isEmpty()) {
                         if (!base.endsWith("/")) base += "/";
@@ -313,7 +313,7 @@ public final class GameLauncher {
                         pool.shutdownNow();
                     }
                     if (first == null) {
-                        // 调用方靠异常类型区分取消与真失败
+                        // 异常类型区分取消
                         first = canceled
                                 ? new java.util.concurrent.CancellationException("已取消")
                                 : e.getCause() instanceof Exception ex ? ex : new Exception(e.getCause());
@@ -336,7 +336,7 @@ public final class GameLauncher {
         return launch(instance, serverIp, resolveJava(instance, null, null, null));
     }
 
-    // 旧版 MC（≤1.12）options.txt 是系统 ANSI 编码
+    // ≤1.12 options.txt 用 ANSI
     static java.nio.charset.Charset optionsCharset(Path options) {
         try {
             byte[] raw = Files.readAllBytes(options);
@@ -347,7 +347,7 @@ public final class GameLauncher {
                         .decode(java.nio.ByteBuffer.wrap(raw));
                 return java.nio.charset.StandardCharsets.UTF_8;
             } catch (java.nio.charset.CharacterCodingException e) {
-                // native.encoding 是系统 ANSI 代码页，和旧版游戏 JVM 的默认编码一致
+                // native.encoding 对齐旧版 JVM
                 try {
                     return java.nio.charset.Charset.forName(System.getProperty("native.encoding",
                             System.getProperty("sun.jnu.encoding", "UTF-8")));
@@ -505,7 +505,7 @@ public final class GameLauncher {
         String assetIndex = Json.str(Json.obj(merged.get("assetIndex")), "id", "legacy");
         String assetsDir = prepareAssetsRoot(game, assetIndex).toAbsolutePath().toString();
         String classpathStr = String.join(File.pathSeparator, classpath.stream().map(Path::toString).toList());
-        // 把用户指定的 jar 或目录插到 classpath 最前面
+        // 用户 jar/目录插 classpath 首部
         String classpathHead = data.getInstance("ClasspathHead",
                 data.get("LaunchAdvanceClasspathHead", ""));
         if (classpathHead != null && !classpathHead.isBlank()) {
@@ -520,7 +520,7 @@ public final class GameLauncher {
                 try {
                     valid = MsAuth.validate(account.accessToken);
                 } catch (Exception e) {
-                    // 校验请求失败不能当作令牌有效
+                    // 校验失败不算有效
                     valid = false;
                 }
             }
@@ -637,7 +637,7 @@ public final class GameLauncher {
         int xms = lockMemory ? ram : (initialRam > 0 ? Math.min(initialRam, ram) : Math.max(256, ram / 4));
         List<String> cmd = new ArrayList<>();
         cmd.add(javaExe);
-        // macOS 上 LWJGL3 必须运行在进程主线程；LWJGL2 的 AWT 路径反而冲突
+        // macOS 上 LWJGL3 必须运行在进程主线程 LWJGL2 的 AWT 路径反而冲突
         if ("osx".equals(osName()) && needsFirstThread(libs)) cmd.add("-XstartOnFirstThread");
         int renderer = data.getInstanceInt("Renderer", -1);
         if (renderer < 0) renderer = data.getInt("LaunchAdvanceRenderer", 0);
@@ -647,7 +647,7 @@ public final class GameLauncher {
         }
         cmd.add("-Xmx" + ram + "M");
         cmd.add("-Xms" + xms + "M");
-        // AlwaysPreTouch 预触堆页，防游戏中途扩堆
+        // AlwaysPreTouch 预触堆
         if (lockMemory) cmd.add("-XX:+AlwaysPreTouch");
         cmd.add("-Dfile.encoding=UTF-8");
         int javaMajor = Data.javaMajor(javaExe);
@@ -659,7 +659,7 @@ public final class GameLauncher {
                 else cmd.add("-XX:+UseG1GC");
             }
             case 1 -> {
-                // ZGenerational 24 起废弃，老写法拒启动
+                // ZGenerational 24+ 已废弃
                 if (javaMajor >= 23) {
                     cmd.add("-XX:+UseZGC");
                 } else if (javaMajor >= 21) {
@@ -719,7 +719,7 @@ public final class GameLauncher {
                 jvmArgs.addAll(Json.arr(Json.obj(argsMap).get("jvm")));
             }
         }
-        // 新版 java.library.path 指向 natives 子目录
+        // java.library.path 指向 natives
         Path javaNativeFolder = nativesDir;
         for (Object o : jvmArgs) {
             String value = o instanceof String s ? s : null;
@@ -774,7 +774,7 @@ public final class GameLauncher {
             for (String a : Shell.splitArgs(extraGame)) cmd.add(subst(a, vars));
         }
         if (serverIp != null && !serverIp.trim().isEmpty()) {
-            // IPv6 拆解统一在 Servers.splitAddress
+            // IPv6 拆解见 Servers.splitAddress
             String[] hp = Servers.splitAddress(serverIp);
             String host = hp[0];
             String port = hp[1].matches("\\d+") ? hp[1] : "";
@@ -802,7 +802,7 @@ public final class GameLauncher {
                 String arg = win ? "/c" : "-c";
                 Process preProcess = new ProcessBuilder(shell, arg, pre).directory(run.toFile())
                         .redirectErrorStream(true).start();
-                // 输出须排水防管道塞死
+                // 持续排水防管道阻塞
                 Thread consumer = new Thread(() -> {
                     try (BufferedReader br = new BufferedReader(
                             new InputStreamReader(preProcess.getInputStream(), StandardCharsets.UTF_8))) {
@@ -820,7 +820,7 @@ public final class GameLauncher {
                         data.launchLog("启动前命令超过 5 分钟未结束，已强制结束：" + pre);
                     }
                 }
-                // 不等待模式：命令常驻后台（隧道/代理），不杀
+                // 不等待模式不杀常驻进程
                 data.launchLog("已执行启动前命令：" + pre);
             } catch (Exception e) {
                 data.launchLog("启动前命令执行失败：" + e.getMessage());
@@ -848,7 +848,7 @@ public final class GameLauncher {
             try (BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
                 String line;
                 while ((line = br.readLine()) != null) {
-                    // 进环形缓冲，供崩溃后分析
+                    // 写入环形缓冲
                     data.launchLog(line);
                 }
             } catch (Exception ignored) {
@@ -955,7 +955,7 @@ public final class GameLauncher {
         boolean linVariant = tail.startsWith("linux");
         if (!((winOs && winVariant) || (macOs && macVariant) || (linOs && linVariant))) return false;
         if (arm) {
-            // 同一个 artifact 有 arm64 变体就排除其他变体
+            // 有 arm64 变体时排除其他
             String key = libName.substring(0, i);
             if (!variantArm) {
                 for (String other : allNames) {
@@ -1078,7 +1078,7 @@ public final class GameLauncher {
             }
             throw new Exception("获取统一通行证下载信息失败：" + e.getMessage());
         }
-        // API 无 hash 用本地，防每次整包重下
+        // 无 hash 用本地缓存
         if (Files.isRegularFile(jar) && jarHash.isEmpty()) return;
         if (Files.isRegularFile(jar) && sha1Of(jar).equalsIgnoreCase(jarHash)) return;
         try {

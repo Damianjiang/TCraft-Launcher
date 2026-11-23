@@ -22,17 +22,17 @@ public class App extends Application {
     private MainWindow window;
 
     public static void main(String[] args) {
-        Boot.main(args); // 走 Boot，JavaFX 起不来还能提示
+        Boot.main(args); // 走 Boot JavaFX 起不来还能提示
     }
 
     @Override
     public void start(Stage stage) {
-        Platform.setImplicitExit(false);   // 隐式退出会在隐藏主窗时带崩程序
+        Platform.setImplicitExit(false); // 隐式退出会在隐藏主窗时带崩程序
         Log.startSession();
         long tPhase = System.nanoTime();
 
         try {
-            // 全局异常：FX 线程弹窗，后台只记日志
+            // 全局异常 FX 线程弹窗 后台只记日志
             Thread.setDefaultUncaughtExceptionHandler((thread, throwable) ->
                     Errors.uncaught(thread, throwable, false));
             Thread.currentThread().setUncaughtExceptionHandler((thread, throwable) ->
@@ -56,7 +56,7 @@ public class App extends Application {
             if (Boolean.getBoolean("tcl.time")) {
                 Data.get().log("阶段：界面构建 " + (System.nanoTime() - tPhase) / 1_000_000 + " ms");
             }
-            // 首帧优先，重活留到空闲
+            // 首帧优先 重活留到空闲
             window.prepareIntro();
             stage.show();
             if (Boolean.getBoolean("tcl.time")) {
@@ -64,6 +64,14 @@ public class App extends Application {
             }
             stage.setAlwaysOnTop(false);
             window.playIntroWhenReady();
+            Plugins.get().attach(window);
+            PauseTransition pluginLoad = new PauseTransition(Duration.millis(1200));
+            pluginLoad.setOnFinished(e -> {
+                Plugins.get().loadAll();
+                window.onPluginsChanged();
+                Plugins.get().fire("app.start", java.util.Map.of("version", Build.VERSION));
+            });
+            pluginLoad.play();
             // 通知旧进程收掉启动窗
             try {
                 Files.writeString(Resources.logDir().resolve(".window-ready"), "1");
@@ -71,7 +79,7 @@ public class App extends Application {
             }
             Resources.cleanupNoiseLogs();
             if (!Data.get().getBool("SystemDebugMode", false)) {
-                // 关掉重定向的 stdout/stderr 才能删 java-error.log
+                // 关重定向流才能删 java-error.log
                 try {
                     System.out.close();
                     System.err.close();
@@ -94,7 +102,7 @@ public class App extends Application {
         top.setOnFinished(e -> stage.setAlwaysOnTop(false));
         top.play();
 
-        // 空闲后再做，首帧优先
+        // 空闲后再做 首帧优先
         PauseTransition idle = new PauseTransition(Duration.millis(2000));
         idle.setOnFinished(e -> {
             Thread javaScan = new Thread(() -> {
@@ -135,7 +143,7 @@ public class App extends Application {
     }
 
     private void applyInitialTheme() {
-        // 先定主题色，首帧不出默认蓝
+        // 先定主题色 首帧不出默认蓝
         Theme.prepareStartupAccent(java.nio.file.Paths.get(Data.get().gameDir, "TCL", "Pictures"));
     }
 
@@ -169,7 +177,7 @@ public class App extends Application {
                 return;
             }
             final Data.Instance chosen = target;
-            // usableJava 起子进程等 5s，勿在 FX 线程调
+            // usableJava 等 5s 仅后台
             Threads.start("TCL-QuickLaunch", () -> {
                 boolean ok = Data.usableJava(Data.get().javaPath);
                 Platform.runLater(() -> {
@@ -284,7 +292,7 @@ public class App extends Application {
 
     @Override
     public void stop() {
-        // 退出前同步回收联机子进程，避免残留
+        // 退出前回收联机子进程
         EasyTier.stop();
     }
 }

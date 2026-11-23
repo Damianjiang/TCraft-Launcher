@@ -35,3 +35,8 @@ Thumbs.db
 build.ps1
 tools/set-icon.ps1
 tools/tcc/
+
+# 文档站
+plugin-docs/node_modules/
+plugin-docs/docs/.vitepress/cache/
+plugin-docs/docs/.vitepress/dist/

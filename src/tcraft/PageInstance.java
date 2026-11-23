@@ -29,6 +29,7 @@ public class PageInstance implements Page {
     private PauseTransition searchDebounce;
     private int sortMode = 0;
     private String collectionFilter = "";
+    private int pageNo = 0;
     private HBox collectionChips;
     private ScrollPane collectionBar;
 
@@ -63,6 +64,7 @@ public class PageInstance implements Page {
         Ui.SearchBox search = Ui.searchBox("搜索实例");
         search.textProperty().addListener((o, a, b) -> {
             query = b == null ? "" : b.toLowerCase(java.util.Locale.ROOT);
+            pageNo = 0;
             if (searchDebounce == null) {
                 searchDebounce = new PauseTransition(Duration.millis(180));
                 searchDebounce.setOnFinished(e -> refreshList());
@@ -77,6 +79,7 @@ public class PageInstance implements Page {
         sort.setOnAction(e -> {
             sortMode = Math.max(0, sort.getSelectionModel().getSelectedIndex());
             data.set("UiInstanceSort", sortMode);
+            pageNo = 0;
             refreshList();
         });
 
@@ -88,12 +91,10 @@ public class PageInstance implements Page {
                 Ui.iconButton("grid-2x2", 30, 14, "切换为网格视图", () -> {
                     gridView = !gridView;
                     data.set("UiInstanceGridView", gridView);
+                    pageNo = 0;
                     refreshList();
                 }),
-                Ui.iconButton("refresh-cw", 30, 14, "刷新实例列表", () -> {
-                    win.toast("实例列表", "已刷新", 1);
-                    rebuild();
-                }),
+                Ui.iconButton("refresh-cw", 30, 14, "刷新实例列表", () -> win.refreshRightWithLoading()),
                 Ui.iconButton("download", 30, 14, "下载新版本", () -> win.openPage("download", true)),
                 Ui.iconButton("package", 30, 14, "导入整合包", () -> importModpack(win)),
                 Ui.iconButton("folder-open", 30, 14, "打开游戏目录", () -> openFolder(data.gameDir))
@@ -148,6 +149,11 @@ public class PageInstance implements Page {
     }
 
     private void refreshList() {
+        pageNo = 0;
+        renderList();
+    }
+
+    private void renderList() {
         if (refreshRunner != null) refreshRunner.run();
     }
 
@@ -179,6 +185,7 @@ public class PageInstance implements Page {
         chip.setOnMouseClicked(e -> {
             if (collectionFilter.equals(value)) return;
             collectionFilter = value;
+            pageNo = 0;
             refreshList();
         });
         if (!value.isEmpty()) {
@@ -250,24 +257,38 @@ public class PageInstance implements Page {
             all.getChildren().add(empty);
             return all;
         }
+        final int pageSize = gridView ? 12 : 20;
+        int pages = Math.max(1, (visible.size() + pageSize - 1) / pageSize);
+        pageNo = Math.max(0, Math.min(pageNo, pages - 1));
+        int from = pageNo * pageSize;
+        int to = Math.min(from + pageSize, visible.size());
+        List<Data.Instance> pageItems = visible.subList(from, to);
         if (gridView) {
             FlowPane flow = new FlowPane(10, 10);
             flow.setPadding(new Insets(8));
-            for (Data.Instance ins : visible) flow.getChildren().add(instanceCard(ins));
+            for (Data.Instance ins : pageItems) flow.getChildren().add(instanceCard(ins));
             all.getChildren().add(flow);
-            return all;
+        } else {
+            List<Data.Instance> fav = new ArrayList<>();
+            List<Data.Instance> modded = new ArrayList<>();
+            List<Data.Instance> normal = new ArrayList<>();
+            for (Data.Instance ins : pageItems) {
+                if (ins.favorite) fav.add(ins);
+                else if (ins.loader != null && !"原版".equals(ins.loader) && !ins.loader.isEmpty()) modded.add(ins);
+                else normal.add(ins);
+            }
+            addGroup(all, "收藏夹", fav);
+            addGroup(all, "可安装 Mod", modded);
+            addGroup(all, "未分类", normal);
         }
-        List<Data.Instance> fav = new ArrayList<>();
-        List<Data.Instance> modded = new ArrayList<>();
-        List<Data.Instance> normal = new ArrayList<>();
-        for (Data.Instance ins : visible) {
-            if (ins.favorite) fav.add(ins);
-            else if (ins.loader != null && !"原版".equals(ins.loader) && !ins.loader.isEmpty()) modded.add(ins);
-            else normal.add(ins);
+        if (pages > 1) {
+            Node pager = Ui.pager(pageNo, pages, visible.size(), page -> {
+                pageNo = page;
+                renderList();
+            });
+            VBox.setMargin(pager, new Insets(8, 6, 4, 6));
+            all.getChildren().add(pager);
         }
-        addGroup(all, "收藏夹", fav);
-        addGroup(all, "可安装 Mod", modded);
-        addGroup(all, "未分类", normal);
         return all;
     }
 
@@ -312,7 +333,7 @@ public class PageInstance implements Page {
         return list;
     }
 
-    // 旧配置没有 addedAt，退回 lastPlayed
+    // 旧配置无 addedAt 用 lastPlayed
     private static long addedAtOf(Data.Instance ins) {
         return ins.addedAt > 0 ? ins.addedAt : ins.lastPlayed;
     }
@@ -405,7 +426,7 @@ public class PageInstance implements Page {
         Ui.menuCard(anchor, instanceRows(anchor, ins).toArray(new Ui.MenuRow[0]));
     }
 
-    // 二级菜单「返回」时原地重建同一份内容
+    // 返回时原地重建
     private List<Ui.MenuRow> instanceRows(Node anchor, Data.Instance ins) {
         List<Ui.MenuRow> rows = new ArrayList<>();
         rows.add(Ui.MenuRow.of("启动游戏", "play", () -> {
@@ -496,7 +517,7 @@ public class PageInstance implements Page {
         Ui.swapMenuCard(popup, content, 210);
     }
 
-    // 同一张卡片里换回一级菜单，不关窗
+    // 卡片内换回一级菜单
     private Ui.ListItem backRow(javafx.stage.Popup popup, Node anchor, Data.Instance ins) {
         Ui.ListItem back = new Ui.ListItem(Theme.icon("arrow-left", 16, Theme.text), "返回", null, 34);
         back.setOnMouseClicked(e -> Ui.swapMenuCard(popup,
@@ -523,7 +544,7 @@ public class PageInstance implements Page {
 
     private void changeIcon(Data.Instance ins) {
         FileChooser chooser = new FileChooser();
-        // OS 对话框不会经过 localize，创建处直接取翻译
+        // OS 对话框创建处翻译
         chooser.setTitle(Lang.t("选择实例图标"));
         chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(Lang.t("PNG 图片"), "*.png"));
         File file = chooser.showOpenDialog(win.stage);
@@ -657,17 +678,17 @@ public class PageInstance implements Page {
     }
 
     private void createInstanceShortcut(Data.Instance ins) {
-        // PowerShell 要等进程返回，不能占 FX 线程
+        // PS 等待进程 勿占 FX
         Threads.start("TCL-Shortcut", () -> {
             try {
                 String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
                 boolean windows = os.contains("win");
                 boolean mac = os.contains("mac");
                 java.nio.file.Path script = Resources.launchTarget();
-                // mac 裸 jar 无脚本，用当前 java 直接拉起
+                // mac 裸 jar 无脚本 用当前 java 直接拉起
                 java.nio.file.Path jar = script == null && mac ? Resources.jar() : null;
                 if (script == null && jar == null) {
-                    // 异常消息最终进 Errors 报告弹窗，Errors UI 不经过 localize
+                    // Errors 弹窗创建处翻译
                     throw new Exception(Lang.t("找不到启动器程序（TCraftLauncher.exe / TCraftLauncher.sh），请确认使用的是完整版程序。"));
                 }
                 java.nio.file.Path appDir = script != null && script.getParent() != null ? script.getParent()
@@ -693,7 +714,7 @@ public class PageInstance implements Page {
                     pb.redirectErrorStream(true);
                     Process p = pb.start();
                     try (java.io.InputStream in = p.getInputStream()) {
-                        // 先等退出再读输出，防挂死
+                        // 先等退出再读输出 防挂死
                         if (!p.waitFor(30, java.util.concurrent.TimeUnit.SECONDS)) {
                             p.destroyForcibly();
                             throw new Exception("WScript.Shell 创建快捷方式超时");
@@ -706,7 +727,7 @@ public class PageInstance implements Page {
                     }
                 } else if (mac) {
                     link = uniquePath(desktop, baseName, ".command");
-                    // exec 不带斜杠只查 PATH 不看当前目录，必须写绝对路径
+                    // exec 仅查 PATH 须用绝对路径
                     String run = script != null
                             ? shellQuote(script.toAbsolutePath().toString())
                             : shellQuote(ProcessHandle.current().info().command().orElse("java"))
@@ -728,7 +749,7 @@ public class PageInstance implements Page {
                             + "Terminal=false\nCategories=Game;\n";
                     java.nio.file.Files.writeString(link, entry, java.nio.charset.StandardCharsets.UTF_8);
                     link.toFile().setExecutable(true);
-                    // GNOME 42+ 需要 trusted 标记，双击才不会提示「不受信任」
+                    // GNOME 42+ 需 trusted 标记
                     try {
                         Process gio = new ProcessBuilder("gio", "set", link.toString(),
                                 "metadata::trusted", "true").redirectErrorStream(true)
@@ -781,7 +802,7 @@ public class PageInstance implements Page {
         chooser.setInitialFileName(ins.name + "-备份-"
                 + java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
                 + ".zip");
-        // 过滤器描述显示在 OS 对话框里
+        // 过滤器描述用于 OS 对话框
         chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(Lang.t("压缩包"), "*.zip"));
         File out = chooser.showSaveDialog(win.stage);
         if (out == null) return;
@@ -886,7 +907,7 @@ public class PageInstance implements Page {
                 for (Data.Instance i : data.instances) {
                     String folder = i.folder == null || i.folder.isEmpty() ? "" : java.nio.file.Paths.get(i.folder)
                             .toAbsolutePath().normalize().toString();
-                    // 与 addGameFolder 一致：Windows 大小写不敏感，其他平台精确相等
+                    // 路径比较 Windows 忽略大小写
                     if ((windows ? folder.equalsIgnoreCase(folderKey) : folder.equals(folderKey))
                             && (i.name.equals(name) || name.equals(i.version))) exists = true;
                 }
@@ -924,7 +945,7 @@ public class PageInstance implements Page {
             try {
                 info = Modpacks.readInfo(packPath);
             } catch (Throwable t) {
-                // 深层嵌套可抛 SOE，须兜底
+                // 深嵌套可能 SOE
                 javafx.application.Platform.runLater(() ->
                         Dialogs.confirm(win, "预读整合包失败",
                                 Lang.tf("读取整合包时出错：%s", t.getMessage() == null ? t.toString() : t.getMessage()),
@@ -934,7 +955,7 @@ public class PageInstance implements Page {
             }
             javafx.application.Platform.runLater(() -> {
                 if (!info.valid) {
-                    // 前缀判断随语言变化，须与「无法识别」串恒等比较；空串同未识别
+                    // 前缀随语言变化 空串视为未识别
                     boolean broken = info.readError != null && !info.readError.isEmpty()
                             && !info.readError.equals(Modpacks.unrecognizedError());
                     Dialogs.confirm(win, broken ? "整合包读取失败" : "无法识别整合包",
@@ -944,7 +965,7 @@ public class PageInstance implements Page {
                             });
                     return;
                 }
-                // 拼接整串不会命中表键，各标签段创建时逐段翻译
+                // 标签分段翻译
                 StringBuilder sb = new StringBuilder();
                 sb.append(Lang.t("类型：")).append(info.typeName).append("\n");
                 sb.append(Lang.t("名称：")).append(info.name).append("\n");
@@ -981,7 +1002,7 @@ public class PageInstance implements Page {
         Data.FolderItem existing = null;
         for (Data.FolderItem folder : data.folders) {
             String known = java.nio.file.Paths.get(folder.path).toAbsolutePath().normalize().toString();
-            // Windows 路径大小写不敏感，其他平台必须精确相等
+            // Windows 路径忽略大小写
             if (windows ? known.equalsIgnoreCase(path) : known.equals(path)) {
                 existing = folder;
                 break;

@@ -9,7 +9,7 @@ public final class Shell {
     private Shell() {
     }
 
-    // 按空白切分参数，引号内的空格不切分，引号本身不保留
+    // 按空白切分 保留引号内空格
     public static List<String> splitArgs(String text) {
         List<String> out = new ArrayList<>();
         if (text == null || text.isEmpty()) return out;
@@ -103,12 +103,12 @@ public final class Shell {
                     default -> null;
                 };
                 if (cls == null) return;
-                // wmic 24H2 已移除，故用 PS；超时放宽到 30s
+                // wmic 已移除 改用 PS
                 runHidden(30, "powershell", "-NoProfile", "-NonInteractive", "-Command",
                         "(Get-Process -Id " + pid + " -ErrorAction Stop).PriorityClass='" + cls + "'");
                 return;
             }
-            // macOS / Linux：renice，数值越小优先级越高
+            // renice 数值越小优先级越高
             int nice = switch (level) {
                 case 0 -> -5;
                 case 2 -> 10;
@@ -149,7 +149,7 @@ public final class Shell {
         runHidden(10, cmd);
     }
 
-    // macOS 无 Swing/JavaFX 可用时的系统级提示，避免从 Finder 启动失败时完全静默
+    // macOS 无 GUI 时用系统提示
     public static void macAlert(String title, String message) {
         if (!isMac()) return;
         try {
@@ -168,7 +168,7 @@ public final class Shell {
         }
     }
 
-    // Linux 桌面通知，notify-send 不存在时静默跳过
+    // Linux 通知 缺 notify-send 跳过
     public static void linuxNotify(String title, String message) {
         if (!isLinux()) return;
         try {
@@ -202,7 +202,7 @@ public final class Shell {
                         d.browse(java.net.URI.create(url));
                         return true;
                     } catch (Exception ignored) {
-                        // URI.create 遇未转义字符会抛，走 rundll32
+                        // URI 未转义时走 rundll32
                     }
                 }
             }
@@ -233,7 +233,7 @@ public final class Shell {
                 return true;
             }
             if (desktopOpen(f)) return true;
-            // 不走 cmd.exe：&|^ 会被当命令分隔符
+            // 不走 cmd.exe &|^ 会被当命令分隔符
             if (f.isDirectory()) {
                 new ProcessBuilder("explorer.exe", f.getAbsolutePath()).redirectErrorStream(true)
                         .redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
@@ -281,7 +281,7 @@ public final class Shell {
             }
         }
         if (!os.contains("win")) {
-            // gio 失败即失败，不可回退成永久删除
+            // gio 失败即失败 不可回退成永久删除
             try {
                 Process p = new ProcessBuilder("gio", "trash", path)
                         .redirectErrorStream(true)

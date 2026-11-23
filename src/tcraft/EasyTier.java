@@ -103,7 +103,7 @@ public final class EasyTier {
     }
 
     private static boolean is64Bit() {
-        // os.arch 必带 64；sun.arch.data.model 不可靠
+        // os.arch 必带 64 sun.arch.data.model 不可靠
         String a = System.getProperty("os.arch", "").toLowerCase(Locale.ROOT);
         return a.contains("64");
     }
@@ -133,7 +133,7 @@ public final class EasyTier {
     }
 
     public static String[] mirrorHosts() {
-        // 标签仅供展示，下载走 PREFIXES 原始值
+        // 标签仅展示 下载用原始值
         String[] out = new String[PREFIXES.length];
         for (int i = 0; i < PREFIXES.length; i++) {
             String host = Lang.t("节点 ") + (i + 1);
@@ -197,7 +197,7 @@ public final class EasyTier {
             }));
         }
         pool.shutdown();
-        // get 等待=单任务上限（2.5s+3.5s）+排队余量，固定 6s 会误判
+        // 等待上限含任务与排队余量
         long perTaskMs = 7000;
         int rounds = (PREFIXES.length + threads - 1) / threads;
         long getTimeoutMs = perTaskMs * (rounds + 1);
@@ -290,7 +290,7 @@ public final class EasyTier {
     }
 
     private static void download(String url, Path target, Progress p) throws Exception {
-        // core/dll 会被执行，无校验值不下载
+        // core/dll 会被执行 无校验值不下载
         String expected = SHA256.getOrDefault(osTag() + "-" + arch(), "");
         if (expected.isEmpty()) {
             throw new Exception(Lang.tf("当前平台（%s-%s）没有内置的联机模块校验值，出于安全考虑已取消下载",
@@ -403,7 +403,7 @@ public final class EasyTier {
             scheme = raw.substring(0, sep).toLowerCase(Locale.ROOT);
             rest = raw.substring(sep + 3);
         }
-        // HTTP(S) 节点带路径，直接测首个响应
+        // HTTP 节点直接测首响应
         if (scheme.equals("http") || scheme.equals("https")) {
             HttpURLConnection c = null;
             try {
@@ -499,7 +499,7 @@ public final class EasyTier {
         stop();
         Path exe = corePath();
         if (!Files.isRegularFile(exe)) throw new Exception(Lang.t("联机模块未安装"));
-        // 从压缩包/U 盘拷入时可能丢失执行位
+        // 拷贝可能丢执行位
         if (!isWindows()) markExecutable();
         List<String> cmd = new ArrayList<>();
         cmd.add(exe.toString());
@@ -648,7 +648,7 @@ public final class EasyTier {
 
     private static String runCommand(String... cmd) throws Exception {
         Process p = new ProcessBuilder(cmd).redirectErrorStream(true).start();
-        // 进程不关 stdout 时 transferTo 永远阻塞，先等退出
+        // 进程不关 stdout 时 transferTo 永远阻塞 先等退出
         if (!p.waitFor(3, TimeUnit.SECONDS)) p.destroyForcibly();
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (InputStream in = p.getInputStream()) {

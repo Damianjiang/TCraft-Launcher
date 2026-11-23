@@ -28,7 +28,7 @@ public final class Dialogs {
         confirm(win, title, message, onOk, warn, null);
     }
 
-    // onCancel 非空时弹窗不能用遮罩关闭，取消一定走回调
+    // onCancel 非空时禁用遮罩关闭
     public static void confirm(MainWindow win, String title, String message, Runnable onOk,
                                boolean warn, Runnable onCancel) {
         VBox card = new VBox(0);
@@ -55,7 +55,7 @@ public final class Dialogs {
                     onOk.run();
                 }
                 : () -> {
-                    // 先清钩子，closeModal 不再把确定当成取消
+                    // 先清钩子 避免误判取消
                     win.setModalCloseHook(null);
                     onOk.run();
                     win.closeModal();
@@ -69,7 +69,7 @@ public final class Dialogs {
                 }));
         card.getChildren().addAll(t, line, body, actions);
         win.showModal(card, onCancel == null, warn ? Theme.warnMask : null);
-        // 被别的弹窗顶掉时也要放行等待方
+        // 被顶掉时放行等待方
         if (onCancel != null) win.setModalCloseHook(onCancel);
     }
 
@@ -230,7 +230,7 @@ public final class Dialogs {
                 win.toast("已添加账户", n, 1);
             };
             if (!isValidMcName(n)) {
-                // 两段是独立词条，各自 Lang.t 后拼接，整串查不到表
+                // 两段独立词条 分别翻译
                 confirm(win, "警告", Lang.t("离线模式账户用户名建议仅使用英文字符、数字以及下划线，")
                         + Lang.t("且长度不超过 16 个字符。确定要继续吗？"), doAdd);
                 return;
@@ -304,7 +304,7 @@ public final class Dialogs {
             VBox card = msgCard("登录微软账号");
             VBox form = new VBox(10);
             form.setPadding(new Insets(15, 7, 0, 7));
-            // Ui.hint 内部对整串做 Lang.t，拼接串必须先按片段译好
+            // 拼接串先分段翻译
             form.getChildren().add(Ui.hint(Lang.t("这个版本没有内置微软登录凭据，开源版不含正版登录。")
                     + Lang.t("要用正版登录，请自行构建完整版并注入自己的 client id，构建说明见 README。"), 0));
             HBox actions = new HBox(12);
@@ -585,7 +585,7 @@ public final class Dialogs {
             box.getChildren().add(actions);
             card.getChildren().add(box);
             win.showModal(card);
-            // 点遮罩、按 ESC 关掉时也要放行后台线程
+            // 遮罩/ESC 关闭也放行
             win.setModalCloseHook(latch::countDown);
         });
         latch.await(120, java.util.concurrent.TimeUnit.SECONDS);
@@ -660,7 +660,7 @@ public final class Dialogs {
                         a.server = c;
                         d.accounts.add(a);
                         d.selectedAccount = d.accounts.size() - 1;
-                        // 记住服务器码，否则注册链接拼不出来
+                        // 保存服务器码以拼注册链接
                         if (!c.isEmpty()) d.set("CacheNideServer", c);
                         d.save();
                         win.refreshAccountBadge();
@@ -808,7 +808,7 @@ public final class Dialogs {
                         win.refreshAccountBadge();
                         viewer.dispose();
                         win.closeModal();
-                        // 静默重建，不闪换页动画
+                        // 静默重建
                         win.openPage(win.currentKey, false);
                         win.toast("皮肤已更换", account.name + " · " + account.skin, 1);
                     }));
@@ -826,7 +826,7 @@ public final class Dialogs {
         for (int i = 0; i < items.length; i++) items[i].setSelected(i == type[0]);
 
         win.showModal(card);
-        // 蒙层/ESC/被链式弹窗顶掉时停掉 3D 自转；hook 须在 showModal 后设置
+        // 关闭或顶掉时停自转 hook 在 showModal 后设
         win.setModalCloseHook(viewer::dispose);
     }
 
@@ -951,7 +951,7 @@ public final class Dialogs {
     private static String fetchMojangSkin(String nameOrUuid, String accountName) throws Exception {
         String id = nameOrUuid.trim();
         String uuid;
-        // parseInt 会溢出，用正则判 32 位 UUID
+        // parseInt 会溢出 用正则判 32 位 UUID
         if (id.matches("[0-9a-fA-F]{32}")) {
             uuid = id.toLowerCase();
         } else {
@@ -970,7 +970,7 @@ public final class Dialogs {
             j = httpGetString("https://api.mojang.com/users/profiles/minecraft/"
                     + java.net.URLEncoder.encode(name, "UTF-8"));
         } catch (Exception e) {
-            // 不存在的玩家返回 204，Http 会抛异常
+            // 不存在的玩家返回 204 Http 会抛异常
             throw new Exception("查不到这个正版玩家：" + name + "（ID 不存在或网络不通）");
         }
         String id = Json.str(Json.obj(Json.parse(j)), "id", "");
@@ -1042,7 +1042,7 @@ public final class Dialogs {
     }
 
     private static byte[] httpGetBytes(String url) throws Exception {
-        // 走共享连接池，偶发 5xx 自动重试
+        // 共享连接池 5xx 自动重试
         return Http.getBytes(url);
     }
 

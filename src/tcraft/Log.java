@@ -16,7 +16,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-// 异步日志：调用线程只入队，写盘由守护线程批量完成；跨启动追加，不覆盖
+// 异步日志 调用线程入队 守护线程写盘
 public final class Log {
 
     private static final int QUEUE_CAPACITY = 4096;
@@ -50,7 +50,7 @@ public final class Log {
         if (text != null) enqueue(text, true);
     }
 
-    // 日志与报错共用的环境信息
+    // 日志/报错共用环境信息
     public static String environment() {
         StringBuilder sb = new StringBuilder();
         sb.append("软件：TCraft Launcher ").append(Build.VERSION)
@@ -64,7 +64,7 @@ public final class Log {
         return sb.toString();
     }
 
-    // 启动分隔，两个日志都写环境信息
+    // 启动分隔并写环境信息
     public static void startSession() {
         if (!SESSION.compareAndSet(false, true)) return;
         try {
@@ -75,7 +75,7 @@ public final class Log {
         enqueue("===== 启动 " + LocalDateTime.now().withNano(0) + " =====\n" + environment(), true);
     }
 
-    // 异常描述：类名 + message + 首个堆栈帧，message 为空也能看出异常类型
+    // 异常描述 类名 + message + 首帧
     public static String describe(Throwable t) {
         if (t == null) return "无异常对象";
         StringBuilder sb = new StringBuilder();
@@ -110,17 +110,17 @@ public final class Log {
         }
     }
 
-    // 当前运行日志全文（含历史滚动文件，按时间顺序）
+    // 运行日志全文 按时间排序
     public static String exportCurrent() {
         return readGroup("launcher.log", EXPORT_LIMIT);
     }
 
-    // 错误日志全文（含历史滚动文件）
+    // 错误日志全文
     public static String exportErrors() {
         return readGroup("errors.log", EXPORT_LIMIT);
     }
 
-    // 日志目录下全部日志，按修改时间顺序拼接
+    // 全部日志按时间拼接
     public static String exportAll() {
         StringBuilder sb = new StringBuilder();
         long total = 0;

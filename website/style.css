@@ -169,18 +169,44 @@ nav a:hover { color: #000; }
 
 .download h2 { margin: 0 0 22px; font-size: 28px; font-weight: 600; }
 
-.btn-download {
+.download-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.btn-download,
+.btn-docs {
     display: inline-block;
-    min-width: 280px;
-    padding: 12px 28px;
+    min-width: 200px;
+    padding: 12px 24px;
     border-radius: 2px;
-    background: #427a2e;
-    color: #fff;
     font-size: 14px;
+    line-height: 1.4;
+    text-align: center;
     text-decoration: none;
 }
 
+.btn-download {
+    background: #427a2e;
+    color: #fff;
+}
+
 .btn-download:hover { background: #4f8f38; }
+
+.btn-docs {
+    border: 1px solid #427a2e;
+    color: #427a2e;
+    background: transparent;
+}
+
+.btn-docs:hover {
+    background: #427a2e;
+    color: #fff;
+}
+
 .download p { margin: 12px 0 0; color: #777; font-size: 13px; }
 
 footer {
@@ -268,7 +294,8 @@ body.locked { overflow: hidden; }
 
     .download { padding: 40px 16px 48px; }
     .download h2 { font-size: 22px; }
-    .btn-download { min-width: 0; width: 100%; max-width: 320px; }
+    .download-actions { gap: 10px; }
+    .btn-download, .btn-docs { min-width: 0; width: 100%; max-width: 320px; }
 }
 
 /* 下载弹窗 */

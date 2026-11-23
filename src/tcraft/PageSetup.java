@@ -193,7 +193,7 @@ public class PageSetup implements Page {
             }
             case "java" -> {
                 data.invalidateJavaScan();
-                // detectJava 要起多个进程，放后台
+                // detectJava 放后台
                 Threads.start("TCL-JavaDetect", () -> {
                     String detected = data.detectJava();
                     javafx.application.Platform.runLater(() -> {
@@ -364,7 +364,7 @@ public class PageSetup implements Page {
         HBox initRow = new HBox(12, initRam, initVal);
         maxRow.setAlignment(Pos.CENTER_LEFT);
         initRow.setAlignment(Pos.CENTER_LEFT);
-        // 滑条常驻，自动配置时置灰
+        // 滑条常驻 自动配置时置灰
         mem.add(radios, Ui.settingRow("最大内存", maxRow), Ui.settingRow("初始内存", initRow));
         auto.setOnAction(() -> {
             data.set("LaunchRamType", 0);
@@ -431,7 +431,7 @@ public class PageSetup implements Page {
         });
         adv.add(waitCmd);
 
-        // 无扫描缓存先占位，后台扫
+        // 无缓存先占位
         List<String> javas;
         if (data.hasJavaScanCache()) {
             javas = findJavas();
@@ -451,7 +451,7 @@ public class PageSetup implements Page {
             String path = javaCombo.getSelectionModel().getSelectedItem();
             if (path == null || path.equals("未找到 Java")) return;
             if (data.javaPath.equals(path)) return;
-            // javaMajor 会起子进程，识别放后台
+            // javaMajor 放后台
             win.toast("正在识别 Java 版本…", path, 0);
             Threads.start("TCL-Java-Switch", () -> {
                 int major = Data.javaMajor(path);
@@ -479,7 +479,7 @@ public class PageSetup implements Page {
         crash.setSelected(data.crashAnalysisEnabled());
         crash.setOnAction(() -> {
             data.set("LaunchCrashAnalysis", crash.isSelected());
-            // 同步写兼容旧配置的反向键
+            // 同步写旧配置反向键
             data.set("LaunchAdvanceDisableCrashAnalysis", !crash.isSelected());
         });
         adv.add(crash);
@@ -489,7 +489,7 @@ public class PageSetup implements Page {
                     i -> {
                         data.set("LaunchAdvanceRenderer", i);
                         if (i > 0) {
-                            // 首次选择时后台拉取 mesa-loader
+                            // 首次选择后台拉 mesa-loader
                             Threads.start("TCL-Mesa", () -> {
                                 try {
                                     Mesa.ensure();
@@ -623,7 +623,7 @@ public class PageSetup implements Page {
         theme.add(Ui.label("主题的强调色会应用到按钮、滑块与选中态，切换后立即生效。", 12, Theme.gray2));
         if (!Theme.nextHiddenThemeName().isEmpty()) {
             int left = Theme.launchesToNextUnlock(data.getInt("SystemCount", 0));
-            // 键与 res 表一字不差（表里带「可」字），差一字就查不到
+            // 键须与 res 表完全一致
             Label prog = Ui.label(Lang.tf("隐藏主题 %d/%d · 每累计启动 %d 次解锁一个，再启动 %d 次可解锁「%s」",
                             Theme.unlockedHiddenIds().size(), Theme.HIDDEN_THEMES.length,
                             Theme.UNLOCK_EVERY_LAUNCHES, left, Lang.t(Theme.nextHiddenThemeName())),
@@ -722,7 +722,7 @@ public class PageSetup implements Page {
         TextField logoText = textRow(detail, "标题栏文字", "TCL", data.get("UiLogoText", "TCL"), s -> {
             data.set("UiLogoText", s);
         });
-        // 失焦或回车再重建，输入中不重建
+        // 失焦/回车才重建
         logoText.focusedProperty().addListener((o, a, focused) -> {
             if (!focused) win.rebuildUi();
         });
@@ -924,7 +924,7 @@ public class PageSetup implements Page {
 
         int mark = bg.content.getChildren().size();
         if (imageCount > 0) {
-            // 下拉顺序与存储值一一对应
+            // 下拉顺序对应存储值
             String[] suitNames = {"自动", "平铺", "居中", "拉伸", "左上 (保持长宽比)",
                     "左中 (保持长宽比)", "左下 (保持长宽比)", "中上 (保持长宽比)",
                     "居中 (保持长宽比)", "中下 (保持长宽比)", "右上 (保持长宽比)",
@@ -980,7 +980,7 @@ public class PageSetup implements Page {
                 data.set("UiThemePreset", -1);
                 Theme.applyWallpaperTheme();
             } else {
-                // 关掉跟随壁纸：把当前取色固化成自定义主题
+                // 关闭跟随时固化当前取色
                 Theme.saveCurrentAsCustom(data);
                 data.set("UiThemePreset", 14);
             }
@@ -1249,7 +1249,7 @@ public class PageSetup implements Page {
     private void buildSystem(VBox page) {
         header(page, "系统", "下载、网络、语言与启动器行为。");
         Ui.Card download = addCard(page, "下载");
-        // 0 和 2 只是首选顺序，下载时还会按速度择优
+        // 0/2 仅是首选顺序
         String[] sourceNames = {"镜像优先（下载时按测速结果择优）", "官方优先（下载时按测速结果择优）", "仅使用官方源"};
         int fileCur = data.getInt("SystemDownloadSource", 0);
         int fileIndex = 1;
@@ -1360,7 +1360,7 @@ public class PageSetup implements Page {
                     File file = chooser.showOpenDialog(win.stage);
                     if (file == null) return;
                     Dialogs.confirm(win, "导入全部数据",
-                            // 四段拼接整串查不到表，合并为单个完整键
+                            // 四段拼接用完整键
                             Lang.tf("将导入 %s 中的配置，同名设置会被文件内容覆盖。\n\n"
                                     + "出于安全考虑，导入时不会应用启动前命令、Java 路径、下载源、代理，"
                                     + "以及 JVM / 游戏附加参数，这些只能在本机手动设置。\n\n确认导入吗？",
@@ -1455,7 +1455,7 @@ public class PageSetup implements Page {
         orderHint.setWrapText(true);
         found.add(orderHint);
         if (!data.hasJavaScanCache()) {
-            // 首次扫描放后台，扫完自动刷新
+            // 首次扫描后台 完成刷新
             found.add(Ui.label("正在扫描本机的 Java…", 12.5, Theme.gray2));
             Threads.start("TCL-JavaScan", () -> {
                 data.scanJavaRuntimes();
@@ -1475,7 +1475,7 @@ public class PageSetup implements Page {
             Ui.ListItem item = new Ui.ListItem(Theme.icon("coffee", 17, selected ? Theme.accent : Theme.text),
                     name, rt.path(), 44);
             item.setSelected(selected);
-            // 顺序写进 LaunchJavaOrder，自动选择按此挑
+            // 顺序写入 LaunchJavaOrder
             StackPane up = Ui.iconButton("arrow-up", 26, 15, "上移", () -> moveJava(rt, -1));
             StackPane down = Ui.iconButton("arrow-down", 26, 15, "下移", () -> moveJava(rt, 1));
             up.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED,
@@ -1517,7 +1517,7 @@ public class PageSetup implements Page {
     }
 
     private void moveJava(Data.JavaRuntime rt, int dir) {
-        // orderedJavas 可能触发全盘探测，放后台
+        // orderedJavas 放后台
         Threads.start("TCL-Java-Order", () -> {
             List<Data.JavaRuntime> list = orderedJavas();
             int index = -1;
@@ -1570,7 +1570,7 @@ public class PageSetup implements Page {
         chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(Lang.t("所有文件"), "*.*"));
         File file = chooser.showOpenDialog(win.stage);
         if (file == null) return;
-        // 探测要起子进程，整段放后台
+        // 探测整段放后台
         Threads.start("TCL-Java-Import", () -> {
             int major = Data.javaMajor(file.getAbsolutePath());
             javafx.application.Platform.runLater(() -> {
@@ -1585,7 +1585,7 @@ public class PageSetup implements Page {
         });
     }
 
-    // 自动扫描覆盖不到的非常规位置，手动指定
+    // 手动指定非常规路径
     private void pickJavaFolder() {
         javafx.stage.DirectoryChooser chooser = new javafx.stage.DirectoryChooser();
         chooser.setTitle(Lang.t("选择要搜索 Java 的文件夹"));
@@ -1690,7 +1690,7 @@ public class PageSetup implements Page {
             if (key.equals(lastKey[0])) return;
             lastKey[0] = key;
             busy.set(true);
-            // 读盘过滤放后台，防卡主线程
+            // 读盘过滤放后台
             Threads.start("TCL-Log-View", () -> {
                 String[] lines = new String[0];
                 String text = "";
@@ -1795,7 +1795,7 @@ public class PageSetup implements Page {
                 return tail;
             }
         } catch (Exception e) {
-            // 回退内存日志时状态栏要说明
+            // 内存日志要在状态栏说明
             lastLogReadError = e.getMessage() == null ? e.toString() : e.getMessage();
         }
         return data.log.toArray(new String[0]);
@@ -1887,7 +1887,7 @@ public class PageSetup implements Page {
         actions.getChildren().addAll(
                 Ui.button("清理所选缓存", Ui.BTN_RED, () ->
                         Dialogs.confirm(win, "清理所选缓存",
-                                // 复选框组合有 8 种整串，逐段翻译才都能命中
+                                // 组合文案分段翻译
                                 Lang.t("将删除：\n· ") + (cacheCheck.isSelected() ? Lang.t("启动器下载缓存") : Lang.t("（跳过）启动器下载缓存"))
                                         + "\n· " + (logCheck.isSelected() ? Lang.t("临时日志文件") : Lang.t("（跳过）临时日志文件"))
                                         + "\n· " + (tempCheck.isSelected() ? Lang.t("临时文件（.tmp / .part）") : Lang.t("（跳过）临时文件"))
@@ -2052,7 +2052,7 @@ public class PageSetup implements Page {
 
     private static java.util.List<String> deleteDirCollect(Path dir, java.util.List<String> failedSink) {
         if (!Files.isDirectory(dir)) return failedSink;
-        Path running = Resources.jar(); // 运行中的 jar 被 JVM 锁定，跳过
+        Path running = Resources.jar(); // 运行中的 jar 被 JVM 锁定 跳过
         try (var stream = Files.walk(dir)) {
             for (Path p : stream.sorted(Comparator.reverseOrder()).toList()) {
                 try {
@@ -2349,7 +2349,7 @@ public class PageSetup implements Page {
         java.net.Proxy proxy;
         try {
             if (mode == 0 || mode == 1) {
-                proxy = null; // 无代理或跟随系统，由 JVM 系统属性决定
+                proxy = null; // 无代理或跟随系统 由 JVM 系统属性决定
             } else if (mode == 3) {
                 proxy = new java.net.Proxy(java.net.Proxy.Type.SOCKS,
                         new java.net.InetSocketAddress(host, Integer.parseInt(port)));
@@ -2358,7 +2358,7 @@ public class PageSetup implements Page {
                         new java.net.InetSocketAddress(host, Integer.parseInt(port)));
             }
         } catch (Exception e) {
-            // 返回串不经 localize，创建处翻译
+            // 返回串创建处翻译
             return Lang.tf("代理参数无效：%s", e.getMessage());
         }
         long start = System.currentTimeMillis();
@@ -2434,7 +2434,7 @@ public class PageSetup implements Page {
         return slider;
     }
 
-    // 拖动只更新数字，停下 80ms 后再重建样式
+    // 拖动更新数字 80ms 后重建
     private Ui.SliderBar sliderRowDebounced(Ui.Card card, String label, double min, double max, double value,
                                             Consumer<Double> onChange, String suffix) {
         Ui.SliderBar slider = Ui.sliderBar(min, max, value);

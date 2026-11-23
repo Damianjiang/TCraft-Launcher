@@ -222,7 +222,7 @@ public class PageResourceDetail implements Page {
             try {
                 List<ResourceVersion> list = new ArrayList<>();
                 if (info.isCurseForge()) {
-                    // 旧版收藏可能只存 slug 没存数字 id
+                    // 旧收藏可能只有 slug
                     if (!pid.matches("\\d+")) {
                         throw new Exception("该收藏缺少 CurseForge 的数字 id，请取消收藏后重新收藏");
                     }
@@ -300,7 +300,7 @@ public class PageResourceDetail implements Page {
         }
         if (ids.isEmpty()) return;
         if (info.isCurseForge()) {
-            // 无批量接口，8 并发逐查，25s 超时按未解析
+            // 8 并发逐查
             java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(ids.size());
             java.util.concurrent.Semaphore gate = new java.util.concurrent.Semaphore(8);
             for (String id : ids) {
@@ -328,7 +328,7 @@ public class PageResourceDetail implements Page {
             } catch (InterruptedException ie) {
                 Thread.currentThread().interrupt();
             }
-            // 拉完再串行填，并发写列表会丢数据
+            // 拉完再串行填
             for (String id : ids) {
                 if (depProjectsCf.containsKey(id)) fillDependencies(list, id);
             }
@@ -906,7 +906,7 @@ public class PageResourceDetail implements Page {
         if (hasDeps) task.subs.add(new Tasks.SubTask("下载前置文件"));
         String ext = extOf(file).toLowerCase();
         boolean worldZip = file.resourceType.equals("world") && (ext.equals("zip") || ext.equals("mca"));
-        // 子任务下标不固定，用引用不用下标
+        // 子任务用引用
         Tasks.SubTask worldSub = worldZip ? new Tasks.SubTask("安装世界存档") : null;
         if (worldSub != null) task.subs.add(worldSub);
         Tasks.INSTANCE.add(task);
@@ -925,7 +925,7 @@ public class PageResourceDetail implements Page {
                     int i = 0;
                     for (DepDownload d : deps) {
                         if (task.canceled) throw new java.io.IOException("已取消");
-                        // fileName 可能带 ../，归一化后须在目标目录内
+                        // fileName 可能带 ../ 归一化后须在目标目录内
                         Path depTarget = dir.resolve(d.version.fileName.replace("~", "-")).toAbsolutePath().normalize();
                         if (!depTarget.startsWith(dirAbs)) {
                             data.log("前置文件名包含非法路径，已跳过：" + d.version.fileName);
@@ -938,7 +938,7 @@ public class PageResourceDetail implements Page {
                     task.subs.get(1).state = Tasks.State.DONE;
                 }
                 if (worldZip && worldSub != null) {
-                    // 解到 saves 后删压缩包，MC 只认解开的目录
+                    // 解压后删包
                     worldSub.state = Tasks.State.RUNNING;
                     task.stage = "解压世界存档";
                     unzipTo(target, target.getParent());

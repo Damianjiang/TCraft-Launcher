@@ -21,7 +21,7 @@ public final class Servers {
         public String name = "";
         public String ip = "";
         public String icon = "";
-        // listRead 捕获的额外 NBT 字段，listWrite 原样写回
+        // 额外 NBT 字段原样写回
         public java.util.Map<String, Object> extra;
     }
 
@@ -67,7 +67,7 @@ public final class Servers {
                     } else if ("ip".equals(key)) {
                         e.ip = str(value);
                     } else if ("icon".equals(key)) {
-                        // icon 是 PNG 字节数组：base64 给界面，原样写回
+                        // icon 转 base64 给界面
                         if (value instanceof byte[] bytes) {
                             e.icon = java.util.Base64.getEncoder().encodeToString(bytes);
                             extra.put(key, value);
@@ -75,7 +75,7 @@ public final class Servers {
                             e.icon = str(value);
                         }
                     } else {
-                        // hidden 等标记须保留，防游戏端设置被抹
+                        // 保留 hidden 等标记
                         extra.put(key, value);
                     }
                 }
@@ -104,7 +104,7 @@ public final class Servers {
             w.writeString("ip");
             w.writeString(s.ip);
             if (s.extra != null && s.extra.get("icon") instanceof byte[] bytes) {
-                // MC 只认 ByteArray 类型的 icon，从文件里读出来的按原类型写回
+                // icon 须按 ByteArray 写回
                 w.writeByte(7);
                 w.writeString("icon");
                 w.writeByteArray(bytes);
@@ -113,7 +113,7 @@ public final class Servers {
                 w.writeString("icon");
                 w.writeString(s.icon);
             }
-            // 未知字段按捕获顺序写回，条目数设上限防调用方塞垃圾
+            // 未知字段按序写回 条目上限
             if (s.extra != null && s.extra.size() <= 64) {
                 for (Map.Entry<String, Object> f : s.extra.entrySet()) {
                     if ("icon".equals(f.getKey())) continue;
@@ -127,7 +127,7 @@ public final class Servers {
             w.writeByte(0);
         }
         w.writeByte(0);
-        // tmp + 原子替换：写一半崩溃/断电不会丢掉整个服务器列表（对齐 Data.save 范式）
+        // tmp + 原子替换
         Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
         try (OutputStream fs = new GZIPOutputStream(Files.newOutputStream(tmp))) {
             fs.write(buf.toByteArray());
@@ -204,7 +204,7 @@ public final class Servers {
         }
 
         Object readPayload(int type, int depth) throws Exception {
-            // servers.dat 不该深嵌套，超限多为构造文件；消息片段各自 Lang.t
+            // 深嵌套超限 消息分段翻译
             if (depth > 128) throw new Exception(Lang.t("NBT 嵌套过深"));
             switch (type) {
                 case 1 -> {
@@ -308,7 +308,7 @@ public final class Servers {
             s.write(b);
         }
 
-        // 一种 NBT 类型只映射一种 Java 类型，才能写回
+        // 一种 NBT 类型只映射一种 Java 类型 才能写回
         static int typeOf(Object v) {
             if (v instanceof Byte) return 1;
             if (v instanceof Short) return 2;
@@ -325,7 +325,7 @@ public final class Servers {
             return -1;
         }
 
-        // 写无名字段的负载（列表元素 / compound 内字段）
+        // 写无名字段的负载 列表元素 / compound 内字段
         void writePayload(Object v) throws java.io.IOException {
             if (v instanceof Byte b) writeByte(b);
             else if (v instanceof Short sh) writeShort(sh);
@@ -420,7 +420,7 @@ public final class Servers {
         return String.valueOf(desc);
     }
 
-    // [v6]:port、[v6]、v4:port、裸 v6 统一拆开；port 为空串表示默认端口
+    // 统一拆分 IPv6 与端口
     public static String[] splitAddress(String address) {
         String host = address == null ? "" : address.trim();
         String port = "";
@@ -477,7 +477,7 @@ public final class Servers {
             sendPacket(client.getOutputStream(), new byte[]{0});
             InputStream stream = client.getInputStream();
             int packetLength = readVarInt(stream);
-            // 能解析的响应包长不超过 1MB+6，超过这个数的一定是垃圾数据
+            // 响应包上限 1MB+6
             if (packetLength <= 0 || packetLength > 2 * 1024 * 1024) {
                 throw new Exception(Lang.t("意外的状态响应包长度：") + packetLength);
             }
@@ -515,7 +515,7 @@ public final class Servers {
         return result;
     }
 
-    // SRV 结果缓存 10 分钟（含失败）
+    // SRV 结果缓存 10 分钟 含失败
     private static final Map<String, Object[]> SRV_CACHE =
             java.util.Collections.synchronizedMap(new java.util.LinkedHashMap<>());
     private static final long SRV_TTL_MS = 600_000L;

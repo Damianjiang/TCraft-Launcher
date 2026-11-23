@@ -27,7 +27,7 @@ final class SmoothScroll {
     private static final Object KEY = new Object();
     private static final Object WHEEL_KEY = new Object();
 
-    // 1.0≈原生一格 40px，3.0 会一划飞出
+    // 1.0≈40px 3.0 过快
     static final double DEFAULT_WHEEL_SPEED = 1.0;
 
     private static final double OMEGA = 20.0;
@@ -60,7 +60,7 @@ final class SmoothScroll {
         pane.getProperties().put(WHEEL_KEY, wheelSpeed);
         SmoothScroll scroll = new SmoothScroll(pane);
         pane.getProperties().put(KEY, scroll);
-        // 过滤阶段先拦下，不然原生 skin 会再滚一次
+        // 先拦截 避免原生再滚
         pane.addEventFilter(ScrollEvent.SCROLL, scroll::onScroll);
         pane.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> scroll.stop());
         pane.contentProperty().addListener((o, a, b) -> scroll.invalidateEffectCache());
@@ -314,10 +314,10 @@ final class SmoothScroll {
         restartRestore();
     }
 
-    // 节点特效被外部替换或清除时整批重扫
+    // 特效变更时重扫
     private boolean staleCache() {
         for (EffectNode node : effectCache) {
-            if (holdsNode(node.node)) continue; // 挂起中被我们置空的，不算失效
+            if (holdsNode(node.node)) continue; // 挂起中被我们置空的 不算失效
             if (node.node.getEffect() != node.effect) return true;
         }
         return false;
@@ -354,7 +354,7 @@ final class SmoothScroll {
     private void collectEffects(Node node, List<EffectNode> out, Set<Node> held) {
         Effect effect = node.getEffect();
         if (effect == null && held != null && held.contains(node)) {
-            // 挂起中被我们摘掉特效的节点按原特效留在缓存里
+            // 挂起节点保留原特效
             for (EffectNode n : suspended) {
                 if (n.node == node) {
                     effect = n.effect;

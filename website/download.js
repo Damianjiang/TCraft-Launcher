@@ -84,7 +84,7 @@
         return (bytes / 1048576).toFixed(1) + ' MB';
     }
 
-    // 复制给群里转发的纯文本：Markdown 语法剥掉，只留内容
+    // 复制给群里转发的纯文本 Markdown 语法剥掉 只留内容
     function plainText(r) {
         const lines = String(r.body || '该版本未填写更新日志。')
             .replace(/<!--[\s\S]*?-->/g, '')

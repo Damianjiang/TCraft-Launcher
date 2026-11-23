@@ -56,7 +56,7 @@ public final class Tasks {
     public void changed() {
     }
 
-    // 失败/取消也算已结束，最多留 40 条
+    // 失败/取消也算结束 最多 40 条
     private static final int MAX_FINISHED = 40;
 
     private void trim() {

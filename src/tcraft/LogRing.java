@@ -7,7 +7,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.function.Predicate;
 
-// 定长日志缓冲：满了丢最旧一条，写入和淘汰都是 O(1)
+// 定长缓冲 满了丢最旧一条
 final class LogRing extends AbstractList<String> {
 
     private final int capacity;
@@ -54,13 +54,13 @@ final class LogRing extends AbstractList<String> {
         return removed;
     }
 
-    // 快照迭代器，不长期持锁
+    // 快照迭代 不长期持锁
     @Override
     public synchronized Iterator<String> iterator() {
         return new java.util.ArrayList<>(items).iterator();
     }
 
-    // 拷贝快照，直接迭代会与写并发抛 CME
+    // 直接迭代会 CME 先拷贝
     public synchronized List<String> snapshot(int last) {
         ArrayList<String> copy = new ArrayList<>(items);
         int from = Math.max(0, copy.size() - Math.max(0, last));

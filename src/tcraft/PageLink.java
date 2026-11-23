@@ -38,7 +38,7 @@ public class PageLink implements Page {
     private static int rpcPort = -1;
     private static String clientAddress = "";
     private static final int LINK_CODE_VERSION = 3;
-    // 联机线程写、FX 线程读
+    // 联机线程写 FX 线程读
     private static volatile double linkPing;
     private static volatile int peopleCount = 1;
     private static volatile int myNat = 10;
@@ -737,7 +737,7 @@ public class PageLink implements Page {
                 lastDecodeError = "";
                 return payload.containsKey("v") ? payload : null;
             } catch (Json.MalformedException e) {
-                // lastDecodeError 整串查不到表，创建处翻译
+                // lastDecodeError 创建处翻译
                 lastDecodeError = Lang.tf("联机码内容不是合法 JSON：%s",
                         e.getMessage() == null ? Lang.t("格式损坏") : e.getMessage());
                 return null;
@@ -803,7 +803,7 @@ public class PageLink implements Page {
     }
 
     private void runLink() {
-        // 旧 worker 的错误回调不能污染新一轮
+        // 旧 worker 不污染新一轮
         final int gen = peerGeneration;
         try {
             EasyTier.ensureInstalled(false, (stage, v) -> setStage(stage));
@@ -821,7 +821,7 @@ public class PageLink implements Page {
             int clientPort = EasyTier.freePort();
             String host = (serverSide ? "Server-" : "Client-") + stableName();
 
-            // 无 TUN：普通用户即可组网，房主服务走虚拟 IP
+            // 无 TUN 也能组网
             StringBuilder a = new StringBuilder("--no-tun --console-log-level info");
             a.append(" --network-name=").append(networkName)
                     .append(" --network-secret=").append(networkSecret)
@@ -843,13 +843,13 @@ public class PageLink implements Page {
 
             setStage("正在启动联机模块…");
             EasyTier.start(a.toString());
-            // core 起来后，取消和报错两条路都要回收它
+            // 取消/报错都回收 core
             try {
                 waitUntilConnected(port);
                 if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
                 if (!serverSide) waitStable(port);
 
-                // 中断标志可能被吞，落 FINISH 前再核一次状态
+                // 落 FINISH 前复核中断
                 if (state != State.LOADING) return;
                 state = State.FINISH;
                 javafx.application.Platform.runLater(() -> {
@@ -870,7 +870,7 @@ public class PageLink implements Page {
                     state = State.LOADING;
                     win.reloadPageIf("link");
                 });
-                // 页内错误态只说状态，真实原因交给弹窗
+                // 页内只显示状态 详情进弹窗
                 Errors.panic("无法建立联机", e);
             }
         } catch (InterruptedException e) {
@@ -885,7 +885,7 @@ public class PageLink implements Page {
                 state = State.LOADING;
                 win.reloadPageIf("link");
             });
-            // 页内错误态只说状态，真实原因交给弹窗
+            // 页内只显示状态 详情进弹窗
             Errors.panic("无法建立联机", e);
         }
     }
@@ -919,7 +919,7 @@ public class PageLink implements Page {
 
     private void waitStable(int port) throws InterruptedException {
         setStage("连接优化中……");
-        // 每轮 fork 一次 easytier-cli，250ms 间隔足够
+        // 每轮 fork 250ms 间隔
         for (int i = 0; i < 20; i++) {
             if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
             if (targetPeer != null && !targetPeer.relay && targetPeer.ping < 100) return;
@@ -992,7 +992,7 @@ public class PageLink implements Page {
         List<String> out = new ArrayList<>();
         nodeLatency.clear();
         Data d = Data.get();
-        // 双方必须连到同一节点，加入方用联机码里的节点
+        // 双方须连同一节点
         if (!serverSide && !pendingNode.isBlank()) {
             out.add(pendingNode);
             selectedNode = pendingNode;
@@ -1146,7 +1146,7 @@ public class PageLink implements Page {
         boolean apply(String value);
     }
 
-    // 离开页面后不再持有页面节点；联机线程继续跑，回来时按静态 state 重建
+    // 离开页面不持有节点 回来按 state 重建
     @Override
     public void onHide() {
         loadingDescLabel = null;
@@ -1186,7 +1186,7 @@ public class PageLink implements Page {
     }
 
     private String localAddress() {
-        // getLocalHost 可能做 DNS 反查卡住 FX 线程
+        // getLocalHost 可能 DNS 反查
         try {
             java.util.Enumeration<java.net.NetworkInterface> nis = java.net.NetworkInterface.getNetworkInterfaces();
             while (nis.hasMoreElements()) {

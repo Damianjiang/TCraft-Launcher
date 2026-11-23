@@ -13,7 +13,7 @@ import java.io.InputStream;
 
 import javax.imageio.ImageIO;
 
-// 仅首次运行/修复 JavaFX 运行库时显示
+// 仅首启或修复运行库时显示
 public final class StartupWindow {
 
     private static final int W = 460;
@@ -30,7 +30,7 @@ public final class StartupWindow {
     private final Window window;
     private final Panel panel;
     private final long openedAt = System.currentTimeMillis();
-    // AWT 文案不走 localize，创建时取当前语言
+    // AWT 文案创建时取语言
     private volatile String status = Lang.t("准备 TCL 启动器中…");
     private volatile String detail = "";
     private volatile int percent = -1;
@@ -62,7 +62,7 @@ public final class StartupWindow {
 
     public static StartupWindow open() {
         try {
-            if (Shell.mac()) return new StartupWindow(true);   // macOS 不起 AWT 窗，防双 toolkit 抢 NSApplication
+            if (Shell.mac()) return new StartupWindow(true); // macOS 不起 AWT 窗 防双 toolkit 抢 NSApplication
             if (java.awt.GraphicsEnvironment.isHeadless()) return new StartupWindow(true);
             StartupWindow[] box = new StartupWindow[1];
             javax.swing.SwingUtilities.invokeAndWait(() -> box[0] = new StartupWindow());
@@ -104,7 +104,7 @@ public final class StartupWindow {
         applyDownload(text, done, total, total > 0 ? (int) Math.min(99, done * 100 / total) : -1);
     }
 
-    // percent 为整体进度，当前文件进度另显在详情行
+    // percent 是总进度
     public void setDownload(String text, long done, long total, int overallPercent) {
         applyDownload(text, done, total, overallPercent);
     }
@@ -142,7 +142,7 @@ public final class StartupWindow {
         }
         long wait = 300 - (System.currentTimeMillis() - openedAt);
         Runnable dispose = () -> java.awt.EventQueue.invokeLater(() -> {
-            // AWT 组件的显隐与销毁按规范只能在 EDT 做
+            // AWT 操作只在 EDT
             try {
                 window.setVisible(false);
                 window.dispose();

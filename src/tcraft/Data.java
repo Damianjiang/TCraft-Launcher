@@ -81,7 +81,7 @@ public final class Data {
             return sb.toString();
         }
 
-        // description 摘要持久化为中文，显示层重拼（键同写入端）
+        // description 摘要存中文 显示层重拼
         private static final java.util.regex.Pattern SUMMARY_P =
                 java.util.regex.Pattern.compile("^(正式版|预览版|愚人节版|远古版) (\\S+)，已安装 (.+)$");
 
@@ -233,7 +233,7 @@ public final class Data {
     public int selectedAccount = 0;
     public int selectedInstance = 0;
     public String gameDir;
-    // 后台扫描线程会补写，跨线程可见性靠 volatile
+    // 扫描线程补写 volatile 保可见
     public volatile String javaPath = "";
     public String downloadCategory = "原版游戏";
     public String otherSection = "about";
@@ -253,7 +253,7 @@ public final class Data {
     private final Properties props = new Properties();
     private final Path configPath;
 
-    // 上次写配置崩溃会留下 .tmp，里面是明文 token，不能过夜
+    // 崩溃残留 .tmp 含明文 token 启动时清理
     private void cleanupConfigTmp() {
         String name = configPath.getFileName().toString();
         for (String suffix : new String[]{".tmp", ".import.tmp"}) {
@@ -290,7 +290,7 @@ public final class Data {
             }
         }
         if (javaPath == null || javaPath.isEmpty()) {
-            // 构造期不逐盘探测，先取缓存
+            // 构造期不逐盘探测 先取缓存
             javaPath = cachedJavaPath();
             if (javaPath.isEmpty()) startJavaScanFill();
         }
@@ -346,12 +346,12 @@ public final class Data {
                 Path p = Paths.get(custom.trim()).toAbsolutePath().normalize();
                 Path base = baseDir().toAbsolutePath().normalize();
                 Path game = Paths.get(gameDir).toAbsolutePath().normalize();
-                // 缓存根与配置/游戏目录双向隔离，防清理误删
+                // 缓存根与配置/游戏目录隔离
                 if (p.getNameCount() > 1 && !p.startsWith(base) && !p.startsWith(game)
                         && !base.startsWith(p) && !game.startsWith(p)
                         && !p.equals(base) && !p.equals(game)) {
                     Files.createDirectories(p);
-                    // 无标记的已有内容目录可能是用户的，不自动认领
+                    // 无标记目录不自动认领
                     ensureCacheMarker(p, false);
                     return p;
                 }
@@ -381,7 +381,7 @@ public final class Data {
         }
     }
 
-    // 破坏性清理（prune / 清空缓存目录）前必须确认标记存在
+    // 破坏性清理前确认目录标记
     public static boolean hasCacheMarker(Path cacheRoot) {
         if (cacheRoot == null) return false;
         try {
@@ -422,7 +422,7 @@ public final class Data {
         } else {
             legacy = Paths.get(System.getProperty("user.home"), ".minecraft");
         }
-        // 默认游戏目录=启动器所在文件夹（绿色版）
+        // 默认游戏目录=启动器所在文件夹 绿色版
         try {
             Path app = Resources.appDir();
             if (app != null && Files.isDirectory(app)) return app.toString();
@@ -458,7 +458,7 @@ public final class Data {
         return list.isEmpty() ? "" : list.get(0).path;
     }
 
-    // 只读扫描缓存，绝不起进程
+    // 只读扫描缓存 绝不起进程
     private String cachedJavaPath() {
         List<JavaRuntime> cached = javaScanCache;
         if (cached == null || cached.isEmpty()) return "";
@@ -489,7 +489,7 @@ public final class Data {
         t.start();
     }
 
-    // 会起 java -version 子进程（走 javaMajor），只能后台线程调
+    // java -version 只能在后台调
     public static boolean usableJava(String path) {
         if (path == null || path.isBlank()) return false;
         try {
@@ -499,7 +499,7 @@ public final class Data {
         }
     }
 
-    // 不起进程的 usableJava，无 release 判 false
+    // 不起进程的 usableJava 无 release 判 false
     public static boolean usableJavaFast(String path) {
         if (path == null || path.isBlank()) return false;
         try {
@@ -540,7 +540,7 @@ public final class Data {
         }
     }
 
-    // 设置页「搜索目录」用，找到的会并入扫描缓存
+    // 设置页搜索目录用 找到的会并入扫描缓存
     public List<JavaRuntime> scanJavaIn(Path dir, int maxDepth) {
         List<String> candidates = new ArrayList<>();
         if (dir != null && Files.isDirectory(dir)) {
@@ -570,7 +570,7 @@ public final class Data {
         return found;
     }
 
-    // 起进程读版本，须并行
+    // 起进程读版本 须并行
     private static List<JavaRuntime> probeAll(List<String> candidates) {
         java.util.LinkedHashMap<String, JavaRuntime> found = new java.util.LinkedHashMap<>();
         List<String> unique = new ArrayList<>();
@@ -625,7 +625,7 @@ public final class Data {
 
         addJavaExes(out, System.getProperty("java.home"), win, mac);
         addJavaExes(out, System.getenv("JAVA_HOME"), win, mac);
-        // 启动器下载的 Java（含 macOS 的 Contents/Home 布局）
+        // 启动器下载的 Java
         try {
             addJavaRoot(out, Resources.home().resolve("java").resolve(JavaInstaller.platformKey()), win, mac);
         } catch (Throwable ignored) {
@@ -683,7 +683,7 @@ public final class Data {
         }
         String userHome = System.getProperty("user.home");
         if (!win && userHome != null) {
-            // JetBrains / SDKMAN 装在用户目录，常不在 PATH
+            // JetBrains / SDKMAN 常在用户目录
             addJavaRoot(out, Paths.get(userHome, ".jdks"), win, mac);
             addJavaRoot(out, Paths.get(userHome, ".sdkman", "candidates", "java"), win, mac);
             if (mac) addJavaRoot(out, Paths.get(userHome, "Library", "Java", "JavaVirtualMachines"), win, mac);
@@ -725,7 +725,7 @@ public final class Data {
 
     private static void addJavaExes(List<String> out, Path home, boolean win, boolean mac) {
         if (home == null) return;
-        // WindowsApps 是商店占位别名，运行会弹商店
+        // WindowsApps 是商店占位别名 运行会弹商店
         String lower = home.toString().toLowerCase(java.util.Locale.ROOT);
         if (win && (lower.contains("\\windowsapps") || lower.contains("/windowsapps"))) return;
         String exe = win ? "javaw.exe" : "java";
@@ -759,7 +759,7 @@ public final class Data {
     }
 
     public static String offlineUuid(String name) {
-        // 必须 UTF-8，与 HMCL、原版离线 UUID 一致
+        // UTF-8 与 HMCL / 原版离线 UUID 一致
         return UUID.nameUUIDFromBytes(("OfflinePlayer:" + name).getBytes(StandardCharsets.UTF_8)).toString();
     }
 
@@ -781,11 +781,11 @@ public final class Data {
             }
         } catch (Exception ignored) {
         }
-        // release 缺失按 64 位；32 位启动时自会报错
+        // release 缺失按 64 位 32 位启动时自会报错
         return true;
     }
 
-    // 会起 java -version 子进程（最多等 5 秒），只能后台线程调
+    // java -version 最多等 5s 仅后台调用
     private static final java.util.regex.Pattern JAVA_VERSION_P =
             java.util.regex.Pattern.compile("version \"([^\"]+)\"");
 
@@ -794,7 +794,7 @@ public final class Data {
         if (fast > 0) return fast;
         try {
             Path exe = Paths.get(javaExe);
-            // javaw 无控制台，探测统一用同目录 java.exe
+            // javaw 无控制台 探测统一用同目录 java.exe
             String name = exe.getFileName() == null ? ""
                     : exe.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
             if (name.equals("javaw.exe") && exe.getParent() != null) {
@@ -818,7 +818,7 @@ public final class Data {
         return 0;
     }
 
-    // 只读 release 认版本，不起进程；无则 0
+    // 只读 release 认版本 不起进程 无则 0
     public static int javaMajorFast(String javaExe) {
         try {
             Path exe = Paths.get(javaExe);
@@ -957,7 +957,7 @@ public final class Data {
         Threads.start("TCL-Manifest", () -> {
             try {
                 lastVersionRefresh = System.currentTimeMillis();
-                // 下载版本策略：0 镜像优先 / 1 官方优先并回退 / 2 只用官方
+                // 下载策略 0 镜像 / 1 官方优先 / 2 仅官方
                 String official = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
                 String mirror = "https://bmclapi2.bangbang93.com/mc/game/version_manifest_v2.json";
                 int src = getInt("SystemVersionSource", 1);
@@ -989,7 +989,7 @@ public final class Data {
                     versions.sort((a, b) -> b.time.compareTo(a.time));
                     fallbackVersions = false;
                 }
-                // 版本数量不写盘，仅兜底数据需留痕
+                // 版本数量不写盘 仅兜底数据需留痕
             } catch (Exception e) {
                 log("获取官方版本列表失败，改用标注过的离线兜底数据：" + Log.describe(e));
                 seedBuiltinVersions();
@@ -1105,7 +1105,7 @@ public final class Data {
 
     public void load() {
         try {
-            // 清旧键，防导入残留叠加
+            // 清旧键 防导入残留叠加
             props.clear();
             if (!Files.exists(configPath)) {
                 props.setProperty("UiThemePreset", "-1");
@@ -1188,7 +1188,7 @@ public final class Data {
                     Instance ins = new Instance(p[0], p[1], p[2], p[3], p[4], p[5],
                             parseLong(p[6]), Boolean.parseBoolean(p[7]), p[8]);
                     if (p.length >= 10) ins.isolation = (int) parseLong(p[9]);
-                    // 旧格式无 addedAt，回退 lastPlayed
+                    // 旧格式无 addedAt 回退 lastPlayed
                     long added = p.length >= 11 ? parseLong(p[10]) : 0;
                     ins.addedAt = added > 0 ? added : ins.lastPlayed;
                     instances.add(ins);
@@ -1248,7 +1248,7 @@ public final class Data {
     public synchronized void save() {
         byte[] payload;
         try {
-            // 先取快照，FX 线程可能正在增删这些列表
+            // 先取快照 FX 线程可能正在增删这些列表
             List<Account> accountSnap = new ArrayList<>(accounts);
             List<Instance> instanceSnap = new ArrayList<>(instances);
             List<Instance> orphanSnap = new ArrayList<>(orphanInstances);
@@ -1275,7 +1275,7 @@ public final class Data {
             props.setProperty("instance.count", String.valueOf(persisted.size()));
             for (int i = 0; i < persisted.size(); i++) {
                 Instance ins = persisted.get(i);
-                // 按 | 切分，文本字段须过 esc
+                // 按 | 切分 文本字段须过 esc
                 props.setProperty("instance." + i, Favorite.esc(ins.name) + "|" + Favorite.esc(ins.version) + "|"
                         + Favorite.esc(ins.loader) + "|" + Favorite.esc(ins.loaderVersion) + "|"
                         + Favorite.esc(ins.description) + "|" + Favorite.esc(ins.icon) + "|" + ins.lastPlayed + "|"
@@ -1301,7 +1301,7 @@ public final class Data {
             Errors.error("保存配置失败（账户、实例与设置可能不会被保留）", e);
             return;
         } catch (RuntimeException e) {
-            // 并发改动等：记日志不外抛
+            // 并发改动等 记日志不外抛
             Errors.error("保存配置时发生异常（本次改动可能未写入）", e);
             return;
         }
@@ -1334,10 +1334,10 @@ public final class Data {
             Files.setPosixFilePermissions(file, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
             return;
         } catch (Exception ignored) {
-            // 没有 POSIX 权限概念的平台（Windows）走下面的 ACL
+            // Windows 无 POSIX 权限 走 ACL
         }
         try {
-            // 配置里有明文 token，Windows 上把 ACL 收紧到只剩文件所有者
+            // 配置含明文 token ACL 限所有者
             java.nio.file.attribute.AclFileAttributeView acl =
                     Files.getFileAttributeView(file, java.nio.file.attribute.AclFileAttributeView.class);
             if (acl == null) return;
@@ -1434,7 +1434,7 @@ public final class Data {
         };
     }
 
-    // 子进程 JVM 的代理 -D 参数；host 空或模式非 2/3 时返回空表
+    // 子进程代理 -D 参数 无 host 或模式非 2/3 返回空
     public List<String> proxyJvmArgs() {
         List<String> args = new ArrayList<>();
         int mode = getInt("SystemHttpProxyType", 1);
@@ -1479,7 +1479,7 @@ public final class Data {
                     dropped.add(key);
                 }
             }
-            // 缺特征键（account/instance 等）即非配置文件
+            // 缺特征键 account/instance 等 即非配置文件
             if (!incoming.containsKey("account.count") && !incoming.containsKey("instance.count")
                     && !incoming.containsKey("folder.count") && !incoming.containsKey("UiThemePreset")) {
                 log("导入配置失败：文件不包含启动器配置项");
@@ -1511,28 +1511,28 @@ public final class Data {
         }
     }
 
-    // 导入黑名单：命令、可执行路径、下载源与代理不能由外部文件决定
+    // 导入黑名单 命令 可执行 源 代理
     static boolean isImportBlockedKey(String key) {
         if (key == null || key.isEmpty()) return false;
         String k = key.toLowerCase(java.util.Locale.ROOT);
-        // 启动前/后命令会直接交给 cmd.exe / sh -c 执行
+        // 启动命令交给 cmd / sh 执行
         if (k.contains("command")) return true;
         // 指向任意可执行文件的路径
         if (k.equals("java.path")) return true;
         // legacy 键与实例变体都落到 java.executable
         if (k.equals("instancejava") || (k.startsWith("instance.") && k.endsWith(".java"))) return true;
-        // classpath 头最先加载，等于任意代码执行
+        // classpath 头最先加载 等于任意代码执行
         if (k.endsWith("classpathhead")) return true;
-        // 缓存根重定向配合清理功能可以删任意目录
+        // 缓存根重定向可删任意目录
         if (k.equals("systemsystemcache")) return true;
-        // 下载源与代理可以把后续所有下载导向第三方
+        // 源与代理可重定向下载
         if (k.equals("systembmclroot")) return true;
         if (k.startsWith("systemproxy")) return true;
         // -javaagent 等是任意代码执行入口
         return k.endsWith("jvmargs") || k.endsWith("gameargs");
     }
 
-    // 运行日志：内存留一份供界面兜底，同时异步追加到 log/launcher.log
+    // 运行日志 内存一份 异步写 launcher.log
     public void log(String line) {
         String stamped = Redact.apply("[" + LocalDateTime.now().toLocalTime().withNano(0) + "] " + line);
         log.add(stamped);

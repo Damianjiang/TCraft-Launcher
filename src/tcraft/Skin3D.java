@@ -138,13 +138,13 @@ public final class Skin3D extends Region {
     private void applySkin(Image image) {
         double iw = image.getWidth(), ih = image.getHeight();
         boolean valid = !image.isError() && iw >= 64 && iw % 64 == 0 && (ih == iw || ih == iw / 2);
-        // palette 每像素一个 Color，贴图上限 512x512
+        // 贴图上限 512x512
         if (!valid || (long) iw * (long) ih > 512 * 512) {
             Data.get().log("3D 皮肤预览：贴图 " + (int) iw + "x" + (int) ih + " 不是有效皮肤，已跳过");
             clearSkin();
             return;
         }
-        // 旧版 64x32 皮肤先镜像补成 64x64 再建模
+        // 64x32 皮肤补成 64x64
         legacySkin = ih < iw;
         if (legacySkin) image = upgradeLegacy(image, (int) iw, (int) ih);
         this.skin = image;
@@ -288,12 +288,12 @@ public final class Skin3D extends Region {
                 frontU, frontV, frontU + Ws, frontV + Hs, cx, cy, cz);
         addFace(new double[]{x1, y0, z0, x0, y0, z0, x0, y1, z0, x1, y1, z0},
                 backU, backV, backU + Ws, backV + Hs, cx, cy, cz);
-        // 右侧条带贴 -x 面（右臂在 -x），左侧条带贴 +x 面
+        // 右臂 -x 左臂 +x
         addFace(new double[]{x0, y0, z0, x0, y0, z1, x0, y1, z1, x0, y1, z0},
                 rightU, rightV, rightU + Ds, rightV + Hs, cx, cy, cz);
         addFace(new double[]{x1, y0, z1, x1, y0, z0, x1, y1, z0, x1, y1, z1},
                 leftU, leftV, leftU + Ds, leftV + Hs, cx, cy, cz);
-        // 顶/底条带上缘都朝模型背后，底面与顶面同朝向（对照 Minecraft ModelBox）
+        // 顶/底条带朝向模型背后
         addFace(new double[]{x0, y0, z0, x1, y0, z0, x1, y0, z1, x0, y0, z1},
                 topU, topV, topU + Ws, topV + Ds, cx, cy, cz);
         addFace(new double[]{x0, y1, z0, x1, y1, z0, x1, y1, z1, x0, y1, z1},

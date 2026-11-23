@@ -1,0 +1,107 @@
+:root {
+  --vp-c-brand-1: #2f9e68;
+  --vp-c-brand-2: #3eaf7c;
+  --vp-c-brand-3: #268357;
+  --vp-c-brand-soft: rgba(62, 175, 124, 0.14);
+}
+
+.dark {
+  --vp-c-brand-1: #7dd3a8;
+  --vp-c-brand-2: #5fc48f;
+  --vp-c-brand-3: #9be0bd;
+  --vp-c-brand-soft: rgba(125, 211, 168, 0.16);
+}
+
+/* TCWiki 同款全屏加载 TCraft 文字绿色扫光 */
+.tk-route-loading__mask {
+  background: var(--vp-c-bg);
+}
+
+.tk-route-loading__spinner {
+  display: none !important;
+}
+
+.tk-route-loading__loader::before {
+  content: "TCraft";
+  display: block;
+  margin-bottom: 12px;
+  color: transparent;
+  font-size: 42px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  line-height: 1.1;
+  background: linear-gradient(105deg, #2f9e68, #2f9e68 35%, #ffffff 45%, #e8fff5 52%, #ffffff 58%, #2f9e68 68%, #2f9e68);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: tc-route-sweep 2.5s ease-in-out infinite;
+}
+
+.dark .tk-route-loading__loader::before {
+  background: linear-gradient(105deg, #7dd3a8, #7dd3a8 35%, #ffffff 45%, #e8fff5 52%, #ffffff 58%, #7dd3a8 68%, #7dd3a8);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+.tk-route-loading__loader p {
+  margin: 0;
+  color: var(--vp-c-text-2);
+  font-size: 12px;
+  letter-spacing: 0.18em;
+}
+
+@keyframes tc-route-sweep {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tk-route-loading__loader::before { animation: none; background-position: 50% 0; }
+}
+
+@media (max-width: 640px) {
+  .tk-route-loading__loader::before { font-size: 34px; }
+}
+
+.vp-doc h1 {
+  letter-spacing: -0.02em;
+}
+
+.vp-doc h2 {
+  margin-top: 40px;
+}
+
+.vp-doc table {
+  display: table;
+  width: 100%;
+}
+
+.vp-doc code {
+  white-space: pre-wrap;
+}
+
+.vp-doc .custom-block {
+  border-radius: 8px;
+}
+
+.vp-doc .custom-block.tip strong,
+.vp-doc .custom-block.warning strong,
+.vp-doc .custom-block.danger strong {
+  display: inline;
+}
+
+.vp-doc a {
+  font-weight: 500;
+}
+
+.tk-footer .message,
+.tk-footer .copyright {
+  font-size: 12.5px;
+}
+
+/* 首页特性卡片图标放大一点 */
+.VPFeature .icon {
+  font-size: 26px;
+}
