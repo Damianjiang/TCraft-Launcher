@@ -70,7 +70,7 @@ public final class PluginsPage {
         ComboBox<String> state = Ui.combo(new String[]{"全部", "已启用", "已禁用", "加载失败"}, 0);
         state.setPrefWidth(100);
         state.setMinWidth(100);
-        StackPane docs = Ui.iconButton("external-link", 28, 14, "开发者文档", () -> Shell.openUrl(DOCS));
+        StackPane docs = Ui.iconButton("external-link", 28, 14, "插件开发文档站", () -> Shell.openUrl(DOCS));
         StackPane folder = Ui.iconButton("folder-open", 28, 14, "打开插件文件夹", () -> {
             try {
                 Files.createDirectories(Plugins.get().dir());

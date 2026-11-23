@@ -50,8 +50,8 @@ const base = process.env.BASE_PATH || '/TCraft-Launcher/wiki/'
 export default defineConfig({
   extends: teekConfig,
   lang: 'zh-CN',
-  title: 'TCraft Launcher 开发者文档',
-  description: 'TCraft Launcher 插件开发文档：清单、API、界面扩展、命令、弹窗与完整示例。',
+  title: 'TCraft Launcher 插件开发文档站',
+  description: 'TCraft Launcher 插件开发文档站：清单、API、界面扩展、命令、弹窗与完整示例。',
   base,
   // 文档成品直接放进官网目录 部署后从 /wiki/ 访问
   outDir: '../../website/wiki',
@@ -59,7 +59,7 @@ export default defineConfig({
   head: [
     ['link', { rel: 'icon', href: base + 'logo.png' }],
     ['meta', { property: 'og:type', content: 'website' }],
-    ['meta', { property: 'og:title', content: 'TCraft Launcher 开发者文档' }],
+    ['meta', { property: 'og:title', content: 'TCraft Launcher 插件开发文档站' }],
     ['meta', { property: 'og:description', content: '用 Java + JavaFX 扩展 TCraft Launcher：页面、按钮、命令、弹窗与任意布局。' }],
     ['link', { rel: 'preconnect', href: 'https://tcraft.pages.dev' }],
     ['link', { rel: 'dns-prefetch', href: 'https://tcraft.pages.dev' }]
@@ -86,7 +86,7 @@ export default defineConfig({
   },
 
   themeConfig: {
-    siteTitle: 'TCL 开发者文档',
+    siteTitle: 'TCL 插件开发文档站',
     logo: '/logo.png',
 
     nav: [
@@ -165,7 +165,7 @@ export default defineConfig({
     },
 
     footer: {
-      message: 'TCraft Launcher 插件文档 · API v1',
+      message: 'TCraft Launcher 插件开发文档站 · API v1',
       copyright: '© 2026 TCraft Launcher'
     },
 

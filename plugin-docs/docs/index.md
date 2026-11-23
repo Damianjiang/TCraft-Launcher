@@ -3,7 +3,7 @@ layout: home
 
 hero:
   name: TCraft Launcher
-  text: 插件开发文档
+  text: 插件开发文档站
   tagline: Java + JavaFX 扩展页面、按钮和命令。
   image:
     src: /logo.png

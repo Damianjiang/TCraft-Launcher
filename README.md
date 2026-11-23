@@ -33,7 +33,7 @@
   </tr>
 </table>
 
-> 更多截图见[官网](https://tcraft.pages.dev)和[插件文档](https://damianjiang.github.io/TCraft-Launcher/wiki/)。
+> 更多截图见[官网](https://tcraft.pages.dev)和[插件开发文档站](https://damianjiang.github.io/TCraft-Launcher/wiki/)。
 
 ## 功能
 
@@ -51,7 +51,7 @@
 
 从 1.3.49 起支持第三方插件，入口为 `更多 → 插件`。1.3.50 起支持 `icon` / `thumbnail` 与统一分页。
 
-- [开发者文档](https://damianjiang.github.io/TCraft-Launcher/wiki/)
+- [插件开发文档站](https://damianjiang.github.io/TCraft-Launcher/wiki/)
 - [文档源码](plugin-docs)
 - [Hello 示例](https://damianjiang.github.io/TCraft-Launcher/wiki/examples/hello-plugin.zip)
 
@@ -91,7 +91,7 @@ javac --release 17 --module-path lib --add-modules javafx.controls,javafx.media 
 ├── lib/            JavaFX 编译依赖
 ├── tools/          Windows 单文件外壳与 WebP 解码库
 ├── plugin-docs/    插件文档源码（VitePress + Teek）
-└── website/        官网与开发者文档
+└── website/        官网与插件开发文档站
     ├── wiki/       构建后的文档
     └── ...         页面、样式、下载脚本、静态资源
 ```
