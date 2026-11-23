@@ -1,6 +1,7 @@
 (function () {
     const API = 'https://api.github.com/repos/Damianjiang/TCraft-Launcher/releases/latest';
     const RELEASES = 'https://github.com/Damianjiang/TCraft-Launcher/releases';
+    const SITE_DOWNLOAD = 'https://tcraft.pages.dev/download.html';
 
     // 能代理 GitHub API 与产物的加速节点
     const NODES = [
@@ -109,7 +110,7 @@
         const text = 'TCraft Launcher ' + release.tag_name + '\n'
             + '发布时间：' + (release.published_at || '').slice(0, 10) + '\n\n'
             + '更新内容：\n' + plainText(release) + '\n\n'
-            + '下载：' + RELEASES;
+            + '下载：' + SITE_DOWNLOAD;
         const done = ok => {
             copyBtn.textContent = ok ? '已复制' : '复制失败，请手动复制';
             setTimeout(() => { copyBtn.textContent = '复制版本信息'; }, 1800);
