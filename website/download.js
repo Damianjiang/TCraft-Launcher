@@ -1,7 +1,7 @@
 (function () {
     const API = 'https://api.github.com/repos/Damianjiang/TCraft-Launcher/releases/latest';
     const RELEASES = 'https://github.com/Damianjiang/TCraft-Launcher/releases';
-    const SITE_DOWNLOAD = 'https://tcraft.pages.dev/download.html';
+    const SITE_DOWNLOAD = 'https://damianjiang.github.io/TCraft-Launcher/';
 
     // 能代理 GitHub API 与产物的加速节点
     const NODES = [
