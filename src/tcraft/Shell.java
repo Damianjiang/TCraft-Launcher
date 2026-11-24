@@ -74,7 +74,8 @@ public final class Shell {
                 java.nio.file.Path cfg = cfgHome != null && !cfgHome.isBlank()
                         ? java.nio.file.Paths.get(cfgHome, "user-dirs.dirs")
                         : java.nio.file.Paths.get(home, ".config", "user-dirs.dirs");
-                if (java.nio.file.Files.isRegularFile(cfg)) {
+                if (java.nio.file.Files.isRegularFile(cfg)
+                        && java.nio.file.Files.size(cfg) <= 1024L * 1024) {
                     for (String line : java.nio.file.Files.readAllLines(cfg)) {
                         if (!line.startsWith("XDG_DESKTOP_DIR=")) continue;
                         String value = line.substring("XDG_DESKTOP_DIR=".length()).replace("\"", "").trim();
@@ -122,7 +123,30 @@ public final class Shell {
         }
     }
 
-    private static void runHidden(long timeoutSeconds, String... cmd) throws java.io.IOException {
+    private static final java.util.Set<String> GPU_APPLIED = java.util.Collections.newSetFromMap(
+            new java.util.concurrent.ConcurrentHashMap<>());
+
+    // 让指定 java 优先使用独显 仅 Windows 每个路径写一次
+    public static void setHighPerformanceGpu(String javaPath) {
+        if (!windows() || javaPath == null || javaPath.isBlank()) return;
+        String path;
+        try {
+            path = new File(javaPath).getAbsolutePath();
+        } catch (Exception e) {
+            return;
+        }
+        String key = path.toLowerCase(java.util.Locale.ROOT);
+        if (!GPU_APPLIED.add(key)) return;
+        try {
+            int code = runHidden(3, "reg", "add", "HKCU\\Software\\Microsoft\\DirectX\\UserGpuPreferences",
+                    "/v", path, "/t", "REG_SZ", "/d", "GpuPreference=2;", "/f");
+            if (code != 0) throw new java.io.IOException("reg 退出状态 " + code);
+        } catch (Exception e) {
+            GPU_APPLIED.remove(key);
+        }
+    }
+
+    private static int runHidden(long timeoutSeconds, String... cmd) throws java.io.IOException {
         Process p;
         try {
             p = new ProcessBuilder(cmd).redirectErrorStream(true)
@@ -136,12 +160,15 @@ public final class Shell {
                 p.descendants().forEach(ProcessHandle::destroyForcibly);
                 p.destroyForcibly();
                 Data.get().log("命令超时已强制结束：" + cmd[0] + "（" + timeoutSeconds + " 秒）");
-            } else if (p.exitValue() != 0) {
-                Data.get().log("命令退出状态 " + p.exitValue() + "：" + cmd[0]);
+                return -1;
             }
+            int code = p.exitValue();
+            if (code != 0) Data.get().log("命令退出状态 " + code + "：" + cmd[0]);
+            return code;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             p.destroyForcibly();
+            return -1;
         }
     }
 

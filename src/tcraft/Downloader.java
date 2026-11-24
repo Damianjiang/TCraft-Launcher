@@ -3,7 +3,6 @@ package tcraft;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -23,6 +22,7 @@ public final class Downloader {
 
     private static final String MANIFEST = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
     private static final String BMCL_DEFAULT = "https://bmclapi2.bangbang93.com";
+    private static final long ZIP_TEXT_MAX = 10L * 1024 * 1024;
 
     static String bmcl() {
         String custom = Data.get().get("SystemBmclRoot", "").trim();
@@ -58,16 +58,15 @@ public final class Downloader {
                                     java.util.function.Consumer<String> onInstalled) {
         Tasks.Task task = new Tasks.Task("安装 " + version.id + ("原版".equals(loader) ? "" : " · " + loader)
                 + (inst != null && !inst.name.isEmpty() && !inst.name.equals(version.id) ? "（" + inst.name + "）" : ""));
-        task.versionId = version.id;
         task.stage = "准备下载";
         task.subs.add(new Tasks.SubTask("获取版本信息"));
         task.subs.add(new Tasks.SubTask("下载客户端"));
         task.subs.add(new Tasks.SubTask("下载依赖库"));
         task.subs.add(new Tasks.SubTask("下载资源索引"));
         task.subs.add(new Tasks.SubTask("下载资源文件"));
-        if (!"原版".equals(loader)) task.subs.add(new Tasks.SubTask("安装 " + loader));
+        if (!"原版".equals(loader)) task.subs.add(new Tasks.SubTask("安装 " + Lang.t(loader)));
         Tasks.INSTANCE.add(task);
-        win.toast("开始下载", version.id + " · " + loader, 0);
+        win.toast("开始下载", version.id + " · " + Lang.t(loader), 0);
         Data data = Data.get();
         data.log("开始安装 " + version.id + "（" + loader + "）");
 
@@ -79,7 +78,7 @@ public final class Downloader {
                 task.stage = "安装完成";
                 task.speed = "";
                 javafx.application.Platform.runLater(() ->
-                        win.toast("安装完成", version.id + ("原版".equals(loader) ? "" : " · " + loader), 1));
+                        win.toast("安装完成", version.id + ("原版".equals(loader) ? "" : " · " + Lang.t(loader)), 1));
                 data.log("安装完成：" + version.id + "（" + loader + "）");
                 if (onInstalled != null) {
                     final String realVersion = actual;
@@ -101,7 +100,6 @@ public final class Downloader {
                     Errors.error(Lang.tf("安装 %s 失败", version.id), e);
                 }
             } finally {
-                Tasks.INSTANCE.changed();
             }
         }, "TCL-Download-" + version.id);
         thread.setDaemon(true);
@@ -139,6 +137,10 @@ public final class Downloader {
 
     public static String install(Tasks.Task task, Data.McVersion version, String loader, Data data, MainWindow win,
                                 java.nio.file.Path gameDirOverride, String loaderVersion, Inst inst) throws Exception {
+        if (!safeVersionId(version.id)) throw new IOException(Lang.t("版本 ID 不合法：") + version.id);
+        if (loaderVersion != null && !loaderVersion.isEmpty() && !safeVersionId(loaderVersion)) {
+            throw new IOException(Lang.t("加载器版本不合法：") + loaderVersion);
+        }
         Path game = gameDirOverride != null ? gameDirOverride : Paths.get(data.gameDir);
         Files.createDirectories(game.resolve("versions"));
         Files.createDirectories(game.resolve("libraries"));
@@ -162,7 +164,6 @@ public final class Downloader {
         sub(task, 0, Tasks.State.RUNNING);
         task.stage = "获取版本信息";
         task.progress = 0.03;
-        Tasks.INSTANCE.changed();
 
         Path versionDir = game.resolve("versions").resolve(version.id);
         Files.createDirectories(versionDir);
@@ -176,7 +177,7 @@ public final class Downloader {
         sub(task, 0, Tasks.State.DONE);
         task.progress = 0.08;
 
-        Map<String, Object> versionData = Json.obj(Json.parse(Files.readString(versionJson, StandardCharsets.UTF_8)));
+        Map<String, Object> versionData = Json.obj(Json.parse(readFileText(versionJson, ZIP_TEXT_MAX)));
         Map<String, Object> downloads = Json.obj(versionData.get("downloads"));
         Map<String, Object> client = Json.obj(downloads.get("client"));
         if (!client.isEmpty()) {
@@ -230,7 +231,6 @@ public final class Downloader {
         if (!libFiles.isEmpty()) {
             int threads = Math.max(1, Math.min(64, Data.get().getInt("SystemMaxThreads", 64)));
             task.threads = threads;
-            Tasks.INSTANCE.changed();
             ExecutorService libPool = Executors.newFixedThreadPool(threads, r -> {
                 Thread t = new Thread(r, "TCL-Lib");
                 t.setDaemon(true);
@@ -254,7 +254,6 @@ public final class Downloader {
                         task.progress = 0.28 + 0.22 * n / (double) total;
                         task.remainingFiles = Math.max(0, total - n);
                         task.stage = "下载依赖库 " + n + " / " + total;
-                        if (n % 3 == 0) Tasks.INSTANCE.changed();
                     }));
                 }
                 for (Future<?> fu : libFutures) {
@@ -277,13 +276,14 @@ public final class Downloader {
         String assetId = Json.str(assetIndex, "id", "legacy");
         String indexUrl = Json.str(assetIndex, "url", "");
         String indexSha1 = Json.str(assetIndex, "sha1", "");
+        if (!safeAssetId(assetId)) throw new IOException(Lang.t("资源索引名称不合法：") + assetId);
         Path indexPath = game.resolve("assets").resolve("indexes").resolve(assetId + ".json");
         downloadTo(task, indexUrl, bmcl() + "/indexes/" + assetId + ".json", indexPath, 0.50, 0.55, indexSha1);
         sub(task, 3, Tasks.State.DONE);
 
         sub(task, 4, Tasks.State.RUNNING);
         task.stage = "读取资源索引";
-        Object index = Json.parse(Files.readString(indexPath, StandardCharsets.UTF_8));
+        Object index = Json.parse(readFileText(indexPath, ZIP_TEXT_MAX));
         Map<String, Object> objects = Json.obj(index, "objects");
         final int totalAssets = Math.max(1, objects.size());
         final AtomicInteger assetDone = new AtomicInteger();
@@ -292,7 +292,6 @@ public final class Downloader {
         int threads = Math.max(1, Math.min(64, Data.get().getInt("SystemMaxThreads", 64)));
         task.threads = threads;
         task.remainingFiles = totalAssets;
-        Tasks.INSTANCE.changed();
         ExecutorService pool = Executors.newFixedThreadPool(threads, r -> {
             Thread t = new Thread(r, "TCL-Asset");
             t.setDaemon(true);
@@ -312,18 +311,10 @@ public final class Downloader {
                     try {
                         if (!assetReady(target, expectedSize, hash)) {
                             Files.deleteIfExists(target);
-                            String assetUrl = Data.get().getInt("SystemDownloadSource", 0) == 1
-                                    ? "https://resources.download.minecraft.net/" + hash.substring(0, 2) + "/" + hash
-                                    : bmcl() + "/assets/" + hash.substring(0, 2) + "/" + hash;
-                            try {
-                                downloadFile(task, assetUrl, target, 0, 0, hash, hash);
-                            } catch (Exception first) {
-                                // CDN 偶发拒连 退避重试
-                                Thread.sleep(600);
-                                Files.deleteIfExists(target);
-                                downloadFile(task, assetUrl, target, 0, 0, hash, hash);
-                            }
-                            if (!assetReady(target, expectedSize, hash)) throw new IOException("文件不完整");
+                            String assetUrl = "https://resources.download.minecraft.net/"
+                                    + hash.substring(0, 2) + "/" + hash;
+                            downloadFile(task, assetUrl, target, 0, 0, hash, hash);
+                            if (!assetReady(target, expectedSize, hash)) throw new IOException(Lang.t("文件不完整"));
                         }
                     } catch (Exception e) {
                         retryQueue.add(new String[]{hash, String.valueOf(expectedSize)});
@@ -332,9 +323,6 @@ public final class Downloader {
                     task.remainingFiles = Math.max(0, totalAssets - n);
                     task.progress = 0.55 + 0.40 * n / (double) totalAssets;
                     task.stage = "下载资源文件 " + n + " / " + totalAssets;
-                    if (n % 40 == 0) {
-                        Tasks.INSTANCE.changed();
-                    }
                 }));
             }
             for (Future<?> f : futures) {
@@ -357,18 +345,13 @@ public final class Downloader {
                 Path target = game.resolve("assets").resolve("objects")
                         .resolve(h[0].substring(0, 2)).resolve(h[0]);
                 long expectedSize = (long) parseNum(h[1], 0);
-                for (String url : new String[]{
-                        bmcl() + "/assets/" + h[0].substring(0, 2) + "/" + h[0],
-                        "https://resources.download.minecraft.net/" + h[0].substring(0, 2) + "/" + h[0]}) {
-                    try {
-                        Files.deleteIfExists(target);
-                        downloadFile(task, url, target, 0, 0, h[0], h[0]);
-                        if (assetReady(target, expectedSize, h[0])) {
-                            ok++;
-                            break;
-                        }
-                    } catch (Exception ignored) {
-                    }
+                String assetUrl = "https://resources.download.minecraft.net/"
+                        + h[0].substring(0, 2) + "/" + h[0];
+                try {
+                    Files.deleteIfExists(target);
+                    downloadFile(task, assetUrl, target, 0, 0, h[0], h[0]);
+                    if (assetReady(target, expectedSize, h[0])) ok++;
+                } catch (Exception ignored) {
                 }
                 task.stage = "补抓失败文件 " + retried + " / " + retryQueue.size();
             }
@@ -394,7 +377,7 @@ public final class Downloader {
             actualVersion = installLiteLoader(task, version.id, game, data);
             sub(task, 5, Tasks.State.DONE);
         } else if ("Forge".equals(loader) || "NeoForge".equals(loader)) {
-            task.stage = "安装 " + loader;
+            task.stage = "安装 " + Lang.t(loader);
             actualVersion = installForgeLike(task, version.id, loader, game, data, loaderVersion);
             sub(task, 5, Tasks.State.DONE);
         } else if ("OptiFine".equals(loader)) {
@@ -404,6 +387,7 @@ public final class Downloader {
         } else if (!"原版".equals(loader)) {
             sub(task, 5, Tasks.State.DONE);
         }
+        if (!safeVersionId(actualVersion)) throw new IOException(Lang.t("生成的版本 ID 不合法：") + actualVersion);
 
         if (inst != null) {
             Data.Instance probe = new Data.Instance("", actualVersion, loader, "", "", "", 0, false,
@@ -422,7 +406,7 @@ public final class Downloader {
                 ? inst.name.trim() : actualVersion;
         Data.Instance instance = new Data.Instance(
                 instanceName, actualVersion, loader, loaderVersion == null ? "" : loaderVersion,
-                version.group() + " " + version.id + ("原版".equals(loader) ? "" : "，已安装 " + loader),
+                version.group() + " " + version.id + ("原版".equals(loader) ? "" : "，已安装 " + Lang.t(loader)),
                 instanceIcon(loader, version),
                 System.currentTimeMillis(), false, game.toString(), Isolation.FOLLOW);
         int selected = -1;
@@ -479,12 +463,12 @@ public final class Downloader {
     private static void installMod(Tasks.Task task, String loader, String mc, String version, Path mods, MainWindow win) {
         try {
             String[] f = Loaders.modFile(loader, mc, version);
-            if (f == null) throw new IOException("找不到 " + loader + " " + version + " 的下载地址");
+            if (f == null) throw new IOException(Lang.t("找不到 ") + Lang.t(loader) + " " + version + Lang.t(" 的下载地址"));
             downloadFile(task, f[0], mods.resolve(f[1]), 0.95, 0.99, loader + " " + version);
             Data.get().log(loader + " " + version + " 已安装到 mods/" + f[1]);
         } catch (Exception e) {
             String msg = loader + " " + version + Lang.t(" 未安装：")
-                    + (e.getMessage() == null ? Lang.t("网络错误") : e.getMessage());
+                    + (e.getMessage() == null ? Lang.t("网络错误") : Lang.t(e.getMessage()));
             Data.get().log(msg);
             javafx.application.Platform.runLater(() -> win.toast("附加载器未安装", msg, 3));
         }
@@ -495,7 +479,7 @@ public final class Downloader {
             downloadOptiFineJar(task, mc, game, chosen);
         } catch (Exception e) {
             String msg = "OptiFine " + chosen + Lang.t(" 未安装：")
-                    + (e.getMessage() == null ? Lang.t("网络错误") : e.getMessage());
+                    + (e.getMessage() == null ? Lang.t("网络错误") : Lang.t(e.getMessage()));
             Data.get().log(msg);
             javafx.application.Platform.runLater(() -> win.toast("附加载器未安装", msg, 3));
         }
@@ -512,26 +496,7 @@ public final class Downloader {
         Path part = target.resolveSibling(target.getFileName() + ".part");
         Files.createDirectories(target.toAbsolutePath().getParent());
         if (Files.isRegularFile(target) && Files.size(target) > 0) {
-            if (sha1 != null) {
-                boolean ok;
-                try {
-                    ok = GameLauncher.sha1Of(target).equalsIgnoreCase(sha1);
-                } catch (Exception e) {
-                    ok = false;
-                }
-                if (ok) return;
-                Files.deleteIfExists(target);
-            } else if (target.getFileName().toString().endsWith(".json")) {
-                // JSON 可解析才算完整
-                try {
-                    Json.parse(Files.readString(target));
-                    return;
-                } catch (Exception ignored) {
-                    Files.deleteIfExists(target);
-                }
-            } else {
-                return;
-            }
+            if (existingDownloadValid(target, sha1)) return;
         }
         IOException last = null;
         for (String candidate : Sources.rank(mirrors(url))) {
@@ -547,6 +512,7 @@ public final class Downloader {
     }
 
     private static final long[] DIRECT_BACKOFF_MS = {200, 500, 1000, 2000, 3000};
+    private static final long MAX_FILE_BYTES = 4L * 1024 * 1024 * 1024;
 
     // 断点续传 校验 退避重试
     private static void transferWithProgress(java.util.function.DoubleConsumer progress, String url,
@@ -600,7 +566,7 @@ public final class Downloader {
                             Files.deleteIfExists(part);
                             digest.reset();
                             done = 0;
-                            last = new IOException("文件校验失败（SHA-1 不匹配）");
+                            last = new IOException(Lang.t("文件校验失败（SHA-1 不匹配）"));
                             continue;
                         }
                     }
@@ -662,6 +628,8 @@ public final class Downloader {
                     out.write(buffer, 0, n);
                     if (digest != null) digest.update(buffer, 0, n);
                     written += n;
+                    NetSpeed.add(n);
+                    if (done + written > MAX_FILE_BYTES) throw new IOException(Lang.t("下载文件超过大小上限"));
                     if (limit > 0) throttle(n, limit);
                     if (progress != null && total > 0) {
                         progress.accept(Math.min(1.0, (done + written) / (double) total));
@@ -749,6 +717,7 @@ public final class Downloader {
                 fv = Json.str(p, mc + "-recommended", Json.str(p, mc + "-latest", ""));
             }
             if (fv.isEmpty()) throw new IOException(Lang.t("没有适用于 Minecraft ") + mc + Lang.t(" 的 Forge 版本"));
+            if (!safeVersionId(fv)) throw new IOException(Lang.t("Forge 版本不合法：") + fv);
             installerUrl = "https://maven.minecraftforge.net/net/minecraftforge/forge/" + mc + "-" + fv
                     + "/forge-" + mc + "-" + fv + "-installer.jar";
             prefix = mc + "-forge";
@@ -772,6 +741,7 @@ public final class Downloader {
                 }
             }
             if (best.isEmpty()) throw new IOException(Lang.t("没有适用于 Minecraft ") + mc + Lang.t(" 的 NeoForge 版本"));
+            if (!safeVersionId(best)) throw new IOException(Lang.t("NeoForge 版本不合法：") + best);
             installerUrl = "https://maven.neoforged.net/releases/net/neoforged/neoforge/" + best
                     + "/neoforge-" + best + "-installer.jar";
             prefix = "neoforge-" + best;
@@ -779,7 +749,7 @@ public final class Downloader {
 
         Path installer = game.resolve("TCL").resolve("installers")
                 .resolve(loader.toLowerCase() + "-" + mc + "-installer.jar");
-        task.stage = "下载 " + loader + " 安装器";
+        task.stage = "下载 " + Lang.t(loader) + " 安装器";
         // 安装器会被执行 无 .sha1 即中止
         String installerSha1 = fetchRemoteSha1(installerUrl);
         if (installerSha1 == null) {
@@ -793,9 +763,9 @@ public final class Downloader {
         downloadFile(task, installerUrl, installer, 0.95, 0.97, loader + " 安装器", installerSha1);
         String javaExe = data.javaPath;
         if (javaExe == null || javaExe.isEmpty() || !Files.isRegularFile(Paths.get(javaExe))) {
-            throw new IOException(Lang.t("未找到可用的 Java 运行时，无法运行 ") + loader + Lang.t(" 安装器"));
+            throw new IOException(Lang.t("未找到可用的 Java 运行时，无法运行 ") + Lang.t(loader) + Lang.t(" 安装器"));
         }
-        task.stage = "正在运行 " + loader + " 安装器";
+        task.stage = "正在运行 " + Lang.t(loader) + " 安装器";
         // 安装器靠 launcher_profiles.json 定位游戏目录
         Path profiles = game.resolve("launcher_profiles.json");
         if (!Files.isRegularFile(profiles)) {
@@ -815,8 +785,8 @@ public final class Downloader {
         cmd.add("--installClient");
         cmd.add(game.toString());
         prefetchInstallerLibraries(task, installer, game, loader);
-        if (task.canceled) throw new IOException("已取消");
-        task.stage = "正在运行 " + loader + " 安装器";
+        if (task.canceled) throw new IOException(Lang.t("已取消"));
+        task.stage = "正在运行 " + Lang.t(loader) + " 安装器";
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.directory(game.toFile());
         pb.redirectErrorStream(true);
@@ -826,7 +796,7 @@ public final class Downloader {
         int code = process.exitValue();
         if (code != 0) {
             String output = Files.isRegularFile(logFile)
-                    ? Files.readString(logFile, StandardCharsets.UTF_8) : "";
+                    ? readFileText(logFile, 4L * 1024 * 1024) : "";
             String tail = output.length() > 400 ? output.substring(output.length() - 400) : output;
             throw new IOException(loader + Lang.t(" 安装器退出码 ") + code + Lang.t("：") + tail.trim());
         }
@@ -856,11 +826,25 @@ public final class Downloader {
         }
     }
 
+    private static String readZipText(java.util.zip.ZipFile zip, java.util.zip.ZipEntry entry)
+            throws IOException {
+        if (entry.getSize() > ZIP_TEXT_MAX) throw new IOException(Lang.t("安装器清单过大"));
+        try (InputStream in = zip.getInputStream(entry)) {
+            return new String(Io.read(in, ZIP_TEXT_MAX), StandardCharsets.UTF_8);
+        }
+    }
+
+    private static String readFileText(Path file, long max) throws IOException {
+        try (InputStream in = Files.newInputStream(file)) {
+            return new String(Io.read(in, max), StandardCharsets.UTF_8);
+        }
+    }
+
     private static void prefetchInstallerLibraries(Tasks.Task task, Path installer, Path game, String loader) {
         try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(installer.toFile())) {
             java.util.zip.ZipEntry entry = zip.getEntry("install_profile.json");
             if (entry == null) return;
-            String text = new String(zip.getInputStream(entry).readAllBytes(), StandardCharsets.UTF_8);
+            String text = readZipText(zip, entry);
             Map<String, Object> profile = Json.obj(Json.parse(text));
             List<Map<String, Object>> libs = new ArrayList<>();
             for (Object o : Json.arr(profile.get("libraries"))) libs.add(Json.obj(o));
@@ -870,7 +854,7 @@ public final class Downloader {
             if (!jsonPath.isEmpty()) {
                 java.util.zip.ZipEntry versionEntry = zip.getEntry(jsonPath.replaceFirst("^/", ""));
                 if (versionEntry != null) {
-                    String versionText = new String(zip.getInputStream(versionEntry).readAllBytes(), StandardCharsets.UTF_8);
+                    String versionText = readZipText(zip, versionEntry);
                     for (Object o : Json.arr(Json.obj(Json.parse(versionText)).get("libraries"))) {
                         libs.add(Json.obj(o));
                     }
@@ -895,7 +879,7 @@ public final class Downloader {
                 prefetch.add(new Object[]{url, path, Json.str(artifact, "sha1", "")});
             }
             if (prefetch.isEmpty()) return;
-            task.stage = "预下载 " + loader + " 依赖";
+            task.stage = "预下载 " + Lang.t(loader) + " 依赖";
             ExecutorService pool = Executors.newFixedThreadPool(
                     Math.max(1, Math.min(8, prefetch.size())), r -> {
                         Thread t = new Thread(r, "TCL-Prefetch");
@@ -909,7 +893,12 @@ public final class Downloader {
                     futures.add(pool.submit(() -> {
                         if (task.canceled) return;
                         String path = (String) p[1];
-                        Path target = game.resolve("libraries").resolve(path);
+                        Path libraries = game.resolve("libraries").toAbsolutePath().normalize();
+                        Path target = libraries.resolve(path).normalize();
+                        if (!target.startsWith(libraries)) {
+                            Data.get().log("预下载跳过非法路径：" + path);
+                            return;
+                        }
                         try {
                             if (!Files.isRegularFile(target) || Files.size(target) <= 0) {
                                 String sha1 = (String) p[2];
@@ -922,7 +911,7 @@ public final class Downloader {
                             Data.get().log("预下载失败：" + path + " " + Log.describe(e));
                         }
                         int n = done.incrementAndGet();
-                        task.stage = "预下载 " + loader + " 依赖 " + n + " / " + prefetch.size();
+                        task.stage = "预下载 " + Lang.t(loader) + " 依赖 " + n + " / " + prefetch.size();
                     }));
                 }
                 for (Future<?> f : futures) {
@@ -946,7 +935,7 @@ public final class Downloader {
         while (true) {
             if (task.canceled) {
                 killTree(process);
-                throw new IOException("已取消");
+                throw new IOException(Lang.t("已取消"));
             }
             if (process.waitFor(700, java.util.concurrent.TimeUnit.MILLISECONDS)) return;
             String line = lastLogLine(logFile);
@@ -954,9 +943,9 @@ public final class Downloader {
             if (!line.isEmpty() && !line.equals(lastLine)) {
                 lastLine = line;
                 lastChange = now;
-                task.stage = "运行 " + loader + " 安装器：" + (line.length() > 70 ? line.substring(0, 70) + "…" : line);
+                task.stage = "运行 " + Lang.t(loader) + " 安装器：" + (line.length() > 70 ? line.substring(0, 70) + "…" : line);
             } else if (now - lastChange > 3000) {
-                task.stage = "运行 " + loader + " 安装器（" + ((now - start) / 1000) + " 秒，下载依赖较慢请稍候）";
+                task.stage = "运行 " + Lang.t(loader) + " 安装器（" + ((now - start) / 1000) + " 秒，下载依赖较慢请稍候）";
                 lastChange = now;
             }
             if (now - start > 20 * 60 * 1000L) {
@@ -1045,7 +1034,7 @@ public final class Downloader {
         String mirror = legacy ? base : bmcl() + "/fabric-meta/v2/versions/loader/" + gameVersion;
         Object list = Json.parse(getText(mirror, base));
         List<Object> loaders = Json.arr(list);
-        if (loaders.isEmpty()) throw new IOException("没有可用的 Fabric 加载器");
+        if (loaders.isEmpty()) throw new IOException(Lang.t("没有可用的 Fabric 加载器"));
         String loaderVersion = null;
         if (wantedVersion != null && !wantedVersion.isBlank()) {
             for (Object o : loaders) {
@@ -1065,6 +1054,7 @@ public final class Downloader {
             }
         }
         if (loaderVersion == null || loaderVersion.isEmpty()) throw new IOException(Lang.t("没有可用的 ") + (legacy ? "Legacy" : "") + Lang.t("Fabric 加载器版本"));
+        if (!safeVersionId(loaderVersion)) throw new IOException(Lang.t("Fabric 加载器版本不合法：") + loaderVersion);
         String profileUrl = base + "/" + loaderVersion + "/profile/json";
         String profileText = getText(mirror + "/" + loaderVersion + "/profile/json", profileUrl);
         Map<String, Object> profile = Json.obj(Json.parse(profileText));
@@ -1109,13 +1099,13 @@ public final class Downloader {
         downloadFile(task, liteUrl, liteJar, 0.95, 0.99, "LiteLoader " + gameVersion,
                 fetchRemoteSha1(liteUrl));
         String json = "{"
-                + "\"id\":\"" + versionName + "\","
+                + "\"id\":" + Json.quote(versionName) + ","
                 + "\"mainClass\":\"net.minecraft.launchwrapper.Launch\","
                 + "\"minimumLauncherVersion\":18,"
-                + "\"inheritsFrom\":\"" + gameVersion + "\","
-                + "\"jar\":\"" + gameVersion + "\","
+                + "\"inheritsFrom\":" + Json.quote(gameVersion) + ","
+                + "\"jar\":" + Json.quote(gameVersion) + ","
                 + "\"arguments\":{\"game\":[\"--tweakClass\",\"com.mumfrey.liteloader.launch.LiteLoaderTweaker\"]},"
-                + "\"libraries\":[{\"name\":\"" + libName + "\","
+                + "\"libraries\":[{\"name\":" + Json.quote(libName) + ","
                 + "\"url\":\"https://dl.liteloader.com/versions/\"}]}";
         Files.writeString(versionDir.resolve(versionName + ".json"), json, StandardCharsets.UTF_8);
         return versionName;
@@ -1131,7 +1121,7 @@ public final class Downloader {
             downloadOptiFineJar(task, gameVersion, game, chosen);
         } catch (Exception e) {
             String msg = "OptiFine " + chosen + Lang.t(" 未安装：")
-                    + (e.getMessage() == null ? Lang.t("网络错误") : e.getMessage());
+                    + (e.getMessage() == null ? Lang.t("网络错误") : Lang.t(e.getMessage()));
             Data.get().log(msg);
             javafx.application.Platform.runLater(() -> win.toast("附加载器未安装", msg, 3));
         }
@@ -1151,6 +1141,7 @@ public final class Downloader {
         Map<String, String> files = Loaders.optifineFiles(mc);
         String file = files.getOrDefault(chosen, "");
         if (file.isEmpty()) throw new IOException(Lang.t("找不到 OptiFine ") + chosen + Lang.t(" 的文件名"));
+        if (!safeVersionId(file)) throw new IOException(Lang.t("OptiFine 文件名不合法：") + file);
         Path target = game.resolve("TCL").resolve("cache").resolve("optifine").resolve(file);
         Exception last = null;
         for (String url : optifineUrls(mc, chosen)) {
@@ -1174,7 +1165,22 @@ public final class Downloader {
         return group + "/" + artifact + "/" + version + "/" + artifact + "-" + version + ".jar";
     }
 
+    private static boolean safeAssetId(String id) {
+        return id != null && id.matches("[A-Za-z0-9][A-Za-z0-9._-]{0,127}");
+    }
+
     // 库路径来自版本 JSON 必须落在 libraries 内 绝对路径或 ../ 一律拒绝
+    // 版本 ID 会拼进目录和地址 不允许路径字符
+    private static boolean safeVersionId(String id) {
+        if (id == null || id.isBlank() || id.length() > 128) return false;
+        if (id.equals(".") || id.contains("\\") || id.contains("/") || id.contains("..") || id.contains(":")) return false;
+        for (int i = 0; i < id.length(); i++) {
+            char c = id.charAt(i);
+            if (c < 32 || c == 127) return false;
+        }
+        return true;
+    }
+
     static Path libraryPath(Path game, String rel) {
         if (rel == null || rel.isEmpty()) return null;
         Path root = game.resolve("libraries").toAbsolutePath().normalize();
@@ -1182,9 +1188,24 @@ public final class Downloader {
         return out.startsWith(root) ? out : null;
     }
 
+    static boolean existingDownloadValid(Path target, String sha1) {
+        try {
+            String name = target.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
+            if (sha1 != null) return GameLauncher.sha1Of(target).equalsIgnoreCase(sha1);
+            if (name.endsWith(".json")) {
+                Json.parse(readFileText(target, ZIP_TEXT_MAX));
+                return true;
+            }
+            return jarLooksValid(target, target);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     static boolean jarLooksValid(Path part, Path target) {
         String name = target.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
-        if (!name.endsWith(".jar") && !name.endsWith(".litemod")) return true;
+        if (!name.endsWith(".jar") && !name.endsWith(".litemod")
+                && !name.endsWith(".zip") && !name.endsWith(".mrpack")) return true;
         try (InputStream in = Files.newInputStream(part)) {
             byte[] m = in.readNBytes(4);
             return m.length == 4 && m[0] == 'P' && m[1] == 'K'
@@ -1197,11 +1218,10 @@ public final class Downloader {
 
     private static void sub(Tasks.Task task, int index, Tasks.State state) {
         if (index >= 0 && index < task.subs.size()) task.subs.get(index).state = state;
-        Tasks.INSTANCE.changed();
     }
 
     private static void check(Tasks.Task task) throws IOException {
-        if (task.canceled) throw new IOException("已取消");
+        if (task.canceled) throw new IOException(Lang.t("已取消"));
     }
 
     private static final java.util.Map<String, Boolean> VERIFIED = new java.util.concurrent.ConcurrentHashMap<>();
@@ -1259,26 +1279,7 @@ public final class Downloader {
         String sha1 = normalizeSha1(expectedSha1);
         if (sha1 == null) sha1 = normalizeSha1(label);
         if (Files.isRegularFile(target) && Files.size(target) > 0) {
-            if (sha1 != null) {
-                boolean ok;
-                try {
-                    ok = GameLauncher.sha1Of(target).equalsIgnoreCase(sha1);
-                } catch (Exception e) {
-                    ok = false;
-                }
-                if (ok) return;
-                Files.deleteIfExists(target);
-            } else if (target.getFileName().toString().endsWith(".json")) {
-                // JSON 可解析才算完整
-                try {
-                    Json.parse(Files.readString(target));
-                    return;
-                } catch (Exception ignored) {
-                    Files.deleteIfExists(target);
-                }
-            } else {
-                return;
-            }
+            if (existingDownloadValid(target, sha1)) return;
         }
         Files.createDirectories(target.getParent());
         Exception last = null;
@@ -1312,6 +1313,11 @@ public final class Downloader {
         }
     }
 
+    private static void addMirror(List<String> out, String url, String officialBase, String mirrorBase) {
+        if (!url.startsWith(officialBase)) return;
+        out.add(mirrorBase + url.substring(officialBase.length()));
+    }
+
     private static List<String> mirrors(String url) {
         List<String> out = new ArrayList<>();
         int source = Data.get().getInt("SystemDownloadSource", 0);
@@ -1320,8 +1326,6 @@ public final class Downloader {
             return out;
         }
         String root = bmcl();
-        String host;
-        try { host = URI.create(root).getHost(); } catch (Exception e) { host = ""; }
 
         String official = officialOf(url, root);
         if (official != null) {
@@ -1332,33 +1336,35 @@ public final class Downloader {
 
         List<String> mirrorUrls = new ArrayList<>();
         if (url.contains("libraries.minecraft.net")) {
-            mirrorUrls.add(url.replace("https://libraries.minecraft.net", root + "/maven"));
-            mirrorUrls.add(url.replace("http://libraries.minecraft.net", root + "/maven"));
+            addMirror(mirrorUrls, url, "https://libraries.minecraft.net", root + "/maven");
+            addMirror(mirrorUrls, url, "http://libraries.minecraft.net", root + "/maven");
         }
-        if ((url.contains("piston-meta.mojang.com") || url.contains("launchermeta.mojang.com"))
-                && host != null && !host.isEmpty()) {
-            mirrorUrls.add(url.replace("piston-meta.mojang.com", host)
-                    .replace("launchermeta.mojang.com", host));
+        if (url.contains("piston-meta.mojang.com") || url.contains("launchermeta.mojang.com")) {
+            addMirror(mirrorUrls, url, "https://piston-meta.mojang.com", root);
+            addMirror(mirrorUrls, url, "http://piston-meta.mojang.com", root);
+            addMirror(mirrorUrls, url, "https://launchermeta.mojang.com", root);
+            addMirror(mirrorUrls, url, "http://launchermeta.mojang.com", root);
         }
         if (url.contains("resources.download.minecraft.net")) {
-            mirrorUrls.add(url.replace("https://resources.download.minecraft.net", root + "/assets"));
+            addMirror(mirrorUrls, url, "https://resources.download.minecraft.net", root + "/assets");
+            addMirror(mirrorUrls, url, "http://resources.download.minecraft.net", root + "/assets");
         }
         if (url.contains("maven.minecraftforge.net")) {
-            mirrorUrls.add(url.replace("https://maven.minecraftforge.net", root + "/maven")
-                    .replace("http://maven.minecraftforge.net", root + "/maven"));
+            addMirror(mirrorUrls, url, "https://maven.minecraftforge.net", root + "/maven");
+            addMirror(mirrorUrls, url, "http://maven.minecraftforge.net", root + "/maven");
         }
         if (url.contains("files.minecraftforge.net/maven")) {
-            mirrorUrls.add(url.replace("https://files.minecraftforge.net/maven", root + "/maven")
-                    .replace("http://files.minecraftforge.net/maven", root + "/maven"));
+            addMirror(mirrorUrls, url, "https://files.minecraftforge.net/maven", root + "/maven");
+            addMirror(mirrorUrls, url, "http://files.minecraftforge.net/maven", root + "/maven");
         }
         if (url.contains("maven.neoforged.net/releases")) {
-            mirrorUrls.add(url.replace("https://maven.neoforged.net/releases", root + "/maven"));
+            addMirror(mirrorUrls, url, "https://maven.neoforged.net/releases", root + "/maven");
         }
         if (url.contains("maven.fabricmc.net")) {
-            mirrorUrls.add(url.replace("https://maven.fabricmc.net", root + "/maven"));
+            addMirror(mirrorUrls, url, "https://maven.fabricmc.net", root + "/maven");
         }
         if (url.contains("meta.fabricmc.net")) {
-            mirrorUrls.add(url.replace("https://meta.fabricmc.net", root + "/fabric-meta"));
+            addMirror(mirrorUrls, url, "https://meta.fabricmc.net", root + "/fabric-meta");
         }
         if (source == 2 && !mirrorUrls.isEmpty()) {
             out.addAll(mirrorUrls);
@@ -1383,7 +1389,7 @@ public final class Downloader {
         return null;
     }
 
-    private static String speed(long bytesPerSec) {
+    static String speed(long bytesPerSec) {
         if (bytesPerSec > 1024 * 1024) return String.format("%.1f M/s", bytesPerSec / 1024.0 / 1024);
         if (bytesPerSec > 1024) return String.format("%.0f K/s", bytesPerSec / 1024.0);
         return bytesPerSec + " B/s";
@@ -1468,7 +1474,7 @@ public final class Downloader {
     @SuppressWarnings("unchecked")
     private static String toJson(Object value) {
         if (value == null) return "null";
-        if (value instanceof String s) return "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+        if (value instanceof String s) return Json.quote(s);
         if (value instanceof Number || value instanceof Boolean) return String.valueOf(value);
         if (value instanceof Map<?, ?> map) {
             StringBuilder sb = new StringBuilder("{");

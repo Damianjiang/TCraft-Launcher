@@ -3,11 +3,13 @@ package tcraft;
 import java.net.URI;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.security.DigestOutputStream;
 import java.security.MessageDigest;
 import java.util.ArrayList;
@@ -246,7 +248,12 @@ public final class EasyTier {
         Files.createDirectories(dir);
         Path marker = dir.resolve(".version");
         if (!force && installed()) {
-            String v = Files.isRegularFile(marker) ? Files.readString(marker).trim() : "";
+            String v = "";
+            if (Files.isRegularFile(marker) && Files.size(marker) <= 4096) {
+                try (InputStream in = Files.newInputStream(marker)) {
+                    v = new String(Io.read(in, 4096), java.nio.charset.StandardCharsets.UTF_8).trim();
+                }
+            }
             if (VERSION.equals(v)) {
                 p.update(Lang.t("联机模块已就绪"), 0.35);
                 return;
@@ -335,9 +342,14 @@ public final class EasyTier {
 
     private static void extract(Path zip, Path dir) throws Exception {
         List<Path> temp = new ArrayList<>();
+        Path outDir = dir.toAbsolutePath().normalize();
+        Files.createDirectories(outDir);
+        long total = 0;
+        int count = 0;
         try (ZipInputStream in = new ZipInputStream(Files.newInputStream(zip))) {
             ZipEntry e;
             while ((e = in.getNextEntry()) != null) {
+                if (++count > 4096) throw new Exception(Lang.t("联机模块压缩包条目过多"));
                 if (e.isDirectory()) continue;
                 String name = e.getName().replace('\\', '/');
                 String base = name.substring(name.lastIndexOf('/') + 1);
@@ -347,8 +359,12 @@ public final class EasyTier {
                         && !lower.endsWith(".dll") && !lower.endsWith(".so") && !lower.endsWith(".dylib")) {
                     continue;
                 }
-                Path out = dir.resolve(base);
-                Files.copy(in, out, StandardCopyOption.REPLACE_EXISTING);
+                Path out = outDir.resolve(base).normalize();
+                if (base.isEmpty() || !out.startsWith(outDir)) continue;
+                try (OutputStream os = Files.newOutputStream(out,
+                        StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+                    total += Io.copy(in, os, 512L * 1024 * 1024 - total);
+                }
                 temp.add(out);
             }
         }

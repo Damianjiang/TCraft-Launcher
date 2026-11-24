@@ -167,7 +167,7 @@ public final class Theme {
     public static String resText(String relative) {
         try (java.io.InputStream in = resStream(relative)) {
             if (in == null) return "";
-            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            return new String(Io.read(in, 2L * 1024 * 1024), StandardCharsets.UTF_8);
         } catch (IOException e) {
             return "";
         }
@@ -176,15 +176,18 @@ public final class Theme {
     private static Path userImage(String name) {
         if (name == null || name.isEmpty()) return null;
         if (name.startsWith("Skins/")) {
-            Path p = skinDir().resolve(name.substring(6));
-            return Files.isRegularFile(p) ? p : null;
+            Path base = skinDir().toAbsolutePath().normalize();
+            Path p = base.resolve(name.substring(6)).normalize();
+            return p.startsWith(base) && Files.isRegularFile(p) ? p : null;
         }
         if (name.startsWith("Icons/")) {
-            Path p = iconDir().resolve(name.substring(6));
-            return Files.isRegularFile(p) ? p : null;
+            Path base = iconDir().toAbsolutePath().normalize();
+            Path p = base.resolve(name.substring(6)).normalize();
+            return p.startsWith(base) && Files.isRegularFile(p) ? p : null;
         }
-        Path skin = skinDir().resolve(name);
-        return Files.isRegularFile(skin) ? skin : null;
+        Path base = skinDir().toAbsolutePath().normalize();
+        Path skin = base.resolve(name).normalize();
+        return skin.startsWith(base) && Files.isRegularFile(skin) ? skin : null;
     }
 
     public static java.io.InputStream imageStream(String name) throws IOException {
@@ -228,9 +231,14 @@ public final class Theme {
             Path dir = fontDir();
             if (!Files.isDirectory(dir)) return;
             try (var stream = Files.list(dir)) {
-                for (Path p : stream.filter(Files::isRegularFile).toList()) {
+                for (Path p : stream.filter(Files::isRegularFile).limit(100).toList()) {
                     String name = p.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
                     if (!name.endsWith(".ttf") && !name.endsWith(".otf") && !name.endsWith(".ttc")) continue;
+                    try {
+                        if (Files.size(p) > 32L * 1024 * 1024) continue;
+                    } catch (Exception ignored) {
+                        continue;
+                    }
                     try (java.io.InputStream in = Files.newInputStream(p)) {
                         Font f = Font.loadFont(in, 13);
                         if (f != null && !USER_FONTS.contains(f.getFamily())) USER_FONTS.add(f.getFamily());
@@ -308,21 +316,30 @@ public final class Theme {
         return n.endsWith(".png") || n.endsWith(".jpg") || n.endsWith(".jpeg") || n.endsWith(".gif");
     }
 
+    private static boolean usableWallpaper(Path file) {
+        try {
+            return Files.isRegularFile(file) && isWallpaperImage(file)
+                    && Files.size(file) <= 32L * 1024 * 1024;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     public static boolean loadCustomWallpaper(Path dir) {
         try {
             if (dir == null || !Files.isDirectory(dir)) return false;
             List<Path> images = new ArrayList<>();
             try (var stream = Files.list(dir)) {
-                stream.filter(Files::isRegularFile).filter(Theme::isWallpaperImage).forEach(images::add);
+                stream.filter(Theme::usableWallpaper).limit(100).forEach(images::add);
             }
             if (images.isEmpty()) return false;
             // 与启动取色同一张图
-            Path pick = pendingWallpaper != null && Files.isRegularFile(pendingWallpaper)
+            Path pick = pendingWallpaper != null && usableWallpaper(pendingWallpaper)
                     ? pendingWallpaper
                     : images.get((int) (Math.random() * images.size()));
             pendingWallpaper = null;
             currentWallpaperFile = pick;
-            Image img = new Image(pick.toUri().toString(), true);
+            Image img = new Image(pick.toUri().toString(), 4096, 4096, true, true, true);
             if (img.isError()) return false;
             final int gen = wallpaperGen.incrementAndGet();
             final Image loaded = img;
@@ -380,7 +397,10 @@ public final class Theme {
         try {
             if (name.contains("/") || name.contains("\\")) {
                 Path abs = Paths.get(name);
-                if (Files.isRegularFile(abs)) return cachedImage(abs);
+                String raw = abs.toString();
+                // 拒绝 UNC 网络路径 防止加载图片时泄露系统凭据
+                boolean unc = raw.startsWith("\\\\") || raw.startsWith("//");
+                if (abs.isAbsolute() && !unc && Files.isRegularFile(abs)) return cachedImage(abs);
             }
             Path user = userImage(name);
             if (user != null) return cachedImage(user);
@@ -401,14 +421,15 @@ public final class Theme {
 
     private static Image cachedImage(Path p) {
         try {
+            if (Files.size(p) > 64L * 1024 * 1024) return null;
             String key = p.toAbsolutePath() + "|" + Files.getLastModifiedTime(p).toMillis() + "|" + Files.size(p);
             Image cached = IMAGE_CACHE.get(key);
             if (cached != null) return cached;
-            Image img = new Image(p.toUri().toString(), false);
+            Image img = new Image(p.toUri().toString(), 4096, 4096, true, false);
             cacheImage(key, img);
             return img;
         } catch (Exception e) {
-            return new Image(p.toUri().toString(), false);
+            return null;
         }
     }
 
@@ -576,7 +597,7 @@ public final class Theme {
             if (pictures != null && Files.isDirectory(pictures)) {
                 List<Path> images = new ArrayList<>();
                 try (var stream = Files.list(pictures)) {
-                    stream.filter(Files::isRegularFile).filter(Theme::isWallpaperImage).forEach(images::add);
+                    stream.filter(Theme::usableWallpaper).limit(100).forEach(images::add);
                 }
                 if (!images.isEmpty()) {
                     Path pick = images.get((int) (Math.random() * images.size()));
@@ -591,7 +612,7 @@ public final class Theme {
                 if (url == null) return null;
                 uri = url.toExternalForm();
             }
-            Image img = new Image(uri, 400, 0, true, false);
+            Image img = new Image(uri, 400, 400, true, false);
             return img.isError() ? null : img;
         } catch (Throwable t) {
             return null;

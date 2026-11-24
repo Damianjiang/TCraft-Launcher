@@ -219,8 +219,10 @@ public final class RemoteImages {
         Path f = fileOf(url);
         if (f == null) return null;
         try {
-            if (!Files.isRegularFile(f) || Files.size(f) == 0) return null;
-            return Files.readAllBytes(f);
+            if (!Files.isRegularFile(f) || Files.size(f) == 0 || Files.size(f) > 2L * 1024 * 1024) return null;
+            try (java.io.InputStream in = Files.newInputStream(f)) {
+                return Io.read(in, 2L * 1024 * 1024);
+            }
         } catch (Exception e) {
             return null;
         }
@@ -253,6 +255,7 @@ public final class RemoteImages {
                         List<Path> files = s.filter(Files::isRegularFile)
                                 .filter(p -> p.getFileName() != null
                                         && SHA1_NAME.matcher(p.getFileName().toString()).matches())
+                                .limit(10000)
                                 .sorted((a, b) -> {
                                     try {
                                         return Long.compare(Files.getLastModifiedTime(a).toMillis(),

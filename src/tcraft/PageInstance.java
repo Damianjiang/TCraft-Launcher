@@ -338,7 +338,7 @@ public class PageInstance implements Page {
         }
         switch (sortMode) {
             case 1 -> list.sort(Comparator.comparing(a -> a.name.toLowerCase(java.util.Locale.ROOT)));
-            case 2 -> list.sort((a, b) -> b.version.compareTo(a.version));
+            case 2 -> list.sort((a, b) -> ResourceVersion.compareVersion(b.version, a.version));
             case 3 -> list.sort((a, b) -> Long.compare(addedAtOf(b), addedAtOf(a)));
             default -> list.sort((a, b) -> Long.compare(b.lastPlayed, a.lastPlayed));
         }
@@ -472,8 +472,13 @@ public class PageInstance implements Page {
         rows.add(Ui.MenuRow.separator());
         rows.add(Ui.MenuRow.of("删除", "trash-2", () -> Dialogs.confirm(win, "删除实例",
                 Lang.tf("确定要删除实例「%s」吗？\n只会从列表中移除，不会删除磁盘文件。", ins.name), () -> {
-                    data.instances.remove(ins);
-                    data.selectedInstance = 0;
+                    int removed = data.instances.indexOf(ins);
+                    if (removed < 0) return;
+                    data.instances.remove(removed);
+                    if (removed < data.selectedInstance) data.selectedInstance--;
+                    else if (removed == data.selectedInstance && data.selectedInstance >= data.instances.size()) {
+                        data.selectedInstance = Math.max(0, data.instances.size() - 1);
+                    }
                     data.save();
                     rebuild();
                     win.toast("实例已删除", ins.name, 1);
@@ -541,6 +546,11 @@ public class PageInstance implements Page {
         Dialogs.input(win, "重命名实例", "新的实例名称", ins.name, name -> {
             String n = name == null ? "" : name.trim();
             if (n.isEmpty()) return;
+            String error = validateInstanceName(n, ins.folder);
+            if (!error.isEmpty()) {
+                win.toast("无法重命名", error, 2);
+                return;
+            }
             for (Data.Instance other : data.instances) {
                 if (other != ins && n.equalsIgnoreCase(other.name)) {
                     win.toast("名称重复", "已经有同名实例了。", 2);
@@ -556,12 +566,15 @@ public class PageInstance implements Page {
 
     private void changeIcon(Data.Instance ins) {
         FileChooser chooser = new FileChooser();
-        // OS 对话框创建处翻译
         chooser.setTitle(Lang.t("选择实例图标"));
         chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(Lang.t("PNG 图片"), "*.png"));
         File file = chooser.showOpenDialog(win.stage);
         if (file == null) return;
         try {
+            if (java.nio.file.Files.size(file.toPath()) > 8L * 1024 * 1024) {
+                win.toast("无法设置图标", "图片不能超过 8MB。", 2);
+                return;
+            }
             String safe = ins.name == null || ins.name.isEmpty() ? "instance" : ins.name;
             for (char c : "\\/:*?\"<>|".toCharArray()) safe = safe.replace(String.valueOf(c), "_");
             java.nio.file.Path dir = Theme.iconDir();
@@ -579,7 +592,7 @@ public class PageInstance implements Page {
 
     private void duplicateInstance(Data.Instance ins) {
         String defaultName = ins.name + "-副本";
-        Dialogs.input(win, "复制实例", "新实例会得到独立的版本文件、Mod 与存档。", defaultName, name -> {
+        Dialogs.input(win, "复制实例", "新实例会复制版本文件，非隔离实例仍共用 Mod 与存档。", defaultName, name -> {
             if (name == null) return;
             String error = validateInstanceName(name, ins.folder);
             if (!error.isEmpty()) {
@@ -588,13 +601,27 @@ public class PageInstance implements Page {
             }
             java.nio.file.Path base = java.nio.file.Paths.get(
                     ins.folder != null && !ins.folder.isEmpty() ? ins.folder : data.gameDir);
-            java.nio.file.Path src = base.resolve("versions").resolve(ins.version);
-            java.nio.file.Path dest = base.resolve("versions").resolve(name);
+            java.nio.file.Path versions = base.resolve("versions").normalize();
+            java.nio.file.Path src = versions.resolve(ins.version == null ? "" : ins.version).normalize();
+            if (src.equals(versions) || !src.startsWith(versions)) {
+                win.toast("无法复制实例", "版本目录不合法。", 2);
+                return;
+            }
+            java.nio.file.Path dest = versions.resolve(name).normalize();
+            if (!dest.startsWith(versions) || dest.equals(versions)) {
+                win.toast("无法复制实例", "名称不合法。", 2);
+                return;
+            }
             final String targetFolder = base.toString();
             final boolean isolated = Isolation.on(ins);
             win.toast("正在复制实例", ins.name + " → " + name, 0);
             Thread worker = new Thread(() -> {
+                boolean created = false;
                 try {
+                    if (java.nio.file.Files.exists(dest)) {
+                        throw new java.nio.file.FileAlreadyExistsException(dest.toString());
+                    }
+                    created = true;
                     copyDirectory(src, dest);
                     rewriteVersionJson(dest, ins.version, name);
                     javafx.application.Platform.runLater(() -> {
@@ -610,12 +637,43 @@ public class PageInstance implements Page {
                         win.toast("实例已复制为", name, 1);
                     });
                 } catch (Exception e) {
+                    if (created) deleteTree(dest);
                     javafx.application.Platform.runLater(() -> Errors.error("复制实例失败", e));
                 }
             }, "TCL-InstanceDuplicate");
             worker.setDaemon(true);
             worker.start();
         });
+    }
+
+    private static void deleteTree(java.nio.file.Path dir) {
+        if (dir == null || !java.nio.file.Files.exists(dir, java.nio.file.LinkOption.NOFOLLOW_LINKS)) return;
+        if (java.nio.file.Files.isSymbolicLink(dir)) {
+            try {
+                java.nio.file.Files.deleteIfExists(dir);
+            } catch (Exception ignored) {
+            }
+            return;
+        }
+        try {
+            java.nio.file.Files.walkFileTree(dir, new java.nio.file.SimpleFileVisitor<java.nio.file.Path>() {
+                @Override
+                public java.nio.file.FileVisitResult visitFile(java.nio.file.Path file,
+                        java.nio.file.attribute.BasicFileAttributes attrs) throws java.io.IOException {
+                    java.nio.file.Files.deleteIfExists(file);
+                    return java.nio.file.FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public java.nio.file.FileVisitResult postVisitDirectory(java.nio.file.Path folder,
+                        java.io.IOException exc) throws java.io.IOException {
+                    if (exc != null) throw exc;
+                    java.nio.file.Files.deleteIfExists(folder);
+                    return java.nio.file.FileVisitResult.CONTINUE;
+                }
+            });
+        } catch (Exception ignored) {
+        }
     }
 
     private static int copyDirectory(java.nio.file.Path src, java.nio.file.Path dest) throws Exception {
@@ -626,6 +684,7 @@ public class PageInstance implements Page {
         try (var walk = java.nio.file.Files.walk(src)) {
             walk.forEach(p -> {
                 try {
+                    if (java.nio.file.Files.isSymbolicLink(p)) return;
                     java.nio.file.Path target = dest.resolve(src.relativize(p).toString());
                     if (java.nio.file.Files.isDirectory(p)) {
                         java.nio.file.Files.createDirectories(target);
@@ -643,17 +702,27 @@ public class PageInstance implements Page {
     }
 
     static void rewriteVersionJson(java.nio.file.Path dir, String oldId, String newId) throws Exception {
+        if (oldId == null || newId == null || oldId.isEmpty() || newId.isEmpty()
+                || oldId.contains("..") || newId.contains("..")
+                || oldId.indexOf('/') >= 0 || oldId.indexOf('\\') >= 0 || oldId.indexOf(':') >= 0
+                || newId.indexOf('/') >= 0 || newId.indexOf('\\') >= 0 || newId.indexOf(':') >= 0) {
+            throw new IllegalArgumentException(Lang.t("非法版本 ID"));
+        }
         java.nio.file.Path oldJson = dir.resolve(oldId + ".json");
         if (!java.nio.file.Files.isRegularFile(oldJson)) {
             try (var list = java.nio.file.Files.list(dir)) {
                 List<java.nio.file.Path> candidates = list
                         .filter(p -> p.getFileName().toString().toLowerCase().endsWith(".json"))
+                        .limit(2)
                         .toList();
                 if (candidates.size() != 1) return;
                 oldJson = candidates.get(0);
             }
         }
-        String text = java.nio.file.Files.readString(oldJson, java.nio.charset.StandardCharsets.UTF_8);
+        String text;
+        try (java.io.InputStream in = java.nio.file.Files.newInputStream(oldJson)) {
+            text = new String(Io.read(in, 10L * 1024 * 1024), java.nio.charset.StandardCharsets.UTF_8);
+        }
         java.util.regex.Matcher m = java.util.regex.Pattern
                 .compile("(\"id\"\\s*:\\s*)\"(?:\\\\.|[^\"\\\\])*\"").matcher(text);
         String updated = m.find()
@@ -671,7 +740,14 @@ public class PageInstance implements Page {
         for (char c : "\\/:*?\"<>|".toCharArray()) {
             if (trimmed.indexOf(c) >= 0) return Lang.tf("名称不能包含字符：%s", c);
         }
+        for (int i = 0; i < trimmed.length(); i++) {
+            char c = trimmed.charAt(i);
+            if (c < 32 || c == 127) return Lang.t("名称不能包含控制字符。");
+        }
         if (trimmed.equals(".") || trimmed.equals("..")) return Lang.t("名称不合法。");
+        if (trimmed.endsWith(".") || trimmed.endsWith(" ")) return Lang.t("名称不能以点或空格结尾。");
+        String upper = trimmed.toUpperCase(java.util.Locale.ROOT);
+        if (upper.matches("CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9]")) return Lang.t("名称是系统保留名。");
         String base = folder != null && !folder.isEmpty() ? folder : data.gameDir;
         if (java.nio.file.Files.exists(java.nio.file.Paths.get(base, "versions", trimmed))) {
             return Lang.t("已存在同名实例。");
@@ -697,14 +773,15 @@ public class PageInstance implements Page {
                 boolean windows = os.contains("win");
                 boolean mac = os.contains("mac");
                 java.nio.file.Path script = Resources.launchTarget();
-                // mac 裸 jar 无脚本 用当前 java 直接拉起
-                java.nio.file.Path jar = script == null && mac ? Resources.jar() : null;
+                // 裸 jar 统一回退到当前 Java 运行 覆盖 Windows/Linux/macOS
+                java.nio.file.Path jar = script == null ? Resources.jar() : null;
                 if (script == null && jar == null) {
-                    // Errors 弹窗创建处翻译
                     throw new Exception(Lang.t("找不到启动器程序（TCraftLauncher.exe / TCraftLauncher.sh），请确认使用的是完整版程序。"));
                 }
                 java.nio.file.Path appDir = script != null && script.getParent() != null ? script.getParent()
                         : jar != null && jar.getParent() != null ? jar.getParent() : Theme.root();
+                String javaExe = java.nio.file.Paths.get(System.getProperty("java.home"), "bin",
+                        windows ? "javaw.exe" : "java").toString();
                 if (!windows && script != null) script.toFile().setExecutable(true);
                 java.nio.file.Path desktop = Shell.desktopDir();
                 java.nio.file.Files.createDirectories(desktop);
@@ -713,10 +790,14 @@ public class PageInstance implements Page {
                 if (windows) {
                     link = uniquePath(desktop, baseName, ".lnk");
                     java.nio.file.Path icon = Resources.iconFile("icon.ico");
+                    String target = script != null ? script.toString() : javaExe;
+                    String arguments = script != null
+                            ? "--launch-instance \"" + q(ins.name) + "\""
+                            : "-jar \"" + q(jar.toString()) + "\" --launch-instance \"" + q(ins.name) + "\"";
                     String ps = "[Console]::OutputEncoding=[Text.Encoding]::UTF8;"
                             + "$s=(New-Object -ComObject WScript.Shell).CreateShortcut('" + q(link.toString()) + "');"
-                            + "$s.TargetPath='" + q(script.toString()) + "';"
-                            + "$s.Arguments='--launch-instance \"" + q(ins.name) + "\"';"
+                            + "$s.TargetPath='" + q(target) + "';"
+                            + "$s.Arguments='" + q(arguments) + "';"
                             + "$s.WorkingDirectory='" + q(appDir.toString()) + "';"
                             + (icon == null ? "" : "$s.IconLocation='" + q(icon.toString()) + "';")
                             + "$s.Description='启动 " + q(ins.name) + " - TCraft Launcher';"
@@ -729,12 +810,13 @@ public class PageInstance implements Page {
                         // 先等退出再读输出 防挂死
                         if (!p.waitFor(30, java.util.concurrent.TimeUnit.SECONDS)) {
                             p.destroyForcibly();
-                            throw new Exception("WScript.Shell 创建快捷方式超时");
+                            throw new Exception(Lang.t("WScript.Shell 创建快捷方式超时"));
                         }
-                        String output = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                        String output = new String(Io.read(in, 64L * 1024),
+                                java.nio.charset.StandardCharsets.UTF_8);
                         if (p.exitValue() != 0 || !java.nio.file.Files.isRegularFile(link)) {
-                            throw new Exception("WScript.Shell 未能生成快捷方式："
-                                    + (output.isBlank() ? "无输出" : output.trim()));
+                            throw new Exception(Lang.t("WScript.Shell 未能生成快捷方式：")
+                                    + (output.isBlank() ? Lang.t("无输出") : output.trim()));
                         }
                     }
                 } else if (mac) {
@@ -742,8 +824,7 @@ public class PageInstance implements Page {
                     // exec 仅查 PATH 须用绝对路径
                     String run = script != null
                             ? shellQuote(script.toAbsolutePath().toString())
-                            : shellQuote(ProcessHandle.current().info().command().orElse("java"))
-                                    + " -jar " + shellQuote(jar.toAbsolutePath().toString());
+                            : shellQuote(javaExe) + " -jar " + shellQuote(jar.toAbsolutePath().toString());
                     java.nio.file.Files.writeString(link,
                             "#!/bin/sh\ncd " + shellQuote(appDir.toString())
                                     + "\nexec " + run
@@ -753,11 +834,14 @@ public class PageInstance implements Page {
                 } else {
                     link = uniquePath(desktop, baseName, ".desktop");
                     java.nio.file.Path icon = Resources.iconFile("icon-256.png");
-                    String entry = "[Desktop Entry]\nType=Application\nName=" + baseName + "\n"
-                            + "Exec=" + desktopQuote(script.toString()) + " --launch-instance "
+                    String run = script != null
+                            ? desktopQuote(script.toString())
+                            : desktopQuote(javaExe) + " -jar " + desktopQuote(jar.toString());
+                    String entry = "[Desktop Entry]\nType=Application\nName=" + desktopText(baseName) + "\n"
+                            + "Exec=" + run + " --launch-instance "
                             + desktopQuote(ins.name) + "\n"
-                            + "Path=" + appDir.toString() + "\n"
-                            + (icon == null ? "" : "Icon=" + icon.toString() + "\n")
+                            + "Path=" + desktopText(appDir.toString()) + "\n"
+                            + (icon == null ? "" : "Icon=" + desktopText(icon.toString()) + "\n")
                             + "Terminal=false\nCategories=Game;\n";
                     java.nio.file.Files.writeString(link, entry, java.nio.charset.StandardCharsets.UTF_8);
                     link.toFile().setExecutable(true);
@@ -780,6 +864,9 @@ public class PageInstance implements Page {
     private static String safeFileName(String name) {
         String result = name == null ? "" : name.trim();
         for (char c : "\\/:*?\"<>|".toCharArray()) result = result.replace(c, '_');
+        StringBuilder clean = new StringBuilder(result.length());
+        for (char c : result.toCharArray()) clean.append(c < 32 || c == 127 ? '_' : c);
+        result = clean.toString();
         return result.isEmpty() ? "实例" : result;
     }
 
@@ -794,7 +881,7 @@ public class PageInstance implements Page {
     }
 
     private static String q(String s) {
-        return s == null ? "" : s.replace("'", "''");
+        return s == null ? "" : s.replace("'", "''").replace("\r", " ").replace("\n", " ");
     }
 
     private static String shellQuote(String s) {
@@ -804,8 +891,13 @@ public class PageInstance implements Page {
     private static String desktopQuote(String s) {
         String value = s == null ? "" : s;
         value = value.replace("\\", "\\\\").replace("\"", "\\\"")
-                .replace("`", "\\`").replace("$", "\\$");
+                .replace("`", "\\`").replace("$", "\\$")
+                .replace("\r", " ").replace("\n", " ");
         return "\"" + value + "\"";
+    }
+
+    private static String desktopText(String s) {
+        return s == null ? "" : s.replace("\r", " ").replace("\n", " ");
     }
 
     private void backupInstance(Data.Instance ins) {
@@ -818,28 +910,42 @@ public class PageInstance implements Page {
         chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(Lang.t("压缩包"), "*.zip"));
         File out = chooser.showSaveDialog(win.stage);
         if (out == null) return;
-        java.nio.file.Path src = java.nio.file.Paths.get(ins.folder);
+        java.nio.file.Path src = ins.folder == null || ins.folder.isEmpty()
+                ? java.nio.file.Paths.get(data.gameDir)
+                : java.nio.file.Paths.get(ins.folder);
         if (!java.nio.file.Files.isDirectory(src)) {
             win.toast("备份失败", Lang.t("实例目录不存在：") + ins.folder, 2);
             return;
         }
+        java.nio.file.Path outPath = out.toPath().toAbsolutePath().normalize();
+        final java.nio.file.Path partZip = outPath.resolveSibling(outPath.getFileName() + ".part");
         win.toast("开始备份", ins.name + " → " + out.getName(), 1);
         Thread worker = new Thread(() -> {
+            java.util.concurrent.atomic.AtomicInteger skipped = new java.util.concurrent.atomic.AtomicInteger();
             try (java.util.zip.ZipOutputStream zos = new java.util.zip.ZipOutputStream(
-                    new java.io.BufferedOutputStream(java.nio.file.Files.newOutputStream(out.toPath())));
+                    new java.io.BufferedOutputStream(java.nio.file.Files.newOutputStream(partZip)));
                  var walk = java.nio.file.Files.walk(src)) {
                 walk.filter(java.nio.file.Files::isRegularFile).forEach(f -> {
                     try {
+                        // 输出文件本身不能进压缩包
+                        java.nio.file.Path current = f.toAbsolutePath().normalize();
+                        if (current.equals(outPath) || current.equals(partZip)) return;
                         String rel = src.relativize(f).toString().replace('\\', '/');
                         zos.putNextEntry(new java.util.zip.ZipEntry(rel));
                         java.nio.file.Files.copy(f, zos);
                         zos.closeEntry();
                     } catch (Exception e) {
+                        skipped.incrementAndGet();
                         data.log("备份跳过文件：" + f + " " + e);
                     }
                 });
-                javafx.application.Platform.runLater(() -> win.toast("备份完成", out.getName(), 1));
+                java.nio.file.Files.move(partZip, outPath,
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                javafx.application.Platform.runLater(() -> win.toast(
+                        skipped.get() == 0 ? Lang.t("备份完成") : Lang.tf("备份完成（跳过 %d 个文件）", skipped.get()),
+                        out.getName(), skipped.get() == 0 ? 1 : 2));
             } catch (Exception e) {
+                try { java.nio.file.Files.deleteIfExists(partZip); } catch (Exception ignored) { }
                 javafx.application.Platform.runLater(() -> Errors.error("备份实例失败", e));
             }
         }, "TCL-Backup");
@@ -912,7 +1018,7 @@ public class PageInstance implements Page {
         String folderKey = gameDir.toAbsolutePath().normalize().toString();
         boolean windows = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win");
         try (var stream = java.nio.file.Files.list(versions)) {
-            stream.filter(java.nio.file.Files::isDirectory).forEach(dir -> {
+            stream.limit(10000).filter(java.nio.file.Files::isDirectory).forEach(dir -> {
                 String name = dir.getFileName().toString();
                 if (!java.nio.file.Files.isRegularFile(dir.resolve(name + ".json"))) return;
                 boolean exists = false;
@@ -925,8 +1031,10 @@ public class PageInstance implements Page {
                 }
                 if (exists) return;
                 String lower = name.toLowerCase(java.util.Locale.ROOT);
-                String loader = lower.contains("fabric") ? "Fabric" : lower.contains("forge") ? "Forge"
-                        : lower.contains("neoforge") ? "NeoForge" : lower.contains("optifine") ? "OptiFine" : "原版";
+                String loader = lower.contains("fabric") ? "Fabric"
+                        : lower.contains("neoforge") ? "NeoForge"
+                        : lower.contains("forge") ? "Forge"
+                        : lower.contains("optifine") ? "OptiFine" : "原版";
                 String icon = "Fabric".equals(loader) ? "Fabric.png" : "Forge".equals(loader) ? "CobbleStone.png"
                         : "NeoForge".equals(loader) ? "NeoForge.png" : "Grass.png";
                 Data.Instance imported = new Data.Instance(name, name, loader, "",
@@ -972,12 +1080,11 @@ public class PageInstance implements Page {
                             && !info.readError.equals(Modpacks.unrecognizedError());
                     Dialogs.confirm(win, broken ? "整合包读取失败" : "无法识别整合包",
                             broken ? info.readError
-                                    : "无法从该压缩包中识别出整合包清单。\n当前支持 Modrinth (.mrpack)、CurseForge (.zip)、MultiMC、HMCL 与 MCBBS 格式。",
+                                    : "无法从该压缩包中识别出整合包清单。\n当前支持 Modrinth (.mrpack)、CurseForge (.zip)、通用整合包与 MCBBS 格式。",
                             () -> {
                             });
                     return;
                 }
-                // 标签分段翻译
                 StringBuilder sb = new StringBuilder();
                 sb.append(Lang.t("类型：")).append(info.typeName).append("\n");
                 sb.append(Lang.t("名称：")).append(info.name).append("\n");
@@ -985,7 +1092,7 @@ public class PageInstance implements Page {
                 sb.append(Lang.t("加载器：")).append(info.loader.isEmpty() ? Lang.t("无") : info.loader + " " + info.loaderVersion);
                 if (!info.unsupportedLoaders.isEmpty()) {
                     Dialogs.confirm(win, "暂不支持的加载器",
-                            Lang.t("该整合包使用了 TCL 不支持的加载器：") + String.join("、", info.unsupportedLoaders)
+                            Lang.t("该整合包使用了 TCL 不支持的加载器：") + String.join(Lang.t("、"), info.unsupportedLoaders)
                                     + Lang.t("\n无法完成安装。"), () -> {
                             });
                     return;

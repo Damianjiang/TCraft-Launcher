@@ -95,7 +95,7 @@ public final class Updates {
         try {
             Path marker = Resources.home().resolve("update").resolve("last-apply-error.txt");
             if (Files.isRegularFile(marker)) {
-                String msg = Files.readString(marker).strip();
+                String msg = Files.size(marker) <= 64L * 1024 ? Files.readString(marker).strip() : "";
                 Files.deleteIfExists(marker);
                 if (!msg.isEmpty()) {
                     PauseTransition notify = new PauseTransition(Duration.seconds(1));
@@ -442,7 +442,8 @@ public final class Updates {
         if (updating) return;
         updating = true;
         String tag = safeTag(release.tag);
-        String ver = clean(release.tag);
+        String verRaw = safeTag(clean(release.tag));
+        final String ver = verRaw.isEmpty() ? Build.VERSION : verRaw;
         Path file = Resources.home().resolve("update").resolve("TCraftLauncher-" + ver + ".jar");
 
         VBox card = Dialogs.msgCard("正在下载更新");
@@ -628,12 +629,13 @@ public final class Updates {
 
     private static void verify(Path file, Release release, String source,
                                java.util.function.BooleanSupplier canceled) throws IOException {
-        String ver = clean(release.tag);
+        String ver = safeTag(clean(release.tag));
+        if (ver.isEmpty()) ver = Build.VERSION;
         String tag = safeTag(release.tag);
         String expect = release.sha256 == null ? "" : release.sha256.trim().toLowerCase(java.util.Locale.ROOT);
         if (expect.isEmpty()) {
             for (String base : downloadBases(source)) {
-                if (canceled.getAsBoolean()) throw new IOException("已取消");
+                if (canceled.getAsBoolean()) throw new IOException(Lang.t("已取消"));
                 try {
                     String text = fetch(base + RELEASES_URL + "/download/" + tag
                             + "/TCraftLauncher-" + ver + ".jar.sha256", "text/plain");
@@ -652,7 +654,7 @@ public final class Updates {
             Files.deleteIfExists(file);
             throw new IOException(Lang.t("未获取到更新包校验值，请到下载页手动更新。"));
         }
-        if (canceled.getAsBoolean()) throw new IOException("已取消");
+        if (canceled.getAsBoolean()) throw new IOException(Lang.t("已取消"));
         String actual = sha256Hex(file);
         if (!actual.equals(expect)) {
             Files.deleteIfExists(file);
@@ -748,11 +750,18 @@ public final class Updates {
     }
 
     static Release parseAtom(String xml) throws Exception {
-        if (xml != null && !xml.isEmpty() && xml.charAt(0) == '\uFEFF') {
+        if (xml == null) throw new IOException("Atom 内容为空");
+        if (xml.length() > 8 * 1024 * 1024) throw new IOException("Atom 内容过大");
+        if (!xml.isEmpty() && xml.charAt(0) == '\uFEFF') {
             xml = xml.substring(1); // 有的源带 BOM String 解析会报 prolog 错误
         }
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         factory.setNamespaceAware(false);
+        try {
+            factory.setXIncludeAware(false);
+            factory.setExpandEntityReferences(false);
+        } catch (Exception ignored) {
+        }
         factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
         factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
         factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);

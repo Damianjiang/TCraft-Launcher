@@ -40,6 +40,8 @@ public final class Plugins {
     private static final Plugins INSTANCE = new Plugins();
     private static final int MAX_ENTRIES = 4096;
     private static final long MAX_BYTES = 512L * 1024 * 1024;
+    private static final long MANIFEST_MAX = 1024L * 1024;
+    private static final long IMAGE_MAX = 8L * 1024 * 1024;
 
     public static Plugins get() {
         return INSTANCE;
@@ -169,7 +171,7 @@ public final class Plugins {
             String pid = Plugins.get().safeId(id, "页面 id");
             String key = manifest.id + ":" + pid;
             if (Plugins.get().pages.containsKey(key)) {
-                throw new IllegalArgumentException("页面 id 已被占用：" + pid);
+                throw new IllegalArgumentException(Lang.t("页面 id 已被占用：") + pid);
             }
             Plugins.get().pages.put(key, new PageDef(manifest.id, title == null ? manifest.name : title,
                     icon == null ? "" : icon, builder));
@@ -198,7 +200,7 @@ public final class Plugins {
 
         @Override
         public void addCommand(String name, String description, Consumer<CommandContext> handler) {
-            if (name == null || name.isBlank()) throw new IllegalArgumentException("命令名不能为空");
+            if (name == null || name.isBlank()) throw new IllegalArgumentException(Lang.t("命令名不能为空"));
             String key = name.trim();
             Plugins.get().commands.put(key, new Cmd(key, description, manifest.id, handler));
             commandNames.add(key);
@@ -469,7 +471,7 @@ public final class Plugins {
                 lp.state = "disabled";
                 continue;
             }
-            load(lp, false);
+            load(lp, true);
         }
     }
 
@@ -529,7 +531,7 @@ public final class Plugins {
             Class<?> type = Class.forName(lp.manifest.main, true, loader);
             Object object = type.getDeclaredConstructor().newInstance();
             if (!(object instanceof TcraftPlugin p)) {
-                throw new IllegalArgumentException("main 类未实现 tcraft.api.TcraftPlugin");
+                throw new IllegalArgumentException(Lang.t("main 类未实现 tcraft.api.TcraftPlugin"));
             }
             lp.instance = p;
             lp.ctx = new PluginContext(lp);
@@ -542,11 +544,12 @@ public final class Plugins {
             } finally {
                 current.setContextClassLoader(old);
             }
-            lp.state = "loaded";
-            lp.enabled = true;
-            Data.get().set("Plugin." + lp.manifest.id + ".enabled", true);
+            lp.state = enabling ? "loaded" : "disabled";
+            lp.enabled = enabling;
+            Data.get().set("Plugin." + lp.manifest.id + ".enabled", enabling);
             log(lp.manifest.id, "已加载 " + lp.manifest.name + " " + lp.manifest.version);
         } catch (Throwable t) {
+            lp.enabled = false;
             lp.state = "failed";
             lp.error = Log.describe(t);
             log(lp.manifest.id, "加载失败：" + lp.error);
@@ -583,7 +586,7 @@ public final class Plugins {
         }
         cleanup(lp);
         lp.instance = null;
-        lp.state = lp.enabled ? "disabled" : "disabled";
+        lp.state = "disabled";
     }
 
     private void cleanup(LoadedPlugin lp) {
@@ -620,13 +623,6 @@ public final class Plugins {
             lp.enabled = true;
             load(lp, true);
         } else {
-            if (lp.instance != null) {
-                try {
-                    lp.instance.onDisable();
-                } catch (Throwable t) {
-                    log(id, "onDisable 异常：" + Log.describe(t));
-                }
-            }
             lp.enabled = false;
             unload(lp);
         }
@@ -636,7 +632,7 @@ public final class Plugins {
     public void reload(String id) {
         LoadedPlugin lp = find(id);
         if (lp == null) return;
-        load(lp, false);
+        load(lp, lp.enabled);
         refreshUi();
     }
 
@@ -644,8 +640,9 @@ public final class Plugins {
     public void release(String id) {
         LoadedPlugin lp = find(id);
         if (lp == null) return;
+        boolean enabled = lp.enabled;
         unload(lp);
-        lp.enabled = true;
+        lp.enabled = enabled;
     }
 
     // 删除前调用 onUninstall 并释放 jar 锁
@@ -741,14 +738,14 @@ public final class Plugins {
         try {
             if (lp.directory) {
                 Path f = lp.source.resolve(clean).normalize();
-                if (!f.startsWith(lp.source) || !Files.isRegularFile(f) || Files.size(f) > 8L * 1024 * 1024) return null;
+                if (!f.startsWith(lp.source) || !Files.isRegularFile(f) || Files.size(f) > IMAGE_MAX) return null;
                 return Files.readAllBytes(f);
             }
             try (java.util.jar.JarFile jar = new java.util.jar.JarFile(lp.source.toFile())) {
                 ZipEntry entry = jar.getEntry(clean);
-                if (entry == null || entry.isDirectory() || entry.getSize() > 8L * 1024 * 1024) return null;
+                if (entry == null || entry.isDirectory() || entry.getSize() > IMAGE_MAX) return null;
                 try (InputStream in = jar.getInputStream(entry)) {
-                    return in.readAllBytes();
+                    return Io.read(in, IMAGE_MAX);
                 }
             }
         } catch (Exception ignored) {
@@ -775,7 +772,7 @@ public final class Plugins {
             if (node != null) page.getChildren().add(node);
         } catch (Throwable t) {
             log(def.owner, "页面渲染失败：" + Log.describe(t));
-            page.getChildren().add(Ui.hint("插件页面渲染失败：" + Log.describe(t), 3));
+            page.getChildren().add(Ui.hint(Lang.t("插件页面渲染失败：") + Log.describe(t), 3));
         }
     }
 
@@ -804,7 +801,7 @@ public final class Plugins {
                     cmd.owner, owner));
         } catch (Throwable t) {
             log(cmd.owner, "命令执行失败 " + name + "：" + Log.describe(t));
-            if (win != null) win.toast("命令执行失败", name + "：" + Log.describe(t), 3);
+            if (win != null) win.toast("命令执行失败", name + Lang.t("：") + Log.describe(t), 3);
         }
     }
 
@@ -832,7 +829,7 @@ public final class Plugins {
     public PluginInfo inspect(Path source) throws IOException {
         try (ZipFile zf = new ZipFile(source.toFile())) {
             ZipEntry entry = manifestEntry(zf);
-            if (entry == null) throw new IOException("压缩包内没有 plugin.json");
+            if (entry == null) throw new IOException(Lang.t("压缩包内没有 plugin.json"));
             Manifest m = readManifest(zf.getInputStream(entry));
             validate(m);
             return m.info(null);
@@ -844,57 +841,68 @@ public final class Plugins {
         String raw = source.getFileName().toString();
         String lower = raw.toLowerCase(java.util.Locale.ROOT);
         if (!lower.endsWith(".zip") && !lower.endsWith(".jar")) {
-            throw new IOException("仅支持 .zip 或 .jar 插件包");
+            throw new IOException(Lang.t("仅支持 .zip 或 .jar 插件包"));
         }
         Manifest m;
         String manifestText;
         String prefix;
         try (ZipFile zf = new ZipFile(source.toFile())) {
             ZipEntry entry = manifestEntry(zf);
-            if (entry == null) throw new IOException("压缩包内没有 plugin.json");
-            manifestText = new String(zf.getInputStream(entry).readAllBytes(), StandardCharsets.UTF_8);
+            if (entry == null) throw new IOException(Lang.t("压缩包内没有 plugin.json"));
+            manifestText = new String(Io.read(zf.getInputStream(entry), MANIFEST_MAX), StandardCharsets.UTF_8);
             m = readManifest(manifestText);
             validate(m);
             String name = entry.getName();
             prefix = name.equals("plugin.json") ? "" : name.substring(0, name.length() - "plugin.json".length());
         }
         Path target = dir().resolve(m.id).normalize();
-        if (!target.startsWith(dir().normalize())) throw new IOException("插件 id 非法：" + m.id);
-        if (Files.exists(target)) {
-            if (!replace) throw new IOException("插件 id 已存在：" + m.id);
-            deleteTree(target);
-        }
-        Files.createDirectories(target);
-        if (lower.endsWith(".jar")) {
-            Files.copy(source, target.resolve(safeFileName(raw)), StandardCopyOption.REPLACE_EXISTING);
-            Files.writeString(target.resolve("plugin.json"), manifestText, StandardCharsets.UTF_8);
-        } else {
-            int[] entries = {0};
-            long[] bytes = {0};
-            try (ZipFile zf = new ZipFile(source.toFile())) {
-                var en = zf.entries();
-                while (en.hasMoreElements()) {
-                    ZipEntry e = en.nextElement();
-                    String name = e.getName();
-                    if (!prefix.isEmpty()) {
-                        if (!name.startsWith(prefix)) continue;
-                        name = name.substring(prefix.length());
+        if (!target.startsWith(dir().normalize())) throw new IOException(Lang.t("插件 id 非法：") + m.id);
+        if (Files.exists(target) && !replace) throw new IOException(Lang.t("插件 id 已存在：") + m.id);
+        // 先解到临时目录 失败不破坏旧插件
+        Path staging = target.resolveSibling("." + m.id + ".installing");
+        deleteTree(staging);
+        Files.createDirectories(staging);
+        try {
+            if (lower.endsWith(".jar")) {
+                if (Files.size(source) > MAX_BYTES) throw new IOException(Lang.t("插件包超过上限（512MB）"));
+                Files.copy(source, staging.resolve(safeFileName(raw)), StandardCopyOption.REPLACE_EXISTING);
+                Files.writeString(staging.resolve("plugin.json"), manifestText, StandardCharsets.UTF_8);
+            } else {
+                int[] entries = {0};
+                long[] bytes = {0};
+                try (ZipFile zf = new ZipFile(source.toFile())) {
+                    var en = zf.entries();
+                    while (en.hasMoreElements()) {
+                        ZipEntry e = en.nextElement();
+                        String name = e.getName();
+                        if (!prefix.isEmpty()) {
+                            if (!name.startsWith(prefix)) continue;
+                            name = name.substring(prefix.length());
+                        }
+                        if (name.isEmpty() || name.endsWith("/")) continue;
+                        if (++entries[0] > MAX_ENTRIES) throw new IOException(Lang.t("插件包文件过多（上限 ") + MAX_ENTRIES + "）");
+                        Path out = staging.resolve(name).normalize();
+                        if (!out.startsWith(staging)) throw new IOException(Lang.t("插件包包含非法路径：") + e.getName());
+                        Files.createDirectories(out.getParent());
+                        try (InputStream in = zf.getInputStream(e);
+                             OutputStream os = Files.newOutputStream(out)) {
+                            bytes[0] += Io.copy(in, os, MAX_BYTES - bytes[0]);
+                        }
                     }
-                    if (name.isEmpty() || name.endsWith("/")) continue;
-                    if (++entries[0] > MAX_ENTRIES) throw new IOException("插件包文件过多（上限 " + MAX_ENTRIES + "）");
-                    Path out = target.resolve(name).normalize();
-                    if (!out.startsWith(target)) throw new IOException("插件包包含非法路径：" + e.getName());
-                    Files.createDirectories(out.getParent());
-                    try (InputStream in = zf.getInputStream(e);
-                         OutputStream os = Files.newOutputStream(out)) {
-                        bytes[0] += in.transferTo(os);
-                    }
-                    if (bytes[0] > MAX_BYTES) throw new IOException("插件包解压超过上限（512MB）");
+                }
+                if (!Files.isRegularFile(staging.resolve("plugin.json"))) {
+                    Files.writeString(staging.resolve("plugin.json"), manifestText, StandardCharsets.UTF_8);
                 }
             }
-            if (!Files.isRegularFile(target.resolve("plugin.json"))) {
-                Files.writeString(target.resolve("plugin.json"), manifestText, StandardCharsets.UTF_8);
+            if (Files.exists(target)) deleteTree(target);
+            try {
+                Files.move(staging, target, StandardCopyOption.ATOMIC_MOVE);
+            } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                Files.move(staging, target, StandardCopyOption.REPLACE_EXISTING);
             }
+        } catch (IOException | RuntimeException e) {
+            deleteTree(staging);
+            throw e;
         }
         return m.id;
     }
@@ -936,7 +944,9 @@ public final class Plugins {
     }
 
     private Manifest readManifestFromDir(Path dir) throws IOException {
-        return readManifest(Files.readString(dir.resolve("plugin.json"), StandardCharsets.UTF_8));
+        try (InputStream in = Files.newInputStream(dir.resolve("plugin.json"))) {
+            return readManifest(in);
+        }
     }
 
     private Manifest readManifestFromJar(Path jar) throws IOException {
@@ -948,7 +958,7 @@ public final class Plugins {
     }
 
     private Manifest readManifest(InputStream in) throws IOException {
-        return readManifest(new String(in.readAllBytes(), StandardCharsets.UTF_8));
+        return readManifest(new String(Io.read(in, MANIFEST_MAX), StandardCharsets.UTF_8));
     }
 
     private Manifest readManifest(String text) {
@@ -971,15 +981,15 @@ public final class Plugins {
     }
 
     private void validate(Manifest m) throws IOException {
-        if (m.id.isEmpty()) throw new IOException("plugin.json 缺少 id");
+        if (m.id.isEmpty()) throw new IOException(Lang.t("plugin.json 缺少 id"));
         if (!m.id.matches("[A-Za-z0-9][A-Za-z0-9._-]{1,63}")) {
-            throw new IOException("插件 id 只允许字母、数字、点、下划线与短横线，长度 2-64：" + m.id);
+            throw new IOException(Lang.t("插件 id 只允许字母、数字、点、下划线与短横线，长度 2-64：") + m.id);
         }
-        if (m.name.isEmpty()) throw new IOException("plugin.json 缺少 name");
-        if (m.version.isEmpty()) throw new IOException("plugin.json 缺少 version");
-        if (m.main.isEmpty()) throw new IOException("plugin.json 缺少 main");
+        if (m.name.isEmpty()) throw new IOException(Lang.t("plugin.json 缺少 name"));
+        if (m.version.isEmpty()) throw new IOException(Lang.t("plugin.json 缺少 version"));
+        if (m.main.isEmpty()) throw new IOException(Lang.t("plugin.json 缺少 main"));
         if (m.api > API_VERSION) {
-            throw new IOException("插件需要 API " + m.api + "，当前客户端仅支持 " + API_VERSION);
+            throw new IOException(Lang.tf("插件需要 API %d，当前客户端仅支持 %d", m.api, API_VERSION));
         }
     }
 
@@ -996,10 +1006,26 @@ public final class Plugins {
     }
 
     private static void deleteTree(Path path) throws IOException {
-        if (!Files.exists(path)) return;
-        try (var walk = Files.walk(path)) {
-            List<Path> items = walk.sorted(Comparator.reverseOrder()).toList();
-            for (Path p : items) Files.deleteIfExists(p);
+        if (path == null || !Files.exists(path, java.nio.file.LinkOption.NOFOLLOW_LINKS)) return;
+        if (Files.isSymbolicLink(path)) {
+            Files.deleteIfExists(path);
+            return;
         }
+        Files.walkFileTree(path, new java.nio.file.SimpleFileVisitor<Path>() {
+            @Override
+            public java.nio.file.FileVisitResult visitFile(Path file,
+                    java.nio.file.attribute.BasicFileAttributes attrs) throws IOException {
+                Files.deleteIfExists(file);
+                return java.nio.file.FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public java.nio.file.FileVisitResult postVisitDirectory(Path folder, IOException exc)
+                    throws IOException {
+                if (exc != null) throw exc;
+                Files.deleteIfExists(folder);
+                return java.nio.file.FileVisitResult.CONTINUE;
+            }
+        });
     }
 }

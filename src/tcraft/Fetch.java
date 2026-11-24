@@ -26,6 +26,12 @@ public final class Fetch {
 
     public static void file(Tasks.Task task, String url, Path target, String sha1,
                             double from, double to) throws IOException {
+        file(task, url, target, sha1, from, to, true);
+    }
+
+    // 并发下载时进度由调用方汇总 单文件不再抢写
+    static void file(Tasks.Task task, String url, Path target, String sha1,
+                     double from, double to, boolean report) throws IOException {
         Path part = target.resolveSibling(target.getFileName() + ".part");
         Files.createDirectories(target.toAbsolutePath().getParent());
 
@@ -53,21 +59,21 @@ public final class Fetch {
                     // 分段退避 可取消
                     long left = BACKOFF_MS[Math.min(attempt - 1, BACKOFF_MS.length - 1)];
                     while (left > 0) {
-                        if (task != null && task.canceled) throw new IOException("已取消");
+                        if (task != null && task.canceled) throw new IOException(Lang.t("已取消"));
                         sleep(Math.min(200, left));
                         left -= 200;
                     }
                 }
-                if (task != null && task.canceled) throw new IOException("已取消");
+                if (task != null && task.canceled) throw new IOException(Lang.t("已取消"));
                 try {
-                    transfer(task, url, part, done, digest, from, to);
+                    transfer(task, url, part, done, digest, from, to, report);
                     if (digest != null) {
                         String actual = HexFormat.of().formatHex(digest.digest());
                         if (!expect.equals(actual)) {
                             Files.deleteIfExists(part);
                             digest = sha1();
                             done = 0;
-                            last = new IOException("文件校验失败（SHA-1 不匹配）");
+                            last = new IOException(Lang.t("文件校验失败（SHA-1 不匹配）"));
                             continue;
                         }
                     }
@@ -109,7 +115,8 @@ public final class Fetch {
     }
 
     private static void transfer(Tasks.Task task, String url, Path part, long done,
-                                 MessageDigest digest, double from, double to) throws IOException {
+                                 MessageDigest digest, double from, double to,
+                                 boolean report) throws IOException {
         Http.Body body = done > 0 ? Http.open(url, Duration.ofSeconds(60), done)
                 : Http.open(url, Duration.ofSeconds(60));
         IdleGuard guard = new IdleGuard(body.in, IDLE_TIMEOUT_MS);
@@ -135,13 +142,17 @@ public final class Fetch {
                 int n;
                 while ((n = in.read(buffer)) >= 0) {
                     guard.touch();
-                    if (task != null && task.canceled) throw new IOException("已取消");
+                    if (task != null && task.canceled) throw new IOException(Lang.t("已取消"));
                     out.write(buffer, 0, n);
                     if (digest != null) digest.update(buffer, 0, n);
                     written += n;
+                    NetSpeed.add(n);
+                    if (done + written > 4L * 1024 * 1024 * 1024) {
+                        throw new IOException(Lang.t("下载文件超过大小上限"));
+                    }
                     if (limit > 0) Downloader.throttle(n, limit);
                     long now = System.currentTimeMillis();
-                    if (task != null && now - lastTick > 400) {
+                    if (report && task != null && now - lastTick > 400) {
                         task.speed = speed((written - lastBytes) * 1000 / Math.max(1, now - lastTick));
                         // from==to 时调用方自管进度
                         if (total > 0 && to > from) {
@@ -180,7 +191,7 @@ public final class Fetch {
                 if (take > 0) out.write(buffer, 0, take);
                 if (out.size() >= maxBytes) {
                     // 超限报错 不给半截
-                    if (in.read() != -1) throw new java.io.IOException("响应超过大小上限");
+                    if (in.read() != -1) throw new java.io.IOException(Lang.t("响应超过大小上限"));
                     break;
                 }
             }

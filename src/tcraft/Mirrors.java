@@ -67,6 +67,9 @@ public final class Mirrors {
         if (url.startsWith("https://media.forgecdn.net")) {
             return base + url.substring("https://media.forgecdn.net".length());
         }
+        if (url.startsWith("https://mediafilez.forgecdn.net")) {
+            return base + url.substring("https://mediafilez.forgecdn.net".length());
+        }
         return null;
     }
 }

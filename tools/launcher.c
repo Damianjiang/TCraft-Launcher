@@ -1428,7 +1428,7 @@ static DWORD WINAPI java_part_thread(void *arg)
                       0x80000000UL | 0x04000000UL | 0x00800000UL | 0x00400000UL);
     if (!req) goto done;
     sprintf(range_a, "Range: bytes=%lu-%lu\r\n", p->start, p->end);
-    // w() 共享池非线程安全 分块线程用栈上缓冲
+    // w 共享池非线程安全 分块线程用栈上缓冲
     if (!MultiByteToWideChar(CP_UTF8, 0, range_a, -1, range_w, 128)) goto done;
     add_hdr_fn(req, range_w, (unsigned long)-1, 0xA0000000UL);
     if (!query_fn(req, 0x20000013UL, &status, &status_len, &status_idx) || status != 206UL) goto done;

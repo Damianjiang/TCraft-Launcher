@@ -27,7 +27,14 @@ public final class InstanceMeta {
 
     public static Path versionDir(Data.Instance ins) {
         String folder = ins.folder != null && !ins.folder.isEmpty() ? ins.folder : Data.get().gameDir;
-        return Paths.get(folder).resolve("versions").resolve(ins.version);
+        Path base = Paths.get(folder).toAbsolutePath().normalize();
+        Path versions = base.resolve("versions").normalize();
+        String version = ins.version == null ? "" : ins.version.trim();
+        Path dir = versions.resolve(version).normalize();
+        if (version.isEmpty() || dir.equals(versions) || !dir.startsWith(versions)) {
+            return versions.resolve("__invalid__");
+        }
+        return dir;
     }
 
     public static Path setupIni(Data.Instance ins) {
@@ -49,6 +56,7 @@ public final class InstanceMeta {
     }
 
     private static java.util.Map<String, String> loadIni(Path file) throws Exception {
+        if (Files.size(file) > 1024L * 1024) throw new java.io.IOException("Setup.ini 过大");
         long modified = Files.getLastModifiedTime(file).toMillis();
         String key = file.toAbsolutePath().toString();
         CachedIni cached = INI_CACHE.get(key);
@@ -65,6 +73,7 @@ public final class InstanceMeta {
             values.put(trimmed.substring(0, eq).trim().toLowerCase(java.util.Locale.ROOT),
                     trimmed.substring(eq + 1).trim());
         }
+        if (INI_CACHE.size() >= 512) INI_CACHE.clear();
         INI_CACHE.put(key, new CachedIni(modified, values));
         return values;
     }
@@ -84,6 +93,9 @@ public final class InstanceMeta {
     public static void write(Data.Instance ins, String key, String value) {
         try {
             Path file = setupIni(ins);
+            if (Files.isRegularFile(file) && Files.size(file) > 1024L * 1024) {
+                throw new java.io.IOException("Setup.ini 过大");
+            }
             List<String> lines = Files.isRegularFile(file)
                     ? new ArrayList<>(Files.readAllLines(file, StandardCharsets.UTF_8))
                     : new ArrayList<>();
@@ -109,7 +121,7 @@ public final class InstanceMeta {
             Files.write(file, out, StandardCharsets.UTF_8);
             INI_CACHE.remove(file.toAbsolutePath().toString());
         } catch (Exception e) {
-            // brief 会被二次 Lang.t 先译无害
+            // brief 可能被再次查表
             Errors.error(Lang.t("保存实例设置失败：") + ins.name + " / " + key, e);
         }
     }
@@ -176,7 +188,10 @@ public final class InstanceMeta {
             try {
                 Path file = storePath();
                 if (!Files.isRegularFile(file)) return out;
-                String text = Files.readString(file, StandardCharsets.UTF_8);
+                String text;
+                try (java.io.InputStream in = Files.newInputStream(file)) {
+                    text = new String(Io.read(in, 1024L * 1024), StandardCharsets.UTF_8);
+                }
                 if (text.startsWith("\uFEFF")) text = text.substring(1);
                 Object root = Json.parse(text);
                 for (Object one : Json.arr(root, "Collections")) {

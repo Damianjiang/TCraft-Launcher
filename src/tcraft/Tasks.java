@@ -29,7 +29,8 @@ public final class Tasks {
         public volatile boolean canceled;
         public volatile String error;
         public Runnable onCancel;
-        public String versionId;
+        public volatile String pendingText = "";
+        public volatile Runnable pendingAction;
         public final List<SubTask> subs = new CopyOnWriteArrayList<>();
 
         public Task(String title) {
@@ -51,9 +52,6 @@ public final class Tasks {
     public void add(Task task) {
         list.add(0, task);
         trim();
-    }
-
-    public void changed() {
     }
 
     // 失败/取消也算结束 最多 40 条
@@ -79,12 +77,25 @@ public final class Tasks {
 
     public double overall() {
         double sum = 0;
-        int n = 0;
+        int active = 0;
+        boolean done = false;
+        boolean failed = false;
         for (Task t : list) {
-            sum += t.state == State.DONE ? 1 : t.progress;
-            n++;
+            switch (t.state) {
+                case RUNNING -> {
+                    sum += Math.max(0, Math.min(1, t.progress));
+                    active++;
+                }
+                case DONE -> done = true;
+                case FAILED -> failed = true;
+                default -> {
+                }
+            }
         }
-        return n == 0 ? 0 : sum / n;
+        if (active > 0) return sum / active;
+        if (done && !failed) return 1;
+        // 空任务按 100 % 显示
+        return list.isEmpty() ? 1 : 0;
     }
 
     public void clearFinished() {

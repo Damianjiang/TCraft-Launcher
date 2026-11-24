@@ -29,6 +29,11 @@ import java.util.zip.ZipOutputStream;
 
 public class PageInstanceSetup implements Page {
 
+    private static final long PACK_JSON_MAX = 10L * 1024 * 1024;
+    private static final long JIJ_MAX = 32L * 1024 * 1024;
+    private static final long JIJ_EXPORT_ENTRY_MAX = 256L * 1024 * 1024;
+    private static final long JIJ_EXPORT_TOTAL_MAX = 2L * 1024 * 1024 * 1024;
+
     private final MainWindow win;
     private final Data data = Data.get();
     private VBox leftList;
@@ -79,11 +84,13 @@ public class PageInstanceSetup implements Page {
                 nav("历史", "history", "history"),
                 nav("设置", "settings", "settings"),
                 nav("Mod 管理", "puzzle", "mods"),
+                nav("更新", "refresh-cw", "updates"),
                 nav("资源包", "palette", "resourcepacks"),
                 nav("光影", "sun", "shaders"),
                 nav("存档", "map", "saves"),
                 nav("存档数据包", "file-box", "savesdatapack"),
                 nav("截图", "image", "screenshots"),
+                nav("原理图", "layers", "schematics"),
                 nav("服务器", "server", "server"),
                 nav("嵌套依赖", "boxes", "jarinjar"),
                 nav("整合包清单", "package", "complist"),
@@ -179,11 +186,13 @@ public class PageInstanceSetup implements Page {
             case "history" -> buildHistory(page);
             case "settings" -> buildSettings(page);
             case "mods" -> buildMods(page);
+            case "updates" -> buildUpdates(page);
             case "resourcepacks" -> buildPacks(page, "resourcepacks", "资源包");
             case "shaders" -> buildPacks(page, "shaderpacks", "光影");
             case "saves" -> buildSaves(page);
             case "savesdatapack" -> buildSavesDatapack(page);
             case "screenshots" -> buildScreenshots(page);
+            case "schematics" -> buildSchematics(page);
             case "server" -> buildServer(page);
             case "jarinjar" -> buildJarInJar(page);
             case "complist" -> buildCompManifest(page);
@@ -334,7 +343,6 @@ public class PageInstanceSetup implements Page {
                 st.filter(Files::isRegularFile)
                         .sorted(java.util.Comparator.comparingLong((Path p) -> p.toFile().lastModified()).reversed())
                         .limit(12)
-                        // 下拉项创建处翻译
                         .forEach(p -> diagAddSource(Lang.tf("崩溃报告 · %s", p.getFileName()), p));
             } catch (Exception ignored) {
             }
@@ -431,7 +439,6 @@ public class PageInstanceSetup implements Page {
         diagDisplay.clear();
         int index = diagSourceCombo == null ? -1 : diagSourceCombo.getSelectionModel().getSelectedIndex();
         if (index < 0 || index >= diagSourcePaths.size()) {
-            // 异步状态文本创建处翻译
             diagStatus.setText(Lang.t("没有可用的日志来源。"));
             diagPath.setText("");
             diagApplyFilter();
@@ -633,6 +640,11 @@ public class PageInstanceSetup implements Page {
             return;
         }
         try {
+            if (Files.size(options) > 4L * 1024 * 1024) {
+                Ui.Card notice = addCard(page, "提示");
+                notice.add(Ui.label("options.txt 超过 4MB，已跳过读取。", 13, Theme.gray2));
+                return;
+            }
             java.nio.charset.Charset cs = GameLauncher.optionsCharset(options);
             for (String line : Files.readAllLines(options, cs)) {
                 int idx = line.indexOf(':');
@@ -834,7 +846,11 @@ public class PageInstanceSetup implements Page {
                     preset.getFileName().toString().replace(".json", ""), null, 40);
             applyRow.setOnMouseClicked(e -> {
                 try {
-                    java.util.Map<String, Object> m = Json.obj(Json.parse(Files.readString(preset, StandardCharsets.UTF_8)));
+                    String presetText;
+                    try (java.io.InputStream in = Files.newInputStream(preset)) {
+                        presetText = new String(Io.read(in, 1024L * 1024), StandardCharsets.UTF_8);
+                    }
+                    java.util.Map<String, Object> m = Json.obj(Json.parse(presetText));
                     int applied = 0;
                     for (Object[] def : OPT_DEFS) {
                         String k = (String) def[0];
@@ -847,7 +863,6 @@ public class PageInstanceSetup implements Page {
                     optionDirty = true;
                     win.closeModal();
                     win.openSetup("options");
-                    // toast 拼接串创建处翻译
                     win.toast(Lang.t("已套用预设「") + preset.getFileName().toString().replace(".json", "") + Lang.t("」"),
                             Lang.t("共 ") + applied + Lang.t("项。记得点「保存修改」写入 options.txt。"), 1);
                 } catch (Exception ex) {
@@ -953,7 +968,7 @@ public class PageInstanceSetup implements Page {
         int ram = data.getInstanceInt("Ram", 4096);
         Ui.SliderBar ramBar = Ui.sliderBar(512, physicalRamMb(), ram);
         ramBar.setPrefWidth(250);
-        Label ramVal = Ui.label(ramType == 0 ? "自动" : ram + " MB", 12, Theme.text);
+        Label ramVal = Ui.label(ramType == 0 ? Lang.t("自动") : ram + " MB", 12, Theme.text);
         ramBar.setOnChanged(b -> {
             int v = (int) (Math.round(b / 512.0) * 512);
             ramVal.setText(v + " MB");
@@ -968,7 +983,7 @@ public class PageInstanceSetup implements Page {
             ramBar.setDisable(!on);
             ramVal.setOpacity(on ? 1 : 0.55);
             int v = (int) (Math.round(ramBar.getValue() / 512.0) * 512);
-            ramVal.setText(on ? v + " MB" : "自动");
+            ramVal.setText(on ? v + " MB" : Lang.t("自动"));
         };
         syncRam.run();
         autoRam.setOnAction(() -> {
@@ -990,10 +1005,10 @@ public class PageInstanceSetup implements Page {
         if (initialRam > ram) initialRam = 0;
         Ui.SliderBar initialBar = Ui.sliderBar(0, Math.max(512, ram), Math.min(Math.max(512, ram), initialRam));
         initialBar.setPrefWidth(250);
-        Label initialVal = Ui.label(initialRam <= 0 ? "自动" : initialRam + " MB", 12, Theme.text);
+        Label initialVal = Ui.label(initialRam <= 0 ? Lang.t("自动") : initialRam + " MB", 12, Theme.text);
         initialBar.setOnChanged(b -> {
             int v = (int) (Math.round(b / 512.0) * 512);
-            initialVal.setText(v <= 0 ? "自动" : v + " MB");
+            initialVal.setText(v <= 0 ? Lang.t("自动") : v + " MB");
             data.setInstance("RamInitial", v);
         });
         HBox initialBox = new HBox(10, initialBar, initialVal);
@@ -1045,7 +1060,6 @@ public class PageInstanceSetup implements Page {
         }
         java.util.List<String> javaOpts = new ArrayList<>();
         java.util.List<String> javaPaths = new ArrayList<>();
-        // 下拉项创建处翻译
         String followLabel = Lang.tf("跟随全局设置（%s）", data.javaPath.isEmpty() ? Lang.t("未找到 Java")
                 : Paths.get(data.javaPath).getFileName());
         javaOpts.add(followLabel);
@@ -1113,10 +1127,12 @@ public class PageInstanceSetup implements Page {
         classpathHead.textProperty().addListener((o, a, b) -> data.setInstance("ClasspathHead", b));
         java.add(Ui.settingRow("类路径头部", classpathHead));
 
-        Ui.Check console = Ui.checkBox("显示控制台窗口（java.exe，占用一个命令行窗口）", false);
-        console.setSelected(data.getInstanceBool("Console", false));
-        console.setOnAction(() -> data.setInstance("Console", console.isSelected()));
-        java.add(console);
+        if (Shell.windows()) {
+            Ui.Check console = Ui.checkBox("显示控制台窗口（java.exe，占用一个命令行窗口）", false);
+            console.setSelected(data.getInstanceBool("Console", false));
+            console.setOnAction(() -> data.setInstance("Console", console.isSelected()));
+            java.add(console);
+        }
 
         Ui.Check disableModUpdate = Ui.checkBox("禁止更新 Mod", false);
         disableModUpdate.setSelected(data.getInstanceBool("DisableModUpdate", false));
@@ -1139,6 +1155,310 @@ public class PageInstanceSetup implements Page {
         } catch (Throwable t) {
             return 4096;
         }
+    }
+
+    private static final java.util.concurrent.atomic.AtomicBoolean UPDATING =
+            new java.util.concurrent.atomic.AtomicBoolean();
+
+    private static final class UpdateItem {
+        final Path file;
+        final ResourceVersion latest;
+        boolean selected = true;
+
+        UpdateItem(Path file, ResourceVersion latest) {
+            this.file = file;
+            this.latest = latest;
+        }
+
+        String display() {
+            return ResourceVersion.stripExtension(file.getFileName().toString());
+        }
+    }
+
+    private void buildUpdates(VBox page) {
+        header(page, "更新", "检查 Mod、资源包与光影的可用新版本");
+        javafx.scene.Node note = Ui.hint("更新检查来自 Modrinth，CurseForge 资源请手动替换。", 0);
+        VBox.setMargin(note, new Insets(0, 0, 10, 0));
+        page.getChildren().add(note);
+        Label status = Ui.label("尚未检查。更新前请备份实例。", 11.5, Theme.gray2);
+        HBox actions = new HBox(10);
+        actions.setAlignment(Pos.CENTER_LEFT);
+        VBox rows = new VBox(1);
+        List<UpdateItem> found = new ArrayList<>();
+        StackPane allBtn = Ui.button("更新选中", Ui.BTN_NORMAL, () -> {
+            List<UpdateItem> chosen = found.stream().filter(i -> i.selected).toList();
+            if (chosen.isEmpty()) return;
+            Dialogs.confirm(win, "更新选中",
+                    Lang.tf("将更新 %d 项内容，旧文件移入回收站，更新前请备份实例。继续？", chosen.size()),
+                    () -> applyAllUpdates(new ArrayList<>(chosen)), true);
+        });
+        allBtn.setDisable(true);
+        Runnable choiceChanged = () -> {
+            long n = found.stream().filter(i -> i.selected).count();
+            allBtn.setDisable(n == 0);
+            if (n > 0) status.setText(Lang.tf("已选 %d 项更新", n));
+        };
+        StackPane[] checkRef = new StackPane[1];
+        Runnable[] checkRun = new Runnable[1];
+        Ui.Check beta = Ui.checkBox("包含测试版", false);
+        beta.setSelected(data.getBool("UiUpdateBeta", false));
+        beta.setOnAction(() -> {
+            data.set("UiUpdateBeta", beta.isSelected());
+            checkRun[0].run();
+        });
+        StackPane checkBtn = Ui.button("检查更新", Ui.BTN_THEME, () -> checkRun[0].run());
+        checkRef[0] = checkBtn;
+        checkRun[0] = () -> {
+            checkRef[0].setDisable(true);
+            allBtn.setDisable(true);
+            beta.setDisable(true);
+            status.setText(Lang.t("正在检查"));
+            rows.getChildren().clear();
+            found.clear();
+            Threads.start("TCL-UpdateCheck", () -> {
+                UpdateScan scan;
+                try {
+                    scan = findUpdates(beta.isSelected());
+                } catch (Exception e) {
+                    scan = new UpdateScan();
+                    scan.failed = 1;
+                }
+                UpdateScan finalScan = scan;
+                javafx.application.Platform.runLater(() -> {
+                    found.addAll(finalScan.items);
+                    renderUpdateRows(rows, found, choiceChanged);
+                    checkRef[0].setDisable(false);
+                    beta.setDisable(false);
+                    allBtn.setDisable(found.isEmpty());
+                    if (found.isEmpty()) {
+                        status.setText(finalScan.failed > 0
+                                ? Lang.tf("%d 个文件检查失败，请检查网络", finalScan.failed)
+                                : finalScan.beta > 0
+                                ? Lang.tf("有 %d 项测试版更新", finalScan.beta)
+                                : "全部已是最新");
+                    } else {
+                        status.setText(Lang.tf("发现 %d 项更新", found.size()));
+                    }
+                });
+            });
+        };
+        actions.getChildren().addAll(checkBtn, allBtn, beta, status);
+        page.getChildren().add(actions);
+        VBox.setMargin(page.getChildren().get(page.getChildren().size() - 1), new Insets(0, 0, 12, 0));
+        Ui.Card card = addCard(page, "可更新内容");
+        if (rows.getChildren().isEmpty()) {
+            rows.getChildren().add(Ui.label("点检查更新后，这里会列出可升级的 Mod 资源包和光影。", 12.5, Theme.gray2));
+        }
+        card.add(rows);
+    }
+
+    private UpdateScan findUpdates(boolean includeBeta) {
+        UpdateScan out = new UpdateScan();
+        Data.Instance ins = data.instance();
+        String version = ins == null || ins.version == null ? "" : ins.version;
+        String loader = ins == null || ins.loader == null ? "" : ins.loader.toLowerCase(java.util.Locale.ROOT);
+        List<Path> files = new ArrayList<>();
+        files.addAll(listFiles(instanceRoot().resolve("mods"), ".jar"));
+        files.addAll(listFiles(instanceRoot().resolve("resourcepacks"), ".zip"));
+        files.addAll(listFiles(instanceRoot().resolve("shaderpacks"), ".zip"));
+        int limit = Math.min(files.size(), 120);
+        for (int i = 0; i < limit; i++) {
+            Path file = files.get(i);
+            boolean isMod = "mods".equals(file.getParent().getFileName().toString());
+            try {
+                String hash = GameLauncher.sha1Of(file);
+                String[] hit = Modrinth.checkUpdateBySha1(hash);
+                if (hit == null) continue;
+                List<Object> versions = Modrinth.projectVersions(hit[0]);
+                ResourceVersion pick = null;
+                boolean betaHit = false;
+                for (Object o : versions) {
+                    ResourceVersion rv = ResourceVersion.fromModrinthJson(Json.obj(o), "mod");
+                    if (rv.downloadUrls.isEmpty()) continue;
+                    if (rv.hash != null && rv.hash.equalsIgnoreCase(hash)) break;
+                    if (!rv.gameVersions.isEmpty() && !version.isEmpty() && !rv.gameVersions.contains(version)) continue;
+                    if (isMod && !rv.loaders.isEmpty() && !loader.isEmpty() && !"原版".equals(loader)) {
+                        boolean match = false;
+                        for (String l : rv.loaders) {
+                            if (l.equalsIgnoreCase(loader)) {
+                                match = true;
+                                break;
+                            }
+                        }
+                        if (!match) continue;
+                    }
+                    if (!includeBeta && rv.releaseType != 0) {
+                        betaHit = true;
+                        continue;
+                    }
+                    pick = rv;
+                    break;
+                }
+                if (pick != null) out.items.add(new UpdateItem(file, pick));
+                else if (betaHit) out.beta++;
+            } catch (Exception ignored) {
+                out.failed++;
+            }
+        }
+        return out;
+    }
+
+    private static final class UpdateScan {
+        final List<UpdateItem> items = new ArrayList<>();
+        int failed;
+        int beta;
+    }
+
+    private void renderUpdateRows(VBox rows, List<UpdateItem> items, Runnable onChange) {
+        rows.getChildren().clear();
+        for (UpdateItem item : items) {
+            String info = item.latest.title(false) + " · " + item.latest.infoLine();
+            Ui.ListItem row = new Ui.ListItem(Theme.icon("refresh-cw", 16, Theme.text),
+                    item.file.getFileName().toString(), info, 44);
+            Ui.Check pick = Ui.checkBox("", item.selected);
+            pick.setOnAction(() -> {
+                item.selected = pick.isSelected();
+                row.setSelected(pick.isSelected());
+                onChange.run();
+            });
+            StackPane host = new StackPane(pick);
+            host.setMaxWidth(Region.USE_PREF_SIZE);
+            HBox.setMargin(host, new Insets(0, 6, 0, 4));
+            row.getChildren().add(host);
+            row.setSelected(item.selected);
+            row.addAction(Ui.listAction("download", 26, 15, "更新",
+                    () -> applyModUpdate(item.file, item.latest)));
+            rows.getChildren().add(row);
+        }
+    }
+
+    private static void remapPackOptions(Path dir, String oldName, String newName) {
+        String folder = dir.getFileName().toString();
+        if (!"resourcepacks".equals(folder) && !"shaderpacks".equals(folder)) return;
+        if (oldName.equals(newName)) return;
+        Path options = dir.getParent().resolve("options.txt");
+        if (!Files.isRegularFile(options)) return;
+        try {
+            if (Files.size(options) > 4L * 1024 * 1024) return;
+            java.nio.charset.Charset cs = GameLauncher.optionsCharset(options);
+            List<String> lines = Files.readAllLines(options, cs);
+            boolean changed = false;
+            for (int i = 0; i < lines.size(); i++) {
+                String line = lines.get(i);
+                if ("resourcepacks".equals(folder) && line.startsWith("resourcePacks:")) {
+                    String updated = line
+                            .replace("\"file/" + oldName + "\"", "\"file/" + newName + "\"")
+                            .replace("\"" + oldName + "\"", "\"" + newName + "\"")
+                            .replaceAll("(?<=[\\[,])" + java.util.regex.Pattern.quote(oldName) + "(?=[,\\]])",
+                                    java.util.regex.Matcher.quoteReplacement(newName));
+                    if (!updated.equals(line)) {
+                        lines.set(i, updated);
+                        changed = true;
+                    }
+                } else if ("shaderpacks".equals(folder) && line.startsWith("shaderPack:")) {
+                    String value = line.substring("shaderPack:".length()).trim();
+                    boolean quoted = value.startsWith("\"") && value.endsWith("\"") && value.length() >= 2;
+                    String bare = quoted ? value.substring(1, value.length() - 1) : value;
+                    if (bare.equals(oldName)) {
+                        lines.set(i, "shaderPack:" + (quoted ? "\"" + newName + "\"" : newName));
+                        changed = true;
+                    }
+                }
+            }
+            if (changed) Files.write(options, lines, cs);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void applyAllUpdates(List<UpdateItem> items) {
+        if (items.isEmpty()) return;
+        if (!UPDATING.compareAndSet(false, true)) {
+            win.toast("已有更新任务", "请等待当前任务结束", 2);
+            return;
+        }
+        Tasks.Task task = new Tasks.Task(items.size() == 1 ? Lang.tf("更新 %s", items.get(0).display()) : "批量更新");
+        for (UpdateItem item : items) task.subs.add(new Tasks.SubTask(item.file.getFileName().toString()));
+        Tasks.INSTANCE.add(task);
+        win.toast(items.size() == 1 ? "开始更新" : "开始批量更新",
+                Lang.tf("%d 项内容", items.size()), 0);
+        Threads.start("TCL-BatchUpdate", () -> {
+            try {
+                int done = 0;
+                int failed = 0;
+                for (int i = 0; i < items.size(); i++) {
+                    if (task.canceled) break;
+                    UpdateItem item = items.get(i);
+                    Tasks.SubTask sub = task.subs.get(i);
+                    sub.state = Tasks.State.RUNNING;
+                    task.stage = "下载 " + (item.latest.fileName == null ? item.display() : item.latest.fileName);
+                    Path source = item.file.toAbsolutePath().normalize();
+                    Path dir = source.getParent();
+                    if (dir == null) {
+                        failed++;
+                        sub.state = Tasks.State.FAILED;
+                        continue;
+                    }
+                    String newName = item.latest.fileName == null ? "" : item.latest.fileName.replace("~", "-");
+                    Path target = newName.isEmpty() ? source : dir.resolve(newName).normalize();
+                    Path backup = null;
+                    boolean existed = Files.exists(target);
+                    try {
+                        if (newName.isEmpty()) throw new java.io.IOException(Lang.t("更新文件名无效"));
+                        if (!target.startsWith(dir)) throw new java.io.IOException(Lang.t("文件名包含非法路径"));
+                        if (existed && !target.equals(source)) {
+                            throw new java.io.IOException(Lang.t("目标文件已存在：") + target.getFileName());
+                        }
+                        if (target.equals(source)) {
+                            backup = dir.resolve(source.getFileName() + ".tcl-old");
+                            Files.move(source, backup, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                        }
+                        Modrinth.downloadUrl(task, item.latest.downloadUrls.get(0), target, item.latest.hash);
+                        remapPackOptions(dir, source.getFileName().toString(), target.getFileName().toString());
+                        sub.state = Tasks.State.DONE;
+                        sub.progress = 1;
+                        Path recycle = backup != null ? backup : source;
+                        if (Files.exists(recycle)) Shell.deleteToRecycleBin(recycle.toString());
+                        done++;
+                        task.progress = (i + 1) / (double) items.size();
+                    } catch (Exception e) {
+                        failed++;
+                        sub.state = Tasks.State.FAILED;
+                        if (backup != null) {
+                            try {
+                                Files.deleteIfExists(target);
+                            } catch (Exception ignored) {
+                            }
+                            try {
+                                Files.move(backup, source, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                            } catch (Exception ignored) {
+                            }
+                        } else if (!existed) {
+                            try {
+                                Files.deleteIfExists(target);
+                            } catch (Exception ignored) {
+                            }
+                        }
+                    }
+                }
+                task.progress = 1;
+                task.stage = Lang.tf("完成 %d 项", done);
+                task.state = task.canceled ? Tasks.State.CANCELED : failed == 0 ? Tasks.State.DONE : Tasks.State.FAILED;
+                if (failed > 0) task.error = Lang.tf("%d 项更新失败", failed);
+                int fDone = done;
+                int fFailed = failed;
+                javafx.application.Platform.runLater(() -> {
+                    win.refreshRight();
+                    if (task.canceled) {
+                        win.toast("已取消更新", Lang.tf("完成 %d 项", fDone), 2);
+                        return;
+                    }
+                    win.toast(fFailed == 0 ? "更新完成" : "部分更新失败",
+                            Lang.tf("成功 %d 项，失败 %d 项", fDone, fFailed), fFailed == 0 ? 1 : 2);
+                });
+            } finally {
+                UPDATING.set(false);
+            }
+        });
     }
 
     private void buildMods(VBox page) {
@@ -1196,7 +1516,8 @@ public class PageInstanceSetup implements Page {
                                HBox filterRow, VBox rows, Path modsDir) {
         filterRow.getChildren().clear();
         long en = mods.stream().filter(p -> !isDisabledPack(p)).count();
-        String[] opts = {"全部 (" + mods.size() + ")", "启用 (" + en + ")", "禁用 (" + (mods.size() - en) + ")"};
+        String[] opts = {Lang.tf("全部 (%d)", mods.size()), Lang.tf("启用 (%d)", en),
+                Lang.tf("禁用 (%d)", mods.size() - en)};
         for (int i = 0; i < opts.length; i++) {
             String label = opts[i];
             int idx = i;
@@ -1244,7 +1565,7 @@ public class PageInstanceSetup implements Page {
         String display = cached != null && !cached.isBlank() ? cached.trim() : fileDisplay;
         Node icon = Theme.icon(disabled ? "link-2-off" : "puzzle", 16, disabled ? Theme.gray4 : Theme.accent);
         Ui.ListItem item = new Ui.ListItem(icon, display,
-                (disabled ? "已禁用 · " : "") + (display.equals(fileDisplay) ? "" : fileDisplay + " · ") + sizeOf(mod), 40);
+                (disabled ? Lang.t("已禁用 · ") : "") + (display.equals(fileDisplay) ? "" : fileDisplay + " · ") + sizeOf(mod), 40);
         if (wantLocalName && cached == null) {
             MOD_NAME_POOL.execute(() -> {
                 String local = readLocalModName(mod);
@@ -1252,7 +1573,7 @@ public class PageInstanceSetup implements Page {
                 cacheModName(cacheKey, local.trim());
                 javafx.application.Platform.runLater(() -> {
                     item.title.setText(local.trim());
-                    item.info.setText((disabled ? "已禁用 · " : "") + fileDisplay + " · " + sizeOf(mod));
+                    item.info.setText((disabled ? Lang.t("已禁用 · ") : "") + fileDisplay + " · " + sizeOf(mod));
                 });
             });
         }
@@ -1272,13 +1593,24 @@ public class PageInstanceSetup implements Page {
     }
 
     // 读盘须后台 不读缓存
+    // 读元数据必须有上限 防恶意条目撑爆堆
+    private static String readZipText(java.util.zip.ZipFile zip, java.util.zip.ZipEntry entry, long max)
+            throws Exception {
+        if (entry == null) return "";
+        if (entry.getSize() > max) return "";
+        try (java.io.InputStream in = zip.getInputStream(entry)) {
+            return new String(Io.read(in, max), java.nio.charset.StandardCharsets.UTF_8);
+        }
+    }
+
+    private static final long MOD_META_MAX = 2L * 1024 * 1024;
+
     private static String readLocalModName(Path mod) {
         String found = "";
         try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(mod.toFile())) {
             java.util.zip.ZipEntry fabric = zip.getEntry("fabric.mod.json");
             if (fabric != null) {
-                String text = new String(zip.getInputStream(fabric).readAllBytes(),
-                        java.nio.charset.StandardCharsets.UTF_8);
+                String text = readZipText(zip, fabric, MOD_META_MAX);
                 java.util.regex.Matcher m = java.util.regex.Pattern.compile(
                         "\"name\"\\s*:\\s*\"([^\"]+)\"").matcher(text);
                 if (m.find()) found = m.group(1);
@@ -1287,8 +1619,7 @@ public class PageInstanceSetup implements Page {
                 java.util.zip.ZipEntry forge = zip.getEntry("META-INF/mods.toml");
                 if (forge == null) forge = zip.getEntry("META-INF/neoforge.mods.toml");
                 if (forge != null) {
-                    String text = new String(zip.getInputStream(forge).readAllBytes(),
-                            java.nio.charset.StandardCharsets.UTF_8);
+                    String text = readZipText(zip, forge, MOD_META_MAX);
                     java.util.regex.Matcher m = java.util.regex.Pattern.compile(
                             "(?m)^\\s*displayName\\s*=\\s*\"([^\"]+)\"").matcher(text);
                     if (m.find()) found = m.group(1);
@@ -1297,8 +1628,7 @@ public class PageInstanceSetup implements Page {
             if (found.isEmpty()) {
                 java.util.zip.ZipEntry old = zip.getEntry("mcmod.info");
                 if (old != null) {
-                    String text = new String(zip.getInputStream(old).readAllBytes(),
-                            java.nio.charset.StandardCharsets.UTF_8);
+                    String text = readZipText(zip, old, MOD_META_MAX);
                     java.util.regex.Matcher m = java.util.regex.Pattern.compile(
                             "\"name\"\\s*:\\s*\"([^\"]+)\"").matcher(text);
                     if (m.find()) found = m.group(1);
@@ -1368,7 +1698,7 @@ public class PageInstanceSetup implements Page {
             try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(mod.toFile())) {
                 java.util.zip.ZipEntry mcmod = zip.getEntry("mcmod.info");
                 if (mcmod != null) {
-                    var root = Json.obj(Json.parse(new String(zip.getInputStream(mcmod).readAllBytes(), StandardCharsets.UTF_8)));
+                    var root = Json.obj(Json.parse(readZipText(zip, mcmod, MOD_META_MAX)));
                     var first = Json.obj(Json.arr(root.get("modList")).isEmpty() ? null : Json.arr(root.get("modList")).get(0));
                     meta = new String[]{Json.str(first, "name", display), Json.str(first, "version", ""),
                             Json.str(first, "description", "")};
@@ -1376,7 +1706,7 @@ public class PageInstanceSetup implements Page {
                 if (meta == null) {
                     java.util.zip.ZipEntry fabric = zip.getEntry("fabric.mod.json");
                     if (fabric != null) {
-                        var root = Json.obj(Json.parse(new String(zip.getInputStream(fabric).readAllBytes(), StandardCharsets.UTF_8)));
+                        var root = Json.obj(Json.parse(readZipText(zip, fabric, MOD_META_MAX)));
                         meta = new String[]{Json.str(root, "name", Json.str(root, "id", display)),
                                 Json.str(root, "version", ""), Json.str(root, "description", "")};
                     }
@@ -1465,7 +1795,7 @@ public class PageInstanceSetup implements Page {
                                 + "\n如果你在游玩整合包，请千万不要自行更新 Mod。更新前请先备份存档。"
                                 + "\n\n是否更新？旧文件将移入回收站。",
                         display, latest.title(false), latest.fileName),
-                        () -> applyModUpdate(mod, latest, display), true));
+                        () -> applyModUpdate(mod, latest), true));
             } catch (Exception e) {
                 javafx.application.Platform.runLater(() ->
                         win.toast("检查更新失败", e.getMessage() == null ? "网络错误" : e.getMessage(), 3));
@@ -1473,56 +1803,8 @@ public class PageInstanceSetup implements Page {
         });
     }
 
-    private void applyModUpdate(Path oldMod, ResourceVersion latest, String display) {
-        Path modsDir = oldMod.getParent();
-        String fileName = latest.fileName.replace("~", "-");
-        Path target = modsDir.resolve(fileName).normalize();
-        if (!target.startsWith(modsDir.toAbsolutePath().normalize())) {
-            Errors.error("Mod 更新失败", new Exception("新文件名包含非法路径：" + fileName));
-            return;
-        }
-        Tasks.Task task = new Tasks.Task("Mod 更新 · " + display);
-        task.subs.add(new Tasks.SubTask("下载新版本"));
-        Tasks.INSTANCE.add(task);
-        final Path[] backup = new Path[1];
-        Thread worker = new Thread(() -> {
-            try {
-                task.subs.get(0).state = Tasks.State.RUNNING;
-                task.stage = "下载 " + fileName;
-                // 同名先挪旧文件
-                if (Files.exists(oldMod) && target.equals(oldMod.toAbsolutePath().normalize())) {
-                    backup[0] = modsDir.resolve(oldMod.getFileName() + ".tcl-old");
-                    Files.move(oldMod, backup[0], java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                }
-                Modrinth.downloadUrl(task, latest.downloadUrls.get(0), target, latest.hash);
-                task.subs.get(0).state = Tasks.State.DONE;
-                Path recycle = backup[0] != null ? backup[0] : oldMod;
-                if (Files.exists(recycle)) Shell.deleteToRecycleBin(recycle.toString());
-                backup[0] = null;
-                task.state = Tasks.State.DONE;
-                task.progress = 1;
-                task.stage = "更新完成";
-                data.log("Mod 已更新：" + display + " → " + fileName);
-                javafx.application.Platform.runLater(() -> {
-                    win.toast("Mod 已更新", display + " → " + latest.title(false), 1);
-                    win.refreshRight();
-                });
-            } catch (Exception e) {
-                if (backup[0] != null && !Files.exists(oldMod)) {
-                    try {
-                        Files.move(backup[0], oldMod, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                    } catch (Exception ignored) {
-                    }
-                }
-                task.state = task.canceled ? Tasks.State.CANCELED : Tasks.State.FAILED;
-                task.stage = e.getMessage() == null ? "更新失败" : e.getMessage();
-                Errors.error("Mod 更新失败", e);
-            } finally {
-                Tasks.INSTANCE.changed();
-            }
-        }, "TCL-ModUpdate-" + display);
-        worker.setDaemon(true);
-        worker.start();
+    private void applyModUpdate(Path oldMod, ResourceVersion latest) {
+        applyAllUpdates(List.of(new UpdateItem(oldMod, latest)));
     }
 
     private void buildPacks(VBox page, String folder, String label) {
@@ -1553,7 +1835,7 @@ public class PageInstanceSetup implements Page {
                         win.toast("无法打开", e.getMessage(), 3);
                     }
                 }),
-                Ui.button("导入 " + label, Ui.BTN_NORMAL, () -> installPacks(dir, label)),
+                Ui.button(Lang.t("导入 ") + Lang.t(label), Ui.BTN_NORMAL, () -> installPacks(dir, label)),
                 Ui.button("刷新", Ui.BTN_NORMAL, () -> win.refreshRightWithLoading()));
         page.getChildren().add(actions);
         VBox.setMargin(page.getChildren().get(page.getChildren().size() - 1), new Insets(0, 0, 12, 0));
@@ -1631,7 +1913,7 @@ public class PageInstanceSetup implements Page {
 
     private void installPacks(Path dir, String label) {
         FileChooser chooser = new FileChooser();
-        chooser.setTitle(Lang.t("选择要导入的 ") + label);
+        chooser.setTitle(Lang.t("选择要导入的 ") + Lang.t(label));
         chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(Lang.t("Zip 压缩包"), "*.zip"));
         List<File> files = chooser.showOpenMultipleDialog(win.stage);
         if (files == null || files.isEmpty()) return;
@@ -1640,7 +1922,7 @@ public class PageInstanceSetup implements Page {
 
     private void importPacks(Path dir, String label, List<Path> files) {
         if (files == null || files.isEmpty()) return;
-        Imports.run(win, "正在导入 " + label, label, dir, files, name -> name.endsWith(".zip"),
+        Imports.run(win, Lang.t("正在导入 ") + Lang.t(label), Lang.t(label), dir, files, name -> name.endsWith(".zip"),
                 true, () -> win.refreshRight());
     }
 
@@ -1649,7 +1931,7 @@ public class PageInstanceSetup implements Page {
         try {
             if (Files.isDirectory(dir)) {
                 try (var stream = Files.list(dir)) {
-                    stream.forEach(p -> {
+                    stream.limit(10000).forEach(p -> {
                         String n = p.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
                         if (Files.isDirectory(p) || n.endsWith(".zip") || n.endsWith(".zip.disabled")) out.add(p);
                     });
@@ -1671,7 +1953,7 @@ public class PageInstanceSetup implements Page {
                         return n.endsWith(".jar") || n.endsWith(".jar.disabled")
                                 || n.endsWith(".zip") || n.endsWith(".zip.disabled")
                                 || n.endsWith(".litemod") || n.endsWith(".litemod.disabled");
-                    }).forEach(out::add);
+                    }).limit(10000).forEach(out::add);
                 }
             }
         } catch (Exception ignored) {
@@ -1697,7 +1979,9 @@ public class PageInstanceSetup implements Page {
         try {
             if (Files.isDirectory(mods)) {
                 try (var stream = Files.list(mods)) {
-                    for (Path p : stream.toList()) {
+                    java.util.Iterator<Path> it = stream.limit(10000).iterator();
+                    while (it.hasNext()) {
+                        Path p = it.next();
                         String n = p.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
                         if (n.endsWith(".jar") && (n.contains("iris") || n.contains("oculus") || n.contains("optifine"))) {
                             return true;
@@ -1714,6 +1998,7 @@ public class PageInstanceSetup implements Page {
         Path options = root.resolve("options.txt");
         if (!Files.isRegularFile(options)) return "";
         try {
+            if (Files.size(options) > 4L * 1024 * 1024) return "";
             for (String line : Files.readAllLines(options, GameLauncher.optionsCharset(options))) {
                 int idx = line.indexOf(':');
                 if (idx > 0 && line.substring(0, idx).equals(key)) return line.substring(idx + 1);
@@ -1726,6 +2011,7 @@ public class PageInstanceSetup implements Page {
     private void writeOption(Path root, String key, String value) {
         Path options = root.resolve("options.txt");
         try {
+            if (Files.exists(options) && Files.size(options) > 4L * 1024 * 1024) return;
             java.nio.charset.Charset cs = Files.exists(options)
                     ? GameLauncher.optionsCharset(options) : StandardCharsets.UTF_8;
             List<String> lines = Files.exists(options)
@@ -1838,12 +2124,12 @@ public class PageInstanceSetup implements Page {
             try (ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(file))) {
                 List<Path> files = new ArrayList<>();
                 try (var stream = Files.walk(save)) {
-                    stream.filter(Files::isRegularFile).forEach(files::add);
+                    stream.filter(p -> !Files.isSymbolicLink(p)).filter(Files::isRegularFile).forEach(files::add);
                 }
                 task.remainingFiles = files.size();
                 int done = 0;
                 for (Path p : files) {
-                    if (task.canceled) throw new Exception("已取消");
+                    if (task.canceled) throw new Exception(Lang.t("已取消"));
                     zip.putNextEntry(new ZipEntry(save.relativize(p).toString().replace('\\', '/')));
                     Files.copy(p, zip);
                     zip.closeEntry();
@@ -1865,7 +2151,6 @@ public class PageInstanceSetup implements Page {
                 task.stage = e.getMessage() == null ? "导出失败" : e.getMessage();
                 javafx.application.Platform.runLater(() -> win.toast("导出失败", task.stage, 3));
             } finally {
-                Tasks.INSTANCE.changed();
             }
         });
     }
@@ -1874,13 +2159,8 @@ public class PageInstanceSetup implements Page {
         Dialogs.confirm(win, "删除存档", Lang.tf("确定要删除存档 %s 吗？\n该世界将永久丢失，无法恢复。", save.getFileName()), () -> {
             Threads.start("TCL-SaveDelete", () -> {
                 String error = null;
-                try (var stream = Files.walk(save)) {
-                    for (Path p : stream.sorted(java.util.Comparator.reverseOrder()).toList()) {
-                        Files.deleteIfExists(p);
-                    }
-                } catch (Exception ex) {
-                    error = ex.getMessage();
-                }
+                Exception ex = deleteTreeChecked(save);
+                if (ex != null) error = ex.getMessage();
                 final String fError = error;
                 javafx.application.Platform.runLater(() -> {
                     if (fError != null) {
@@ -1903,7 +2183,8 @@ public class PageInstanceSetup implements Page {
                         String n = p.getFileName().toString().toLowerCase();
                         for (String s : suffixes) if (n.endsWith(s)) return true;
                         return false;
-                    }).sorted(Comparator.comparing(p -> p.getFileName().toString().toLowerCase())).forEach(out::add);
+                    }).limit(10000).forEach(out::add);
+                    out.sort(Comparator.comparing(p -> p.getFileName().toString().toLowerCase()));
                 }
             }
         } catch (Exception ignored) {
@@ -1955,8 +2236,9 @@ public class PageInstanceSetup implements Page {
         try {
             if (Files.isDirectory(savesDir)) {
                 try (var s = Files.list(savesDir)) {
-                    s.filter(Files::isDirectory).sorted(Comparator.comparing(p -> p.getFileName().toString().toLowerCase()))
+                    s.filter(Files::isDirectory).limit(10000)
                             .forEach(saves::add);
+                    saves.sort(Comparator.comparing(p -> p.getFileName().toString().toLowerCase()));
                 }
             }
         } catch (Exception ignored) {
@@ -1995,6 +2277,7 @@ public class PageInstanceSetup implements Page {
             card.add(rows);
             renderSaves(saves, fmt, pageNo, pageSize, rows);
         }
+        buildSaveBackups(page);
     }
 
     private void renderSaves(List<Path> saves, DateTimeFormatter fmt, int[] pageNo, int[] pageSize, VBox rows) {
@@ -2011,13 +2294,17 @@ public class PageInstanceSetup implements Page {
             } catch (Exception ignored) {
             }
             String fTime = time;
-            Ui.ListItem item = new Ui.ListItem(Theme.icon("map", 16, Theme.text), save.getFileName().toString(), "最后修改 " + time, 40);
+            Ui.ListItem item = new Ui.ListItem(Theme.icon("map", 16, Theme.text), save.getFileName().toString(), Lang.t("最后修改 ") + time, 40);
+            StackPane info = Ui.listAction("info", 26, 15, "世界详情", () -> showWorldInfo(save));
             StackPane open = Ui.listAction("folder-open", 26, 15, "打开存档文件夹", () -> openFolder(save.toString()));
             StackPane rename = Ui.listAction("pencil", 26, 15, "重命名存档", () -> renameSave(save));
+            StackPane backup = Ui.listAction("archive", 26, 15, "备份存档", () -> backupSave(save));
             StackPane export = Ui.listAction("upload", 26, 15, "导出为 .zip", () -> exportSave(save));
             StackPane delete = Ui.listAction("trash-2", 26, 15, "删除存档", () -> deleteSave(save));
+            item.addAction(info);
             item.addAction(open);
             item.addAction(rename);
+            item.addAction(backup);
             item.addAction(export);
             item.addAction(delete);
             item.setOnMouseClicked(e -> openFolder(save.toString()));
@@ -2032,11 +2319,315 @@ public class PageInstanceSetup implements Page {
         }
     }
 
+    private void buildSaveBackups(VBox page) {
+        Path dir = instanceRoot().resolve("backups").resolve("saves");
+        List<Path> backups = new ArrayList<>();
+        try {
+            if (Files.isDirectory(dir)) {
+                try (var s = Files.list(dir)) {
+                    s.filter(p -> p.getFileName().toString().toLowerCase(java.util.Locale.ROOT).endsWith(".zip"))
+                            .limit(10000)
+                            .forEach(backups::add);
+                    backups.sort(Comparator.comparingLong((Path p) -> p.toFile().lastModified()).reversed());
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        Ui.Card card = addCard(page, "存档备份");
+        HBox actions = new HBox(10);
+        actions.setAlignment(Pos.CENTER_LEFT);
+        actions.getChildren().addAll(
+                Ui.button("打开备份文件夹", Ui.BTN_NORMAL, () -> {
+                    try {
+                        Files.createDirectories(dir);
+                        openFolder(dir.toString());
+                    } catch (Exception e) {
+                        win.toast("无法打开", e.getMessage(), 3);
+                    }
+                }),
+                Ui.label(Lang.tf("共 %d 份备份。", backups.size()), 11.5, Theme.gray2));
+        card.add(actions);
+        if (backups.isEmpty()) {
+            card.add(Ui.label("还没有备份。点存档右侧的备份按钮即可生成。", 12.5, Theme.gray2));
+            return;
+        }
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm");
+        int limit = Math.min(backups.size(), 12);
+        for (int i = 0; i < limit; i++) {
+            Path zip = backups.get(i);
+            String time = "";
+            long size = 0;
+            try {
+                time = Files.getLastModifiedTime(zip).toInstant().atZone(ZoneId.systemDefault()).format(fmt);
+                size = Files.size(zip);
+            } catch (Exception ignored) {
+            }
+            Ui.ListItem item = new Ui.ListItem(Theme.icon("archive", 16, Theme.text),
+                    zip.getFileName().toString(), time + " · " + readableSize(size), 40);
+            item.addAction(Ui.listAction("rotate-ccw", 26, 15, "还原为新存档", () -> restoreBackup(zip)));
+            item.addAction(Ui.listAction("trash-2", 26, 15, "删除备份", () ->
+                    Dialogs.confirm(win, "删除备份", Lang.tf("确定要删除备份 %s 吗？", zip.getFileName()), () -> {
+                        try {
+                            Files.deleteIfExists(zip);
+                            win.openSetup("saves");
+                            win.toast("备份已删除", "", 1);
+                        } catch (Exception e) {
+                            win.toast("删除失败", e.getMessage(), 3);
+                        }
+                    }, true)));
+            card.add(item);
+        }
+    }
+
+    private static String readableSize(long bytes) {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024L * 1024) return String.format(java.util.Locale.ROOT, "%.1f KB", bytes / 1024.0);
+        if (bytes < 1024L * 1024 * 1024) return String.format(java.util.Locale.ROOT, "%.1f MB", bytes / (1024.0 * 1024));
+        return String.format(java.util.Locale.ROOT, "%.1f GB", bytes / (1024.0 * 1024 * 1024));
+    }
+
+    private void showWorldInfo(Path save) {
+        VBox card = new VBox(10);
+        card.setPadding(new Insets(20, 22, 16, 22));
+        card.setPrefWidth(470);
+        card.setBackground(Ui.fill(Theme.dialogBg, 12));
+        card.setEffect(Theme.shadow(22, 4, 0.32, Theme.text));
+        Label title = Ui.semi("世界详情", 18, Theme.accentDark);
+        Label path = Ui.label(save.getFileName().toString(), 12, Theme.gray2);
+        VBox rows = new VBox(8);
+        try {
+            Map<String, Object> level = LevelDat.data(LevelDat.read(save.resolve("level.dat")));
+            String mode = switch ((int) LevelDat.number(level, "GameType", 0)) {
+                case 1 -> "创造";
+                case 2 -> "冒险";
+                case 3 -> "旁观";
+                default -> "生存";
+            };
+            String difficulty = switch ((int) LevelDat.number(level, "Difficulty", 2)) {
+                case 0 -> "和平";
+                case 1 -> "简单";
+                case 3 -> "困难";
+                default -> "普通";
+            };
+            String version = "";
+            Object ver = level.get("Version");
+            if (ver instanceof Map<?, ?> m && m.get("Name") != null) version = String.valueOf(m.get("Name"));
+            long last = LevelDat.number(level, "LastPlayed", 0);
+            String lastText = last > 0 ? DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm")
+                    .format(java.time.Instant.ofEpochMilli(last).atZone(ZoneId.systemDefault())) : "";
+            rows.getChildren().addAll(
+                    infoRow("世界名称", LevelDat.text(level, "LevelName", save.getFileName().toString())),
+                    infoRow("种子", String.valueOf(LevelDat.number(level, "RandomSeed", 0))),
+                    infoRow("游戏模式", Lang.t(mode) + " · " + Lang.t(difficulty)
+                            + (LevelDat.number(level, "hardcore", 0) == 1 ? " · " + Lang.t("极限") : "")),
+                    infoRow("允许作弊", LevelDat.number(level, "allowCommands", 0) == 1 ? "是" : "否"),
+                    infoRow("游戏版本", version.isEmpty() ? "未知" : version),
+                    infoRow("上次游玩", lastText.isEmpty() ? "未知" : lastText));
+        } catch (Exception e) {
+            rows.getChildren().add(Ui.label(Lang.t("读取 level.dat 失败：") + e.getMessage(), 12.5, Theme.red));
+        }
+        HBox actions = new HBox(10);
+        actions.setAlignment(Pos.CENTER_RIGHT);
+        actions.getChildren().addAll(
+                Ui.button("打开文件夹", Ui.BTN_NORMAL, () -> openFolder(save.toString())),
+                Ui.button("关闭", Ui.BTN_THEME, () -> {
+                    win.setModalCloseHook(null);
+                    win.closeModal();
+                }));
+        card.getChildren().addAll(title, path, rows, actions);
+        win.showModal(card, true);
+    }
+
+    private HBox infoRow(String name, String value) {
+        Label key = Ui.label(name, 12, Theme.gray2);
+        key.setMinWidth(88);
+        key.setPrefWidth(88);
+        Label text = Ui.label(value, 12.5, Theme.text);
+        text.setWrapText(true);
+        HBox.setHgrow(text, Priority.ALWAYS);
+        HBox row = new HBox(10, key, text);
+        row.setAlignment(Pos.CENTER_LEFT);
+        return row;
+    }
+
+    private void backupSave(Path save) {
+        Path dir = instanceRoot().resolve("backups").resolve("saves");
+        String stamp = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").format(java.time.LocalDateTime.now());
+        String base = save.getFileName() + "-" + stamp;
+        Path target = dir.resolve(base + ".zip");
+        int n = 1;
+        while (Files.exists(target)) {
+            target = dir.resolve(base + "-" + n + ".zip");
+            n++;
+        }
+        Path finalTarget = target;
+        win.toast("正在备份", save.getFileName().toString(), 0);
+        Threads.start("TCL-Save-Backup", () -> {
+            try {
+                Files.createDirectories(dir);
+                try (ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(finalTarget.toFile()))) {
+                    try (var walk = Files.walk(save)) {
+                        var files = walk.filter(Files::isRegularFile)
+                                .filter(p -> !Files.isSymbolicLink(p)).iterator();
+                        while (files.hasNext()) {
+                            Path p = files.next();
+                            String name = save.relativize(p).toString().replace('\\', '/');
+                            zip.putNextEntry(new ZipEntry(save.getFileName() + "/" + name));
+                            Files.copy(p, zip);
+                            zip.closeEntry();
+                        }
+                    }
+                }
+                javafx.application.Platform.runLater(() -> {
+                    win.openSetup("saves");
+                    win.toast("备份完成", finalTarget.getFileName().toString(), 1);
+                });
+            } catch (Exception e) {
+                try {
+                    Files.deleteIfExists(finalTarget);
+                } catch (Exception ignored) {
+                }
+                javafx.application.Platform.runLater(() -> win.toast("备份失败", e.getMessage(), 3));
+            }
+        });
+    }
+
+    private void restoreBackup(Path zip) {
+        Dialogs.confirm(win, "还原存档",
+                Lang.tf("将把 %s 解压成一份新存档，不会覆盖现有世界。继续？", zip.getFileName()), () -> {
+                    Path savesDir = instanceRoot().resolve("saves");
+                    String base = zip.getFileName().toString();
+                    if (base.toLowerCase(java.util.Locale.ROOT).endsWith(".zip")) {
+                        base = base.substring(0, base.length() - 4);
+                    }
+                    String stamp = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").format(java.time.LocalDateTime.now());
+                    Path dest = savesDir.resolve(base + "-还原-" + stamp);
+                    int n = 1;
+                    while (Files.exists(dest)) {
+                        dest = savesDir.resolve(base + "-还原-" + stamp + "-" + n);
+                        n++;
+                    }
+                    Path finalDest = dest;
+                    Threads.start("TCL-Save-Restore", () -> {
+                        try {
+                            Path restoreBase = finalDest.toAbsolutePath().normalize();
+                            Files.createDirectories(restoreBase);
+                            long total = 0;
+                            int count = 0;
+                            try (java.util.zip.ZipFile zf = new java.util.zip.ZipFile(zip.toFile())) {
+                                var entries = zf.entries();
+                                while (entries.hasMoreElements()) {
+                                    ZipEntry entry = entries.nextElement();
+                                    String name = entry.getName().replace('\\', '/');
+                                    while (name.startsWith("/")) name = name.substring(1);
+                                    if (name.isEmpty() || name.endsWith("/")) continue;
+                                    if (++count > 200000) throw new java.io.IOException(Lang.t("备份条目过多"));
+                                    int slash = name.indexOf('/');
+                                    String rel = slash >= 0 ? name.substring(slash + 1) : name;
+                                    Path target = restoreBase.resolve(rel).normalize();
+                                    if (!target.startsWith(restoreBase)) continue;
+                                    Files.createDirectories(target.getParent());
+                                    try (var in = zf.getInputStream(entry);
+                                         var out = Files.newOutputStream(target)) {
+                                        byte[] buffer = new byte[8192];
+                                        int read;
+                                        while ((read = in.read(buffer)) > 0) {
+                                            total += read;
+                                            if (total > 8L * 1024 * 1024 * 1024) {
+                                                throw new java.io.IOException(Lang.t("备份解压后体积过大"));
+                                            }
+                                            out.write(buffer, 0, read);
+                                        }
+                                    }
+                                }
+                            }
+                            if (!Files.exists(restoreBase.resolve("level.dat"))) {
+                                throw new java.io.IOException("备份中缺少 level.dat");
+                            }
+                            javafx.application.Platform.runLater(() -> {
+                                win.openSetup("saves");
+                                win.toast("已还原为新存档", finalDest.getFileName().toString(), 1);
+                            });
+                        } catch (Exception e) {
+                            try (var walk = Files.walk(finalDest)) {
+                                walk.sorted(java.util.Comparator.reverseOrder()).forEach(p -> {
+                                    try {
+                                        Files.deleteIfExists(p);
+                                    } catch (Exception ignored) {
+                                    }
+                                });
+                            } catch (Exception ignored) {
+                            }
+                            javafx.application.Platform.runLater(() -> win.toast("还原失败", e.getMessage(), 3));
+                        }
+                    });
+                });
+    }
+
     private void buildScreenshots(VBox page) {
         Path dir = instanceRoot().resolve("screenshots");
-        List<Path> shots = listFiles(dir, ".png", ".jpg", ".jpeg");
+        List<Path> allShots = listFiles(dir, ".png", ".jpg", ".jpeg");
+        allShots.sort(Comparator.comparingLong((Path p) -> {
+            try {
+                return Files.getLastModifiedTime(p).toMillis();
+            } catch (Exception e) {
+                return 0L;
+            }
+        }).reversed());
+        int range = data.getInt("UiShotRange", 0);
+        List<Path> shots = new ArrayList<>(allShots);
+        if (range > 0) {
+            long now = System.currentTimeMillis();
+            long threshold;
+            if (range == 1) {
+                threshold = java.time.LocalDate.now().atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
+            } else {
+                long span = range == 2 ? 7 * 86400_000L : 30 * 86400_000L;
+                threshold = now - span;
+            }
+            long cut = threshold;
+            shots.removeIf(p -> {
+                try {
+                    return Files.getLastModifiedTime(p).toMillis() < cut;
+                } catch (Exception e) {
+                    return false;
+                }
+            });
+        }
         header(page, "截图", Lang.tf("共 %d 张截图。", shots.size()));
+        ComboBox<String> timeBox = Ui.combo(new String[]{"全部时间", "今天", "近 7 天", "近 30 天"}, range);
+        timeBox.setOnAction(e -> {
+            int i = timeBox.getSelectionModel().getSelectedIndex();
+            if (i < 0) return;
+            data.set("UiShotRange", i);
+            win.refreshRightWithLoading();
+        });
         HBox actions = new HBox(10);
+        actions.setAlignment(Pos.CENTER_LEFT);
+        java.util.Set<Path> selected = new java.util.HashSet<>();
+        StackPane[] deleteRef = new StackPane[1];
+        StackPane deleteSelected = Ui.button("删除选中", Ui.BTN_RED, () -> {
+            List<Path> targets = new ArrayList<>(selected);
+            if (targets.isEmpty()) return;
+            Dialogs.confirm(win, "删除选中", Lang.tf("将把选中的 %d 张截图移入回收站？", targets.size()), () -> {
+                deleteRef[0].setDisable(true);
+                Threads.start("TCL-Shot-Delete", () -> {
+                    int failed = 0;
+                    for (Path p : targets) {
+                        if (!Shell.deleteToRecycleBin(p.toString())) failed++;
+                    }
+                    int fFailed = failed;
+                    javafx.application.Platform.runLater(() -> {
+                        selected.clear();
+                        win.refreshRightWithLoading();
+                        win.toast(fFailed == 0 ? "已删除选中截图" : "部分截图删除失败",
+                                fFailed == 0 ? "" : Lang.tf("%d 张未能删除", fFailed), fFailed == 0 ? 1 : 2);
+                    });
+                });
+            }, true);
+        });
+        deleteSelected.setDisable(true);
+        deleteRef[0] = deleteSelected;
         actions.getChildren().addAll(
                 Ui.button("打开截图文件夹", Ui.BTN_NORMAL, () -> {
                     try {
@@ -2046,12 +2637,37 @@ public class PageInstanceSetup implements Page {
                         win.toast("无法打开", e.getMessage(), 3);
                     }
                 }),
+                timeBox,
                 Ui.button("刷新", Ui.BTN_NORMAL, () -> win.refreshRightWithLoading()));
+        if (!allShots.isEmpty()) {
+            actions.getChildren().add(deleteSelected);
+            actions.getChildren().add(Ui.button("清空截图", Ui.BTN_RED, () ->
+                    Dialogs.confirm(win, "清空截图", Lang.tf("将删除全部 %d 张截图，此操作不可撤销。", allShots.size()), () -> {
+                        Threads.start("TCL-Shot-Clear", () -> {
+                            int failed = 0;
+                            for (Path p : allShots) {
+                                try {
+                                    Files.deleteIfExists(p);
+                                } catch (Exception e) {
+                                    failed++;
+                                }
+                            }
+                            int fFailed = failed;
+                            javafx.application.Platform.runLater(() -> {
+                                win.refreshRightWithLoading();
+                                win.toast(fFailed == 0 ? "已清空截图" : "部分截图删除失败",
+                                        fFailed == 0 ? "" : Lang.tf("%d 张未能删除", fFailed), fFailed == 0 ? 1 : 2);
+                            });
+                        });
+                    }, true)));
+        }
         page.getChildren().add(actions);
         VBox.setMargin(page.getChildren().get(page.getChildren().size() - 1), new Insets(0, 0, 12, 0));
         if (shots.isEmpty()) {
             Ui.Card card = addCard(page, "截图列表");
-            card.add(Ui.label("还没有截图。在游戏中按 F2 截图后会显示在这里。", 12.5, Theme.gray2));
+            card.add(Ui.label(allShots.isEmpty()
+                    ? "还没有截图。在游戏中按 F2 截图后会显示在这里。"
+                    : "该时间段没有截图。", 12.5, Theme.gray2));
             return;
         }
         Ui.Card card = addCard(page, "截图列表");
@@ -2070,6 +2686,8 @@ public class PageInstanceSetup implements Page {
             render[0].run();
         });
         render[0] = () -> {
+            selected.clear();
+            deleteSelected.setDisable(true);
             int pages = Math.max(1, (shots.size() + pageSize[0] - 1) / pageSize[0]);
             pageNo[0] = Math.min(pageNo[0], pages - 1);
             int from = pageNo[0] * pageSize[0];
@@ -2088,7 +2706,18 @@ public class PageInstanceSetup implements Page {
                     clip.setArcWidth(8);
                     clip.setArcHeight(8);
                     iv.setClip(clip);
-                    box.getChildren().add(iv);
+                    Ui.Check pick = Ui.checkBox("", false);
+                    pick.setOnAction(() -> {
+                        if (pick.isSelected()) selected.add(shot);
+                        else selected.remove(shot);
+                        deleteSelected.setDisable(selected.isEmpty());
+                    });
+                    StackPane pickHost = new StackPane(pick);
+                    pickHost.setOnMouseClicked(e -> e.consume());
+                    StackPane image = new StackPane(iv, pickHost);
+                    StackPane.setAlignment(pickHost, Pos.TOP_RIGHT);
+                    StackPane.setMargin(pickHost, new Insets(5));
+                    box.getChildren().add(image);
                 } catch (Exception ignored) {
                 }
                 Label name = Ui.label(shot.getFileName().toString(), 11, Theme.gray2);
@@ -2098,12 +2727,18 @@ public class PageInstanceSetup implements Page {
                 StackPane rowBtns = new StackPane();
                 HBox btns = new HBox(6);
                 btns.setAlignment(Pos.CENTER);
-                StackPane open = Ui.listAction("folder-open", 24, 14, "打开图片", () -> openFolder(shot.toString()));
-                StackPane del = Ui.listAction("trash-2", 24, 14, "删除截图", () -> deleteFile(shot, "截图"));
-                btns.getChildren().addAll(open, del);
+                StackPane open = Ui.listAction("search", 24, 14, "预览截图", () -> previewScreenshot(shot));
+                StackPane setBg = Ui.listAction("image", 24, 14, "设为启动器背景", () -> setScreenshotAsBackground(shot));
+                StackPane del = Ui.listAction("trash-2", 24, 14, "删除截图", () -> {
+                    selected.remove(shot);
+                    deleteSelected.setDisable(selected.isEmpty());
+                    deleteFile(shot, "截图");
+                });
+                btns.getChildren().addAll(open, setBg, del);
                 rowBtns.getChildren().add(btns);
+                rowBtns.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_CLICKED, e -> e.consume());
                 box.getChildren().add(rowBtns);
-                box.setOnMouseClicked(e -> openFolder(shot.toString()));
+                box.setOnMouseClicked(e -> previewScreenshot(shot));
                 box.setPadding(new Insets(6));
                 box.setBackground(Ui.fill(Theme.cardBg, 8));
                 flow.getChildren().add(box);
@@ -2119,33 +2754,222 @@ public class PageInstanceSetup implements Page {
         render[0].run();
     }
 
+    private void previewScreenshot(Path shot) {
+        javafx.scene.image.Image img;
+        try {
+            img = new javafx.scene.image.Image(shot.toUri().toString(), 0, 0, true, true, false);
+        } catch (Exception e) {
+            win.toast("无法读取截图", e.getMessage(), 3);
+            return;
+        }
+        if (img.isError() || img.getWidth() <= 0 || img.getHeight() <= 0) {
+            win.toast("无法读取截图", shot.getFileName().toString(), 3);
+            return;
+        }
+        VBox card = new VBox(12);
+        card.setPadding(new Insets(18, 20, 14, 20));
+        card.setBackground(Ui.fill(Theme.dialogBg, 12));
+        card.setEffect(Theme.shadow(22, 4, 0.32, Theme.text));
+        Label title = Ui.semi(shot.getFileName().toString(), 16, Theme.text);
+        ImageView big = new ImageView(img);
+        big.setPreserveRatio(true);
+        double w = Math.min(760, img.getWidth());
+        double h = Math.min(520, img.getHeight());
+        if (w / img.getWidth() < h / img.getHeight()) {
+            big.setFitWidth(w);
+            big.setFitHeight(w * img.getHeight() / img.getWidth());
+        } else {
+            big.setFitHeight(h);
+            big.setFitWidth(h * img.getWidth() / img.getHeight());
+        }
+        HBox actions = new HBox(10);
+        actions.setAlignment(Pos.CENTER_RIGHT);
+        actions.getChildren().addAll(
+                Ui.button("设为背景", Ui.BTN_HIGHLIGHT, () -> setScreenshotAsBackground(shot)),
+                Ui.button("复制图片", Ui.BTN_NORMAL, () -> {
+                    javafx.scene.input.ClipboardContent cc = new javafx.scene.input.ClipboardContent();
+                    cc.putImage(img);
+                    javafx.scene.input.Clipboard.getSystemClipboard().setContent(cc);
+                    win.toast("已复制图片", "", 1);
+                }),
+                Ui.button("打开原图", Ui.BTN_NORMAL, () -> openFolder(shot.toString())),
+                Ui.button("删除", Ui.BTN_RED, () -> {
+                    win.setModalCloseHook(null);
+                    win.closeModal();
+                    deleteFile(shot, "截图");
+                    win.refreshRightWithLoading();
+                }),
+                Ui.button("关闭", Ui.BTN_NORMAL, () -> {
+                    win.setModalCloseHook(null);
+                    win.closeModal();
+                }));
+        card.getChildren().addAll(title, big, actions);
+        win.showModal(card, true);
+    }
+
+    private void setScreenshotAsBackground(Path shot) {
+        try {
+            if (shot == null || Files.size(shot) > 32L * 1024 * 1024) {
+                win.toast("无法设为背景", "截图不存在或超过 32MB。", 3);
+                return;
+            }
+        } catch (Exception e) {
+            win.toast("无法设为背景", e.getMessage(), 3);
+            return;
+        }
+        Path dir = Paths.get(data.gameDir, "TCL", "Pictures");
+        Path target = dir.resolve("壁纸-" + shot.getFileName());
+        win.setModalCloseHook(null);
+        win.closeModal();
+        Threads.start("TCL-Shot-Bg", () -> {
+            try {
+                Files.createDirectories(dir);
+                Files.copy(shot, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                javafx.application.Platform.runLater(() -> {
+                    data.set("UiBackgroundType", 0);
+                    win.refreshWallpaper(true);
+                    win.toast("已设为背景", shot.getFileName().toString(), 1);
+                });
+            } catch (Exception e) {
+                javafx.application.Platform.runLater(() -> win.toast("设置背景失败", e.getMessage(), 3));
+            }
+        });
+    }
+
     private static final java.util.LinkedHashMap<String, javafx.scene.image.Image> SCREENSHOT_CACHE =
             new java.util.LinkedHashMap<>(32, 0.75f, true);
     private static final int SCREENSHOT_CACHE_LIMIT = 60;
 
-    private static javafx.scene.image.Image cachedScreenshot(Path p) {
-        try {
-            String key = p.toAbsolutePath() + "|" + Files.getLastModifiedTime(p).toMillis();
-            synchronized (SCREENSHOT_CACHE) {
-                javafx.scene.image.Image hit = SCREENSHOT_CACHE.get(key);
-                if (hit != null) return hit;
-            }
-            javafx.scene.image.Image img = new javafx.scene.image.Image(p.toUri().toString(), 170, 96, false, true, true);
-            synchronized (SCREENSHOT_CACHE) {
-                while (SCREENSHOT_CACHE.size() >= SCREENSHOT_CACHE_LIMIT) {
-                    SCREENSHOT_CACHE.remove(SCREENSHOT_CACHE.keySet().iterator().next());
-                }
-                SCREENSHOT_CACHE.put(key, img);
-            }
-            return img;
-        } catch (Exception e) {
-            return new javafx.scene.image.Image(p.toUri().toString(), 170, 96, false, true, true);
+    private static javafx.scene.image.Image cachedScreenshot(Path p) throws java.io.IOException {
+        String key = p.toAbsolutePath() + "|" + Files.getLastModifiedTime(p).toMillis();
+        synchronized (SCREENSHOT_CACHE) {
+            javafx.scene.image.Image hit = SCREENSHOT_CACHE.get(key);
+            if (hit != null) return hit;
         }
+        javafx.scene.image.Image img = new javafx.scene.image.Image(p.toUri().toString(), 170, 96, false, true, true);
+        synchronized (SCREENSHOT_CACHE) {
+            while (SCREENSHOT_CACHE.size() >= SCREENSHOT_CACHE_LIMIT) {
+                SCREENSHOT_CACHE.remove(SCREENSHOT_CACHE.keySet().iterator().next());
+            }
+            SCREENSHOT_CACHE.put(key, img);
+        }
+        return img;
     }
 
     private final java.util.List<Servers.Entry> serverList = new ArrayList<>();
     private final java.util.List<Label> serverStatusLabels = new ArrayList<>();
     private boolean pingLock = false;
+
+    private void buildSchematics(VBox page) {
+        Path dir = instanceRoot().resolve("schematics");
+        List<Path> files = listFiles(dir, ".schematic", ".schem", ".nbt");
+        header(page, "原理图", Lang.tf("共 %d 个文件。", files.size()));
+        HBox actions = new HBox(10);
+        actions.setAlignment(Pos.CENTER_LEFT);
+        actions.getChildren().addAll(
+                Ui.button("导入原理图", Ui.BTN_THEME, () -> importSchematics(dir)),
+                Ui.button("打开文件夹", Ui.BTN_NORMAL, () -> {
+                    try {
+                        Files.createDirectories(dir);
+                        openFolder(dir.toString());
+                    } catch (Exception e) {
+                        win.toast("无法打开", e.getMessage(), 3);
+                    }
+                }),
+                Ui.button("刷新", Ui.BTN_NORMAL, () -> win.refreshRightWithLoading()));
+        page.getChildren().add(actions);
+        VBox.setMargin(page.getChildren().get(page.getChildren().size() - 1), new Insets(0, 0, 12, 0));
+        if (files.isEmpty()) {
+            Ui.Card card = addCard(page, "原理图列表");
+            card.add(Ui.label("还没有原理图。支持 .schematic .schem .nbt，导入后可在游戏里用投影模组读取。", 12.5, Theme.gray2));
+            return;
+        }
+        Ui.Card card = addCard(page, "原理图列表");
+        int[] pageSize = {pageSize("UiPageSizeSchematics", 20)};
+        int[] pageNo = {0};
+        VBox rows = new VBox(1);
+        ComboBox<String> sizeBox = Ui.pageSizeBox(pageSize[0]);
+        HBox sizeRow = new HBox(6, Ui.label("每页", 11.5, Theme.gray2), sizeBox);
+        card.add(sizeRow);
+        card.add(rows);
+        Runnable[] render = new Runnable[1];
+        sizeBox.setOnAction(e -> {
+            pageSize[0] = Integer.parseInt(sizeBox.getValue());
+            data.set("UiPageSizeSchematics", pageSize[0]);
+            pageNo[0] = 0;
+            render[0].run();
+        });
+        render[0] = () -> {
+            int pages = Math.max(1, (files.size() + pageSize[0] - 1) / pageSize[0]);
+            pageNo[0] = Math.min(pageNo[0], pages - 1);
+            int from = pageNo[0] * pageSize[0];
+            int to = Math.min(from + pageSize[0], files.size());
+            rows.getChildren().clear();
+            DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm");
+            for (int i = from; i < to; i++) {
+                Path file = files.get(i);
+                String info = "";
+                try {
+                    info = readableSize(Files.size(file)) + " · "
+                            + Files.getLastModifiedTime(file).toInstant().atZone(ZoneId.systemDefault()).format(fmt);
+                } catch (Exception ignored) {
+                }
+                Ui.ListItem item = new Ui.ListItem(Theme.icon("layers", 16, Theme.text),
+                        file.getFileName().toString(), info, 40);
+                item.addAction(Ui.listAction("folder-open", 26, 15, "打开所在文件夹",
+                        () -> openFolder(dir.toString())));
+                item.addAction(Ui.listAction("trash-2", 26, 15, "删除原理图", () -> deleteFile(file, "原理图")));
+                rows.getChildren().add(item);
+            }
+            if (pages > 1) {
+                rows.getChildren().add(Ui.pager(pageNo[0], pages, files.size(), targetPage -> {
+                    pageNo[0] = targetPage;
+                    render[0].run();
+                }));
+            }
+        };
+        render[0].run();
+    }
+
+    private void importSchematics(Path dir) {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle(Lang.t("导入原理图"));
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(
+                Lang.t("原理图文件"), "*.schematic", "*.schem", "*.nbt"));
+        List<File> chosen = chooser.showOpenMultipleDialog(win.stage);
+        if (chosen == null || chosen.isEmpty()) return;
+        win.toast("正在导入", Lang.tf("%d 个文件", chosen.size()), 0);
+        Threads.start("TCL-Schematic-Import", () -> {
+            int ok = 0;
+            int fail = 0;
+            for (File file : chosen) {
+                try {
+                    Files.createDirectories(dir);
+                    Path target = dir.resolve(file.getName());
+                    String name = file.getName();
+                    int dot = name.lastIndexOf('.');
+                    String base = dot < 0 ? name : name.substring(0, dot);
+                    String ext = dot < 0 ? "" : name.substring(dot);
+                    int n = 1;
+                    while (Files.exists(target)) {
+                        target = dir.resolve(base + " (" + n + ")" + ext);
+                        n++;
+                    }
+                    Files.copy(file.toPath(), target);
+                    ok++;
+                } catch (Exception e) {
+                    fail++;
+                }
+            }
+            int fOk = ok;
+            int fFail = fail;
+            javafx.application.Platform.runLater(() -> {
+                win.refreshRight();
+                win.toast(fFail == 0 ? "导入完成" : "部分导入失败",
+                        Lang.tf("成功 %d 个，失败 %d 个", fOk, fFail), fFail == 0 ? 1 : 2);
+            });
+        });
+    }
 
     private void buildServer(VBox page) {
         header(page, "服务器", "在游戏中添加的多人服务器会显示在这里。");
@@ -2319,7 +3143,7 @@ public class PageInstanceSetup implements Page {
     }
 
     private void pingSingle(Servers.Entry entry, Label status) {
-        status.setText("查询中……");
+        status.setText(Lang.t("查询中……"));
         Threads.start("TCL-Ping-One", () -> {
             Servers.PingResult r = Servers.ping(entry.ip, 3000);
             javafx.application.Platform.runLater(() -> applyPing(status, r));
@@ -2338,7 +3162,7 @@ public class PageInstanceSetup implements Page {
         if (pingLock) return;
         pingLock = true;
         List<Label> statuses = new ArrayList<>(serverStatusLabels);
-        for (Label l : statuses) l.setText("查询中……");
+        for (Label l : statuses) l.setText(Lang.t("查询中……"));
         if (statuses.isEmpty()) {
             pingLock = false;
             return;
@@ -2355,7 +3179,7 @@ public class PageInstanceSetup implements Page {
                         } catch (Exception e) {
                             javafx.application.Platform.runLater(() -> {
                                 if (label.getScene() == null) return;
-                                label.setText("离线（查询异常）");
+                                label.setText(Lang.t("离线（查询异常）"));
                                 label.setTextFill(Theme.gray3);
                                 label.setOpacity(0.8);
                             });
@@ -2380,12 +3204,12 @@ public class PageInstanceSetup implements Page {
         // 旧标签脱场景后不回写
         if (status.getScene() == null) return;
         if (r.online) {
-            status.setText("在线 · " + r.players + "/" + r.maxPlayers + " · " + r.latency + "ms · "
+            status.setText(Lang.t("在线 · ") + r.players + "/" + r.maxPlayers + " · " + r.latency + "ms · "
                     + r.version + "  " + (r.motd == null ? "" : r.motd));
             status.setTextFill(Theme.text);
             status.setOpacity(1);
         } else {
-            status.setText("离线" + (r.errorMessage == null || r.errorMessage.isEmpty() ? "" : "（" + r.errorMessage + "）"));
+            status.setText(Lang.t("离线") + (r.errorMessage == null || r.errorMessage.isEmpty() ? "" : "（" + r.errorMessage + "）"));
             status.setTextFill(Theme.gray3);
             status.setOpacity(0.8);
         }
@@ -2397,7 +3221,7 @@ public class PageInstanceSetup implements Page {
             String base64 = icon;
             int comma = base64.indexOf(',');
             if (comma >= 0) base64 = base64.substring(comma + 1);
-            byte[] buffer = java.util.Base64.getDecoder().decode(base64);
+            byte[] buffer = Base64Safe.decode(base64);
             javafx.scene.image.Image img = new javafx.scene.image.Image(
                     new java.io.ByteArrayInputStream(buffer));
             if (img.isError()) return null;
@@ -2412,11 +3236,14 @@ public class PageInstanceSetup implements Page {
         java.util.List<Path> packs = new java.util.ArrayList<>();
         if (Files.isDirectory(dir)) {
             try (var stream = Files.list(dir)) {
-                stream.filter(Files::isDirectory).forEach(world -> {
+                stream.filter(Files::isDirectory).limit(1000).forEach(world -> {
                     Path dp = world.resolve("datapacks");
                     if (Files.isDirectory(dp)) {
                         try (var s2 = Files.list(dp)) {
-                            s2.filter(Files::isDirectory).forEach(packs::add);
+                            s2.filter(Files::isDirectory).limit(10000)
+                                    .forEach(p -> {
+                                        if (packs.size() < 10000) packs.add(p);
+                                    });
                         } catch (Exception ignored) {
                         }
                     }
@@ -2503,7 +3330,7 @@ public class PageInstanceSetup implements Page {
                 while ((e = zip.getNextEntry()) != null) {
                     if (e.isDirectory()) continue;
                     if (e.getName().equals("modrinth.index.json") || e.getName().equals("manifest.json")) {
-                        entries.put(e.getName(), zip.readAllBytes());
+                        entries.put(e.getName(), Io.read(zip, PACK_JSON_MAX));
                     }
                     if (entries.size() == 2) break;
                 }
@@ -2647,7 +3474,6 @@ public class PageInstanceSetup implements Page {
                 javafx.application.Platform.runLater(() ->
                         win.toast(Lang.t("下载失败：") + target.getFileName(), e.getMessage(), 3));
             } finally {
-                Tasks.INSTANCE.changed();
             }
         });
     }
@@ -2665,8 +3491,8 @@ public class PageInstanceSetup implements Page {
         if (Files.isDirectory(mods)) {
             try (var stream = Files.list(mods)) {
                 stream.filter(p -> p.getFileName().toString().toLowerCase().endsWith(".jar"))
-                        .sorted(java.util.Comparator.comparing(p -> p.getFileName().toString()))
-                        .forEach(modJars::add);
+                        .limit(10000).forEach(modJars::add);
+                modJars.sort(java.util.Comparator.comparing(p -> p.getFileName().toString()));
             } catch (Exception ignored) {
             }
         }
@@ -2706,20 +3532,22 @@ public class PageInstanceSetup implements Page {
         jijList.getChildren().clear();
         jijExportAll.setVisible(false);
         if (jijCurrentMod == null || !Files.isRegularFile(jijCurrentMod)) {
-            jijTip.setText("请选择一个 Mod。");
+            jijTip.setText(Lang.t("请选择一个 Mod。"));
             return;
         }
         Path modPath = jijCurrentMod;
-        jijTip.setText("正在读取…");
+        jijTip.setText(Lang.t("正在读取…"));
         Threads.start("TCL-JarInJar", () -> {
             List<String[]> jars = new ArrayList<>();
             String error = null;
             try (java.util.zip.ZipInputStream zip = new java.util.zip.ZipInputStream(Files.newInputStream(modPath))) {
                 java.util.zip.ZipEntry e;
+                int scanned = 0;
                 while ((e = zip.getNextEntry()) != null) {
+                    if (++scanned > 4096) throw new java.io.IOException("Mod 内条目过多");
                     String n = e.getName();
                     if (!n.startsWith("META-INF/jars/") || !n.endsWith(".jar")) continue;
-                    String[] info = jijReadNestedInfo(zip.readAllBytes());
+                    String[] info = jijReadNestedInfo(Io.read(zip, JIJ_MAX));
                     jars.add(new String[]{n, String.valueOf(e.getSize()), info[0], info[1]});
                 }
             } catch (Exception ex) {
@@ -2738,7 +3566,7 @@ public class PageInstanceSetup implements Page {
             while ((e = nested.getNextEntry()) != null) {
                 if (!e.getName().equals("fabric.mod.json")) continue;
                 java.util.Map<String, Object> json = Json.obj(Json.parse(
-                        new String(nested.readAllBytes(), StandardCharsets.UTF_8)));
+                        new String(Io.read(nested, MOD_META_MAX), StandardCharsets.UTF_8)));
                 String name = Json.str(json, "name", "");
                 if (name.isEmpty()) name = Json.str(json, "id", "");
                 return new String[]{name, Json.str(json, "version", "")};
@@ -2752,11 +3580,11 @@ public class PageInstanceSetup implements Page {
         // 入口比对防旧结果
         if (modPath != jijCurrentMod) return;
         if (error != null) {
-            jijTip.setText("读取失败：" + error);
+            jijTip.setText(Lang.t("读取失败：") + error);
             return;
         }
         if (jars.isEmpty()) {
-            jijTip.setText("该 Mod 不包含内嵌依赖（Jar-in-Jar）。");
+            jijTip.setText(Lang.t("该 Mod 不包含内嵌依赖（Jar-in-Jar）。"));
             return;
         }
         jijTip.setText(Lang.tf("共找到 %d 个内嵌依赖：", jars.size()));
@@ -2795,6 +3623,7 @@ public class PageInstanceSetup implements Page {
             String error = null;
             Path folder = null;
             boolean found = false;
+            long total = 0;
             try {
                 folder = jijExportFolder(modPath);
                 try (java.util.zip.ZipInputStream zip = new java.util.zip.ZipInputStream(Files.newInputStream(modPath))) {
@@ -2802,8 +3631,18 @@ public class PageInstanceSetup implements Page {
                     while ((e = zip.getNextEntry()) != null) {
                         if (!e.getName().equals(entryName)) continue;
                         found = true;
-                        Path target = folder.resolve(entryName.substring(entryName.lastIndexOf('/') + 1));
-                        Files.copy(zip, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                        if (e.getSize() > JIJ_EXPORT_ENTRY_MAX) throw new java.io.IOException("内嵌依赖过大");
+                        Path base = folder.toAbsolutePath().normalize();
+                        String leaf = entryName.substring(entryName.lastIndexOf('/') + 1).replace('\\', '/');
+                        Path target = base.resolve(leaf).normalize();
+                        if (leaf.isEmpty() || !target.startsWith(base) || target.equals(base)) {
+                            throw new java.io.IOException("内嵌依赖文件名不合法");
+                        }
+                        Files.createDirectories(base);
+                        try (java.io.OutputStream out = Files.newOutputStream(target,
+                                java.nio.file.StandardOpenOption.CREATE_NEW)) {
+                            total += Io.copy(zip, out, JIJ_EXPORT_TOTAL_MAX - total);
+                        }
                         break;
                     }
                 }
@@ -2835,14 +3674,26 @@ public class PageInstanceSetup implements Page {
             String error = null;
             Path folder = null;
             int count = 0;
+            long total = 0;
             try {
                 folder = jijExportFolder(modPath);
                 try (java.util.zip.ZipInputStream zip = new java.util.zip.ZipInputStream(Files.newInputStream(modPath))) {
                     java.util.zip.ZipEntry e;
+                    int scanned = 0;
                     while ((e = zip.getNextEntry()) != null) {
+                        if (++scanned > 4096) throw new java.io.IOException("Mod 内条目过多");
                         if (!e.getName().startsWith("META-INF/jars/") || !e.getName().endsWith(".jar")) continue;
-                        Files.copy(zip, folder.resolve(e.getName().substring(e.getName().lastIndexOf('/') + 1)),
-                                java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                        if (e.getSize() > JIJ_EXPORT_ENTRY_MAX) throw new java.io.IOException("内嵌依赖过大");
+                        Path base = folder.toAbsolutePath().normalize();
+                        String leaf = e.getName().substring(e.getName().lastIndexOf('/') + 1).replace('\\', '/');
+                        Path target = base.resolve(leaf).normalize();
+                        if (leaf.isEmpty() || !target.startsWith(base) || target.equals(base)) {
+                            throw new java.io.IOException("内嵌依赖文件名不合法");
+                        }
+                        try (java.io.OutputStream out = Files.newOutputStream(target,
+                                java.nio.file.StandardOpenOption.CREATE_NEW)) {
+                            total += Io.copy(zip, out, JIJ_EXPORT_TOTAL_MAX - total);
+                        }
                         count++;
                     }
                 }
@@ -2870,24 +3721,56 @@ public class PageInstanceSetup implements Page {
         return folder;
     }
 
+    private static String safeCopyName(String raw) {
+        String value = raw == null ? "实例" : raw.trim();
+        for (char c : "\\/:*?\"<>|".toCharArray()) value = value.replace(c, '_');
+        StringBuilder clean = new StringBuilder(value.length());
+        for (char c : value.toCharArray()) clean.append(c < 32 || c == 127 ? '_' : c);
+        value = clean.toString().trim();
+        if (value.isEmpty() || value.equals(".") || value.equals("..")) return "实例";
+        if (value.length() > 48) value = value.substring(0, 48);
+        while (value.endsWith(".") || value.endsWith(" ")) value = value.substring(0, value.length() - 1);
+        String upper = value.toUpperCase(java.util.Locale.ROOT);
+        if (value.isEmpty() || upper.matches("CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9]")) return "实例";
+        return value;
+    }
+
     private void copyInstance() {
         Data.Instance ins = data.instance();
         if (ins == null) return;
-        String name = ins.name + "-副本";
+        String stem = safeCopyName(ins.name);
+        String name = stem + "-副本";
         int n = 2;
         while (true) {
             boolean exists = false;
             for (Data.Instance i : data.instances) if (i.name.equals(name)) exists = true;
             if (!exists) break;
-            name = ins.name + "-副本" + (n++);
+            name = stem + "-副本" + (n++);
         }
         final String copyName = name;
         Path base = baseRoot();
-        Path srcRoot = base.resolve("versions").resolve(ins.version);
-        Path newFolder = base.resolve("versions").resolve(copyName);
+        Path versions = base.resolve("versions").normalize();
+        Path srcRoot = versions.resolve(ins.version == null ? "" : ins.version).normalize();
+        if (srcRoot.equals(versions) || !srcRoot.startsWith(versions)) {
+            win.toast("复制失败", Lang.t("版本目录不合法。"), 3);
+            return;
+        }
+        Path newFolder = versions.resolve(copyName).normalize();
+        if (!newFolder.startsWith(versions) || newFolder.equals(versions)) {
+            win.toast("复制失败", Lang.t("名称不合法。"), 3);
+            return;
+        }
         boolean isolated = Isolation.on(ins);
         if (!Files.isDirectory(srcRoot)) {
             win.toast("复制失败", Lang.t("版本目录不存在：") + srcRoot, 3);
+            return;
+        }
+        if (Files.isSymbolicLink(srcRoot)) {
+            win.toast("复制失败", "版本目录是符号链接。", 3);
+            return;
+        }
+        if (Files.isSymbolicLink(newFolder) || Files.exists(newFolder)) {
+            win.toast("复制失败", Lang.t("已存在同名版本目录：") + copyName, 3);
             return;
         }
         Tasks.Task task = new Tasks.Task("复制实例 · " + ins.name);
@@ -2895,20 +3778,27 @@ public class PageInstanceSetup implements Page {
         Tasks.INSTANCE.add(task);
         win.toast("正在复制实例", name, 0);
         Threads.start("TCL-InstanceCopy", () -> {
+            boolean created = false;
             try {
                 Files.createDirectories(newFolder);
+                created = true;
+                long totalFiles;
                 try (var stream = Files.walk(srcRoot)) {
-                    List<Path> files = stream.filter(Files::isRegularFile).toList();
-                    task.remainingFiles = files.size();
-                    int done = 0;
-                    for (Path f : files) {
-                        if (task.canceled) throw new Exception("已取消");
+                    totalFiles = stream.filter(p -> !Files.isSymbolicLink(p)).filter(Files::isRegularFile).count();
+                }
+                task.remainingFiles = (int) Math.min(Integer.MAX_VALUE, totalFiles);
+                long copied = 0;
+                try (var stream = Files.walk(srcRoot)) {
+                    var it = stream.filter(p -> !Files.isSymbolicLink(p)).filter(Files::isRegularFile).iterator();
+                    while (it.hasNext()) {
+                        Path f = it.next();
+                        if (task.canceled) throw new Exception(Lang.t("已取消"));
                         Path dest = newFolder.resolve(srcRoot.relativize(f).toString());
                         Files.createDirectories(dest.getParent());
                         Files.copy(f, dest, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                        done++;
-                        task.progress = done / (double) files.size();
-                        task.stage = "正在复制 " + done + " / " + files.size();
+                        copied++;
+                        task.progress = totalFiles > 0 ? copied / (double) totalFiles : 1;
+                        task.stage = "正在复制 " + copied + " / " + totalFiles;
                     }
                 }
                 PageInstance.rewriteVersionJson(newFolder, ins.version, copyName);
@@ -2923,17 +3813,53 @@ public class PageInstanceSetup implements Page {
                     task.state = Tasks.State.DONE;
                     task.progress = 1;
                     task.stage = "复制完成";
-                    Tasks.INSTANCE.changed();
                     win.toast("已复制实例", copy.name, 1);
                     win.openPage("instance", true);
                 });
             } catch (Exception e) {
+                if (created) deleteTree(newFolder);
                 task.state = task.canceled ? Tasks.State.CANCELED : Tasks.State.FAILED;
                 task.stage = e.getMessage() == null ? "复制失败" : e.getMessage();
-                Tasks.INSTANCE.changed();
                 javafx.application.Platform.runLater(() -> win.toast("复制失败", task.stage, 3));
             }
         });
+    }
+
+    private static void deleteTree(Path dir) {
+        deleteTreeChecked(dir);
+    }
+
+    private static Exception deleteTreeChecked(Path dir) {
+        if (dir == null || !Files.exists(dir, java.nio.file.LinkOption.NOFOLLOW_LINKS)) return null;
+        if (Files.isSymbolicLink(dir)) {
+            try {
+                Files.deleteIfExists(dir);
+                return null;
+            } catch (Exception e) {
+                return e;
+            }
+        }
+        try {
+            Files.walkFileTree(dir, new java.nio.file.SimpleFileVisitor<Path>() {
+                @Override
+                public java.nio.file.FileVisitResult visitFile(Path file,
+                        java.nio.file.attribute.BasicFileAttributes attrs) throws java.io.IOException {
+                    Files.deleteIfExists(file);
+                    return java.nio.file.FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public java.nio.file.FileVisitResult postVisitDirectory(Path folder, java.io.IOException exc)
+                        throws java.io.IOException {
+                    if (exc != null) throw exc;
+                    Files.deleteIfExists(folder);
+                    return java.nio.file.FileVisitResult.CONTINUE;
+                }
+            });
+            return null;
+        } catch (Exception e) {
+            return e;
+        }
     }
 
     private record ExportOption(String key, String title, String rules, String showRules,
@@ -2960,7 +3886,7 @@ public class PageInstanceSetup implements Page {
             new ExportOption("shaderpacks", "光影包", null, "shaderpacks/", true, false, false, false),
     };
 
-    private static final String[] EXPORT_EXCLUDES = {"!*.log", "!*.dat_old", "!*.BakaCoreInfo", "!hmclversion.cfg", "!log4j2.xml"};
+    private static final String[] EXPORT_EXCLUDES = {"!*.log", "!*.dat_old", "!*.BakaCoreInfo", "!log4j2.xml"};
 
     private final java.util.Map<String, Boolean> exportChecked = new java.util.LinkedHashMap<>();
     private String exportConfiguredName = "";
@@ -3064,14 +3990,14 @@ public class PageInstanceSetup implements Page {
         if (!Files.isDirectory(dir)) return;
         String[] blacklist = {"Quark Programmer Art.zip", "+ EuphoriaPatches_", "TCL Skin.zip"};
         try (var stream = Files.list(dir)) {
-            stream.forEach(p -> {
+            stream.limit(10000).forEach(p -> {
                 String n = p.getFileName().toString();
                 for (String b : blacklist) if (n.contains(b)) return;
                 if (Files.isRegularFile(p) && (n.toLowerCase().endsWith(".zip") || n.toLowerCase().endsWith(".rar"))) {
-                    exportSubOptions.add(new ExportOption(folder + "/" + n, label + " · " + n,
+                    exportSubOptions.add(new ExportOption(folder + "/" + n, Lang.t(label) + " · " + n,
                             globEscape(folder + "/" + n), null, true, false, false, false));
                 } else if (acceptFolder && Files.isDirectory(p)) {
-                    exportSubOptions.add(new ExportOption(folder + "/" + n, label + " · " + n,
+                    exportSubOptions.add(new ExportOption(folder + "/" + n, Lang.t(label) + " · " + n,
                             globEscape(folder + "/" + n + "/"), null, true, false, false, false));
                 }
             });
@@ -3175,7 +4101,7 @@ public class PageInstanceSetup implements Page {
                 if (parent != null) Files.createDirectories(parent);
                 target = Paths.get(exportConfiguredPackPath).toFile();
             } catch (Exception ex) {
-                String msg = "指定的路径：" + exportConfiguredPackPath + "\n\n" + ex.getMessage();
+                String msg = Lang.t("指定的路径：") + exportConfiguredPackPath + "\n\n" + ex.getMessage();
                 Dialogs.confirm(win, "无法使用配置文件中指定的导出路径", msg + Lang.t("\n\n仍要手动选择导出位置吗？"),
                         () -> startExport(nameField, versionField, ruleOverride, true));
                 return;
@@ -3203,8 +4129,11 @@ public class PageInstanceSetup implements Page {
         final String fPackName = packName;
         final String fPackVersion = packVersion;
         final java.io.File fTarget = target;
+        task.pendingText = "打开所在文件夹";
+        task.pendingAction = () -> Shell.openFolder(fTarget.getParent());
         Threads.start("TCL-Export", () -> {
             Path cache = null;
+            final Path partialZip = fTarget.toPath().resolveSibling(fTarget.getName() + ".part");
             try {
                 cache = Files.createTempDirectory("tcl-export-");
                 Path overrides = cache.resolve("modpack").resolve("overrides");
@@ -3213,6 +4142,7 @@ public class PageInstanceSetup implements Page {
 
                 java.util.List<Path> hostedCandidates = new ArrayList<>();
                 final int[] copied = {0};
+                final int[] failedCopies = {0};
                 try (var walk = Files.walk(game, 20)) {
                     walk.filter(Files::isRegularFile).forEach(file -> {
                         if (task.canceled) throw new java.io.UncheckedIOException(new java.io.IOException("导出已取消"));
@@ -3236,9 +4166,14 @@ public class PageInstanceSetup implements Page {
                                     || lower.endsWith(".disabled") || lower.endsWith(".old"))) {
                                 hostedCandidates.add(dest);
                             }
-                        } catch (Exception ignored) {
+                        } catch (Exception ex) {
+                            failedCopies[0]++;
+                            data.log("导出时复制失败：" + relative + " " + Log.describe(ex));
                         }
                     });
+                }
+                if (failedCopies[0] > 0) {
+                    throw new java.io.IOException(Lang.tf("有 %d 个文件复制失败，导出已中止", failedCopies[0]));
                 }
                 task.subs.get(0).state = Tasks.State.DONE;
 
@@ -3346,8 +4281,9 @@ public class PageInstanceSetup implements Page {
                 }
 
                 Path packRoot = cache.resolve("modpack");
+                java.util.concurrent.atomic.AtomicInteger zipFailures = new java.util.concurrent.atomic.AtomicInteger();
                 task.threads = 1;
-                try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(fTarget.toPath()))) {
+                try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(partialZip))) {
                     try (var walk = Files.walk(packRoot)) {
                         walk.filter(Files::isRegularFile).forEach(file -> {
                             try {
@@ -3355,11 +4291,18 @@ public class PageInstanceSetup implements Page {
                                 zip.putNextEntry(new ZipEntry(entryName));
                                 Files.copy(file, zip);
                                 zip.closeEntry();
-                            } catch (Exception ignored) {
+                            } catch (Exception ex) {
+                                zipFailures.incrementAndGet();
+                                data.log("打包文件失败：" + file + " " + Log.describe(ex));
                             }
                         });
                     }
                 }
+                if (zipFailures.get() > 0) {
+                    Files.deleteIfExists(partialZip);
+                    throw new java.io.IOException(Lang.tf("有 %d 个文件打包失败，导出已中止", zipFailures.get()));
+                }
+                Files.move(partialZip, fTarget.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                 task.subs.get(2).state = Tasks.State.DONE;
                 task.state = Tasks.State.DONE;
                 task.progress = 1;
@@ -3368,6 +4311,7 @@ public class PageInstanceSetup implements Page {
                     Shell.openFolder(fTarget.getParent().toString());
                 });
             } catch (Exception e) {
+                try { Files.deleteIfExists(partialZip); } catch (Exception ignored) { }
                 task.subs.forEach(sub -> {
                     if (sub.state == Tasks.State.RUNNING) sub.state = Tasks.State.FAILED;
                 });
@@ -3382,7 +4326,6 @@ public class PageInstanceSetup implements Page {
                     } catch (Exception ignored) {
                     }
                 }
-                Tasks.INSTANCE.changed();
             }
         });
     }
@@ -3454,6 +4397,7 @@ public class PageInstanceSetup implements Page {
         task.subs.add(new Tasks.SubTask("写入压缩包"));
         Tasks.INSTANCE.add(task);
         Threads.start("TCL-Backup", () -> {
+            boolean complete = false;
             try {
                 Path game = instanceRoot();
                 List<Path> files = new ArrayList<>();
@@ -3469,7 +4413,7 @@ public class PageInstanceSetup implements Page {
                 try (ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(file))) {
                     int done = 0;
                     for (Path p : files) {
-                        if (task.canceled) throw new Exception("已取消");
+                        if (task.canceled) throw new Exception(Lang.t("已取消"));
                         zip.putNextEntry(new ZipEntry(game.relativize(p).toString().replace('\\', '/')));
                         Files.copy(p, zip);
                         zip.closeEntry();
@@ -3481,6 +4425,7 @@ public class PageInstanceSetup implements Page {
                 task.state = Tasks.State.DONE;
                 task.subs.get(0).state = Tasks.State.DONE;
                 task.stage = "备份完成";
+                complete = true;
                 javafx.application.Platform.runLater(() -> win.toast("备份完成", file.getName(), 1));
             } catch (Exception e) {
                 task.subs.forEach(sub -> {
@@ -3490,7 +4435,12 @@ public class PageInstanceSetup implements Page {
                 task.stage = e.getMessage() == null ? "备份失败" : e.getMessage();
                 javafx.application.Platform.runLater(() -> win.toast("备份失败", task.stage, 3));
             } finally {
-                Tasks.INSTANCE.changed();
+                if (!complete) {
+                    try {
+                        Files.deleteIfExists(file.toPath());
+                    } catch (Exception ignored) {
+                    }
+                }
             }
         });
     }
@@ -3564,7 +4514,10 @@ public class PageInstanceSetup implements Page {
         java.io.File file = chooser.showOpenDialog(win.stage);
         if (file == null) return;
         try {
-            String text = Files.readString(file.toPath(), StandardCharsets.UTF_8);
+            String text;
+            try (java.io.InputStream in = Files.newInputStream(file.toPath())) {
+                text = new String(Io.read(in, 2L * 1024 * 1024), StandardCharsets.UTF_8);
+            }
             String sep = "==============================================================";
             String[] segments = text.split(sep);
             java.util.Map<String, String> ini = new java.util.LinkedHashMap<>();
@@ -3661,7 +4614,8 @@ public class PageInstanceSetup implements Page {
 
     private void packLauncherFiles(Path payloadRoot) throws Exception {
         Path base = Resources.appDir();
-        for (String script : new String[]{"TCraftLauncher.bat", "TCraftLauncher-debug.bat", "TCraftLauncher.sh"}) {
+        for (String script : new String[]{"TCraftLauncher.bat", "TCraftLauncher-debug.bat",
+                "TCraftLauncher.sh", "TCraftLauncher.command"}) {
             Path src = base.resolve(script);
             if (Files.isRegularFile(src)) {
                 Files.copy(src, payloadRoot.resolve(script),
@@ -3680,7 +4634,7 @@ public class PageInstanceSetup implements Page {
                 + System.lineSeparator()
                 + "本压缩包已包含启动器程序、启动脚本与资源文件。" + System.lineSeparator()
                 + "运行需要 Java 17 或更高版本；首次启动会自动下载 JavaFX 运行库。" + System.lineSeparator()
-                + "zip 不保存可执行位：Linux/macOS 下若 .sh 无法直接运行，请用 sh TCraftLauncher.sh 启动。" + System.lineSeparator()
+                + "zip 不保存可执行位：Linux/macOS 下若 .sh 或 .command 无法直接运行，请用 sh 运行对应脚本（TCraftLauncher.sh / TCraftLauncher.command）。" + System.lineSeparator()
                 + System.lineSeparator()
                 + "整合包游戏文件位于 overrides 目录（Modrinth 格式请先导入 .mrpack）。" + System.lineSeparator();
         Files.writeString(payloadRoot.resolve("启动器文件说明.txt"), readme, StandardCharsets.UTF_8);

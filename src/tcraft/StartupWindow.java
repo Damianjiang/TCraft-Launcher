@@ -87,14 +87,14 @@ public final class StartupWindow {
     }
 
     public void setIndeterminate(String text) {
-        status = text == null ? "" : text;
+        status = Lang.t(text == null ? "" : text);
         detail = "";
         percent = -1;
         repaint();
     }
 
     public void setStatus(String text, int value) {
-        status = text == null ? "" : text;
+        status = Lang.t(text == null ? "" : text);
         detail = "";
         percent = value;
         repaint();
@@ -127,7 +127,7 @@ public final class StartupWindow {
         }
         if (speedMb > 0) d.append(String.format(java.util.Locale.ROOT, "  %.1f MB/s", speedMb));
         detail = d.toString();
-        status = text == null ? "" : text;
+        status = Lang.t(text == null ? "" : text);
         percent = overallPercent;
         repaint();
     }

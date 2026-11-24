@@ -127,7 +127,7 @@ public class PageDownload implements Page {
     private VBox vanillaBox;
     private VBox selectBox;
     private StackPane pagesOverlap;
-    private Data.McVersion selectVersion;
+    private volatile Data.McVersion selectVersion;
     private TextField selectNameField;
     private StackPane selectIcon;
     private Label renameHint;
@@ -158,6 +158,7 @@ public class PageDownload implements Page {
         boolean available = true;
         java.util.List<String> versions;
         boolean fetched;
+        int requestSeq;
         int pageNo;
     }
 
@@ -184,7 +185,7 @@ public class PageDownload implements Page {
             if (loadRef == null) return;
             javafx.application.Platform.runLater(() -> {
                 loadRef.setProgress(p);
-                loadRef.setStage(p >= 1 ? "解析版本列表…" : "下载版本清单…");
+                loadRef.setStage(Lang.t(p >= 1 ? "解析版本列表…" : "下载版本清单…"));
             });
         });
         Data.McVersion release = data.firstOf("release");
@@ -386,7 +387,7 @@ public class PageDownload implements Page {
     }
 
     private Node loaderLoading(LoaderCard lc) {
-        Ui.LoadCard card = new Ui.LoadCard("正在获取 " + lc.title + " 版本列表", "拉取版本清单…");
+        Ui.LoadCard card = new Ui.LoadCard(Lang.tf("正在获取 %s 版本列表", Lang.t(lc.title)), Lang.t("拉取版本清单…"));
         StackPane box = new StackPane(card);
         box.setPadding(new Insets(8, 0, 8, 0));
         box.setAlignment(Pos.CENTER_LEFT);
@@ -396,14 +397,15 @@ public class PageDownload implements Page {
     private void prefetchOne(LoaderCard lc) {
         if (lc.fetched) return;
         lc.fetched = true;
+        final int seq = ++lc.requestSeq;
         String mc = selectVersion == null ? "" : selectVersion.id;
         Thread t = new Thread(() -> {
             try {
                 java.util.List<String> v = Loaders.versions(lc.loaderKey, mc);
                 javafx.application.Platform.runLater(() -> {
-                    // 切走版本后丢弃旧结果
+                    // 切走版本或又有新请求后丢弃旧结果
                     String now = selectVersion == null ? "" : selectVersion.id;
-                    if (!now.equals(mc)) return;
+                    if (seq != lc.requestSeq || !now.equals(mc)) return;
                     lc.versions = v;
                     lc.error = null;
                     lc.fetched = true;
@@ -414,11 +416,11 @@ public class PageDownload implements Page {
             } catch (Exception e) {
                 javafx.application.Platform.runLater(() -> {
                     String now = selectVersion == null ? "" : selectVersion.id;
-                    if (!now.equals(mc)) return;
+                    if (seq != lc.requestSeq || !now.equals(mc)) return;
                     lc.versions = null; // 下次展开时重试
-                    lc.error = e.getMessage() == null ? "获取失败" : e.getMessage();
+                    lc.error = e.getMessage() == null ? Lang.t("获取失败") : Lang.t(e.getMessage());
                     lc.fetched = false;
-                    lc.list.getChildren().setAll(Ui.hint(lc.title + Lang.t(" 版本列表获取失败：") + lc.error, 2));
+                    lc.list.getChildren().setAll(Ui.hint(Lang.t(lc.title) + Lang.t(" 版本列表获取失败：") + Lang.t(lc.error), 2));
                     refreshAll();
                 });
             }
@@ -446,9 +448,9 @@ public class PageDownload implements Page {
         }
         if (lc.versions.isEmpty()) {
             if (lc.error != null) {
-                lc.list.getChildren().add(Ui.hint(lc.title + Lang.t(" 版本列表获取失败：") + lc.error, 2));
+                lc.list.getChildren().add(Ui.hint(Lang.t(lc.title) + Lang.t(" 版本列表获取失败：") + Lang.t(lc.error), 2));
             } else {
-                lc.list.getChildren().add(Ui.hint(Lang.t("该 Minecraft 版本没有可用的 ") + lc.title, 1));
+                lc.list.getChildren().add(Ui.hint(Lang.t("该 Minecraft 版本没有可用的 ") + Lang.t(lc.title), 1));
             }
             return;
         }
@@ -542,7 +544,7 @@ public class PageDownload implements Page {
                 collapse(lc.clearBtn, true);
             } else {
                 collapse(lc.statusIcon, false);
-                String status = (lc.error != null) ? lc.error : "可以添加";
+                String status = (lc.error != null) ? Lang.t(lc.error) : "可以添加";
                 lc.statusLabel.setText(status);
                 lc.statusLabel.setTextFill("获取失败".equals(status) || "无".equals(status) ? Theme.red : Theme.gray4);
                 collapse(lc.clearBtn, false);
@@ -819,6 +821,14 @@ public class PageDownload implements Page {
             win.toast("实例名称不能为空", "", 2);
             return;
         }
+        if (!validInstanceName(name)) {
+            win.toast("实例名称不可用", "不能包含路径分隔符或系统保留字符，也不能使用保留名称。", 2);
+            return;
+        }
+        if (java.nio.file.Files.exists(java.nio.file.Paths.get(data.gameDir, "versions", name))) {
+            win.toast("实例已存在", "请换一个名称，避免覆盖已有的版本目录。", 2);
+            return;
+        }
         Inst inst = buildInst(name);
         Runnable begin = () -> {
             Downloader.startInstall(win, inst);
@@ -834,6 +844,14 @@ public class PageDownload implements Page {
             return;
         }
         begin.run();
+    }
+
+    private static boolean validInstanceName(String name) {
+        if (name.length() > 64 || name.equals(".") || name.equals("..")) return false;
+        if (name.matches(".*[\\\\/:*?\"<>|].*")) return false;
+        if (name.endsWith(".") || name.endsWith(" ")) return false;
+        String upper = name.toUpperCase(java.util.Locale.ROOT);
+        return !upper.matches("CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9]");
     }
 
     private Inst buildInst(String name) {
@@ -860,11 +878,13 @@ public class PageDownload implements Page {
         }
         String name = Loaders.installerName(lc.loaderKey, version);
         if (name.isEmpty()) name = lc.key.replaceAll("[^A-Za-z0-9._-]", "_") + "-" + version + ".jar";
+        name = name.replaceAll("[\\\\/:*?\"<>|]", "_");
+        if (name.isEmpty() || name.equals(".") || name.equals("..")) name = "installer.jar";
         java.nio.file.Path target = java.nio.file.Paths.get(data.gameDir, "TCL", "installers", name);
-        win.toast("正在下载安装器", lc.title + " · " + version, 0);
+        win.toast("正在下载安装器", Lang.t(lc.title) + " · " + version, 0);
         Thread t = new Thread(() -> {
             try {
-                Downloader.downloadFileTo(null, url, target, lc.title + " 安装器");
+                Downloader.downloadFileTo(null, url, target, lc.title + Lang.t(" 安装器"));
                 javafx.application.Platform.runLater(() ->
                         win.toast("安装器已下载", Lang.t("已保存到 ") + target.getFileName(), 1));
             } catch (Exception e) {
@@ -1120,7 +1140,7 @@ public class PageDownload implements Page {
         };
     }
 
-    // 仅最后一次请求可写界面
+    // 仅最新请求可写界面
     private int resourceRequestGen;
 
     private void fetchResources(String q, String category, String projectType, int classId,
@@ -1151,13 +1171,13 @@ public class PageDownload implements Page {
             host.getChildren().remove(resourceLoadingHost);
         }
         final int gen = ++resourceRequestGen;
-        // 异步节点创建处翻译
         Ui.LoadCard searchLoad = new Ui.LoadCard(
                 resourcePage == 0 ? Lang.t("正在搜索") : Lang.tf("正在加载第 %d 页", resourcePage + 1),
                 source.equals("全部") ? "Modrinth · CurseForge" : source);
         rows.getChildren().setAll(searchLoad);
         javafx.application.Platform.runLater(() -> searchLoad.setStage(
-                source.equals("全部") ? "并发请求 Modrinth 与 CurseForge…" : "请求 " + source + "…"));
+                source.equals("全部") ? Lang.t("并发请求 Modrinth 与 CurseForge…")
+                        : Lang.t("请求 ") + source + "…"));
         // 请求期间禁用翻页
         prev.setDisable(true);
         next.setDisable(true);
@@ -1192,7 +1212,15 @@ public class PageDownload implements Page {
                             throw new java.io.IOException("CurseForge 需要 API Key（请在 设置 → 系统 → CurseForge Key 填入，在 https://console.curseforge.com/ 生成）");
                         }
                         List<Resource> got = new ArrayList<>();
-                        for (CurseForge.Project p : CurseForge.search(q, classId, RESOURCE_PAGE_SIZE, fCfCategoryId, offset)) {
+                        int cfLoader = loader == null ? -1 : switch (loader) {
+                            case "forge" -> 1;
+                            case "fabric" -> 4;
+                            case "liteloader" -> 3;
+                            case "neoforge" -> 6;
+                            default -> -1;
+                        };
+                        for (CurseForge.Project p : CurseForge.search(q, classId, RESOURCE_PAGE_SIZE,
+                                fCfCategoryId, offset, versionValid ? version : "", cfLoader)) {
                             Resource r = new Resource();
                             r.name = p.name;
                             r.slug = p.slug;

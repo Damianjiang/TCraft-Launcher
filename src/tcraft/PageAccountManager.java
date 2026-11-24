@@ -121,7 +121,9 @@ public class PageAccountManager implements Page {
 
     private static boolean hasLocalSkin(String skin) {
         if (skin == null || !skin.startsWith("Skins/")) return false;
-        return java.nio.file.Files.isRegularFile(Theme.skinDir().resolve(skin.substring(6)));
+        java.nio.file.Path base = Theme.skinDir().toAbsolutePath().normalize();
+        java.nio.file.Path p = base.resolve(skin.substring(6)).normalize();
+        return p.startsWith(base) && java.nio.file.Files.isRegularFile(p);
     }
 
     private void refreshAccount(Data.Account a, boolean silent) {
@@ -135,10 +137,10 @@ public class PageAccountManager implements Page {
                     skin = MsAuth.refreshSkin(a);
                 } else {
                     Yggdrasil.Server server = Yggdrasil.accountServer(a);
-                    if (server == null) throw new Exception("缺少认证服务器地址，请重新登录该账户");
+                    if (server == null) throw new Exception(Lang.t("缺少认证服务器地址，请重新登录该账户"));
                     Yggdrasil.Profile profile = new Yggdrasil.Profile(a.uuid, who);
                     String url = Yggdrasil.skinUrlOf(server, profile);
-                    if (url == null) throw new Exception("服务器没有返回该账户的皮肤");
+                    if (url == null) throw new Exception(Lang.t("服务器没有返回该账户的皮肤"));
                     skin = Skins.download(who, url);
                 }
             } catch (Exception e) {
@@ -319,7 +321,6 @@ public class PageAccountManager implements Page {
 
     private String rowInfo(int index, boolean current) {
         Data.Account a = data.accounts.get(index);
-        // 拼接串创建处翻译
         return Lang.t(loginType(a)) + (current ? Lang.t(" · 当前账户") : "");
     }
 
@@ -340,12 +341,15 @@ public class PageAccountManager implements Page {
             win.toast("无法删除", "至少需要保留一个账户。", 2);
             return;
         }
-        Data.Account a = data.accounts.get(index);
+            Data.Account a = data.accounts.get(index);
         Dialogs.confirm(win, "删除账户", Lang.tf("确定要删除账户 %s 吗？此操作不可撤销。", a.name), () -> {
             int i = data.accounts.indexOf(a);
             if (i < 0) return;
             data.accounts.remove(i);
-            if (data.selectedAccount >= data.accounts.size()) data.selectedAccount = 0;
+            if (i < data.selectedAccount) data.selectedAccount--;
+            else if (i == data.selectedAccount && data.selectedAccount >= data.accounts.size()) {
+                data.selectedAccount = Math.max(0, data.accounts.size() - 1);
+            }
             data.save();
             refreshSilently();
             win.toast("账户已删除", a.name, 1);

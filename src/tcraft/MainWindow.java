@@ -209,7 +209,7 @@ public final class MainWindow {
         stage.initStyle(javafx.stage.StageStyle.TRANSPARENT);
         stage.setScene(scene);
         stage.setTitle("TCraft Launcher");
-        // add(null) 会抛 NPE
+        // 图标为空时跳过
         javafx.scene.image.Image winIcon = Theme.loadImage("logo.png");
         if (winIcon != null) stage.getIcons().add(winIcon);
         stage.setMinWidth(810);
@@ -230,7 +230,7 @@ public final class MainWindow {
         });
         stage.setOnCloseRequest(e -> {
             e.consume();
-            closeWindow();
+            requestClose();
         });
         openPage("launch", false);
         long tPage = System.nanoTime();
@@ -250,8 +250,8 @@ public final class MainWindow {
         data.set("SystemCount", launches);
         java.util.List<String> unlockedNow = Theme.applyLaunchUnlocks(launches);
         if (!unlockedNow.isEmpty()) {
-            // toast 对整串查表 拼接串须各自先译
-            String names = String.join("、", unlockedNow.stream().map(Lang::t).toList());
+            // toast 对整串查表 拼接串须先分别查
+            String names = String.join(Lang.t("、"), unlockedNow.stream().map(Lang::t).toList());
             data.log("隐藏主题已解锁：" + names + "（累计启动 " + launches + " 次）");
             Platform.runLater(() -> toast("隐藏主题已解锁", names + Lang.t(" —— 可在 设置 → 个性化 中选用。"), 1));
         }
@@ -447,7 +447,7 @@ public final class MainWindow {
             st.setToY(0);
             node.getProperties().put("tclExtraHide", st);
             st.setOnFinished(e -> {
-                // 仅当仍是本次隐藏才 setVisible 新的显示请求优先
+                // 仅当仍是当前隐藏才 setVisible 新的显示请求优先
                 if (node.getProperties().remove("tclExtraHide", st)) {
                     node.setVisible(false);
                     node.setManaged(false);
@@ -568,7 +568,7 @@ public final class MainWindow {
         try {
             Files.createDirectories(dir);
             try (var stream = Files.list(dir)) {
-                stream.filter(Files::isRegularFile).forEach(p -> {
+                stream.filter(Files::isRegularFile).limit(100).forEach(p -> {
                     String n = p.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
                     for (String ext : VIDEO_EXTS) {
                         if (n.endsWith("." + ext)) {
@@ -890,7 +890,6 @@ public final class MainWindow {
                 boolean normalExit = exit == 0 || gameStopRequested;
                 gameStopRequested = false;
                 data.log("游戏进程已退出，返回码 " + exit);
-                // 数字拼接会破坏查表 前缀单独翻译
                 toast(normalExit ? "游戏已退出" : "游戏异常退出", Lang.t("返回码 ") + exit, normalExit ? 0 : 2);
                 if (!normalExit && data.crashAnalysisEnabled()) {
                     analyzeCrashAsync(crashIns);
@@ -1213,7 +1212,7 @@ public final class MainWindow {
                 langBtn,
                 pluginActionBox,
                 Ui.iconButtonWhite("minus", 28, 16, "最小化", () -> stage.setIconified(true)),
-                Ui.iconButtonWhite("x", 28, 16, "关闭", this::closeWindow)
+                Ui.iconButtonWhite("x", 28, 16, "关闭", this::requestClose)
         );
         refreshPluginActions();
         right.addEventHandler(MouseEvent.MOUSE_PRESSED, e -> {
@@ -1338,7 +1337,7 @@ public final class MainWindow {
             try {
                 Path p = Paths.get(data.gameDir, "TCL", "Logo.png");
                 if (Files.exists(p)) {
-                    ImageView iv = new ImageView(new Image(p.toUri().toString(), false));
+                    ImageView iv = new ImageView(new Image(p.toUri().toString(), 256, 256, true, true));
                     iv.setFitHeight(22);
                     iv.setPreserveRatio(true);
                     iv.setMouseTransparent(true);
@@ -1791,7 +1790,7 @@ public final class MainWindow {
         if (rightRefreshAnim != null) {
             rightRefreshAnim.stop();
             rightRefreshAnim = null;
-            // stop() 后 setOnFinished 不跑 在此补 onHide
+            // stop 后完成回调不跑 在此补 onHide
             hidePage(rightPendingHide);
             rightPendingHide = null;
         }
@@ -1974,7 +1973,6 @@ public final class MainWindow {
         try {
             page = createPage(key);
         } catch (Exception e) {
-            // brief 会二次翻译 先译无害
             Errors.error(Lang.t("构造「") + key + Lang.t("」页面失败"), e);
             return;
         }
@@ -2102,7 +2100,7 @@ public final class MainWindow {
         if (page == null) return;
         leftHost.setMouseTransparent(true);
         rightHost.setMouseTransparent(true);
-        // page.left() 重调会生成隐藏新树
+        // page.left 重调会生成隐藏新树
         Node left = curLeft;
         Node right = curRight;
         if (left != null) {
@@ -3041,7 +3039,7 @@ public final class MainWindow {
                 }));
             }
             for (Plugins.CommandInfo c : Plugins.get().allCommands()) {
-                entries.add(searchEntry(c.name, "插件命令 · " + c.pluginName, "package",
+                entries.add(searchEntry(c.name, Lang.t("插件命令 · ") + c.pluginName, "package",
                         (Runnable) () -> Plugins.get().runCommand(c.name, "")));
             }
             entries.add(searchEntry("今日人品", "实用工具", "coffee", (Runnable) () -> openPage("other", true)));
@@ -3067,7 +3065,6 @@ public final class MainWindow {
         if (!data.getBool("UiHiddenPageSetup", false)) {
             for (String[] s : setup) {
                 if (setupHidden(s[1])) continue;
-                // 拼接标题分段翻译
                 entries.add(new Object[]{"设置 - " + s[0], "设置", "settings", (Runnable) () -> {
                     pendingSetupSection = s[1];
                     openPage("setup", true);
@@ -3100,7 +3097,7 @@ public final class MainWindow {
             String query = q == null ? "" : q.trim().toLowerCase();
             int count = 0;
             for (Object[] entry : entries) {
-                // 原文与译文都参与匹配
+                // 原文与中文都参与匹配
                 String title = (String) entry[4];
                 String sub = (String) entry[5];
                 String titleRaw = (String) entry[0];
@@ -3682,7 +3679,6 @@ public final class MainWindow {
                 java.nio.file.Path json = Isolation.base(ins).resolve("versions")
                         .resolve(ins.version).resolve(ins.version + ".json");
                 if (!java.nio.file.Files.isRegularFile(json)) {
-                    // 分段翻译
                     throw new Exception(Lang.t("未找到版本文件 ") + json + Lang.t("，请先在「下载」页安装 ") + ins.version);
                 }
                 data.launchLog("游戏目录：" + Isolation.run(ins) + (Isolation.on(ins) ? "（已隔离）" : "（共用）"));
@@ -3874,6 +3870,10 @@ public final class MainWindow {
         rebuildUi();
     }
 
+    public void requestClose() {
+        closeWindow();
+    }
+
     public void closeWindow() {
         if (closing) return;
         closing = true;
@@ -3898,7 +3898,7 @@ public final class MainWindow {
             stopVideo();
             if (shellTimer != null) shellTimer.stop();
             Platform.exit();
-            // Platform.exit() 不退后台线程 延迟强退
+            // Platform.exit 不退后台线程 延迟强退
             Thread killer = new Thread(() -> {
                 try {
                     Thread.sleep(350);
@@ -3913,7 +3913,28 @@ public final class MainWindow {
     }
 
     private void installDropTarget(Scene scene) {
+        scene.addEventFilter(javafx.scene.input.DragEvent.DRAG_OVER, e -> {
+            var authServer = AuthlibInjectorDnD.parse(e.getDragboard());
+            if (authServer.isPresent() && !hasOpenModal()) {
+                e.acceptTransferModes(javafx.scene.input.TransferMode.COPY);
+                e.consume();
+            }
+        });
+        scene.addEventFilter(javafx.scene.input.DragEvent.DRAG_DROPPED, e -> {
+            var authServer = AuthlibInjectorDnD.parse(e.getDragboard());
+            if (authServer.isPresent() && !hasOpenModal()) {
+                e.setDropCompleted(true);
+                e.consume();
+                Dialogs.yggdrasilCard(this, authServer.get());
+            }
+        });
         scene.setOnDragOver(e -> {
+            var authServer = AuthlibInjectorDnD.parse(e.getDragboard());
+            if (authServer.isPresent() && !hasOpenModal()) {
+                e.acceptTransferModes(javafx.scene.input.TransferMode.COPY);
+                e.consume();
+                return;
+            }
             var files = e.getDragboard().getFiles();
             if (!files.isEmpty() && isDropCandidate(files.get(0))) {
                 e.acceptTransferModes(javafx.scene.input.TransferMode.COPY);
@@ -3924,6 +3945,13 @@ public final class MainWindow {
         scene.setOnDragExited(e -> hideDropHint());
         scene.setOnDragDropped(e -> {
             hideDropHint();
+            var authServer = AuthlibInjectorDnD.parse(e.getDragboard());
+            if (authServer.isPresent() && !hasOpenModal()) {
+                e.setDropCompleted(true);
+                e.consume();
+                Dialogs.yggdrasilCard(this, authServer.get());
+                return;
+            }
             var files = e.getDragboard().getFiles();
             if (files.isEmpty()) return;
             boolean done = false;

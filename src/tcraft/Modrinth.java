@@ -79,6 +79,16 @@ public final class Modrinth {
     }
 
     private static final int CACHE_LIMIT = 200;
+    private static final int UPDATE_CACHE_LIMIT = 300;
+    private static final long UPDATE_TTL_MS = 600_000L;
+
+    private static final Map<String, Object[]> UPDATE_CACHE = Collections.synchronizedMap(
+            new LinkedHashMap<>(64, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, Object[]> eldest) {
+                    return size() > UPDATE_CACHE_LIMIT;
+                }
+            });
 
     private static final Map<String, List<Object>> VERSIONS_CACHE = Collections.synchronizedMap(
             new LinkedHashMap<>(64, 0.75f, true) {
@@ -131,16 +141,25 @@ public final class Modrinth {
 
     // null 仅表示未收录
     public static String[] checkUpdateBySha1(String sha1) {
+        String key = sha1 == null ? "" : sha1.toLowerCase();
+        Object[] cached = UPDATE_CACHE.get(key);
+        if (cached != null && System.currentTimeMillis() - (Long) cached[1] < UPDATE_TTL_MS) {
+            String[] value = (String[]) cached[0];
+            return value.length == 0 ? null : value;
+        }
         String text;
         try {
-            String body = "{\"hashes\": [\"{h}\"], \"algorithm\": \"sha1\"}".replace("{h}", sha1.toLowerCase());
+            String body = "{\"hashes\": [\"{h}\"], \"algorithm\": \"sha1\"}".replace("{h}", key);
             text = post(API + "/version_files", body);
         } catch (IOException e) {
             throw new java.io.UncheckedIOException(e);
         }
         Map<String, Object> root = Json.obj(Json.parse(text));
-        Map<String, Object> hit = Json.obj(root.get(sha1.toLowerCase()));
-        if (hit.isEmpty()) return null;
+        Map<String, Object> hit = Json.obj(root.get(key));
+        if (hit.isEmpty()) {
+            UPDATE_CACHE.put(key, new Object[]{new String[0], System.currentTimeMillis()});
+            return null;
+        }
         String projectId = Json.str(hit, "project_id", "");
         String versionNumber = Json.str(hit, "version_number", "");
         String fileName = "", url = "", hash = "";
@@ -152,17 +171,42 @@ public final class Modrinth {
                 hash = Json.str(Json.obj(fm.get("hashes")), "sha1", hash).toLowerCase();
             }
         }
-        if (projectId.isEmpty() || url.isEmpty()) return null;
-        return new String[]{projectId, versionNumber, fileName, url, hash};
+        String[] result = projectId.isEmpty() || url.isEmpty()
+                ? null : new String[]{projectId, versionNumber, fileName, url, hash};
+        UPDATE_CACHE.put(key, new Object[]{result == null ? new String[0] : result, System.currentTimeMillis()});
+        return result;
     }
 
     public static String post(String url, String body) throws IOException {
-        return Http.post(url, body, Map.of("Accept", "application/json"));
+        Map<String, String> headers = Map.of("Accept", "application/json");
+        for (String candidate : Mirrors.apiCandidates(url)) {
+            try {
+                return Http.postOnce(candidate, body, headers, candidate.equals(url) ? 4 : 10);
+            } catch (IOException ignored) {
+            }
+        }
+        return Http.post(url, body, headers);
     }
 
     public static void downloadUrl(Tasks.Task task, String url, Path target, String sha1) throws IOException {
-        Fetch.file(task, url, target, sha1, 0, 0.98);
-        if (task != null) task.remainingFiles = 1;
+        downloadUrl(task, url, target, sha1, true);
+    }
+
+    static void downloadUrl(Tasks.Task task, String url, Path target, String sha1, boolean report) throws IOException {
+        IOException last = null;
+        // 资源镜像同样走候选 并按域名测速排序
+        for (String candidate : Sources.rank(Mirrors.images(url))) {
+            try {
+                Fetch.file(task, candidate, target, sha1, 0, report ? 0.98 : 0, report);
+                if (report && task != null) task.remainingFiles = 1;
+                return;
+            } catch (IOException e) {
+                if (task != null && task.canceled) throw e;
+                last = e;
+            }
+        }
+        if (last != null) throw last;
+        throw new IOException(Lang.t("下载失败：") + target.getFileName());
     }
 
     private static String get(String url) throws IOException {

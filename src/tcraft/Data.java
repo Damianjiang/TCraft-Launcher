@@ -247,7 +247,9 @@ public final class Data {
 
     public void launchLog(String line) {
         // 500 行供崩溃分析
-        launchLog.add(Redact.apply("[" + LocalDateTime.now().toLocalTime().withNano(0) + "] " + line));
+        String raw = line == null ? "" : line;
+        if (raw.length() > 8192) raw = raw.substring(0, 8192) + "…";
+        launchLog.add(Redact.apply("[" + LocalDateTime.now().toLocalTime().withNano(0) + "] " + raw));
     }
 
     private final Properties props = new Properties();
@@ -282,7 +284,10 @@ public final class Data {
             try {
                 Path cfg = configPath.getParent().resolve("launcher.cfg");
                 if (Files.isRegularFile(cfg)) {
-                    String picked = Files.readString(cfg, StandardCharsets.UTF_8).trim();
+                    String picked;
+                    try (InputStream in = Files.newInputStream(cfg)) {
+                        picked = new String(Io.read(in, 64L * 1024), StandardCharsets.UTF_8).trim();
+                    }
                     if (usableJavaFast(picked)) javaPath = picked;
                 }
             } catch (Exception e) {
@@ -344,16 +349,22 @@ public final class Data {
         if (custom != null && !custom.isBlank()) {
             try {
                 Path p = Paths.get(custom.trim()).toAbsolutePath().normalize();
+                String rawPath = p.toString();
+                // 自定义缓存目录不接受 UNC 网络共享 避免启动或清理时访问远端
+                if (rawPath.startsWith("\\\\") || rawPath.startsWith("//")) {
+                    throw new IllegalArgumentException("UNC cache path");
+                }
                 Path base = baseDir().toAbsolutePath().normalize();
                 Path game = Paths.get(gameDir).toAbsolutePath().normalize();
                 // 缓存根与配置/游戏目录隔离
-                if (p.getNameCount() > 1 && !p.startsWith(base) && !p.startsWith(game)
+                if (p.getNameCount() > 1 && !Files.isSymbolicLink(p)
+                        && !p.startsWith(base) && !p.startsWith(game)
                         && !base.startsWith(p) && !game.startsWith(p)
                         && !p.equals(base) && !p.equals(game)) {
                     Files.createDirectories(p);
                     // 无标记目录不自动认领
                     ensureCacheMarker(p, false);
-                    return p;
+                    if (hasCacheMarker(p)) return p;
                 }
             } catch (Exception ignored) {
             }
@@ -425,7 +436,8 @@ public final class Data {
         // 默认游戏目录=启动器所在文件夹 绿色版
         try {
             Path app = Resources.appDir();
-            if (app != null && Files.isDirectory(app)) return app.toString();
+            // Program Files /Applications /opt 只读时改用用户目录
+            if (app != null && Files.isDirectory(app) && Files.isWritable(app)) return app.toString();
         } catch (Exception ignored) {
         }
         return legacy.toString();
@@ -759,7 +771,7 @@ public final class Data {
     }
 
     public static String offlineUuid(String name) {
-        // UTF-8 与 HMCL / 原版离线 UUID 一致
+        // 按原版离线 UUID 算法生成
         return UUID.nameUUIDFromBytes(("OfflinePlayer:" + name).getBytes(StandardCharsets.UTF_8)).toString();
     }
 
@@ -808,7 +820,7 @@ public final class Data {
                     p.destroyForcibly();
                     return 0;
                 }
-                String text = new String(in.readAllBytes(),
+                String text = new String(Io.read(in, 64L * 1024),
                         java.nio.charset.StandardCharsets.UTF_8);
                 java.util.regex.Matcher m = JAVA_VERSION_P.matcher(text);
                 if (m.find()) return parseJavaMajor(m.group(1));
@@ -982,7 +994,7 @@ public final class Data {
                     }
                     real.add(v);
                 }
-                if (real.isEmpty()) return;
+                if (real.isEmpty()) throw new java.io.IOException(Lang.t("官方版本列表为空"));
                 synchronized (this) {
                     versions.clear();
                     versions.addAll(real);
@@ -1053,19 +1065,55 @@ public final class Data {
         return props.getProperty(key, def);
     }
 
-    private long lastSaveTick;
+    // 合并短时间内的连续改动 保证最后一次一定会落盘
+    private final java.util.Timer saveTimer = new java.util.Timer("TCL-ConfigSave", true);
+    private java.util.TimerTask saveTask;
+    private boolean saveDirty;
 
     void setRuntime(String key, String value) {
-        props.setProperty(key, value);
+        props.setProperty(key, clampValue(value));
     }
 
-    public void set(String key, Object value) {
-        props.setProperty(key, String.valueOf(value));
-        long now = System.currentTimeMillis();
-        if (now - lastSaveTick > 600) {
-            lastSaveTick = now;
-            save();
+    private static String clampValue(Object value) {
+        String text = String.valueOf(value);
+        return text.length() > 1024 * 1024 ? text.substring(0, 1024 * 1024) : text;
+    }
+
+    public synchronized void set(String key, Object value) {
+        props.setProperty(key, clampValue(value));
+        saveDirty = true;
+        if (saveTask != null) return;
+        saveTask = new java.util.TimerTask() {
+            @Override
+            public void run() {
+                flushPendingSave();
+            }
+        };
+        saveTimer.schedule(saveTask, 600);
+    }
+
+    private synchronized void flushPendingSave() {
+        saveTask = null;
+        if (!saveDirty) return;
+        if (save()) saveDirty = false;
+        else if (saveTask == null) {
+            saveTask = new java.util.TimerTask() {
+                @Override
+                public void run() {
+                    flushPendingSave();
+                }
+            };
+            saveTimer.schedule(saveTask, 1200);
         }
+    }
+
+    // 退出前同步落盘 不丢最后一次改动
+    public synchronized void flushSave() {
+        if (saveTask != null) {
+            saveTask.cancel();
+            saveTask = null;
+        }
+        if (saveDirty && save()) saveDirty = false;
     }
 
     public String instanceKey(String key) {
@@ -1108,8 +1156,7 @@ public final class Data {
             // 清旧键 防导入残留叠加
             props.clear();
             if (!Files.exists(configPath)) {
-                props.setProperty("UiThemePreset", "-1");
-                props.setProperty("UiAutoThemeFromBackground", "true");
+                props.setProperty("UiThemePreset", "-1");                props.setProperty("UiAutoThemeFromBackground", "true");
                 props.setProperty("UiBackgroundOpacity", "1000");
                 props.setProperty("UiBackgroundBlur", "0");
                 props.setProperty("UiBackgroundSuit", "0");
@@ -1124,6 +1171,9 @@ public final class Data {
                 props.setProperty("SystemMaxThreads", "64");
                 props.setProperty("SystemDownloadSource", "0");
                 return;
+            }
+            if (Files.size(configPath) > 16L * 1024 * 1024) {
+                throw new IOException(Lang.t("配置文件过大，已拒绝加载"));
             }
             try (InputStream in = Files.newInputStream(configPath)) {
                 props.load(in);
@@ -1153,7 +1203,7 @@ public final class Data {
                 props.setProperty("LaunchIsolationMigrated", "true");
             }
             Lang.setMode(getInt("SystemLanguage", 0));
-            int count = getInt("account.count", 0);
+            int count = Math.max(0, Math.min(10000, getInt("account.count", 0)));
             accounts.clear();
             for (int i = 0; i < count; i++) {
                 String raw = props.getProperty("account." + i);
@@ -1178,7 +1228,7 @@ public final class Data {
                 }
             }
             selectedAccount = getInt("account.selected", 0);
-            int icount = getInt("instance.count", 0);
+            int icount = Math.max(0, Math.min(10000, getInt("instance.count", 0)));
             instances.clear();
             for (int i = 0; i < icount; i++) {
                 String raw = props.getProperty("instance." + i);
@@ -1197,7 +1247,7 @@ public final class Data {
             migrateLegacyIsolation();
             selectedInstance = getInt("instance.selected", 0);
             folders.clear();
-            int foldCount = getInt("folder.count", 0);
+            int foldCount = Math.max(0, Math.min(5000, getInt("folder.count", 0)));
             for (int i = 0; i < foldCount; i++) {
                 String raw = props.getProperty("folder." + i);
                 if (raw == null) continue;
@@ -1217,7 +1267,7 @@ public final class Data {
             if (!folderPath.isEmpty()) gameDir = folderPath;
             javaPath = get("java.path", javaPath);
             favorites.clear();
-            int fc = getInt("favorite.count", 0);
+            int fc = Math.max(0, Math.min(5000, getInt("favorite.count", 0)));
             for (int i = 0; i < fc; i++) {
                 String f = props.getProperty("favorite." + i);
                 if (f != null && !f.isEmpty()) favorites.add(Favorite.decode(f));
@@ -1245,7 +1295,7 @@ public final class Data {
 
     private final Object saveWriteLock = new Object();
 
-    public synchronized void save() {
+    public synchronized boolean save() {
         byte[] payload;
         try {
             // 先取快照 FX 线程可能正在增删这些列表
@@ -1293,29 +1343,36 @@ public final class Data {
             for (int i = 0; i < favoriteSnap.size(); i++) {
                 props.setProperty("favorite." + i, favoriteSnap.get(i).encode());
             }
+            // 删除已移除账户和实例的旧配置键 防止令牌残留
+            pruneIndexed("account.", accountSnap.size());
+            pruneIndexed("instance.", persisted.size());
+            pruneIndexed("folder.", folderSnap.size());
+            pruneIndexed("favorite.", favoriteSnap.size());
             props.setProperty("SystemLanguage", String.valueOf(Lang.setting));
             java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
             props.store(buf, "TCraft Launcher JavaFX");
             payload = buf.toByteArray();
         } catch (IOException e) {
             Errors.error("保存配置失败（账户、实例与设置可能不会被保留）", e);
-            return;
+            return false;
         } catch (RuntimeException e) {
             // 并发改动等 记日志不外抛
             Errors.error("保存配置时发生异常（本次改动可能未写入）", e);
-            return;
+            return false;
         }
         // saveWriteLock 只保证 .tmp 替换原子性
+        Path tmp = null;
         try {
             synchronized (saveWriteLock) {
                 Files.createDirectories(configPath.getParent());
-                Path tmp = configPath.resolveSibling(configPath.getFileName() + ".tmp");
+                tmp = configPath.resolveSibling(configPath.getFileName() + ".tmp");
                 try (OutputStream out = Files.newOutputStream(tmp,
                         java.nio.file.StandardOpenOption.CREATE,
                         java.nio.file.StandardOpenOption.TRUNCATE_EXISTING,
                         java.nio.file.StandardOpenOption.WRITE)) {
                     out.write(payload);
                 }
+                restrictPermissions(tmp);
                 try {
                     Files.move(tmp, configPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING,
                             java.nio.file.StandardCopyOption.ATOMIC_MOVE);
@@ -1326,6 +1383,29 @@ public final class Data {
             restrictPermissions(configPath);
         } catch (IOException e) {
             Errors.error("保存配置失败（账户、实例与设置可能不会被保留）", e);
+            return false;
+        } finally {
+            if (tmp != null) {
+                try {
+                    Files.deleteIfExists(tmp);
+                } catch (Exception ignored) {
+                }
+            }
+        }
+        saveDirty = false;
+        return true;
+    }
+
+    private void pruneIndexed(String prefix, int keep) {
+        for (String key : new ArrayList<>(props.stringPropertyNames())) {
+            if (!key.startsWith(prefix)) continue;
+            String tail = key.substring(prefix.length());
+            if (!tail.matches("\\d+")) continue;
+            try {
+                if (Integer.parseInt(tail) >= keep) props.remove(key);
+            } catch (NumberFormatException ignored) {
+                props.remove(key);
+            }
         }
     }
 
@@ -1400,7 +1480,17 @@ public final class Data {
                 host = address;
             }
         }
-        if (host.isEmpty()) return;
+        host = host == null ? "" : host.trim();
+        if (host.isEmpty() || host.indexOf('/') >= 0 || host.indexOf('\\') >= 0
+                || host.indexOf(' ') >= 0 || host.indexOf('\t') >= 0) return;
+        int portNumber = 7890;
+        try {
+            portNumber = Integer.parseInt(port == null ? "" : port.trim());
+        } catch (NumberFormatException e) {
+            portNumber = getInt("SystemProxyPort", 7890);
+        }
+        if (portNumber < 1 || portNumber > 65535) portNumber = 7890;
+        port = String.valueOf(portNumber);
         if (mode == 3) {
             System.setProperty("socksProxyHost", host);
             System.setProperty("socksProxyPort", port);
@@ -1454,29 +1544,90 @@ public final class Data {
         return args;
     }
 
-    public boolean exportConfig(Path target) {
+    public synchronized boolean exportConfig(Path target) {
+        Path outPath = target == null ? null : target.toAbsolutePath().normalize();
+        Path tmp = null;
+        if (outPath == null || outPath.equals(configPath.toAbsolutePath().normalize())) {
+            log("导出配置失败：目标路径不可用");
+            return false;
+        }
         try {
             save();
-            Files.copy(configPath, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            // 导出副本不含令牌与密码 防转发后凭据外流
+            Properties out = new Properties();
+            out.putAll(props);
+            for (String key : out.stringPropertyNames()) {
+                if (key.matches("account\\.\\d+")) {
+                    out.setProperty(key, sanitizeAccountSecrets(out.getProperty(key, "")));
+                } else if (key.equals("SystemProxyPass") || key.equals("SystemCurseKey")) {
+                    out.setProperty(key, "");
+                }
+            }
+            Files.createDirectories(outPath.getParent());
+            tmp = outPath.resolveSibling(outPath.getFileName() + ".tmp");
+            try (OutputStream os = Files.newOutputStream(tmp,
+                    java.nio.file.StandardOpenOption.CREATE,
+                    java.nio.file.StandardOpenOption.TRUNCATE_EXISTING,
+                    java.nio.file.StandardOpenOption.WRITE)) {
+                out.store(os, "TCraft Launcher JavaFX export (tokens removed)");
+            }
+            restrictPermissions(tmp);
+            try {
+                Files.move(tmp, outPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                        java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+            } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                Files.move(tmp, outPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+            restrictPermissions(outPath);
             return true;
         } catch (Exception e) {
             log("导出配置失败：" + Log.describe(e));
             return false;
+        } finally {
+            if (tmp != null) {
+                try {
+                    Files.deleteIfExists(tmp);
+                } catch (Exception ignored) {
+                }
+            }
         }
     }
 
-    public boolean importConfig(Path source) {
+    public synchronized boolean importConfig(Path source) {
+        Path importTmp = configPath.resolveSibling(configPath.getFileName() + ".import.tmp");
         try {
+            // 先落盘旧改动 再停掉延迟保存 防止旧快照覆盖导入结果
+            flushSave();
+            if (source == null || !Files.isRegularFile(source)) {
+                log("导入配置失败：文件不存在");
+                return false;
+            }
+            if (Files.size(source) > 8L * 1024 * 1024) {
+                log("导入配置失败：文件超过 8MB 上限");
+                return false;
+            }
             Properties incoming = new Properties();
             try (InputStream in = Files.newInputStream(source)) {
                 incoming.load(in);
             }
             // 命令/可执行/代理类键拒收
             List<String> dropped = new ArrayList<>();
+            int sanitizedAccounts = 0;
             for (String key : new ArrayList<>(incoming.stringPropertyNames())) {
+                String value = incoming.getProperty(key, "");
                 if (isImportBlockedKey(key)) {
                     incoming.remove(key);
                     dropped.add(key);
+                } else if (hasNetworkPathKey(key, value)) {
+                    // 配置导入不接受网络路径 防启动时向 UNC 主机泄露凭据
+                    incoming.remove(key);
+                    dropped.add(key);
+                } else if (key.matches("account\\.\\d+")) {
+                    String clean = sanitizeAccountSecrets(value);
+                    if (!clean.equals(value)) {
+                        incoming.setProperty(key, clean);
+                        sanitizedAccounts++;
+                    }
                 }
             }
             // 缺特征键 account/instance 等 即非配置文件
@@ -1486,32 +1637,70 @@ public final class Data {
                 return false;
             }
             Files.createDirectories(configPath.getParent());
-            Path tmp = configPath.resolveSibling(configPath.getFileName() + ".import.tmp");
-            try (OutputStream out = Files.newOutputStream(tmp,
+            try (OutputStream out = Files.newOutputStream(importTmp,
                     java.nio.file.StandardOpenOption.CREATE,
                     java.nio.file.StandardOpenOption.TRUNCATE_EXISTING,
                     java.nio.file.StandardOpenOption.WRITE)) {
                 incoming.store(out, "TCraft Launcher JavaFX");
             }
+            restrictPermissions(importTmp);
             try {
-                Files.move(tmp, configPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                Files.move(importTmp, configPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING,
                         java.nio.file.StandardCopyOption.ATOMIC_MOVE);
             } catch (java.nio.file.AtomicMoveNotSupportedException e) {
-                Files.move(tmp, configPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                Files.move(importTmp, configPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             }
             restrictPermissions(configPath);
             load();
             if (!dropped.isEmpty()) {
                 log("导入配置时已忽略 " + dropped.size() + " 项敏感设置：" + String.join("、", dropped));
             }
+            if (sanitizedAccounts > 0) {
+                log("导入配置时已清除 " + sanitizedAccounts + " 个账号的令牌和认证服务器");
+            }
             return true;
         } catch (Exception e) {
             log("导入配置失败：" + Log.describe(e));
             return false;
+        } finally {
+            try {
+                Files.deleteIfExists(importTmp);
+            } catch (Exception ignored) {
+            }
         }
     }
 
-    // 导入黑名单 命令 可执行 源 代理
+    // 导入配置里的目录不接受 UNC / 网络共享路径
+    static boolean hasNetworkPathKey(String key, String value) {
+        if (key == null || value == null || value.isEmpty()) return false;
+        String k = key.toLowerCase(java.util.Locale.ROOT);
+        String path;
+        if (k.equals("folder.current")) {
+            path = value;
+        } else if (k.matches("folder\\.\\d+")) {
+            String[] p = value.split("\\|", -1);
+            path = p.length >= 2 ? p[1] : "";
+        } else if (k.matches("instance\\.\\d+")) {
+            String[] p = value.split("\\|", -1);
+            path = p.length >= 9 ? p[8] : "";
+        } else {
+            return false;
+        }
+        path = path.trim();
+        return path.startsWith("\\\\") || path.startsWith("//");
+    }
+
+    // 账号条目去掉令牌与认证服务器 只保留身份信息
+    private static String sanitizeAccountSecrets(String raw) {
+        String[] p = raw.split("\\|", -1);
+        if (p.length >= 5) p[4] = "";
+        if (p.length >= 7) p[6] = "";
+        if (p.length >= 8) p[7] = "";
+        if (p.length >= 9) p[8] = "";
+        return String.join("|", p);
+    }
+
+    // 导入黑名单 命令 可执行 源 代理 凭据
     static boolean isImportBlockedKey(String key) {
         if (key == null || key.isEmpty()) return false;
         String k = key.toLowerCase(java.util.Locale.ROOT);
@@ -1527,14 +1716,22 @@ public final class Data {
         if (k.equals("systemsystemcache")) return true;
         // 源与代理可重定向下载
         if (k.equals("systembmclroot")) return true;
-        if (k.startsWith("systemproxy")) return true;
+        if (k.contains("proxy")) return true;
+        // 镜像可接管接口与文件下载 配合 Key 会外流凭据
+        if (k.contains("mirror")) return true;
+        // 第三方 Key 与代理密码不进导入文件
+        if (k.equals("systemcursekey")) return true;
+        // 自动进服会把会话送到配置指定的服务器
+        if (k.equals("serverenter") || (k.startsWith("instance.") && k.endsWith(".serverenter"))) return true;
         // -javaagent 等是任意代码执行入口
         return k.endsWith("jvmargs") || k.endsWith("gameargs");
     }
 
     // 运行日志 内存一份 异步写 launcher.log
     public void log(String line) {
-        String stamped = Redact.apply("[" + LocalDateTime.now().toLocalTime().withNano(0) + "] " + line);
+        String raw = line == null ? "" : line;
+        if (raw.length() > 8192) raw = raw.substring(0, 8192) + "…";
+        String stamped = Redact.apply("[" + LocalDateTime.now().toLocalTime().withNano(0) + "] " + raw);
         log.add(stamped);
         Log.info(stamped);
         if (getBool("SystemDebugMode", false)) System.out.println("[TCL] " + stamped);

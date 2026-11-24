@@ -878,7 +878,7 @@ TCL 的所有网络请求（下载、登录、API）均不经过代理	All of TC
 在 Minecraft 正式版更新时弹窗提示	Pop up a notice when a Minecraft release version updates	在 Minecraft 正式版更新時彈窗提示	
 在 Minecraft 测试版（快照、预发布版）更新时弹窗提示	Pop up a notice when a Minecraft test version (snapshot, pre-release) updates	在 Minecraft 測試版（快照、預發布版）更新時彈窗提示	
 取消勾选后，启动游戏达到一定次数时会弹窗建议你支持正版。\n勾选后不再提示（登录一次正版账号也会自动停止提示）。	Untick and a prompt to support premium appears after a certain number of launches.\nTicking stops the prompts (logging in once with a premium account also stops them automatically).	取消勾選後，啟動遊戲達到一定次數時會彈窗建議你支援正版。\n勾選後不再提示（登入一次正版帳號也會自動停止提示）。	
-设置界面语言与部分日期、数字等文化相关显示。\n「自动识别」按系统当前语言就近选择简中 / 繁中 / 英文。	Sets the interface language and some culture-dependent displays (dates, numbers, etc.).\n“自动识别” picks 简中 / 繁中 / English closest to the current system language.	設定介面語言與部分日期、數字等文化相關顯示。\n「自動識別」按系統當前語言就近選擇簡中 / 繁中 / 英文。	
+设置界面语言与部分日期、数字等文化相关显示。\n「自动识别」按系统当前语言就近选择简中 / 繁中 / 英文。	Sets the interface language and some culture-dependent displays (dates, numbers, etc.).\n“Auto detect” picks Simplified Chinese / Traditional Chinese / English closest to the current system language.	設定介面語言與部分日期、數字等文化相關顯示。\n「自動識別」按系統當前語言就近選擇簡中 / 繁中 / 英文。	
 显示包括启动器功能调查、活动等在内的全部公告	Show all announcements, including launcher feature surveys, events, etc.	顯示包括啟動器功能調查、活動等在內的全部公告	
 TCL 的下载、皮肤等缓存文件的存储位置。\n不推荐路径中带有空格。\n留空即为默认值，重启 TCL 后生效。	Where TCL stores its cache files for downloads, skins, etc.\nPaths with spaces are not recommended.\nLeave blank for the default; takes effect after restarting TCL.	TCL 的下載、皮膚等快取檔案的儲存位置。\n不推薦路徑中帶有空間。\n留空即為預設值，重啟 TCL 後生效。	
 在下载时不直接复制其他 MC 文件夹中已经存在的相同文件，而是重新下载文件。\n只建议在测试下载速度时开启。	During downloads, don't copy identical files that already exist in other MC folders — re-download them instead.\nOnly recommended when testing download speed.	在下載時不直接複製其他 MC 資料夾中已經存在的相同檔案，而是重新下載檔案。\n只建議在測試下載速度時開啟。	
@@ -911,7 +911,7 @@ TCL 的下载、皮肤等缓存文件的存储位置。\n不推荐路径中带�
 启动 Minecraft 时使用的额外 JVM 参数，在没有确定把握的情况下请不要尝试修改。\n\n支持 Minecraft 版本 JSON 中的字符串替换标记，例如 ${library_directory}。\n也支持使用 TCL 的替换标记，在 更多 → 帮助 中搜索 “替换标记” 以了解用法。\n\n若留空，则跟随全局设置的值。	Extra JVM arguments used when launching Minecraft. Do not change them unless you know exactly what you are doing.\n\nSupports the string replace markers in the Minecraft version JSON, e.g. ${library_directory}.\nTCL's replace markers are also supported — search “replace markers” under More → Help to learn how.\n\nLeave blank to follow the global setting.	啟動 Minecraft 時使用的額外 JVM 參數，在沒有確定的把握之前請勿嘗試修改。\n\n支援 Minecraft 版本 JSON 中的字串替換標記，例如 ${library_directory}。\n也支援使用 TCL 的替換標記，在 更多 → 幫助 中搜尋「替換標記」以了解用法。\n\n若留空，則跟隨全域設定的值。	
 文本框中的内容将会被直接拼合在启动参数的末尾。\n例如，输入 --demo 则会以试玩模式启动游戏。\n\n支持 Minecraft 版本 JSON 中的字符串替换标记，例如 ${library_directory}。\n也支持使用 TCL 的替换标记，在 更多 → 帮助 中搜索 “替换标记” 以了解用法。\n\n若留空，则跟随全局设置的值。	The text you enter is appended directly to the end of the launch arguments.\nFor example, typing --demo starts the game in demo mode.\n\nSupports the string replace markers in the Minecraft version JSON, e.g. ${library_directory}.\nTCL's replace markers are also supported — search “replace markers” under More → Help to learn how.\n\nLeave blank to follow the global setting.	文本框中的內容將會被直接拼接在啟動參數的末尾。\n例如，輸入 --demo 則會以試玩模式啟動遊戲。\n\n支援 Minecraft 版本 JSON 中的字串替換標記，例如 ${library_directory}。\n也支援使用 TCL 的替換標記，在 更多 → 幫助 中搜尋「替換標記」以了解用法。\n\n若留空，則跟隨全域設定的值。	
 是否使用 Java Launch Wrapper 修复 Java 18- 在中文路径下可能无法正常启动的问题。\n详见：https://github.com/00ll00/java_launch_wrapper	Use Java Launch Wrapper to fix an issue where Java 18 and later may fail to start under a path that contains Chinese characters.\nSee: https://github.com/00ll00/java_launch_wrapper	是否使用 Java Launch Wrapper 修復 Java 18- 在中文路徑下可能無法正常啟動的問題。\n詳見：https://github.com/00ll00/java_launch_wrapper	
-是否使用 LWJGL Unsafe Agent 修复 LWJGL 3.4.1 的一个性能问题。\n详见：https://github.com/HMCL-dev/lwjgl-unsafe-agent	Use LWJGL Unsafe Agent to fix a performance issue in LWJGL 3.4.1.\nSee: https://github.com/HMCL-dev/lwjgl-unsafe-agent	是否使用 LWJGL Unsafe Agent 修復 LWJGL 3.4.1 的一個效能問題。\n詳見：https://github.com/HMCL-dev/lwjgl-unsafe-agent	
+是否使用 LWJGL Unsafe Agent 修复 LWJGL 3.4.1 的一个性能问题。	Use LWJGL Unsafe Agent to fix a performance issue in LWJGL 3.4.1.	是否使用 LWJGL Unsafe Agent 修復 LWJGL 3.4.1 的一個效能問題。	
 第一次打开 TCL，按顺序做三件事即可进入游戏：\n1. 确认 Java：多数版本自带匹配，若启动报 Java 相关错误，到「设置 → Java」手动指定一个 Java 路径（老版本用 Java 8，新版本用 17 或更高）。\n2. 下载版本：进「下载」页选一个 Minecraft 版本并安装（见下一节）。\n3. 登录并启动：切到「启动」页，选登录方式、点「开始游戏」。\n首次启动会弹窗介绍 TCL，看完点「我知道了」即可，之后不再出现。	First time in TCL? Do these three things in order to get into the game:\n1. Check Java: most versions match automatically; if launch reports a Java error, point to a Java path under Settings → Java (older versions use Java 8, newer ones Java 17 or higher).\n2. Download a version: open the Download page, pick a Minecraft version and install it (next section).\n3. Log in and launch: switch to the Launch page, choose a login method, and click Play.\nThe first launch shows an intro to TCL; dismiss it with “Got it” and it won't reappear.	第一次打開 TCL，依序做三件事即可進入遊戲：\n1. 確認 Java：多數版本自帶匹配，若啟動報 Java 相關錯誤，到「設定 → Java」手動指定一個 Java 路徑（老版本用 Java 8，新版本用 17 或更高）。\n2. 下載版本：進「下載」頁選一個 Minecraft 版本並安裝（見下一節）。\n3. 登入並啟動：切到「啟動」頁，選登入方式、點「開始遊戲」。\n首次啟動會彈窗介紹 TCL，看完點「我知道了」即可，之後不再出現。	
 1. 打开「下载」页，左侧选择版本类型：原版（vanilla）、Forge、NeoForge、Fabric、OptiFine、LiteLoader。\n2. 右侧会出现该类型下的具体版本号，选中你要玩的那一个。\n3. 点「下载并开始安装」。进度条会实时显示下载百分比，全程走多线程并对节点测速，自动挑最快的一条。\n4. 下载完成后会自动安装，装好即可在「启动」页看到该版本。\n小提示：想玩别人的整合包，进「下载 → 整合包」，粘贴整合包地址或上传本地整合包文件，同样点「下载并开始安装」。	1. Open the Download page and pick a version type on the left: vanilla, Forge, NeoForge, Fabric, OptiFine, or LiteLoader.\n2. The specific version numbers for that type appear on the right; select the one you want to play.\n3. Click Download and install. The progress bar shows the download percentage in real time; it runs multithreaded and speed-tests the nodes, automatically picking the fastest.\n4. Once the download finishes, it installs automatically; the version then shows up on the Launch page.\nTip: to play someone else's modpack, go to Download → Modpacks, paste the modpack link or upload a local modpack file, and click Download and install the same way.	1. 打開「下載」頁，左側選擇版本類型：原版（vanilla）、Forge、NeoForge、Fabric、OptiFine、LiteLoader。\n2. 右側會出現該類型下的具體版本號，選中你要玩的那一個。\n3. 點「下載並開始安裝」。進度條會即時顯示下載百分比，全程走多執行緒並對節點測速，自動挑最快的一條。\n4. 下載完成後會自動安裝，裝好即可在「啟動」頁看到該版本。\n小提示：想玩別人的整合包，進「下載 → 整合包」，貼上整合包位址或上傳本地整合包檔案，同樣點「下載並開始安裝」。	
 进「启动」页，选择你的账号类型：正版账号（国际区直接登录；国内区账号用「国内区」方式）、或离线模式（无需账号，自己填一个名字即可，只能打单人/自己开的联机，不能上别人家的正版服）。	Open the Launch page and pick your account type: a premium account (log in directly in the international region; use the “China region” method for a China-region account), or offline mode (no account needed — just enter a name; you can only play singleplayer or a room you host, not join others' premium servers).	進「啟動」頁，選擇你的帳號類型：正版帳號（國際區直接登入；國內區帳號用「國內區」方式）、或離線模式（無需帳號，自己填一個名字即可，只能打單人／自己開的聯機，不能上別人家的正版服）。	
@@ -2003,7 +2003,7 @@ Blessing Skin 服务器	Blessing Skin server	Blessing Skin 伺服器
 应用皮肤失败：	Failed to apply the skin: 	套用皮膚失敗：	
 从皮肤站获取皮肤失败，已回退默认皮肤：	Failed to fetch the skin from the skin station; fell back to the default skin: 	從皮膚站取得皮膚失敗，已回退預設皮膚：	
 下午好	Good afternoon	下午好	
-从背景图片中提取主色调，让启动器的整套配色自动跟随壁纸（HMCL 动态取色同款体验）。手动选择其他主题后此功能对当前背景失效，刷新背景图后重新生效。	Extracts the dominant color from the background image so the launcher's whole palette follows the wallpaper (like HMCL's dynamic colors). Picking another theme disables it for the current background; refreshing the background re-enables it.	從背景圖片提取主色調，讓啟動器的整套配色自動跟隨桌布（HMCL 動態取色同款體驗）。手動選擇其他主題後此功能對目前背景失效，重新整理背景圖後重新生效。	
+从背景图片中提取主色调，让启动器的整套配色自动跟随壁纸。手动选择其他主题后此功能对当前背景失效，刷新背景图后重新生效。	Extracts the dominant color from the background image so the launcher's whole palette follows the wallpaper. Picking another theme disables it for the current background; refreshing the background re-enables it.	從背景圖片提取主色調，讓啟動器的整套配色自動跟隨桌布。手動選擇其他主題後此功能對目前背景失效，重新整理背景圖後重新生效。	
 刷新该账号的皮肤与头像缓存	Refresh this account's skin and avatar cache	重新整理該帳號的皮膚與頭像快取	
 复制该账号的 UUID	Copy this account's UUID	複製該帳號的 UUID	
 夜深了	Late night	夜深了	
@@ -2044,7 +2044,7 @@ Blessing Skin 服务器	Blessing Skin server	Blessing Skin 伺服器
 皮肤图片读取失败，无法预览。	Could not read the skin image, so preview is unavailable.	皮膚圖片讀取失敗，無法預覽。	
 皮肤已获取，请在预览窗口确认后保存	Skin fetched; confirm in the preview window before saving	皮膚已取得，請在預覽視窗確認後儲存	
 保存失败：	Save failed: 	儲存失敗：	
-NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.\n非 MINECRAFT 官方产品。未经 MOJANG 或 MICROSOFT 批准，也不与 MOJANG 或 MICROSOFT 关联。	NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.\nThis launcher is not an official Minecraft product. It is not approved by or associated with Mojang or Microsoft.	NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.\n非 MINECRAFT 官方產品。未經 MOJANG 或 MICROSOFT 批准，也不與 MOJANG 或 MICROSOFT 關聯。	
+NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.\n非 MINECRAFT 官方产品。未经 MOJANG 或 MICROSOFT 批准，也不与 MOJANG 或 MICROSOFT 关联。	NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.	NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.\n非 MINECRAFT 官方產品。未經 MOJANG 或 MICROSOFT 批准，也不與 MOJANG 或 MICROSOFT 關聯。	
 Minecraft、Minecraft 徽标及相关名称、品牌、图像与音效的著作权和商标权，均归 Mojang Synergies AB 与 Microsoft 所有，本启动器不主张任何权利，也不将 Minecraft 名称用作自身的主标题或标识。\n\nTCraft Launcher（简称 TCL）由 TCraft 团队独立开发与维护，与 Mojang Studios、Microsoft、网易（Minecraft 中国代理）均无隶属、赞助、授权、合作或背书关系，也未获其审查或认可。\n\n本启动器不包含、不分发 Minecraft 游戏本体或任何游戏文件，不提供破解、盗版、绕过正版验证或规避付费的功能；游戏本体与更新始终来自官方渠道。TCL 不运营也不代理任何 Minecraft 服务器，联机功能只负责把你已连接的设备互相连通。\n\n使用本启动器即表示：你已通过官方渠道购买 Minecraft: Java Edition 并持有有效账户，已阅读并同意《Minecraft 最终用户许可协议》（EULA）与《Minecraft 使用准则》；未成年人须取得监护人同意。使用本软件的风险由你自行承担。\n\n本启动器完全免费，不出售、不租赁、不设付费解锁，也不将 Minecraft 品牌用于商业推广。任何以 TCL 名义收费的行为均与本团队无关，也不能作为获得 Minecraft 的途径。	Minecraft, the Minecraft logo and all related names, brands, images and sounds are the copyright and trademark property of Mojang Synergies AB and Microsoft. This launcher claims no rights to them and does not use the Minecraft name as its own primary title or identifier.\n\nTCraft Launcher (TCL) is independently developed and maintained by the TCraft team. It is not affiliated with, sponsored, authorised by, partnered with or endorsed by Mojang Studios, Microsoft, or NetEase (the Minecraft China publisher), and has not been reviewed or approved by them.\n\nThis launcher does not contain or distribute the Minecraft game or any of its game files, and provides no cracking, piracy, authentication-bypass or paywall-evasion features; the game and its updates always come from official channels. TCL does not operate or proxy any Minecraft server; the online-play feature only connects devices you already control.\n\nBy using this launcher you confirm that you have purchased Minecraft: Java Edition through official channels and hold a valid account, that you have read and agree to the Minecraft End User License Agreement (EULA) and the Minecraft Usage Guidelines, and that you are of legal age or have your guardian's consent. You use this software at your own risk.\n\nThis launcher is completely free. It is not sold, rented or paywalled, and does not use the Minecraft brand for commercial promotion. Any charge made in the name of TCL is unrelated to this team and does not grant access to Minecraft.	Minecraft、Minecraft 徽標及相關名稱、品牌、圖像與音效的著作權和商標權，均歸 Mojang Synergies AB 與 Microsoft 所有，本啟動器不主張任何權利，也不將 Minecraft 名稱用作自身的主標題或標識。\n\nTCraft Launcher（簡稱 TCL）由 TCraft 團隊獨立開發與維護，與 Mojang Studios、Microsoft、網易（Minecraft 中國代理）均無隸屬、贊助、授權、合作或背書關係，也未獲其審查或認可。\n\n本啟動器不包含、不分發 Minecraft 遊戲本體或任何遊戲文件，不提供破解、盜版、繞過正版驗證或規避付費的功能；遊戲本體與更新始終來自官方渠道。TCL 不運營也不代理任何 Minecraft 服務器，聯機功能只負責把你已連接的設備互相連通。\n\n使用本啟動器即表示：你已通過官方渠道購買 Minecraft: Java Edition 並持有有效賬戶，已閱讀並同意《Minecraft 最終用戶許可協議》（EULA）與《Minecraft 使用準則》；未成年人須取得監護人同意。使用本軟件的風險由你自行承擔。\n\n本啟動器完全免費，不出售、不租賃、不設付費解鎖，也不將 Minecraft 品牌用於商業推廣。任何以 TCL 名義收費的行爲均與本團隊無關，也不能作爲獲得 Minecraft 的途徑。	
 开发者、发布者与责任方均为 TCraft 团队。本软件按「现状」提供，不对使用或无法使用本软件造成的直接、间接损失承担责任；对存档、配置等文件的操作请自行备份。\n\n侵权投诉、合规问题与功能反馈：TCraft Launcher 启动器交流群（群号 1131373915）：https://qm.qq.com/q/UONlv4VgwE（本项目唯一对外渠道）。涉及 Minecraft 品牌的投诉，也可通过 https://help.minecraft.net/ 联系 Mojang。\n\nMinecraft EULA：https://www.minecraft.net/eula\nMinecraft 使用准则：https://www.minecraft.net/usage-guidelines\n本启动器使用了 Lucide 图标库（ISC 协议）等开源组件，相关权利归各自作者所有。	The developer, publisher and responsible party is the TCraft team. This software is provided as is, without liability for any direct or indirect loss arising from its use or from the inability to use it; back up your saves and configuration files before operating on them.\n\nCopyright complaints, compliance questions and feedback: TCraft Launcher group (QQ 1131373915): https://qm.qq.com/q/UONlv4VgwE (the project's only official channel). Complaints concerning the Minecraft brand may also be sent to Mojang via https://help.minecraft.net/.\n\nMinecraft EULA: https://www.minecraft.net/eula\nMinecraft Usage Guidelines: https://www.minecraft.net/usage-guidelines\nThis launcher uses open-source components such as the Lucide icon set (ISC licence); all rights remain with their respective authors.	開發者、發佈者與責任方均爲 TCraft 團隊。本軟件按「現狀」提供，不對使用或無法使用本軟件造成的直接、間接損失承擔責任；對存檔、配置等文件的操作請自行備份。\n\n侵權投訴、合規問題與功能反饋：TCraft Launcher 啟動器交流群（群號 1131373915）（本項目唯一對外渠道）。涉及 Minecraft 品牌的投訴，也可通過 https://help.minecraft.net/ 聯繫 Mojang。\n\nMinecraft EULA：https://www.minecraft.net/eula\nMinecraft 使用準則：https://www.minecraft.net/usage-guidelines\n本啟動器使用了 Lucide 圖標庫（ISC 協議）等開源組件，相關權利歸各自作者所有。	
 Minecraft 是 Mojang Synergies AB 的商标。\n本启动器（TCraft Launcher）由社区独立开发，与 Mojang、Minecraft 官方、Microsoft 以及网易（Minecraft 中国）均没有任何隶属或合作关系。\n本启动器不分发 Minecraft 游戏本体，也不提供盗版下载；使用本启动器即表示你已购买 Minecraft 或持有正版访问资格，并同意遵守 Minecraft 最终用户许可协议（EULA）。	Minecraft is a trademark of Mojang Synergies AB.\nThis launcher (TCraft Launcher) is independently developed by the community and is not affiliated with Mojang, Minecraft, Microsoft, or NetEase (Minecraft China) in any way.\nIt does not distribute the Minecraft game or enable piracy; by using it you confirm that you own a legitimate copy of Minecraft and agree to the Minecraft EULA.	Minecraft 是 Mojang Synergies AB 的商標。\n本啟動器（TCraft Launcher）由社區獨立開發，與 Mojang、Minecraft 官方、Microsoft 以及網易（Minecraft 中國）均沒有任何隸屬或合作關係。\n本啟動器不分發 Minecraft 遊戲本體，也不提供盜版下載；使用本啟動器即表示你已購買 Minecraft 或持有正版訪問資格，並同意遵守 Minecraft 最終用戶許可協議（EULA）。	
@@ -2213,7 +2213,7 @@ SOCKS5 代理	SOCKS5 proxy	SOCKS5 代理
 导出全部数据	Export all data	導出全部數據	
 导入全部数据	Import all data	導入全部數據	
 正在导入数据…	Importing data…	正在導入數據…	
-主题、背景、声音与外观。每项改动即时生效。	Theme, background, sounds and appearance. Every change applies instantly.	主題、背景、聲音與外觀。每項改動即時生效。	
+主题、背景、声音与外观。改动自动保存，外观类设置即时生效。	Theme, background, sound and appearance. Changes are saved automatically; appearance settings apply instantly.	主題、背景、聲音與外觀。改動自動儲存，外觀類設定即時生效。	
 主题与配色	Theme & colors	主題與配色	
 主题的强调色会应用到按钮、滑块与选中态，切换后立即生效。	The accent color applies to buttons, sliders and selection states — effective immediately.	主題的強調色會應用到按鈕、滑塊與選中態，切換後立即生效。	
 弹出菜单	Popup menus	彈出菜單	
@@ -2339,7 +2339,7 @@ Mojang 官方	Mojang official	Mojang 官方
 重命名实例	Rename instance	重命名實例	
 新名称会成为实例的文件夹名。	The new name becomes the instance's folder name.	新名稱會成爲實例的文件夾名。	
 该版本正在被修改，请稍后再复制！	This version is being modified — duplicate it later!	該版本正在被修改，請稍後再複製！	
-新实例会得到独立的版本文件、Mod 与存档。	The new instance gets its own version files, mods and saves.	新實例會得到獨立的版本文件、Mod 與存檔。	
+新实例会复制版本文件，非隔离实例仍共用 Mod 与存档。	The new instance copies version files. Non-isolated instances still share mods and saves.	新實例會複製版本檔案，非隔離實例仍共用 Mod 與存檔。	
 实例已复制为	Instance duplicated as 	實例已複製爲	
 备份实例	Back up instance	備份實例	
 压缩包	Archive	壓縮包	
@@ -2745,7 +2745,7 @@ CurseForge 的 API 需要密钥才能查询世界 / 模组 / 整合包列表，�
 在 MC 启动前执行特定命令或程序，语法与 Windows 的命令提示符一致。\n\n你可以用替换标记来动态改变其内容或实现相对路径，在 更多 → 帮助 中搜索 “替换标记” 以了解用法。例如：\n· &quot;{verpath}test.exe&quot;：运行版本文件夹下的 test.exe	Runs a command or program before Minecraft starts, using the same syntax as the Windows command prompt.\n\nUse replacement tags for dynamic content or relative paths — search “replacement tags” in More → Help. Example:\n· &quot;{verpath}test.exe&quot;: run test.exe from the version folder	在 MC 啟動前執行特定命令或程式，語法與 Windows 的命令提示字元一致。\n\n你可以用替換標記來動態改變其內容或實現相對路徑，在 更多 → 說明 中搜尋「替換標記」以了解用法。例如：\n· &quot;{verpath}test.exe&quot;：執行版本資料夾下的 test.exe	
 开发者、发布者与责任方均为 TCraft 团队。本软件按「现状」提供，不对使用或无法使用本软件造成的直接、间接损失承担责任；对存档、配置等文件的操作请自行备份。\n\n侵权投诉、合规问题与功能反馈：TCraft Launcher 启动器交流群（群号 1131373915）	The developer, publisher and responsible party is the TCraft team. This software is provided "as is"; no liability for direct or indirect losses arising from its use; back up saves and configs yourself.\n\nComplaints, compliance and feedback: the TCraft Launcher group (1131373915)	開發者、發布者與責任方均為 TCraft 團隊。本軟體按「現狀」提供，不對使用或無法使用本軟體造成的直接、間接損失承擔責任；對存檔、設定等檔案的操作請自行備份。\n\n侵權投訴、合規問題與功能回饋：TCraft Launcher 啟動器交流群（群號 1131373915）	
 Minecraft、Minecraft 徽标及相关名称、品牌、图像与音效的著作权和商标权，均归 Mojang Synergies AB 与 Microsoft 所有，本启动器不主张任何权利，也不将 Minecraft 名称用作自身的主标题或主品牌。	Minecraft, the Minecraft logo and related names, brands, images and sounds are the property of Mojang Synergies AB and Microsoft; this launcher claims no rights over them and does not use the Minecraft name as its own main title or brand.	Minecraft、Minecraft 徽標及相關名稱、品牌、圖像與音效的著作權和商標權，均歸 Mojang Synergies AB 與 Microsoft 所有，本啟動器不主張任何權利，也不將 Minecraft 名稱用作自身的主標題或主品牌。	
-NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.\n非 MINECRAFT 官方产品。未经 MOJANG 或 MICROSOFT 授权或关联。	NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.\n非 MINECRAFT 官方產品。未經 MOJANG 或 MICROSOFT 授權或關聯。	NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.\n非 MINECRAFT 官方產品。未經 MOJANG 或 MICROSOFT 授權或關聯。	
+NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.\n非 MINECRAFT 官方产品。未经 MOJANG 或 MICROSOFT 授权或关联。	NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.	NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.\n非 MINECRAFT 官方產品。未經 MOJANG 或 MICROSOFT 授權或關聯。	
 上面这些都没解决的话，可以进 TCL 官方 QQ 群求助：\n\n  群号：1131373915\n  点击加入：https://qm.qq.com/q/UONlv4VgwE	If none of the above helps, join the official TCL QQ group for support:\n\n  Group: 1131373915\n  Join: https://qm.qq.com/q/UONlv4VgwE	上面這些都沒解決的話，可以進 TCL 官方 QQ 群求助：\n\n  群號：1131373915\n  點擊加入：https://qm.qq.com/q/UONlv4VgwE	
 TCL 由 TCraft 团队开发与维护。\n提供游戏与模组、整合包、资源包、光影的下载与管理，支持正版 / 离线 / 第三方登录。	TCL is developed and maintained by the TCraft team.\nIt provides game, mod, modpack, resource pack and shader downloads and management, with premium / offline / third-party login.	TCL 由 TCraft 團隊開發與維護。\n提供遊戲與模組、整合包、資源包、光影的下載與管理，支援正版 / 離線 / 第三方登入。	
 新版本在群内发布。加入 TCraft Launcher 启动器交流群（群号 1131373915）	New releases are posted in the group. Join the TCraft Launcher group (1131373915)	新版本在群內發布。加入 TCraft Launcher 啟動器交流群（群號 1131373915）	
@@ -3969,7 +3969,7 @@ Java 已安装	Java installed	Java 已安裝
 成就图片已保存：	Achievement image saved: 	成就圖片已儲存：
 当前平台不支持自动下载	Automatic download is not supported on this platform	當前平台不支援自動下載
 把 .ttf / .otf 字体放进 游戏目录/TCL/Fonts 后点「重新加载字体」，即可在列表中选择；macOS / Linux 会自动使用系统自带的苹方 / Noto Sans CJK。	Put .ttf / .otf fonts into GameDir/TCL/Fonts, then click "Reload fonts" to pick them from the list; macOS / Linux automatically use the built-in PingFang / Noto Sans CJK.	把 .ttf / .otf 字型放進 遊戲目錄/TCL/Fonts 後點「重新載入字型」，即可在清單中選擇；macOS / Linux 會自動使用系統內建的蘋方 / Noto Sans CJK。
-下载缓存与社区图片都会放到这里；改到剩余空间更大的盘可以避免 C 盘被占满。	Download cache and community images are stored here; move it to a drive with more free space if C: is filling up.	下載快取與社群圖片都會放到這裡；改到剩餘空間更大的磁碟可以避免 C 盤被佔滿。
+下载缓存与社区图片都会放到这里；输入后按回车或点击其它位置生效，改到剩余空间更大的盘可以避免 C 盘被占满。	Download cache and community images are stored here; press Enter or click elsewhere to apply. Move it to a drive with more free space if C: is filling up.	下載快取與社群圖片都會放到這裡；輸入後按 Enter 或點擊其它位置生效。改到剩餘空間更大的磁碟可以避免 C 盤被佔滿。
 请手动安装 Java，然后用「导入 Java…」添加。	Please install Java manually, then add it with "Import Java…".	請手動安裝 Java，然後用「匯入 Java…」加入。
 Java 下载已取消	Java download cancelled	Java 下載已取消
 JVM 参数已恢复为空（使用游戏默认）	JVM arguments cleared (game defaults will be used)	JVM 參數已還原為空（使用遊戲預設）
@@ -4137,7 +4137,7 @@ OpenJFX 17 没有 32 位 Linux 原生包。请安装 64 位 Java 后重新启动
 启动器失去焦点时暂停（省 CPU）	Pause when the launcher loses focus (saves CPU)	啟動器失去焦點時暫停（節省 CPU）	
 留空使用默认	Leave empty for the default	留空使用預設	
 跟随系统	Follow system	跟隨系統	
-将导入 %s 中的配置，同名设置会被文件内容覆盖。\n\n出于安全考虑，导入时不会应用启动前命令、Java 路径、下载源、代理，以及 JVM / 游戏附加参数，这些只能在本机手动设置。\n\n确认导入吗？	Configuration will be imported from %s; settings with the same names will be overwritten by the file.\n\nFor safety, importing does not apply pre-launch commands, Java paths, download sources or proxy, nor JVM / game argument overrides — those can only be set manually on this machine.\n\nImport now?	將匯入 %s 中的配置，同名設定會被檔案內容覆蓋。\n\n出於安全考慮，匯入時不會應用啟動前命令、Java 路徑、下載源、代理，以及 JVM / 遊戲附加參數，這些只能在本機手動設定。\n\n確認匯入嗎？	
+将导入 %s 中的配置，同名设置会被文件内容覆盖。\n\n出于安全考虑，导入时不会应用启动前命令、Java 路径、代理、镜像、更新源、自动进服、代理密码与第三方 Key、账号令牌与认证服务器，以及 JVM / 游戏附加参数，这些只能在本机手动设置。\n\n确认导入吗？	Configuration will be imported from %s; settings with the same names will be overwritten by the file.\n\nFor safety, importing does not apply pre-launch commands, Java paths, proxy, mirrors, update sources, auto-join servers, proxy passwords, third-party keys, account tokens or auth servers, nor JVM / game argument overrides — those can only be set manually on this machine.\n\nImport now?	將匯入 %s 中的配置，同名設定會被檔案內容覆蓋。\n\n出於安全考慮，匯入時不會應用啟動前命令、Java 路徑、代理、鏡像、更新源、自動進服、代理密碼與第三方 Key、帳號權杖與認證伺服器，以及 JVM / 遊戲附加參數，這些只能在本機手動設定。\n\n確認匯入嗎？	
 配置已重新加载，敏感项已忽略	Configuration reloaded; sensitive items were skipped	配置已重新載入，敏感項已忽略	
 搜索目录…	Search folder…	搜尋目錄…	
 正在扫描本机的 Java…	Scanning this PC for Java…	正在掃描本機的 Java…	
@@ -4147,7 +4147,7 @@ OpenJFX 17 没有 32 位 Linux 原生包。请安装 64 位 Java 后重新启动
 请选择 bin 目录下的 %s	Please choose %s inside the bin folder	請選擇 bin 目錄下的 %s	
 选择要搜索 Java 的文件夹	Choose a folder to search for Java	選擇要搜尋 Java 的資料夾	
 没有找到 Java	No Java found	沒有找到 Java	
-换个目录再试，或直接选择 bin\java.exe	Try another folder, or pick bin\java.exe directly	換個目錄再試，或直接選擇 bin\java.exe	
+换个目录再试，或直接选择 %s	Try another folder, or select %s directly	換個目錄再試，或直接選擇 %s	
 找到 %d 个 Java	Found %d Java installations	找到 %d 個 Java	
 读取失败：%s（当前显示内存日志）	Read failed: %s (showing the in-memory log)	讀取失敗：%s（目前顯示記憶體日誌）	
 \n\n不会删除游戏存档与已安装版本。是否继续？	\n\nGame saves and installed versions will not be deleted. Continue?	\n\n不會刪除遊戲存檔與已安裝版本。是否繼續？	
@@ -4161,7 +4161,7 @@ OpenJFX 17 没有 32 位 Linux 原生包。请安装 64 位 Java 后重新启动
 预读整合包失败	Failed to pre-read the modpack	預讀整合包失敗	
 读取整合包时出错：%s	Error while reading the modpack: %s	讀取整合包時出錯：%s	
 整合包读取失败	Failed to read the modpack	整合包讀取失敗	
-无法从该压缩包中识别出整合包清单。\n当前支持 Modrinth (.mrpack)、CurseForge (.zip)、MultiMC、HMCL 与 MCBBS 格式。	No modpack manifest could be identified in this archive.\nSupported formats: Modrinth (.mrpack), CurseForge (.zip), MultiMC, HMCL and MCBBS.	無法從該壓縮包中識別出整合包清單。\n目前支援 Modrinth (.mrpack)、CurseForge (.zip)、MultiMC、HMCL 與 MCBBS 格式。	
+无法从该压缩包中识别出整合包清单。\n当前支持 Modrinth (.mrpack)、CurseForge (.zip)、通用整合包与 MCBBS 格式。	No modpack manifest could be identified in this archive.\nSupported formats: Modrinth (.mrpack), CurseForge (.zip), generic modpacks and MCBBS.	無法從該壓縮包中識別出整合包清單。\n目前支援 Modrinth (.mrpack)、CurseForge (.zip)、通用整合包與 MCBBS 格式。	
 \n无法完成安装。	\nThe installation cannot be completed.	\n無法完成安裝。	
 \n\n是否开始安装？	\n\nStart installation now?	\n\n是否開始安裝？	
 版本扫描失败：%s	Version scan failed: %s	版本掃描失敗：%s	
@@ -4190,7 +4190,7 @@ Java 21（1.20.5+）	Java 21 (1.20.5+)	Java 21（1.20.5+）
 共 %d 首	%d tracks	共 %d 首	
 已清空背景音乐	Background music cleared	已清空背景音樂	
 删除了 %d 个文件	Deleted %d files	刪除了 %d 個檔案	
-字体预览 The quick brown fox 中文 123	Font preview The quick brown fox 中文 123	字型預覽 The quick brown fox 中文 123	
+字体预览 The quick brown fox 中文 123	Font preview The quick brown fox 123	字型預覽 The quick brown fox 中文 123	
 字体已安装	Font installed	字型已安裝	
 安装字体失败	Failed to install font	安裝字型失敗	
 选择标题栏图片	Choose title bar image	選擇標題列圖片	
@@ -4267,3 +4267,340 @@ Mod文件	Mod file	Mod 檔案
 整合包缺少文件下载地址：%s	The modpack is missing a download URL: %s	整合包缺少檔案下載位址：%s	
 有 %d 个文件没有下载地址，已跳过，请在安装后手动补齐	%d files have no download URL and were skipped; add them manually after installation	有 %d 個檔案沒有下載位址，已跳過，請在安裝後手動補齊	
 启动器已在运行，请切换到已打开的窗口。	The launcher is already running. Switch to the open window.	啟動器已在執行，請切換到已開啟的視窗。	
+优先使用独立显卡	Prefer dedicated GPU	優先使用獨立顯卡	
+仅 Windows 生效，写入系统显卡首选项；笔记本切换独显时可减少核显占用。	Windows only. Writes the GPU preference into the system; helps laptops use the dedicated GPU.	僅 Windows 生效，寫入系統顯卡偏好；筆記本切換獨顯時可減少核顯佔用。	
+选择可选文件	Choose optional files	選擇可選檔案	
+共 %d 个可选文件，取消勾选的不安装。	%d optional files; unchecked files are skipped.	共 %d 個可選檔案，取消勾選的不安裝。	
+全不选	Select none	全不選	
+预览截图	Preview screenshot	預覽截圖	
+设为启动器背景	Set as launcher background	設為啟動器背景	
+无法读取截图	Can't read the screenshot	無法讀取截圖	
+设为背景	Set as background	設為背景	
+打开原图	Open original	開啟原圖	
+设置背景失败	Failed to set background	設定背景失敗	
+已设为背景	Set as background	已設為背景	
+自动换行	Word wrap	自動換行	
+运行环境	Runtime environment	執行環境	
+内存上限	Memory limit	記憶體上限	
+世界详情	World details	世界詳情	
+游戏模式	Game mode	遊戲模式	
+允许作弊	Cheats allowed	允許作弊	
+读取 level.dat 失败：	Failed to read level.dat:	讀取 level.dat 失敗：	
+存档备份	World backups	存檔備份	
+打开备份文件夹	Open backup folder	開啟備份資料夾	
+共 %d 份备份。	%d backups.	共 %d 份備份。	
+还没有备份。点存档右侧的备份按钮即可生成。	No backups yet. Use the backup button next to a world.	還沒有備份。點存檔右側的備份按鈕即可產生。	
+还原为新存档	Restore as new world	還原為新存檔	
+确定要删除备份 %s 吗？	Delete backup %s?	確定要刪除備份 %s 嗎？	
+备份存档	Back up world	備份存檔	
+还原存档	Restore world	還原存檔	
+将把 %s 解压成一份新存档，不会覆盖现有世界。继续？	Extract %s as a new world; existing worlds are kept. Continue?	將把 %s 解壓成一份新存檔，不會覆蓋現有世界。繼續？	
+已还原为新存档	Restored as a new world	已還原為新存檔	
+还原失败	Restore failed	還原失敗	
+备份已删除	Backup deleted	備份已刪除	
+显示主界面	Show window	顯示主介面	
+全部更新	Update all	全部更新	
+可更新内容	Available updates	可更新內容	
+尚未检查。更新前请备份实例。	Not checked yet. Back up the instance before updating.	尚未檢查。更新前請備份實例。	
+正在检查	Checking	正在檢查	
+全部已是最新	Everything is up to date	全部已是最新	
+发现 %d 项更新	%d updates available	發現 %d 項更新	
+点检查更新后，这里会列出可升级的 Mod 资源包和光影。	Click check updates to list upgradable mods, resource packs and shaders.	點檢查更新後，這裡會列出可升級的 Mod 資源包和光影。	
+批量更新	Batch update	批次更新	
+开始更新	Starting update	開始更新	
+%d 项内容	%d items	%d 項內容	
+将更新 %d 项内容，旧文件移入回收站，更新前请备份实例。继续？	Update %d items? Old files go to the recycle bin. Back up the instance first.	將更新 %d 項內容，舊檔案移入回收筒，更新前請備份實例。繼續？	
+部分更新失败	Some updates failed	部分更新失敗	
+成功 %d 项，失败 %d 项	%d succeeded, %d failed	成功 %d 項，失敗 %d 項	
+完成 %d 项	%d finished	完成 %d 項	
+%d 项更新失败	%d updates failed	%d 項更新失敗	
+原理图	Schematics	原理圖	
+共 %d 个文件。	%d files.	共 %d 個檔案。	
+导入原理图	Import schematics	匯入原理圖	
+原理图文件	Schematic files	原理圖檔案	
+原理图列表	Schematic list	原理圖清單	
+还没有原理图。支持 .schematic .schem .nbt，导入后可在游戏里用投影模组读取。	No schematics yet. Supports .schematic .schem .nbt for use with schematic mods.	還沒有原理圖。支援 .schematic .schem .nbt，匯入後可在遊戲裡用投影模組讀取。	
+删除原理图	Delete schematic	刪除原理圖	
+部分导入失败	Some imports failed	部分匯入失敗	
+成功 %d 个，失败 %d 个	%d succeeded, %d failed	成功 %d 個，失敗 %d 個	
+全部时间	All time	全部時間	
+今天	Today	今天	
+近 7 天	Last 7 days	近 7 天	
+近 30 天	Last 30 days	近 30 天	
+清空截图	Clear screenshots	清空截圖	
+将删除全部 %d 张截图，此操作不可撤销。	Delete all %d screenshots? This cannot be undone.	將刪除全部 %d 張截圖，此操作不可撤銷。	
+已清空截图	Screenshots cleared	已清空截圖	
+部分截图删除失败	Some screenshots couldn't be deleted	部分截圖刪除失敗	
+%d 张未能删除	%d couldn't be deleted	%d 張未能刪除	
+该时间段没有截图。	No screenshots in this range.	該時間段沒有截圖。	
+开始批量更新	Batch update started	開始批次更新	
+已取消更新	Update canceled	已取消更新	
+已复制图片	Image copied	已複製圖片	
+正在导入	Importing	正在匯入	
+%d 个文件检查失败，请检查网络	%d files failed the check; check your network	%d 個檔案檢查失敗，請檢查網路
+检查 Mod、资源包与光影的可用新版本	Check for new versions of mods, resource packs and shaders	檢查 Mod、資源包與光影的可用新版本
+删除选中	Delete selected	刪除選中	
+将把选中的 %d 张截图移入回收站？	Move the %d selected screenshots to the recycle bin?	將把選中的 %d 張截圖移入回收筒？	
+已删除选中截图	Selected screenshots deleted	已刪除選中截圖
+包含测试版	Include beta versions	包含測試版	
+有 %d 项测试版更新	%d beta updates available	有 %d 項測試版更新
+更新检查来自 Modrinth，CurseForge 资源请手动替换。	Update checks use Modrinth; replace CurseForge files manually.	更新檢查來自 Modrinth，CurseForge 資源請手動替換。
+更新选中	Update selected	更新選中	
+已选 %d 项更新	%d updates selected	已選 %d 項更新
+每页	Page	每頁	
+已有更新任务	Update task already running	已有更新任務	
+请等待当前任务结束	Wait for the current task to finish	請等待當前任務結束	
+更新文件名无效	Invalid update file name	更新檔案名稱無效	
+文件名包含非法路径	File name contains an invalid path	檔案名稱包含非法路徑	
+目标文件已存在：	Target file already exists:	目標檔案已存在：	
+%d 个文件	%d files	%d 個檔案	
+备份条目过多	Too many backup entries	備份項目過多
+极限	Hardcore	極限
+备份解压后体积过大	Backup expands beyond the size limit	備份解壓後體積過大	
+有 %d 个文件复制失败，导出已中止	%d files failed to copy; export aborted	有 %d 個檔案複製失敗，匯出已中止	
+有 %d 个文件打包失败，导出已中止	%d files failed to package; export aborted	有 %d 個檔案打包失敗，匯出已中止	
+备份完成（跳过 %d 个文件）	Backup complete (%d files skipped)	備份完成（跳過 %d 個檔案）	
+导出完成（不含令牌与认证服务器）	Export complete (tokens and auth servers removed)	匯出完成（不含令牌與認證伺服器）	
+名称不能包含控制字符。	Name cannot contain control characters.	名稱不能包含控制字元。
+下载文件超过大小上限	Downloaded file exceeds the size limit	下載檔案超過大小上限
+插件管理	Plugins	外掛管理
+共 %d 个，已启用 %d 个。插件可以添加页面、按钮、命令与弹窗。	%d plugins, %d enabled. Plugins can add pages, buttons, commands, and dialogs.	共 %d 個，已啟用 %d 個。外掛可以新增頁面、按鈕、指令與對話框。
+搜索插件	Search plugins	搜尋外掛
+导入插件	Import plugin	匯入外掛
+加载失败	Failed to load	載入失敗
+插件开发文档站	Plugin developer docs	外掛開發文件站
+打开插件文件夹	Open plugin folder	開啟外掛資料夾
+刷新插件	Refresh plugins	重新整理外掛
+插件拥有完整权限，可以读写文件、联网并执行任意代码。只安装你信任的插件。	Plugins have full permissions and can read and write files, access the network, and run arbitrary code. Only install plugins you trust.	外掛擁有完整權限，可以讀寫檔案、連網並執行任意程式碼。只安裝你信任的外掛。
+还没有安装任何插件。\n点击「导入插件」选择 .zip 或 .jar；也可以把插件文件夹放进 %s 后点击刷新。	No plugins installed yet.\nClick "Import plugin" to choose a .zip or .jar, or place plugin folders in %s and click Refresh.	尚未安裝任何外掛。\n點擊「匯入外掛」選擇 .zip 或 .jar；也可以把外掛資料夾放進 %s 後點擊重新整理。
+没有匹配的插件。	No matching plugins.	沒有符合的外掛。
+插件导入	Plugin import	外掛匯入
+一次拖入一个插件包	Drag in one plugin package at a time	一次拖入一個外掛包
+正在加载插件	Loading plugins…	正在載入外掛
+插件已刷新	Plugins refreshed	外掛已重新整理
+共 %d 个插件	%d plugins	共 %d 個外掛
+命令	Commands	指令
+已禁用插件	Plugin disabled	外掛已停用
+已启用插件	Plugin enabled	外掛已啟用
+删除插件	Delete plugin	刪除外掛
+确定要删除插件「%s」吗？	Delete plugin "%s"?	確定要刪除外掛「%s」嗎？
+文件被占用或回收站不可用，插件已禁用。	The file is in use or the recycle bin is unavailable, so the plugin was disabled.	檔案被佔用或回收筒無法使用，外掛已停用。
+选择插件包	Select plugin package	選擇外掛包
+插件包	Plugin package	外掛包
+无法读取插件	Cannot read plugin	無法讀取外掛
+插件：	Plugin: 	外掛：
+标识：	ID: 	識別碼：
+作者：	Author: 	作者：
+已存在同 id 插件，导入后将覆盖旧版本。	A plugin with the same ID already exists; importing will replace the old version.	已存在同 ID 外掛，匯入後將覆蓋舊版本。
+覆盖安装插件	Replace plugin	覆蓋安裝外掛
+正在导入插件	Importing plugin…	正在匯入外掛
+插件已导入	Plugin imported	外掛已匯入
+插件导入失败	Plugin import failed	外掛匯入失敗
+导入插件失败	Failed to import plugin	匯入外掛失敗
+没有命令	No commands	沒有指令
+插件「%s」没有注册命令。	Plugin "%s" has no registered commands.	外掛「%s」沒有註冊指令。
+插件命令 · 	Plugin commands · 	外掛指令 ·
+参数（可选）	Arguments (optional)	參數（選填）
+运行	Run	執行
+作者	Author	作者
+状态	Status	狀態
+路径	Path	路徑
+已注册命令	Registered commands	已註冊指令
+已注册页面	Registered pages	已註冊頁面
+重新加载	Reload	重新載入
+已重新加载	Reloaded	已重新載入
+渲染器（下次启动生效）	Renderer (takes effect next launch)	渲染器（下次啟動生效）
+自定义（见上方输入框）	Custom (see the field above)	自訂（見上方輸入框）
+图片过大	Image too large	圖片過大
+标题栏图片不能超过 8MB。	Title bar images cannot exceed 8 MB.	標題列圖片不能超過 8MB。
+字体过大	Font file too large	字型過大
+字体文件不能超过 32MB。	Font files cannot exceed 32 MB.	字型檔案不能超過 32MB。
+调试模式（重启生效，排查问题时开启，会把日志同步输出到控制台）	Debug mode (takes effect after restart; enable when troubleshooting to mirror logs to the console)	偵錯模式（重新啟動後生效，排查問題時開啟，會把日誌同步輸出到主控台）
+TCL 检查更新	TCL update check	TCL 檢查更新
+启动时自动检查更新	Check for updates on startup	啟動時自動檢查更新
+只影响版本号与更新日志的读取；点「前往下载」统一跳官网，由用户自己选节点下载。	Only affects reading version numbers and changelogs. "Go to download" always opens the official site, where you choose a node yourself.	只影響版本號與更新日誌的讀取；點「前往下載」統一跳官網，由使用者自己選節點下載。
+资源镜像	Resource mirrors	資源鏡像
+镜像地址	Mirror URL	鏡像位址
+Mod 镜像源	Mod mirror source	Mod 鏡像來源
+官方源（默认）	Official (default)	官方來源（預設）
+内置镜像（mod.mcimirror.top）	Built-in mirror (mod.mcimirror.top)	內建鏡像（mod.mcimirror.top）
+手动填写	Manual	手動填寫
+影响 Modrinth / CurseForge 的接口、图标与文件下载。默认只走官方；选了镜像后优先走镜像，失败自动回退官方。内置镜像为第三方公益服务，也可以填自己的反代地址。	Affects Modrinth / CurseForge APIs, icons, and file downloads. By default only the official source is used; after selecting a mirror it is tried first, with automatic fallback to the official source. The built-in mirror is a third-party community service; you can also enter your own reverse-proxy address.	影響 Modrinth / CurseForge 的介面、圖示與檔案下載。預設只走官方；選了鏡像後優先走鏡像，失敗自動回退官方。內建鏡像為第三方公益服務，也可以填自己的反向代理位址。
+缓存目录未启用	Cache directory not enabled	快取目錄未啟用
+该目录非空且不是缓存目录，已回退到默认目录。	That directory is not empty and is not a cache directory; reverted to the default directory.	該目錄非空且不是快取目錄，已回退到預設目錄。
+缓存目录无效	Invalid cache directory	快取目錄無效
+已回退到默认目录。	Reverted to the default directory.	已回退到預設目錄。
+正在获取 Minecraft 版本列表	Fetching Minecraft versions…	正在取得 Minecraft 版本清單
+连接 Mojang…	Connecting to Mojang…	連線 Mojang…
+解析版本列表…	Parsing version list…	解析版本清單…
+下载版本清单…	Downloading version manifest…	下載版本清單…
+正在获取 %s 版本列表	Fetching %s versions…	正在取得 %s 版本清單
+拉取版本清单…	Fetching version manifest…	拉取版本清單…
+不能包含路径分隔符或系统保留字符，也不能使用保留名称。	Cannot contain path separators, reserved characters, or reserved names.	不能包含路徑分隔符或系統保留字元，也不能使用保留名稱。
+实例已存在	Instance already exists	執行個體已存在
+请换一个名称，避免覆盖已有的版本目录。	Choose another name to avoid overwriting an existing version directory.	請換一個名稱，避免覆蓋已有的版本目錄。
+请求资源列表…	Requesting resource list…	請求資源清單…
+并发请求 Modrinth 与 CurseForge…	Querying Modrinth and CurseForge in parallel…	並行請求 Modrinth 與 CurseForge…
+请求 	Requesting 	請求 
+更新 	Update 	更新 
+这个实例的 mods 文件夹是空的。\n点击「安装 Mod」选择文件，或把 .jar 直接拖进来。	This instance's mods folder is empty.\nClick "Install Mod" to choose files, or drag .jar files here.	這個執行個體的 mods 資料夾是空的。\n點擊「安裝 Mod」選擇檔案，或把 .jar 直接拖進來。
+全部 (%d)	All (%d)	全部 (%d)
+启用 (%d)	Enabled (%d)	啟用 (%d)
+禁用 (%d)	Disabled (%d)	停用 (%d)
+正在导入 Mod	Importing Mods…	正在匯入 Mod
+更新 %s	Update %s	更新 %s
+导入 	Import 	匯入 
+这个文件夹是空的。把 %s 的 .zip 直接拖进来，或点「导入 %s」。	This folder is empty. Drag %s .zip files here, or click "Import %s".	這個資料夾是空的。把 %s 的 .zip 直接拖進來，或點「匯入 %s」。
+选择要导入的 	Select what to import: 	選擇要匯入的 
+正在导入 	Importing 	正在匯入 
+备份中缺少 level.dat	level.dat is missing from the backup	備份中缺少 level.dat
+无法设为背景	Cannot set as background	無法設為背景
+截图不存在或超过 32MB。	The screenshot does not exist or exceeds 32 MB.	截圖不存在或超過 32MB。
+版本目录不合法。	Invalid version directory.	版本目錄不合法。
+版本目录是符号链接。	The version directory is a symbolic link.	版本目錄是符號連結。
+已存在同名版本目录：	A version directory with the same name already exists: 	已存在同名版本目錄：
+读取到 %d 个文件	Read %d files	讀取到 %d 個檔案
+可导入 %d 个	%d importable	可匯入 %d 個
+已导入 %d 个	%d imported	已匯入 %d 個
+已在目录中 %d 个	%d already in the folder	已在目錄中 %d 個
+已跳过 %d 个（后缀不支持）	%d skipped (unsupported extension)	已跳過 %d 個（副檔名不支援）
+导入失败 %d 个	%d failed to import	匯入失敗 %d 個
+跳过	Skipped	跳過
+%s：	%s: 	%s：
+… 还有 %d 个	…and %d more	…還有 %d 個
+待导入 %d 个文件	%d files pending	待匯入 %d 個檔案
+读取文件列表失败：	Failed to read file list: 	讀取檔案清單失敗：
+请等待当前导入完成	Wait for the current import to finish	請等待目前匯入完成
+没有导入文件	No files imported	沒有匯入檔案
+导入结果	Import result	匯入結果
+准备导入	Preparing import	準備匯入
+当前文件	Current file	目前檔案
+进度	Progress	進度
+正在读取	Reading…	正在讀取
+插件	Plugins	外掛
+插件页面	Plugin pages	外掛頁面
+正在读取本地列表	Reading local list…	正在讀取本機清單
+关闭启动器	Close launcher	關閉啟動器
+加载自定义背景	Load custom background	載入自訂背景
+已从 	Loaded custom background from 	已從 
+ 加载自定义背景	 custom background	 載入自訂背景
+所有背景视频都无法播放，已切回图片背景	All background videos failed to play; switched back to the image background.	所有背景影片都無法播放，已切回圖片背景。
+提示：已开启版本隔离，共享目录的 mods 不会自动复制到 	Note: version isolation is enabled; mods in the shared directory are not copied to 	提示：已開啟版本隔離，共享目錄的 mods 不會自動複製到 
+正在下载 WebP 解码库…	Downloading WebP decoder…	正在下載 WebP 解碼器…
+正在下载 JavaFX %s（%d/%d）	Downloading JavaFX %s (%d/%d)	正在下載 JavaFX %s（%d/%d）
+%s 下载失败	%s download failed	%s 下載失敗
+刷新新闻失败	Failed to refresh news	重新整理新聞失敗
+TCL 的功能规划与交互设计参考了社区启动器的通用做法，界面与代码均为独立编写，与其他启动器无隶属、赞助或背书关系。	TCL's feature planning and interaction design reference common practices among community launchers. The UI and code are independently written, with no affiliation, sponsorship, or endorsement by any other launcher.	TCL 的功能規劃與互動設計參考了社群啟動器的通用做法，介面與程式碼均為獨立編寫，與其他啟動器無隸屬、贊助或背書關係。
+图标来自 Lucide（ISC），WebP 解码使用 jwebp（Apache-2.0），联机能力来自 EasyTier，在此一并致谢。	Icons from Lucide (ISC), WebP decoding via jwebp (Apache-2.0), and multiplayer powered by EasyTier. Thanks to all.	圖示來自 Lucide（ISC），WebP 解碼使用 jwebp（Apache-2.0），連機能力來自 EasyTier，在此一併致謝。
+插件扩展	Plugin extensions	外掛擴充功能
+无法重命名	Cannot rename	無法重新命名
+无法设置图标	Cannot set icon	無法設定圖示
+图片不能超过 8MB。	Images cannot exceed 8 MB.	圖片不能超過 8MB。
+非法版本 ID	Invalid version ID	非法版本 ID
+名称是系统保留名。	That name is reserved by the system.	名稱是系統保留名稱。
+微软登录失败：	Microsoft login failed: 	Microsoft 登入失敗：
+这个账号还没有游戏角色，请先创建角色	This account has no game character yet. Create one first.	這個帳號還沒有遊戲角色，請先建立角色
+皮肤文件过大	Skin file too large	面板檔案過大
+获取皮肤失败：	Failed to get skin: 	取得面板失敗：
+获取 Yggdrasil 皮肤失败：	Failed to get Yggdrasil skin: 	取得 Yggdrasil 面板失敗：
+第 %d / %d 页 · 共 %d 项	Page %d / %d · %d items	第 %d / %d 頁 · 共 %d 項
+页面 id	Page ID	頁面 ID
+页面 id 已被占用：	Page ID already in use: 	頁面 ID 已被佔用：
+命令名不能为空	Command name cannot be empty	指令名稱不能為空
+保存配置失败：	Failed to save config: 	儲存設定失敗：
+读取配置失败：	Failed to read config: 	讀取設定失敗：
+读取 plugin.json 失败：	Failed to read plugin.json: 	讀取 plugin.json 失敗：
+插件 id 重复：	Duplicate plugin ID: 	外掛 ID 重複：
+main 类未实现 tcraft.api.TcraftPlugin	The main class does not implement tcraft.api.TcraftPlugin	main 類別未實作 tcraft.api.TcraftPlugin
+这个插件页面不存在，插件可能已被删除或禁用。	This plugin page does not exist; the plugin may have been deleted or disabled.	此外掛頁面不存在，外掛可能已被刪除或停用。
+插件未加载，无法显示页面。	The plugin is not loaded, so the page cannot be shown.	外掛未載入，無法顯示頁面。
+页面渲染失败：	Failed to render page: 	頁面渲染失敗：
+插件页面渲染失败：	Failed to render plugin page: 	外掛頁面渲染失敗：
+命令不存在	Command not found	指令不存在
+命令执行失败	Command failed	指令執行失敗
+事件处理失败	Event handling failed	事件處理失敗
+压缩包内没有 plugin.json	The archive does not contain plugin.json	壓縮檔內沒有 plugin.json
+仅支持 .zip 或 .jar 插件包	Only .zip or .jar plugin packages are supported	僅支援 .zip 或 .jar 外掛包
+插件 id 非法：	Invalid plugin ID: 	外掛 ID 非法：
+插件 id 已存在：	Plugin ID already exists: 	外掛 ID 已存在：
+插件包超过上限（512MB）	Plugin package exceeds the 512 MB limit	外掛包超過上限（512MB）
+插件包文件过多（上限 	Too many files in the plugin package (limit 	外掛包檔案過多（上限 
+插件包包含非法路径：	Plugin package contains an invalid path: 	外掛包包含非法路徑：
+plugin.json 缺少 id	plugin.json is missing id	plugin.json 缺少 id
+插件 id 只允许字母、数字、点、下划线与短横线，长度 2-64：	Plugin IDs may only contain letters, digits, dots, underscores, and hyphens, 2-64 characters: 	外掛 ID 只允許字母、數字、點、底線與短橫線，長度 2-64：
+plugin.json 缺少 name	plugin.json is missing name	plugin.json 缺少 name
+plugin.json 缺少 version	plugin.json is missing version	plugin.json 缺少 version
+plugin.json 缺少 main	plugin.json is missing main	plugin.json 缺少 main
+插件需要 API 	Plugin requires API 	外掛需要 API 
+，当前客户端仅支持 	; this client only supports 	，目前用戶端僅支援 
+只允许字母、数字、点、下划线、短横线，最长 64：	Only letters, digits, dots, underscores, and hyphens are allowed, up to 64 characters: 	只允許字母、數字、點、底線、短橫線，最長 64：
+检测到 SOCKS 代理：启动器内部下载不支持 SOCKS，已改为直连。如需让启动器也走代理，请在「设置 → 网络」改用 HTTP 代理模式。	SOCKS proxy detected: the launcher's internal downloads do not support SOCKS and have switched to a direct connection. To route the launcher through a proxy, switch to HTTP proxy mode in Settings → Network.	偵測到 SOCKS 代理：啟動器內部下載不支援 SOCKS，已改為直連。如需讓啟動器也走代理，請在「設定 → 網路」改用 HTTP 代理模式。
+TCL 的功能规划与交互设计参考了社区启动器的通用做法，界面与代码均为独立编写，与其他启动器无隶属、赞助或背书关系。\n图标来自 Lucide（ISC），WebP 解码使用 jwebp（Apache-2.0），联机能力来自 EasyTier，在此一并致谢。	TCL's feature planning and interaction design reference common practices among community launchers. The UI and code are independently written, with no affiliation, sponsorship, or endorsement by any other launcher.\nIcons from Lucide (ISC), WebP decoding via jwebp (Apache-2.0), and multiplayer powered by EasyTier. Thanks to all.	TCL 的功能規劃與互動設計參考了社群啟動器的通用做法，介面與程式碼均為獨立編寫，與其他啟動器無隸屬、贊助或背書關係。\n圖示來自 Lucide（ISC），WebP 解碼使用 jwebp（Apache-2.0），連機能力來自 EasyTier，在此一併致謝。
+导出时复制失败：	Failed to copy during export: 	匯出時複製失敗：
+打包文件失败：	Failed to package files: 	打包檔案失敗：
+同步资源包到 options.txt 失败：	Failed to sync resource packs to options.txt: 	同步資源包到 options.txt 失敗：
+确定要删除插件「%s」吗？\n插件目录会移入回收站，数据目录保留。	Delete plugin "%s"?\nThe plugin folder will be moved to the recycle bin; its data folder is kept.	確定要刪除外掛「%s」嗎？\n外掛目錄會移入回收筒，資料目錄保留。
+读取到 %d 个文件\n	Read %d files\n	讀取到 %d 個檔案\n
+可导入 %d 个\n	%d importable\n	可匯入 %d 個\n
+通用整合包	Generic modpack	通用整合包
+整合包版本号包含非法字符	Modpack version contains invalid characters	整合包版本號包含非法字元
+整合包未提供 Minecraft 版本信息	The modpack does not specify a Minecraft version	整合包未提供 Minecraft 版本資訊
+整合包安装失败：	Modpack installation failed: 	整合包安裝失敗：
+整合包安装完成：	Modpack installation complete: 	整合包安裝完成：
+整合包版本已就绪：	Modpack version ready: 	整合包版本已就緒：
+整合包缺失以下必需文件（可能已被原作者删除）：	The modpack is missing these required files (they may have been removed by the author): 	整合包缺少以下必要檔案（可能已被原作者刪除）：
+整合包内容没有下载地址：	The modpack entry has no download URL: 	整合包內容沒有下載位址：
+整合包文件数量过多	Too many files in the modpack	整合包檔案數量過多
+整合包自带实例设置文件过大，已删除	The modpack's bundled instance settings file was too large and was deleted	整合包內建執行個體設定檔過大，已刪除
+已被忽略（只允许本机手动设置）	ignored (only local manual settings are allowed)	已被忽略（只允許本機手動設定）
+OptiFine 需从官网手动下载安装器；原版文件已就绪。	OptiFine must be downloaded manually from the official site; the vanilla files are ready.	OptiFine 需從官網手動下載安裝器；原版檔案已就緒。
+安装失败：	Installation failed: 	安裝失敗：
+版本 ID 不合法：	Invalid version ID: 	版本 ID 不合法：
+加载器版本不合法：	Invalid loader version: 	載入器版本不合法：
+资源索引名称不合法：	Invalid asset index name: 	資源索引名稱不合法：
+生成的版本 ID 不合法：	Generated version ID is invalid: 	產生的版本 ID 不合法：
+创建 mods 目录失败：	Failed to create mods directory: 	建立 mods 目錄失敗：
+无法创建 mods 文件夹：	Cannot create mods folder: 	無法建立 mods 資料夾
+预下载失败：	Pre-download failed: 	預先下載失敗：
+安装器清单过大	Installer manifest too large	安裝器清單過大
+下载整合包内容 0 / 	Downloading modpack files 0 / 	下載整合包內容 0 / 
+Forge 版本不合法：	Invalid Forge version: 	Forge 版本不合法：
+NeoForge 版本不合法：	Invalid NeoForge version: 	NeoForge 版本不合法：
+Fabric 加载器版本不合法：	Invalid Fabric loader version: 	Fabric 載入器版本不合法：
+OptiFine 文件名不合法：	Invalid OptiFine file name: 	OptiFine 檔案名稱不合法：
+Java 清单缺少下载地址：	The Java manifest has no download URL: 	Java 清單缺少下載位址：
+options.txt 超过 4MB，已跳过读取。	options.txt exceeds 4 MB; skipped reading it.	options.txt 超過 4MB，已跳過讀取。
+NBT 节点过多	Too many NBT nodes	NBT 節點過多
+NBT 列表长度异常：	Abnormal NBT list length: 	NBT 清單長度異常：
+NBT 字段过多	Too many NBT fields	NBT 欄位過多
+、	, 	、
+响应超过大小上限	The response exceeds the size limit	回應超過大小上限
+未找到可用的 Java，自动下载 Java 也没有成功	No usable Java found, and automatic Java download also failed	找不到可用的 Java，自動下載 Java 也沒有成功
+版本目录不合法	Invalid version directory	版本目錄不合法
+natives 压缩包条目过多	Too many entries in the natives archive	natives 壓縮包條目過多
+统一通行证缺少校验值	The unified passport is missing a checksum	統一通行證缺少校驗值
+authlib-injector 缺少校验值	authlib-injector is missing a checksum	authlib-injector 缺少校驗值
+找不到 level.dat	level.dat not found	找不到 level.dat
+level.dat 过大	level.dat is too large	level.dat 過大
+不是 NBT 复合标签	Not an NBT compound tag	不是 NBT 複合標籤
+level.dat 结构无效	Invalid level.dat structure	level.dat 結構無效
+标签名过长	Tag name is too long	標籤名過長
+NBT 文本过多	Too much NBT text	NBT 文字過多
+字节数组过大	Byte array is too large	位元組陣列過大
+列表过大	List is too large	清單過大
+复合标签字段过多	Too many compound tag fields	複合標籤欄位過多
+整型数组过大	Int array is too large	整型陣列過大
+长整型数组过大	Long array is too large	長整型陣列過大
+未知标签类型 	|Unknown tag type 	|未知標籤類型 
+，自动选择的 Java 为 	, but the Java selected automatically is 	，自動選擇的 Java 為 
+官方版本列表为空	The official version list is empty	官方版本清單為空
+配置文件过大，已拒绝加载	The config file is too large and was not loaded	設定檔過大，已拒絕載入
+联机模块压缩包条目过多	Too many entries in the multiplayer module archive	聯機模組壓縮包條目過多
+皮肤图片尺寸无效（%d×%d，应为 64×32、64×64 或它们的整数倍）	Invalid skin image size (%d×%d; expected 64×32, 64×64, or an integer multiple)	皮膚圖片尺寸無效（%d×%d，應為 64×32、64×64 或它們的整數倍）
+插件需要 API %d，当前客户端仅支持 %d	Plugin requires API %d; this client only supports %d	外掛程式需要 API %d，目前用戶端僅支援 %d
+下载内容不是 jar	The downloaded file is not a JAR	下載內容不是 JAR
+WebP 解码库校验值不匹配	The WebP decoder checksum does not match	WebP 解碼庫校驗值不匹配
+文件过大	File is too large	檔案過大
+拿不到 .sha1 校验值：	Could not obtain the .sha1 checksum:	無法取得 .sha1 校驗值：
+SHA1 校验失败：	SHA-1 verification failed:	SHA-1 校驗失敗：
+WScript.Shell 创建快捷方式超时	WScript.Shell timed out while creating the shortcut	WScript.Shell 建立捷徑逾時

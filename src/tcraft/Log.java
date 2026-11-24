@@ -43,11 +43,11 @@ public final class Log {
     }
 
     public static void info(String line) {
-        if (line != null) enqueue(line, false);
+        if (line != null) enqueue(Redact.apply(line), false);
     }
 
     public static void error(String text) {
-        if (text != null) enqueue(text, true);
+        if (text != null) enqueue(Redact.apply(text), true);
     }
 
     // 日志/报错共用环境信息
@@ -125,8 +125,10 @@ public final class Log {
         StringBuilder sb = new StringBuilder();
         long total = 0;
         for (Path p : allLogFiles()) {
+            if (total >= EXPORT_LIMIT) break;
             String body;
             try {
+                if (Files.size(p) > EXPORT_LIMIT - total) continue;
                 body = Files.readString(p, StandardCharsets.UTF_8);
             } catch (Throwable t) {
                 continue;
@@ -178,7 +180,10 @@ public final class Log {
 
     private static void enqueue(String text, boolean isError) {
         ensureStarted();
-        if (!QUEUE.offer(new String[]{text, isError ? "1" : "0"})) DROPPED.incrementAndGet();
+        // 单条日志限长 防异常消息带超大响应体写盘
+        String line = text;
+        if (line.length() > 8192) line = line.substring(0, 8192) + "…";
+        if (!QUEUE.offer(new String[]{line, isError ? "1" : "0"})) DROPPED.incrementAndGet();
     }
 
     private static void ensureStarted() {
@@ -328,12 +333,11 @@ public final class Log {
             files.add(dir.resolve(base));
             for (Path p : files) {
                 if (!Files.isRegularFile(p)) continue;
-                String body = Files.readString(p, StandardCharsets.UTF_8);
-                if (sb.length() + body.length() > limit) {
-                    sb.append(body, 0, (int) Math.max(0, limit - sb.length()));
+                if (Files.size(p) > limit - sb.length()) {
                     sb.append("\n… 日志超过 ").append(limit / 1024 / 1024).append(" MB，其余部分已省略\n");
                     break;
                 }
+                String body = Files.readString(p, StandardCharsets.UTF_8);
                 sb.append(body);
             }
         } catch (Throwable ignored) {

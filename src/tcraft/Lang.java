@@ -53,8 +53,10 @@ public final class Lang {
                     while (entries.hasMoreElements()) {
                         java.util.jar.JarEntry en = entries.nextElement();
                         if ("res/langtables.txt".equalsIgnoreCase(en.getName()) && !en.isDirectory()) {
-                            return new String(jf.getInputStream(en).readAllBytes(),
-                                    java.nio.charset.StandardCharsets.UTF_8);
+                            try (java.io.InputStream in = jf.getInputStream(en)) {
+                                return new String(Io.read(in, 2L * 1024 * 1024),
+                                        java.nio.charset.StandardCharsets.UTF_8);
+                            }
                         }
                     }
                 }
@@ -64,7 +66,10 @@ public final class Lang {
                 for (int i = 0; i < 5 && cur != null; i++) {
                     Path f = cur.resolve("res").resolve("LangTables.txt");
                     if (java.nio.file.Files.isRegularFile(f)) {
-                        return java.nio.file.Files.readString(f, java.nio.charset.StandardCharsets.UTF_8);
+                        try (java.io.InputStream in = java.nio.file.Files.newInputStream(f)) {
+                            return new String(Io.read(in, 2L * 1024 * 1024),
+                                    java.nio.charset.StandardCharsets.UTF_8);
+                        }
                     }
                     cur = cur.getParent();
                 }
@@ -74,7 +79,7 @@ public final class Lang {
         // 兜底走 classpath
         try (var in = Lang.class.getResourceAsStream("/res/LangTables.txt")) {
             if (in != null) {
-                return new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                return new String(Io.read(in, 2L * 1024 * 1024), java.nio.charset.StandardCharsets.UTF_8);
             }
         } catch (Throwable ignored) {
         }
@@ -116,7 +121,6 @@ public final class Lang {
             String s = tx.getText();
             if (s != null && !s.isEmpty()) tx.setText(t(s));
         }
-        // ComboBox 选项非 Labeled 单独翻译
         if (node instanceof javafx.scene.control.ComboBox<?> combo) {
             javafx.collections.ObservableList items = combo.getItems();
             for (int i = 0; i < items.size(); i++) {

@@ -91,9 +91,14 @@ public final class Boot {
         // stub 互斥量已失效 长期单实例靠此文件锁
         Path lockFile = Resources.home().resolve("launcher.lock");
         for (int attempt = 0; attempt < 20; attempt++) {
+            FileChannel ch;
             try {
-                FileChannel ch = FileChannel.open(lockFile, StandardOpenOption.CREATE,
-                        StandardOpenOption.WRITE);
+                ch = FileChannel.open(lockFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+            } catch (Exception e) {
+                // 目录不可写不拦启动
+                return true;
+            }
+            try {
                 FileLock lock = ch.tryLock();
                 if (lock != null) {
                     instanceLockChannel = ch;
@@ -102,10 +107,12 @@ public final class Boot {
                 }
                 ch.close();
             } catch (OverlappingFileLockException e) {
+                closeQuietly(ch);
                 return false;
             } catch (Exception e) {
-                // 文件系统不支持锁时不要因此拦住启动
-                return true;
+                // 文件已持锁 按已运行处理
+                closeQuietly(ch);
+                return false;
             }
             try {
                 // 旧进程退出需要一点时间
@@ -116,6 +123,13 @@ public final class Boot {
             }
         }
         return false;
+    }
+
+    private static void closeQuietly(FileChannel ch) {
+        try {
+            ch.close();
+        } catch (Exception ignored) {
+        }
     }
 
     static void releaseInstanceLock() {
@@ -154,7 +168,7 @@ public final class Boot {
             if ("true".equalsIgnoreCase(p.getProperty("SystemDebugMode", "false"))) {
                 System.setProperty("prism.verbose", "true");
             }
-            // Data.get() 前读语言 0简/1英/2繁/3系统
+            // 读语言要先于 Data.get 0简/1英/2繁/3系统
             Lang.setMode(parseInt(p.getProperty("SystemLanguage", "0")));
         } catch (Throwable ignored) {
             // 配置损坏按默认启动

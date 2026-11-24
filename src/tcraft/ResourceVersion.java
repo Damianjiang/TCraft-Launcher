@@ -112,6 +112,7 @@ public class ResourceVersion {
 
     public static ResourceVersion fromCurseForgeJson(Map<String, Object> data, String expectedType) {
         ResourceVersion r = new ResourceVersion();
+        r.resourceType = expectedType;
         r.id = String.valueOf((long) Json.num(data, "id", 0));
         r.display = Json.str(data, "displayName", "").replace("\t", "").trim();
         r.releaseDate = Json.str(data, "fileDate", "");
@@ -166,12 +167,10 @@ public class ResourceVersion {
         for (String l : java.util.List.of("fabric", "forge", "quilt", "neoforge")) {
             if (rawVersions.contains(l)) r.loaders.add(l);
         }
-        r.resourceType = expectedType;
         return r;
     }
 
-    public String infoLine(boolean useFileNameTitle) {
-        // 拼接行逐段翻译
+    public String infoLine() {
         List<String> parts = new ArrayList<>();
         if (!loaders.isEmpty()) parts.add(displayLoaders(loaders));
         if (!fileName.isEmpty() && !fileName.equals(display)) {
@@ -187,7 +186,7 @@ public class ResourceVersion {
                 break;
             }
         }
-        if (allNonStandard) parts.add(Lang.t("游戏版本 ") + String.join("、", gameVersions));
+        if (allNonStandard) parts.add(Lang.t("游戏版本 ") + String.join(Lang.t("、"), gameVersions));
         if (downloadCount > 0) {
             // 英文 k 为千位
             parts.add(Lang.t("下载 ") + (downloadCount > 100000
@@ -220,7 +219,7 @@ public class ResourceVersion {
             if (l == null || l.isEmpty()) continue;
             names.add(Character.toUpperCase(l.charAt(0)) + l.substring(1).toLowerCase());
         }
-        return String.join("、", names);
+        return String.join(Lang.t("、"), names);
     }
 
     public static boolean isStandard(String name) {

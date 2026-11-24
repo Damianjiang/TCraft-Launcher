@@ -44,7 +44,7 @@ public final class Mesa {
         Downloader.downloadFileTo(null, URL, tmp, "mesa-loader");
         if (!SHA1.equalsIgnoreCase(sha1(tmp))) {
             Files.deleteIfExists(tmp);
-            throw new IOException("渲染器组件下载校验失败，请重试");
+            throw new IOException(Lang.t("渲染器组件下载校验失败，请重试"));
         }
         Files.move(tmp, jar, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         return jar;

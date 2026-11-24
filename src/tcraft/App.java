@@ -27,7 +27,6 @@ public class App extends Application {
 
     @Override
     public void start(Stage stage) {
-        Platform.setImplicitExit(false); // 隐式退出会在隐藏主窗时带崩程序
         Log.startSession();
         long tPhase = System.nanoTime();
 
@@ -40,6 +39,8 @@ public class App extends Application {
             Theme.init();
             Theme.applyComponentOpacity();
             applyInitialTheme();
+            // Data 就绪后重建带代理的客户端
+            Data.get().applyProxy();
             if (Boolean.getBoolean("tcl.time")) {
                 Data.get().log("阶段：主题与语言 " + (System.nanoTime() - tPhase) / 1_000_000 + " ms");
             }
@@ -292,6 +293,11 @@ public class App extends Application {
 
     @Override
     public void stop() {
+        // 退出前同步保存 防最后一次改动丢失
+        try {
+            Data.get().flushSave();
+        } catch (Throwable ignored) {
+        }
         // 退出前回收联机子进程
         EasyTier.stop();
     }

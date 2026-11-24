@@ -39,6 +39,7 @@ public final class Event {
         }
     }
 
+    @SuppressWarnings("unchecked")
     public List<Object> list(String key) {
         Object v = data.get(key);
         return v instanceof List ? (List<Object>) v : Collections.emptyList();

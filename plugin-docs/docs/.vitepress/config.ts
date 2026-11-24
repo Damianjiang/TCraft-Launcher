@@ -35,7 +35,7 @@ const teekConfig = defineTeekConfig({
   articleAnalyze: { enabled: false },
   breadcrumb: { enabled: false },
 
-  loading: '页面加载中...',
+  loading: false,
 
   vitePlugins: {
     sidebar: false,

@@ -61,7 +61,7 @@ public final class Yggdrasil {
 
     public static Server locate(String input) throws IOException, AuthException {
         String url = input == null ? "" : input.trim();
-        if (url.isEmpty()) throw new AuthException(0, "请填写认证服务器地址");
+        if (url.isEmpty()) throw new AuthException(0, Lang.t("请填写认证服务器地址"));
         if (!url.contains("://")) url = "https://" + url;
         try {
             URI.create(url);
@@ -167,7 +167,7 @@ public final class Yggdrasil {
             Map<String, Object> p = Json.obj(o);
             if (!p.isEmpty()) out.available.add(profile(p));
         }
-        if (out.accessToken.isEmpty()) throw new AuthException(resp.statusCode(), "服务器没有返回 accessToken");
+        if (out.accessToken.isEmpty()) throw new AuthException(resp.statusCode(), Lang.t("服务器没有返回 accessToken"));
         return out;
     }
 
@@ -201,7 +201,7 @@ public final class Yggdrasil {
     private static String textureUrl(String base64) {
         if (base64 == null || base64.isEmpty()) return null;
         try {
-            String json = new String(java.util.Base64.getDecoder().decode(base64),
+            String json = new String(Base64Safe.decode(base64),
                     StandardCharsets.UTF_8);
             Map<String, Object> textures = Json.obj(Json.parse(json), "textures");
             Map<String, Object> skin = Json.obj(textures, "SKIN");
@@ -247,14 +247,14 @@ public final class Yggdrasil {
         String text = remote == null ? "" : remote.trim();
         String low = text.toLowerCase(java.util.Locale.ROOT);
         if (low.contains("invalid credentials") || low.contains("invalid username or password")) {
-            return "用户名或密码错误";
+            return Lang.t("用户名或密码错误");
         }
         if (low.contains("invalid token") || low.contains("expired")) {
-            return "登录已过期，请重新登录";
+            return Lang.t("登录已过期，请重新登录");
         }
         if (!text.isEmpty()) return text;
-        if (status == 401 || status == 403) return "用户名或密码错误，或登录已过期";
-        if ("ForbiddenOperationException".equals(error)) return "服务器拒绝了这次登录，请检查账号状态";
+        if (status == 401 || status == 403) return Lang.t("用户名或密码错误，或登录已过期");
+        if ("ForbiddenOperationException".equals(error)) return Lang.t("服务器拒绝了这次登录，请检查账号状态");
         return Lang.t("认证服务器返回 HTTP ") + status;
     }
 
@@ -274,7 +274,7 @@ public final class Yggdrasil {
             return Http.client().send(b.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new IOException("请求被中断", e);
+            throw new IOException(Lang.t("请求被中断"), e);
         }
     }
 
@@ -290,12 +290,12 @@ public final class Yggdrasil {
     private static Map<String, Object> parseObject(String text, int status) throws AuthException {
         String body = text == null ? "" : text.trim();
         if (!body.startsWith("{")) {
-            throw new AuthException(status, "服务器返回的不是 JSON，请检查地址是否为 Yggdrasil API");
+            throw new AuthException(status, Lang.t("服务器返回的不是 JSON，请检查地址是否为 Yggdrasil API"));
         }
         try {
             return Json.obj(Json.parse(body));
         } catch (Exception e) {
-            throw new AuthException(status, "服务器返回的 JSON 无法解析");
+            throw new AuthException(status, Lang.t("服务器返回的 JSON 无法解析"));
         }
     }
 

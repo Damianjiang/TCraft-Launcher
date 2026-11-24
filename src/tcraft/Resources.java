@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
-import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -27,7 +26,7 @@ public final class Resources {
     }
 
     private static Path homeDir;
-    private static boolean logsMigrated;
+    private static volatile boolean logsMigrated;
 
     public static synchronized Path home() {
         if (homeDir != null) return homeDir;
@@ -141,11 +140,13 @@ public final class Resources {
     public static String platform() {
         String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
         String arch = System.getProperty("os.arch", "").toLowerCase(java.util.Locale.ROOT);
-        boolean arm = arch.contains("aarch64") || arch.contains("arm64");
-        boolean x86 = arch.equals("x86") || arch.equals("i386") || arch.equals("ia32");
-        if (os.contains("win")) return arm ? "win-arm64" : x86 ? "win-x86" : "win";
-        if (os.contains("mac")) return arm ? "mac-aarch64" : "mac";
-        if (arm) return "linux-aarch64";
+        boolean arm64 = arch.contains("aarch64") || arch.contains("arm64");
+        boolean arm32 = arch.contains("arm") && !arm64;
+        boolean x86 = arch.equals("x86") || arch.equals("i386") || arch.equals("i686") || arch.equals("ia32");
+        if (os.contains("win")) return arm64 ? "win-arm64" : arm32 ? "win-arm" : x86 ? "win-x86" : "win";
+        if (os.contains("mac")) return arm64 ? "mac-aarch64" : "mac";
+        if (arm32) return "linux-arm";
+        if (arm64) return "linux-aarch64";
         if (x86) return "linux-x86";
         return "linux";
     }
@@ -167,6 +168,7 @@ public final class Resources {
             Path up = parent.getParent();
             if (up != null && (Files.isRegularFile(up.resolve("TCraftLauncher.exe"))
                     || Files.isRegularFile(up.resolve("TCraftLauncher.sh"))
+                    || Files.isRegularFile(up.resolve("TCraftLauncher.command"))
                     || Files.isRegularFile(up.resolve("TCraftLauncher.bat")))) {
                 return up;
             }
@@ -187,6 +189,8 @@ public final class Resources {
     }
 
     private static final String WEBP_JAR = "webp-0.2.0.jar";
+    // 下载后先校验哈希 防镜像投毒
+    private static final String WEBP_SHA256 = "3f644c53bec98c7129e3461b947ca918525ea888f151bd226785fb98db75c8d9";
 
     public static Path webpJar() {
         return home().resolve("dependencies").resolve("libs").resolve(WEBP_JAR);
@@ -195,10 +199,16 @@ public final class Resources {
     // 首启补 WebP 库 失败不拦启动
     private static boolean ensureWebp(StartupWindow ui) {
         Path target = webpJar();
+        Path tmp = target.resolveSibling(WEBP_JAR + ".part");
         try {
-            if (Files.isRegularFile(target) && Files.size(target) > 100_000) return false;
+            if (Files.isRegularFile(target) && Files.size(target) > 100_000
+                    && WEBP_SHA256.equals(sha256(target))) return false;
+            try {
+                Files.deleteIfExists(target);
+            } catch (Exception ignored) {
+            }
             Files.createDirectories(target.getParent());
-            ui.setStatus("正在下载 WebP 解码库…", 88);
+            ui.setStatus(Lang.t("正在下载 WebP 解码库…"), 88);
             String[] urls = {
                     "https://mirrors.cloud.tencent.com/nexus/repository/maven-public/org/glavo/webp/0.2.0/webp-0.2.0.jar",
                     "https://repo1.maven.org/maven2/org/glavo/webp/0.2.0/webp-0.2.0.jar"
@@ -208,9 +218,11 @@ public final class Resources {
                 try {
                     byte[] data = Http.getBytes(url);
                     if (data == null || data.length < 100_000 || data[0] != 'P' || data[1] != 'K') {
-                        throw new IOException("下载内容不是 jar");
+                        throw new IOException(Lang.t("下载内容不是 jar"));
                     }
-                    Path tmp = target.resolveSibling(WEBP_JAR + ".part");
+                    if (!WEBP_SHA256.equals(sha256(data))) {
+                        throw new IOException(Lang.t("WebP 解码库校验值不匹配"));
+                    }
                     Files.write(tmp, data);
                     Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
                     return true;
@@ -223,21 +235,32 @@ public final class Resources {
         } catch (Exception e) {
             Log.error("[" + java.time.LocalDateTime.now().toLocalTime().withNano(0) + "] WebP 解码库下载失败：" + e);
             return false;
+        } finally {
+            try {
+                Files.deleteIfExists(tmp);
+            } catch (Exception ignored) {
+            }
         }
     }
 
     public static void bootstrap(String[] args, StartupWindow ui) throws Exception {
         if (jar() == null) return; // 开发模式由 IDE 提供 JavaFX
-        ui.setStatus("检查运行环境…", 10);
+        ui.setStatus(Lang.t("检查运行环境…"), 10);
         boolean fxReady = fxPresent();
-        Path rt = fxReady ? home().resolve("dependencies").resolve(platform()).resolve("openjfx")
-                : ensureJavaFx(ui);
-        boolean webpReady = ensureWebp(ui);
-        if (!fxReady || webpReady) {
-            ui.setStatus("正在启动主界面…", 95);
-            relaunch(jar(), rt, platform(), args, ui);
+        if (!fxReady) {
+            // 只有内置 JavaFX 缺失时才需要下载运行库
+            Path rt = ensureJavaFx(ui);
+            // WebP 只是可选解码库 失败不能拦 JavaFX 重启
+            ensureWebp(ui);
+            ui.setStatus(Lang.t("正在启动主界面…"), 95);
+            relaunch(jar(), rt, platform(), args);
+        } else {
+            // 内置 JavaFX 不能套外部 module-path 否则找不到模块
+            ensureWebp(ui);
+            ui.setStatus(Lang.t("正在启动主界面…"), 95);
+            relaunchBuiltin(jar(), args);
         }
-        ui.setStatus("正在启动主界面…", 90);
+        ui.setStatus(Lang.t("正在启动主界面…"), 90);
     }
 
     public static Path iconFile(String name) {
@@ -328,14 +351,13 @@ public final class Resources {
     }
 
     private static Path ensureJavaFx(StartupWindow ui) throws Exception {
-        ui.setStatus("检查 JavaFX 运行库…", 15);
+        ui.setStatus(Lang.t("检查 JavaFX 运行库…"), 15);
         String plat = platform();
         String classifier = switch (plat) {
             case "win" -> "win";
             case "mac" -> "mac";
             case "mac-aarch64" -> "mac-aarch64";
             case "linux" -> "linux";
-            // 异常文案分段翻译
             case "win-arm64" -> throw new IOException(
                     Lang.t("OpenJFX 17 没有 Windows ARM64 原生包。请使用 x64 版 Java 运行启动器（Windows 会自动模拟），")
                             + Lang.t("或把 JavaFX 17 放到 ") + home().resolve("dependencies").resolve("win-arm64").resolve("openjfx"));
@@ -364,10 +386,15 @@ public final class Resources {
         }
         if (jarsPresent && jarVersionMatches(dir.resolve(jarName("base", classifier, version)), version)) {
             extractAllNatives(dir, classifier, version);
-            if (!marker.equals(Files.isRegularFile(ready) ? Files.readString(ready).trim() : "")) {
+            String readyText = "";
+            if (Files.isRegularFile(ready)) {
+                if (Files.size(ready) <= 64L * 1024) readyText = Files.readString(ready).trim();
+                else Files.deleteIfExists(ready);
+            }
+            if (!marker.equals(readyText)) {
                 Files.writeString(ready, marker);
             }
-            ui.setStatus("运行库检查完成", 70);
+            ui.setStatus(Lang.t("运行库检查完成"), 70);
             return dir;
         }
         // 17 和 21 混用起不来
@@ -384,7 +411,7 @@ public final class Resources {
             downloadArtifact(module, classifier, version, target, ui, base, span,
                     i + 1, JFX_MODULES.length);
         }
-        ui.setStatus("正在解压运行库…", 92);
+        ui.setStatus(Lang.t("正在解压运行库…"), 92);
         extractAllNatives(dir, classifier, version);
         Files.writeString(ready, marker);
         return dir;
@@ -414,7 +441,8 @@ public final class Resources {
     private static void extractAllNatives(Path dir, String classifier, String version) throws IOException {
         Path marker = dir.resolve(".natives");
         String expected = version + "-" + classifier;
-        if (Files.isRegularFile(marker) && expected.equals(Files.readString(marker).trim())) {
+        if (Files.isRegularFile(marker) && Files.size(marker) <= 64L * 1024
+                && expected.equals(Files.readString(marker).trim())) {
             return;
         }
         for (String module : JFX_MODULES) {
@@ -429,7 +457,7 @@ public final class Resources {
             JarEntry en = jf.getJarEntry("javafx.properties");
             if (en == null) return false;
             try (InputStream in = jf.getInputStream(en)) {
-                String text = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                String text = new String(Io.read(in, 64L * 1024), java.nio.charset.StandardCharsets.UTF_8);
                 for (String line : text.split("\\R")) {
                     if (!line.startsWith("javafx.version=")) continue;
                     return expected.equals(line.substring("javafx.version=".length()).trim());
@@ -452,13 +480,13 @@ public final class Resources {
                     + jarName(module, classifier, version);
             try {
                 download(url, target, ui,
-                        Lang.t("正在下载 JavaFX ") + module + "（" + index + "/" + total + "）", base, span);
+                        Lang.tf("正在下载 JavaFX %s（%d/%d）", module, index, total), base, span);
                 return;
             } catch (Exception e) {
                 last = e;
             }
         }
-        throw new IOException("JavaFX " + module + Lang.t(" 下载失败"), last);
+        throw new IOException(Lang.tf("%s 下载失败", "JavaFX " + module), last);
     }
 
     private static void download(String url, Path target, StartupWindow ui, String label,
@@ -466,7 +494,7 @@ public final class Resources {
         Path tmp = target.resolveSibling(target.getFileName() + ".part");
         // 连接阶段无进度 先切不确定态
         ui.setIndeterminate(label + Lang.t(" · 连接中…"));
-        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+        HttpURLConnection c = (HttpURLConnection) java.net.URI.create(url).toURL().openConnection();
         c.setConnectTimeout(12000);
         c.setReadTimeout(45000);
         c.setInstanceFollowRedirects(true);
@@ -483,7 +511,7 @@ public final class Resources {
                 while ((n = in.read(buf)) > 0) {
                     out.write(buf, 0, n);
                     done += n;
-                    if (done > 80L * 1024 * 1024) throw new IOException("文件过大");
+                    if (done > 80L * 1024 * 1024) throw new IOException(Lang.t("文件过大"));
                     long now = System.currentTimeMillis();
                     if (now - lastUi > 80) {
                         lastUi = now;
@@ -499,11 +527,11 @@ public final class Resources {
             }
             // 无 .sha1 视为坏源换仓 无校验不落盘
             String expected = fetchText(url + ".sha1");
-            if (expected == null) throw new IOException("拿不到 .sha1 校验值：" + url);
+            if (expected == null) throw new IOException(Lang.t("拿不到 .sha1 校验值：") + url);
             String actual = sha1(tmp);
             if (!actual.equalsIgnoreCase(expected)) {
                 Files.deleteIfExists(tmp);
-                throw new IOException("SHA1 校验失败：" + url);
+                throw new IOException(Lang.t("SHA1 校验失败：") + url);
             }
             Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
         } finally {
@@ -514,12 +542,12 @@ public final class Resources {
 
     private static String fetchText(String url) {
         try {
-            HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+            HttpURLConnection c = (HttpURLConnection) java.net.URI.create(url).toURL().openConnection();
             c.setConnectTimeout(5000);
             c.setReadTimeout(5000);
             c.setRequestProperty("User-Agent", "TCraftLauncher");
             try (InputStream in = c.getInputStream()) {
-                String text = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).trim();
+                String text = new String(Io.read(in, 64L * 1024), java.nio.charset.StandardCharsets.UTF_8).trim();
                 int space = text.indexOf(' ');
                 if (space > 0) text = text.substring(0, space);
                 return text.length() >= 40 ? text.substring(0, 40) : null;
@@ -539,6 +567,20 @@ public final class Resources {
             while ((n = in.read(buf)) > 0) md.update(buf, 0, n);
         }
         return java.util.HexFormat.of().formatHex(md.digest());
+    }
+
+    private static String sha256(Path file) throws Exception {
+        MessageDigest md = MessageDigest.getInstance("SHA-256");
+        try (InputStream in = Files.newInputStream(file)) {
+            byte[] buf = new byte[65536];
+            int n;
+            while ((n = in.read(buf)) > 0) md.update(buf, 0, n);
+        }
+        return java.util.HexFormat.of().formatHex(md.digest());
+    }
+
+    private static String sha256(byte[] data) throws Exception {
+        return java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(data));
     }
 
     private static void extractNatives(Path jar, Path dir) throws IOException {
@@ -566,6 +608,7 @@ public final class Resources {
             case "win" -> "win";
             case "mac" -> "mac";
             case "mac-aarch64" -> "mac-aarch64";
+            case "win-arm64" -> "win-arm64";
             case "linux" -> "linux";
             case "linux-aarch64" -> "linux-aarch64";
             default -> throw new IOException(Lang.t("没有 JavaFX 17 运行库：") + plat);
@@ -577,7 +620,7 @@ public final class Resources {
         return String.join(File.pathSeparator, paths);
     }
 
-    private static void relaunch(Path jar, Path rt, String plat, String[] args, StartupWindow ui)
+    private static void relaunch(Path jar, Path rt, String plat, String[] args)
             throws IOException {
         String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
         String exe = os.contains("win") ? "javaw.exe" : "java";
@@ -602,7 +645,14 @@ public final class Resources {
                 : jar.toString());
         cmd.add("tcraft.Boot");
         if (args != null && args.length > 0) cmd.addAll(Arrays.asList(args));
+        startBootProcess(cmd);
+    }
 
+    private static void relaunchBuiltin(Path jar, String[] args) throws IOException {
+        startBootProcess(directLaunchCommand(jar, args));
+    }
+
+    private static void startBootProcess(List<String> cmd) throws IOException {
         Path log = logDir().resolve("launch.log");
         Path ready = logDir().resolve(".window-ready");
         Files.deleteIfExists(ready);
@@ -611,7 +661,8 @@ public final class Resources {
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.redirectErrorStream(true);
         pb.redirectInput(ProcessBuilder.Redirect.from(
-                new File(os.contains("win") ? "NUL:" : "/dev/null")));
+                new File(System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win")
+                        ? "NUL" : "/dev/null")));
         // 诊断输出追加
         pb.redirectOutput(ProcessBuilder.Redirect.appendTo(log.toFile()));
         pb.start();

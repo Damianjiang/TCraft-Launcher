@@ -14,7 +14,6 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 public final class Http {
@@ -41,11 +40,8 @@ public final class Http {
     private static final ExecutorService POOL = idlePool(
             Math.max(4, Math.min(8, Runtime.getRuntime().availableProcessors())), "TCL-Net");
 
-    private static final ExecutorService ASYNC = Executors.newCachedThreadPool(r -> {
-        Thread t = new Thread(r, "TCL-Http");
-        t.setDaemon(true);
-        return t;
-    });
+    // 下载线程 64 HTTP 回调同量级
+    private static final ExecutorService ASYNC = idlePool(64, "TCL-Http");
 
     private static volatile HttpClient client = build();
     private static volatile HttpClient clientNoRedirect = build(HttpClient.Redirect.NEVER);
@@ -183,6 +179,17 @@ public final class Http {
         return send(b.build(), url);
     }
 
+    public static String postOnce(String url, String body, Map<String, String> headers,
+                                  int timeoutSec) throws IOException {
+        try {
+            return follow("POST", url, body, Duration.ofSeconds(timeoutSec), headers,
+                    "application/json", false);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException(Lang.t("请求被中断"), e);
+        }
+    }
+
     public static String post(String url, String body, Map<String, String> headers) throws IOException {
         if (hasCredentialHeader(headers)) {
             return sendRedirectAware("POST", url, body, Duration.ofSeconds(25), headers, "application/json", false);
@@ -261,7 +268,7 @@ public final class Http {
                 return follow(method, url, body, timeout, headers, contentType, gzip);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                throw new IOException("请求被中断", e);
+                throw new IOException(Lang.t("请求被中断"), e);
             } catch (IOException e) {
                 if (e instanceof StatusException se && !retryable(se.code)) throw e;
                 last = e;
@@ -327,7 +334,7 @@ public final class Http {
                 resp = client.send(req, HttpResponse.BodyHandlers.ofInputStream());
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                throw new IOException("请求被中断", e);
+                throw new IOException(Lang.t("请求被中断"), e);
             } catch (IOException e) {
                 last = e;
                 nextDelay = BACKOFF_MS[Math.min(attempt, BACKOFF_MS.length - 1)];
@@ -400,7 +407,7 @@ public final class Http {
                 resp = client.send(req, HttpResponse.BodyHandlers.ofInputStream());
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                throw new IOException("请求被中断", e);
+                throw new IOException(Lang.t("请求被中断"), e);
             } catch (IOException e) {
                 last = e;
                 continue;
@@ -549,7 +556,7 @@ public final class Http {
                 resp = client.send(builder.build(), HttpResponse.BodyHandlers.ofInputStream());
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                throw new IOException("请求被中断", e);
+                throw new IOException(Lang.t("请求被中断"), e);
             } catch (IOException e) {
                 last = e;
                 continue;

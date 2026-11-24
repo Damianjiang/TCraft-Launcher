@@ -98,7 +98,7 @@ javac --release 17 --module-path lib --add-modules javafx.controls,javafx.media 
 
 ## 致谢
 
-- 交互参考 HMCL；代码独立编写，与 HMCL、PCL 无关联
+- 交互参考社区启动器的通用做法；代码独立编写，与其他启动器无关联
 - 图标来自 Lucide（ISC）；联机来自 EasyTier；WebP 解码使用 jwebp（Apache-2.0）
 - Minecraft 是 Mojang / Microsoft 的商标，本启动器与其无关
 

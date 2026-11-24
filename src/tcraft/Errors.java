@@ -94,7 +94,6 @@ public final class Errors {
     public static void panic(String brief, Throwable ex) {
         String head = briefText(brief, ex);
         String detail = detailText(brief, ex);
-        // 标题拼接串 两段分别翻译
         enqueue(new Report(Lang.t("联机出错：") + (brief == null ? "" : Lang.t(brief)), head, detail,
                 Behavior.ALERT, true, false));
     }
@@ -108,7 +107,7 @@ public final class Errors {
     }
 
     public static void uncaught(Thread thread, Throwable ex, boolean fxThread) {
-        // brief 含线程名 先译前缀
+        // brief 含线程名
         String brief = Lang.t(fxThread ? "界面线程未捕获异常" : "后台线程未捕获异常")
                 + (thread == null ? "" : " @" + thread.getName());
         if (!fxThread) {
@@ -552,7 +551,6 @@ public final class Errors {
     }
 
     private static String briefText(String brief, Throwable ex) {
-        // headline 分段翻译 异常原文不译
         String b = brief == null ? Lang.t("发生错误") : Lang.t(brief);
         String m = briefOf(ex);
         return sanitize(b + Lang.t("：") + m);

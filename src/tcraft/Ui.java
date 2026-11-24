@@ -13,6 +13,7 @@ import javafx.scene.Node;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.PasswordField;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
@@ -118,7 +119,7 @@ public final class Ui {
         bar.setAlignment(Pos.CENTER_RIGHT);
         bar.setMaxWidth(Double.MAX_VALUE);
         bar.setPadding(new Insets(8, 6, 2, 6));
-        Label info = label("第 " + (cur + 1) + " / " + pages + " 页 · 共 " + totalItems + " 项", 11.5, Theme.gray2);
+        Label info = label(Lang.tf("第 %d / %d 页 · 共 %d 项", cur + 1, pages, totalItems), 11.5, Theme.gray2);
         StackPane prev = button("上一页", BTN_NORMAL, () -> {
             if (cur > 0) onPage.accept(cur - 1);
         });
@@ -722,7 +723,6 @@ public final class Ui {
                 box.getChildren().add(sep);
                 continue;
             }
-            // 弹层创建处翻译
             ListItem item = new ListItem(Theme.icon(row.icon, 16, Theme.text), Lang.t(row.title), null, 34);
             item.setOnMouseClicked(e -> {
                 if (!row.keepOpen) closeMenuCard(activeMenu);
@@ -1374,6 +1374,17 @@ public final class Ui {
 
     public static TextField field(String hint) {
         TextField tf = new TextField();
+        styleField(tf, hint);
+        return tf;
+    }
+
+    public static PasswordField password(String hint) {
+        PasswordField tf = new PasswordField();
+        styleField(tf, hint);
+        return tf;
+    }
+
+    private static void styleField(TextField tf, String hint) {
         tf.setPromptText(Lang.t(hint));
         tf.setFont(Theme.font(13));
         tf.setPrefHeight(30);
@@ -1389,7 +1400,6 @@ public final class Ui {
         tf.disabledProperty().addListener((o, was, now) -> {
             if (now) tf.setStyle(fieldStyle(Theme.gray6, Theme.gray5));
         });
-        return tf;
     }
 
     private static String fieldStyle(Color bg, Color border) {

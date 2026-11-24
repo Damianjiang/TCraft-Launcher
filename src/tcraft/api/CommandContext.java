@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-// args 为命令名后的整串参数 argv() 按空白切分
+// args 为命令名后的整串 参数按空白切分
 public final class CommandContext {
 
     public final String name;

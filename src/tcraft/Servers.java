@@ -88,6 +88,7 @@ public final class Servers {
 
     public static void listWrite(Path indie, List<Entry> servers) throws Exception {
         Path file = indie.resolve("servers.dat");
+        List<Entry> list = servers == null ? List.of() : servers;
         ByteArrayOutputStream buf = new ByteArrayOutputStream();
         NbtWriter w = new NbtWriter(buf);
         w.writeByte(10);
@@ -95,8 +96,8 @@ public final class Servers {
         w.writeByte(9);
         w.writeString("servers");
         w.writeByte(10);
-        w.writeInt(servers == null ? 0 : servers.size());
-        for (Entry s : servers) {
+        w.writeInt(list.size());
+        for (Entry s : list) {
             w.writeByte(8);
             w.writeString("name");
             w.writeString(s.name);
@@ -129,14 +130,21 @@ public final class Servers {
         w.writeByte(0);
         // tmp + 原子替换
         Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
-        try (OutputStream fs = new GZIPOutputStream(Files.newOutputStream(tmp))) {
-            fs.write(buf.toByteArray());
-        }
         try {
-            Files.move(tmp, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING,
-                    java.nio.file.StandardCopyOption.ATOMIC_MOVE);
-        } catch (java.nio.file.AtomicMoveNotSupportedException e) {
-            Files.move(tmp, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            try (OutputStream fs = new GZIPOutputStream(Files.newOutputStream(tmp))) {
+                fs.write(buf.toByteArray());
+            }
+            try {
+                Files.move(tmp, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                        java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+            } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                Files.move(tmp, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally {
+            try {
+                Files.deleteIfExists(tmp);
+            } catch (Exception ignored) {
+            }
         }
     }
 
@@ -199,12 +207,14 @@ public final class Servers {
             }
         }
 
+        private int nodes;
+
         Object readPayload(int type) throws Exception {
             return readPayload(type, 0);
         }
 
         Object readPayload(int type, int depth) throws Exception {
-            // 深嵌套超限 消息分段翻译
+            if (++nodes > 1_000_000) throw new Exception(Lang.t("NBT 节点过多"));
             if (depth > 128) throw new Exception(Lang.t("NBT 嵌套过深"));
             switch (type) {
                 case 1 -> {
@@ -236,7 +246,10 @@ public final class Servers {
                 case 9 -> {
                     int elemType = readByte();
                     int count = readInt();
-                    List<Object> out = new ArrayList<>();
+                    if (count < 0 || count > 1_000_000) {
+                        throw new java.io.EOFException(Lang.t("NBT 列表长度异常：") + count);
+                    }
+                    List<Object> out = new ArrayList<>(Math.min(count, 1024));
                     for (int i = 0; i < count; i++) out.add(readPayload(elemType, depth + 1));
                     return out;
                 }
@@ -245,6 +258,7 @@ public final class Servers {
                     while (true) {
                         int t = readByte();
                         if (t == 0) break;
+                        if (map.size() >= 65536) throw new java.io.EOFException(Lang.t("NBT 字段过多"));
                         String name = readString();
                         map.put(name, readPayload(t, depth + 1));
                     }
@@ -526,6 +540,7 @@ public final class Servers {
             return (String[]) cached[1];
         }
         String[] result = srvResolveRemote(host);
+        if (SRV_CACHE.size() >= 512) SRV_CACHE.clear();
         SRV_CACHE.put(host, new Object[]{System.currentTimeMillis(), result});
         return result;
     }
@@ -542,7 +557,7 @@ public final class Servers {
             if (code != 200) return null;
             String body;
             try (java.io.InputStream in = c.getInputStream()) {
-                body = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+                body = new String(Io.read(in, 1024L * 1024), StandardCharsets.UTF_8);
             }
             java.util.Map<String, Object> root = Json.obj(Json.parse(body));
             if (!(root.get("Answer") instanceof List<?> answers) || answers.isEmpty()) return null;

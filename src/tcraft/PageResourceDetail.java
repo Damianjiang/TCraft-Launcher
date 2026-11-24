@@ -224,7 +224,7 @@ public class PageResourceDetail implements Page {
                 if (info.isCurseForge()) {
                     // 旧收藏可能只有 slug
                     if (!pid.matches("\\d+")) {
-                        throw new Exception("该收藏缺少 CurseForge 的数字 id，请取消收藏后重新收藏");
+                        throw new Exception(Lang.t("该收藏缺少 CurseForge 的数字 id，请取消收藏后重新收藏"));
                     }
                     for (Object o : CurseForge.projectFiles(Long.parseLong(pid))) {
                         ResourceVersion v = ResourceVersion.fromCurseForgeJson(Json.obj(o), expectedType());
@@ -601,7 +601,7 @@ public class PageResourceDetail implements Page {
 
     private Node versionRow(ResourceVersion v, boolean isBadDisplay) {
         Node icon = releaseIcon(v.releaseType);
-        Ui.ListItem row = new Ui.ListItem(icon, v.title(isBadDisplay), v.infoLine(isBadDisplay), 42);
+        Ui.ListItem row = new Ui.ListItem(icon, v.title(isBadDisplay), v.infoLine(), 42);
         if (expectedType().equals("modpack")) {
             row.setOnMouseClicked(e -> installModpack(v));
             StackPane save = Ui.iconButton("save", 28, 15, "另存为", () -> save(v));
@@ -839,7 +839,7 @@ public class PageResourceDetail implements Page {
                         askDownloadDeps(deps, unresolved, file, target.toPath());
                     } else {
                         if (!unresolved.isEmpty()) {
-                            win.toast("前置无法自动解析", Lang.t("请手动下载：") + String.join("、", unresolved), 3);
+                            win.toast("前置无法自动解析", Lang.t("请手动下载：") + String.join(Lang.t("、"), unresolved), 3);
                         }
                         startDownloadTask(desc, file, target.toPath(), new ArrayList<>());
                     }
@@ -858,7 +858,7 @@ public class PageResourceDetail implements Page {
             if (i < deps.size() - 1) msg.append("、");
         }
         if (!unresolved.isEmpty()) {
-            msg.append(Lang.tf("；另有以下前置无法自动解析，需要手动下载：%s", String.join("、", unresolved)));
+            msg.append(Lang.tf("；另有以下前置无法自动解析，需要手动下载：%s", String.join(Lang.t("、"), unresolved)));
         }
         msg.append(Lang.t("\n是否一并下载这些前置？"));
         VBox card = new VBox(12);
@@ -905,7 +905,7 @@ public class PageResourceDetail implements Page {
         boolean hasDeps = !deps.isEmpty();
         if (hasDeps) task.subs.add(new Tasks.SubTask("下载前置文件"));
         String ext = extOf(file).toLowerCase();
-        boolean worldZip = file.resourceType.equals("world") && (ext.equals("zip") || ext.equals("mca"));
+        boolean worldZip = file.resourceType.equals("world") && ext.equals("zip");
         // 子任务用引用
         Tasks.SubTask worldSub = worldZip ? new Tasks.SubTask("安装世界存档") : null;
         if (worldSub != null) task.subs.add(worldSub);
@@ -924,7 +924,7 @@ public class PageResourceDetail implements Page {
                     Path dirAbs = dir.toAbsolutePath().normalize();
                     int i = 0;
                     for (DepDownload d : deps) {
-                        if (task.canceled) throw new java.io.IOException("已取消");
+                        if (task.canceled) throw new java.io.IOException(Lang.t("已取消"));
                         // fileName 可能带 ../ 归一化后须在目标目录内
                         Path depTarget = dir.resolve(d.version.fileName.replace("~", "-")).toAbsolutePath().normalize();
                         if (!depTarget.startsWith(dirAbs)) {
@@ -967,7 +967,6 @@ public class PageResourceDetail implements Page {
                     Platform.runLater(() -> win.toast("下载失败", task.stage, 3));
                 }
             } finally {
-                Tasks.INSTANCE.changed();
             }
         });
     }
@@ -988,18 +987,26 @@ public class PageResourceDetail implements Page {
     }
 
     private static void unzipTo(Path zip, Path targetDir) throws java.io.IOException {
+        final long maxBytes = 8L * 1024 * 1024 * 1024;
+        final long maxEntry = 4L * 1024 * 1024 * 1024;
+        final int maxEntries = 200000;
+        Path base = targetDir.toAbsolutePath().normalize();
+        long total = 0;
+        int count = 0;
         try (java.util.zip.ZipFile zf = new java.util.zip.ZipFile(zip.toFile())) {
             var entries = zf.entries();
             while (entries.hasMoreElements()) {
                 java.util.zip.ZipEntry entry = entries.nextElement();
-                Path out = targetDir.resolve(entry.getName()).normalize();
-                if (!out.startsWith(targetDir)) continue; // 防路径穿越
+                if (++count > maxEntries) throw new java.io.IOException("压缩包条目过多");
+                Path out = base.resolve(entry.getName()).normalize();
+                if (!out.startsWith(base)) continue; // 防路径穿越
                 if (entry.isDirectory()) {
                     Files.createDirectories(out);
                 } else {
+                    if (entry.getSize() > maxEntry) throw new java.io.IOException("压缩包单条目过大");
                     Files.createDirectories(out.getParent());
                     try (var in = zf.getInputStream(entry); var outStream = Files.newOutputStream(out)) {
-                        in.transferTo(outStream);
+                        total += Io.copy(in, outStream, maxBytes - total);
                     }
                 }
             }

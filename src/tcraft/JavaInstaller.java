@@ -28,12 +28,19 @@ public final class JavaInstaller {
     public static String platformKey() {
         String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
         String arch = System.getProperty("os.arch", "").toLowerCase(java.util.Locale.ROOT);
-        boolean arm = arch.contains("aarch64") || arch.contains("arm64");
-        boolean x86 = arch.equals("x86") || arch.equals("i386");
-        if (os.contains("win")) return arm ? "windows-arm64" : x86 ? "windows-x86" : "windows-x64";
-        if (os.contains("mac") || os.contains("darwin")) return arm ? "mac-os-arm64" : "mac-os";
-        // Mojang 没有发布 Linux ARM64 运行时 走手动安装
-        if (arm) return "";
+        boolean arm64 = arch.contains("aarch64") || arch.contains("arm64");
+        boolean arm32 = arch.contains("arm") && !arm64;
+        boolean x86 = arch.equals("x86") || arch.equals("i386") || arch.equals("i686") || arch.equals("ia32");
+        if (os.contains("win")) {
+            if (arm32) return "";
+            return arm64 ? "windows-arm64" : x86 ? "windows-x86" : "windows-x64";
+        }
+        if (os.contains("mac") || os.contains("darwin")) {
+            if (arm32) return "";
+            return arm64 ? "mac-os-arm64" : "mac-os";
+        }
+        // Mojang 没有发布 Linux ARM 运行时 走手动安装
+        if (arm64 || arm32) return "";
         if (x86) return "linux-i386";
         return "linux";
     }
@@ -75,11 +82,12 @@ public final class JavaInstaller {
         java.util.concurrent.atomic.AtomicInteger done = new java.util.concurrent.atomic.AtomicInteger();
         Path backup = base.resolve("." + component + ".old");
         boolean installed = false;
+        boolean hadTarget = false;
         try {
             List<Map.Entry<String, Map<String, Object>>> fileEntries = new java.util.ArrayList<>();
             for (Map.Entry<String, Object> e : files.entrySet()) {
                 if (cancelled != null && cancelled.getAsBoolean()) {
-                    throw new java.util.concurrent.CancellationException("已取消");
+                    throw new java.util.concurrent.CancellationException(Lang.t("已取消"));
                 }
                 String rel = e.getKey();
                 Map<String, Object> file = Json.obj(e.getValue());
@@ -125,7 +133,7 @@ public final class JavaInstaller {
                                 if (stop.get()) return;
                                 if (cancelled != null && cancelled.getAsBoolean()) {
                                     firstError.compareAndSet(null,
-                                            new java.util.concurrent.CancellationException("已取消"));
+                                            new java.util.concurrent.CancellationException(Lang.t("已取消")));
                                     stop.set(true);
                                     return;
                                 }
@@ -133,21 +141,22 @@ public final class JavaInstaller {
                                 Map<String, Object> file = fe.getValue();
                                 Map<String, Object> raw = Json.obj(Json.obj(file.get("downloads")).get("raw"));
                                 String url = Json.str(raw, "url", "");
-                                if (!url.isEmpty()) {
-                                    Path dst = temp.resolve(rel).normalize();
-                                    Files.createDirectories(dst.getParent());
-                                    String sha1 = Json.str(raw, "sha1", "");
-                                    Downloader.downloadFileTo(null, url, dst, rel, sha1);
-                                    if (Boolean.parseBoolean(String.valueOf(file.get("executable")))) {
-                                        dst.toFile().setExecutable(true, false);
-                                    }
-                                    int n = done.incrementAndGet();
-                                    if (status != null && n % 5 == 0) {
-                                        status.accept(Lang.tf("正在下载 Java 运行时 %d / %d", n, total));
-                                    }
-                                    if (progress != null && n % 5 == 0 && total > 0) {
-                                        progress.accept(Math.min(0.95, 0.90 * n / total));
-                                    }
+                                if (url.isEmpty()) {
+                                    throw new IOException(Lang.t("Java 清单缺少下载地址：") + rel);
+                                }
+                                Path dst = temp.resolve(rel).normalize();
+                                Files.createDirectories(dst.getParent());
+                                String sha1 = Json.str(raw, "sha1", "");
+                                Downloader.downloadFileTo(null, url, dst, rel, sha1);
+                                if (Boolean.parseBoolean(String.valueOf(file.get("executable")))) {
+                                    dst.toFile().setExecutable(true, false);
+                                }
+                                int n = done.incrementAndGet();
+                                if (status != null && n % 5 == 0) {
+                                    status.accept(Lang.tf("正在下载 Java 运行时 %d / %d", n, total));
+                                }
+                                if (progress != null && n % 5 == 0 && total > 0) {
+                                    progress.accept(Math.min(0.95, 0.90 * n / total));
                                 }
                             } catch (Exception e) {
                                 firstError.compareAndSet(null, e);
@@ -173,7 +182,8 @@ public final class JavaInstaller {
             if (status != null) status.accept(Lang.t("正在解压 Java 运行时…"));
             if (progress != null) progress.accept(0.96);
             deleteDir(backup);
-            if (Files.exists(target)) {
+            hadTarget = Files.exists(target);
+            if (hadTarget) {
                 try {
                     Files.move(target, backup, StandardCopyOption.REPLACE_EXISTING);
                 } catch (Exception e) {
@@ -204,11 +214,16 @@ public final class JavaInstaller {
             return exe;
         } catch (Exception e) {
             deleteDir(temp);
-            if (!installed && Files.exists(backup)) {
-                deleteDir(target);
-                try {
-                    Files.move(backup, target, StandardCopyOption.REPLACE_EXISTING);
-                } catch (Exception ignored) {
+            if (!installed) {
+                if (Files.exists(backup)) {
+                    deleteDir(target);
+                    try {
+                        Files.move(backup, target, StandardCopyOption.REPLACE_EXISTING);
+                    } catch (Exception ignored) {
+                    }
+                } else if (!hadTarget) {
+                    // 没有旧版本可回滚时删掉半成品
+                    deleteDir(target);
                 }
             }
             throw e;
@@ -255,7 +270,6 @@ public final class JavaInstaller {
             try {
                 Path exe = install(component, s -> {
                     task.stage = s;
-                    Tasks.INSTANCE.changed();
                 }, () -> task.canceled);
                 task.state = Tasks.State.DONE;
                 task.progress = 1;
@@ -272,7 +286,6 @@ public final class JavaInstaller {
                 task.error = e.getMessage();
                 javafx.application.Platform.runLater(() -> win.toast("Java 下载失败", e.getMessage(), 3));
             } finally {
-                Tasks.INSTANCE.changed();
             }
         }, "TCL-JavaInstall");
         t.setDaemon(true);

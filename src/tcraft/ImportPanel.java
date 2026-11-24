@@ -125,10 +125,10 @@ public final class ImportPanel extends StackPane {
         busy = true;
         setVisible(true);
         setPickOnBounds(true);
-        title.setText(heading);
+        title.setText(Lang.t(heading));
         subtitle.setText(target);
-        step.setText("准备导入");
-        count.setText(total > 0 ? "0 / " + total : "正在读取");
+        step.setText(Lang.t("准备导入"));
+        count.setText(total > 0 ? "0 / " + total : Lang.t("正在读取"));
         percent.setText("0 %");
         progress.set(0);
         barBox.setVisible(total > 0);
@@ -170,9 +170,9 @@ public final class ImportPanel extends StackPane {
         }
         double value = total <= 0 ? 0 : Math.min(1, done / (double) total);
         progress.set(value);
-        count.setText(total > 0 ? done + " / " + total : "正在读取");
+        count.setText(total > 0 ? done + " / " + total : Lang.t("正在读取"));
         percent.setText(Math.round(value * 100) + " %");
-        step.setText(text == null ? "" : text);
+        step.setText(text == null ? "" : Lang.t(text));
         barBox.setVisible(total > 0);
         barBox.setManaged(total > 0);
     }
@@ -184,12 +184,21 @@ public final class ImportPanel extends StackPane {
             return;
         }
         progress.set(1);
-        count.setText("完成");
+        count.setText(Lang.t("完成"));
         percent.setText("100 %");
-        step.setText(text == null ? "" : text);
+        step.setText(text == null ? "" : Lang.t(text));
         loading.stop();
         PauseTransition wait = new PauseTransition(Duration.millis(650));
-        wait.setOnFinished(e -> close(after));
+        wait.setOnFinished(e -> {
+            close(after);
+            Threads.start("TCL-Memory", () -> {
+                try {
+                    Thread.sleep(2000);
+                } catch (InterruptedException ignored) {
+                }
+                Memory.trim();
+            });
+        });
         wait.play();
     }
 

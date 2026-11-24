@@ -23,7 +23,10 @@ public final class Isolation {
         if (!on(ins)) return base;
         String version = ins.version == null ? "" : ins.version.trim();
         if (version.isEmpty()) return base;
-        return base.resolve("versions").resolve(version);
+        Path versions = base.resolve("versions").normalize();
+        Path run = versions.resolve(version).normalize();
+        if (run.equals(versions) || !run.startsWith(versions)) return base;
+        return run;
     }
 
     public static boolean on(Data.Instance ins) {

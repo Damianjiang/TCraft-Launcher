@@ -20,11 +20,11 @@ public final class Skins {
 
     public static String save(String accountName, byte[] png) throws IOException {
         int[] size = pngSize(png);
-        if (size == null) throw new IOException("皮肤文件不是有效的 PNG 图片");
+        if (size == null) throw new IOException(Lang.t("皮肤文件不是有效的 PNG 图片"));
         int w = size[0], h = size[1];
         // 解码前先拒超大 PNG
         if (w < 64 || w % 64 != 0 || (h != w && h != w / 2) || (long) w * h > 2048L * 2048L) {
-            throw new IOException("皮肤图片尺寸无效（" + w + "×" + h + "，应为 64×32、64×64 或它们的整数倍）");
+            throw new IOException(Lang.tf("皮肤图片尺寸无效（%d×%d，应为 64×32、64×64 或它们的整数倍）", w, h));
         }
         String safe = safeName(accountName);
         Path dir = Theme.skinDir();

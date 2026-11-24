@@ -1,6 +1,5 @@
 package tcraft;
 
-import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -328,7 +327,7 @@ public final class MsAuth {
         if (resp.code == 401 || resp.code == 403) return refreshSkinWithToken(account);
         if (resp.code != 200) throw new Exception(Lang.tf("获取 Minecraft 档案失败：%s", errorText(resp)));
         String url = activeSkinUrl(parse(resp.body));
-        if (url.isEmpty()) throw new Exception("该账户当前没有皮肤");
+        if (url.isEmpty()) throw new Exception(Lang.t("该账户当前没有皮肤"));
         return Skins.download(account.name, url);
     }
 
@@ -341,7 +340,7 @@ public final class MsAuth {
         if (!r.name.isEmpty()) account.name = r.name;
         // 新令牌立即落盘
         Data.get().save();
-        if (r.skinUrl.isEmpty()) throw new Exception("该账户当前没有皮肤");
+        if (r.skinUrl.isEmpty()) throw new Exception(Lang.t("该账户当前没有皮肤"));
         return Skins.download(account.name, r.skinUrl);
     }
 
@@ -398,7 +397,6 @@ public final class MsAuth {
     }
 
     private static String errorText(Resp r) {
-        // 兜底文案先翻译再拼接
         if (r == null) return Lang.t("未知错误");
         Map<String, Object> m = lenientParse(r.body);
         String why = Json.str(m, "error_description", "");
@@ -459,9 +457,8 @@ public final class MsAuth {
 
     private static String readAll(InputStream in) throws Exception {
         if (in == null) return "";
-        try (InputStream i = in; ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            i.transferTo(out);
-            return out.toString(StandardCharsets.UTF_8);
+        try (InputStream i = in) {
+            return new String(Io.read(i, 4L * 1024 * 1024), StandardCharsets.UTF_8);
         }
     }
 

@@ -296,6 +296,13 @@ public class PageSetup implements Page {
                 i -> data.set("LaunchVisibility", VISIBILITY_VALUES[i]));
         comboRow(arg, "进程优先级", PRIORITY_ITEMS, data.getInt("LaunchPriority", 1),
                 i -> data.set("LaunchPriority", i));
+        if (Shell.windows()) {
+            Ui.Check gpu = Ui.checkBox("优先使用独立显卡", false);
+            gpu.setSelected(data.getBool("LaunchHighPerformanceGpu", false));
+            gpu.setOnAction(() -> data.set("LaunchHighPerformanceGpu", gpu.isSelected()));
+            arg.add(gpu);
+            arg.add(Ui.hint("仅 Windows 生效，写入系统显卡首选项；笔记本切换独显时可减少核显占用。", 0));
+        }
 
         int winType = data.getInt("LaunchWindowType", 1);
         HBox sizeRow = new HBox(6);
@@ -357,7 +364,7 @@ public class PageSetup implements Page {
         });
         initRam.setOnChanged(b -> {
             int v = (int) (Math.round(b / 256.0) * 256);
-            initVal.setText(v == 0 ? "自动" : v + " MB");
+            initVal.setText(v == 0 ? Lang.t("自动") : v + " MB");
             data.set("LaunchRamInitial", v);
         });
         HBox maxRow = new HBox(12, maxRam, maxVal);
@@ -474,7 +481,9 @@ public class PageSetup implements Page {
         textRow(adv, "类路径头部", "留空则不添加", data.get("LaunchAdvanceClasspathHead", ""),
                 s -> data.set("LaunchAdvanceClasspathHead", s));
         adv.add(directCheck("锁定内存分配（-Xms = -Xmx）", "LaunchAdvanceLockMemory", false));
-        adv.add(directCheck("显示控制台窗口（java.exe）", "LaunchAdvanceNoJavaw", false));
+        if (Shell.windows()) {
+            adv.add(directCheck("显示控制台窗口（java.exe）", "LaunchAdvanceNoJavaw", false));
+        }
         Ui.Check crash = Ui.checkBox("游戏异常退出时自动分析崩溃原因", false);
         crash.setSelected(data.crashAnalysisEnabled());
         crash.setOnAction(() -> {
@@ -533,7 +542,7 @@ public class PageSetup implements Page {
 
     private String initialRamLabel() {
         int v = data.getInt("LaunchRamInitial", 0);
-        return v == 0 ? "自动" : v + " MB";
+        return v == 0 ? Lang.t("自动") : v + " MB";
     }
 
     private void refreshMemoryDisplay(int gameRamMb) {
@@ -618,7 +627,7 @@ public class PageSetup implements Page {
     }
 
     private void buildUi(VBox page) {
-        header(page, "个性化", "主题、背景、声音与外观。每项改动即时生效。");
+        header(page, "个性化", "主题、背景、声音与外观。改动自动保存，外观类设置即时生效。");
         Ui.Card theme = addCard(page, "主题与配色");
         theme.add(Ui.label("主题的强调色会应用到按钮、滑块与选中态，切换后立即生效。", 12, Theme.gray2));
         if (!Theme.nextHiddenThemeName().isEmpty()) {
@@ -780,7 +789,7 @@ public class PageSetup implements Page {
             win.toast("字体已切换", i <= 0 ? Lang.t("跟随系统默认") : Theme.userFonts().get(i - 1), 1);
         });
         fontCard.add(Ui.settingRow("界面字体", fontCombo));
-        Label fontPreview = new Label("字体预览 The quick brown fox 中文 123");
+        Label fontPreview = new Label(Lang.t("字体预览 The quick brown fox 中文 123"));
         fontPreview.setFont(Theme.font(16));
         fontPreview.setWrapText(true);
         fontCard.add(fontPreview);
@@ -1104,6 +1113,10 @@ public class PageSetup implements Page {
         File file = chooser.showOpenDialog(win.stage);
         if (file == null) return;
         try {
+            if (Files.size(file.toPath()) > 8L * 1024 * 1024) {
+                win.toast("图片过大", "标题栏图片不能超过 8MB。", 3);
+                return;
+            }
             Path dir = Paths.get(data.gameDir, "TCL");
             Files.createDirectories(dir);
             Path dst = dir.resolve("Logo.png");
@@ -1124,6 +1137,10 @@ public class PageSetup implements Page {
         File file = chooser.showOpenDialog(win.stage);
         if (file == null) return;
         try {
+            if (Files.size(file.toPath()) > 32L * 1024 * 1024) {
+                win.toast("字体过大", "字体文件不能超过 32MB。", 3);
+                return;
+            }
             Files.createDirectories(Theme.fontDir());
             Path dst = Theme.fontDir().resolve(file.getName());
             Files.copy(file.toPath(), dst, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
@@ -1146,9 +1163,11 @@ public class PageSetup implements Page {
         int removed = 0;
         try {
             Path dir = Paths.get(data.gameDir, "TCL", "Pictures");
-            if (Files.isDirectory(dir)) {
+            if (Files.isDirectory(dir) && !Files.isSymbolicLink(dir)) {
                 try (var s = Files.list(dir)) {
-                    for (Path p : s.filter(Files::isRegularFile).toList()) {
+                    var it = s.filter(Files::isRegularFile).iterator();
+                    while (it.hasNext()) {
+                        Path p = it.next();
                         try {
                             Files.delete(p);
                             removed++;
@@ -1177,12 +1196,16 @@ public class PageSetup implements Page {
         int removed = 0;
         try {
             Path dir = Music.folder(data.gameDir);
-            if (Files.isDirectory(dir)) {
-                for (Path p : Music.tracks(data.gameDir)) {
-                    try {
-                        Files.delete(p);
-                        removed++;
-                    } catch (Exception ignored) {
+            if (Files.isDirectory(dir) && !Files.isSymbolicLink(dir)) {
+                try (var s = Files.list(dir)) {
+                    var it = s.filter(Files::isRegularFile).iterator();
+                    while (it.hasNext()) {
+                        Path p = it.next();
+                        try {
+                            Files.delete(p);
+                            removed++;
+                        } catch (Exception ignored) {
+                        }
                     }
                 }
             }
@@ -1231,12 +1254,16 @@ public class PageSetup implements Page {
         int removed = 0;
         try {
             Path dir = win.videoFolder();
-            if (Files.isDirectory(dir)) {
-                for (Path p : win.scanVideos()) {
-                    try {
-                        Files.delete(p);
-                        removed++;
-                    } catch (Exception ignored) {
+            if (Files.isDirectory(dir) && !Files.isSymbolicLink(dir)) {
+                try (var s = Files.list(dir)) {
+                    var it = s.filter(Files::isRegularFile).iterator();
+                    while (it.hasNext()) {
+                        Path p = it.next();
+                        try {
+                            Files.delete(p);
+                            removed++;
+                        } catch (Exception ignored) {
+                        }
                     }
                 }
             }
@@ -1271,11 +1298,14 @@ public class PageSetup implements Page {
 
         textRow(download, "最大线程数", "64", data.get("SystemMaxThreads", "64"), s -> data.set("SystemMaxThreads", s));
         textRow(download, "速度限制", "不限", data.get("SystemSpeedLimit", ""), s -> data.set("SystemSpeedLimit", s));
-        textRow(download, "缓存文件夹", "留空使用默认", data.get("SystemSystemCache", ""), s -> {
-            data.set("SystemSystemCache", s == null ? "" : s.trim());
-            RemoteImages.resetCacheDir();
+        TextField cacheField = textRow(download, "缓存文件夹", "留空使用默认", data.get("SystemSystemCache", ""), s -> {
+            // 路径检查通过后再写缓存
         });
-        download.add(Ui.hint("下载缓存与社区图片都会放到这里；改到剩余空间更大的盘可以避免 C 盘被占满。", 0));
+        cacheField.setOnAction(e -> commitCachePath(cacheField));
+        cacheField.focusedProperty().addListener((o, was, now) -> {
+            if (!now) commitCachePath(cacheField);
+        });
+        download.add(Ui.hint("下载缓存与社区图片都会放到这里；输入后按回车或点击其它位置生效，改到剩余空间更大的盘可以避免 C 盘被占满。", 0));
         Label target = Ui.label("请在 实例页左侧「文件夹列表」中更改下载目标文件夹。"
                 + "在某个文件夹或游戏版本上右键，即可选择打开对应文件夹。", 12, Theme.gray3);
         target.setWrapText(true);
@@ -1310,7 +1340,7 @@ public class PageSetup implements Page {
             Lang.setMode(index);
             data.set("SystemLanguage", index);
             win.rebuildUi();
-            win.toast("语言已切换", index == 3 ? Lang.langName() : Lang.langName(), 1);
+            win.toast("语言已切换", Lang.langName(), 1);
         });
         language.add(Ui.settingRow("语言", lang));
         FlowPane i18n = new FlowPane(10, 10);
@@ -1350,7 +1380,7 @@ public class PageSetup implements Page {
                     File file = chooser.showSaveDialog(win.stage);
                     if (file != null) {
                         boolean ok = data.exportConfig(file.toPath());
-                        win.toast(ok ? "导出完成" : "导出失败", file.getName(), ok ? 1 : 3);
+                        win.toast(ok ? "导出完成（不含令牌与认证服务器）" : "导出失败", file.getName(), ok ? 1 : 3);
                     }
                 }),
                 Ui.button("导入全部数据", Ui.BTN_NORMAL, () -> {
@@ -1362,8 +1392,10 @@ public class PageSetup implements Page {
                     Dialogs.confirm(win, "导入全部数据",
                             // 四段拼接用完整键
                             Lang.tf("将导入 %s 中的配置，同名设置会被文件内容覆盖。\n\n"
-                                    + "出于安全考虑，导入时不会应用启动前命令、Java 路径、下载源、代理，"
-                                    + "以及 JVM / 游戏附加参数，这些只能在本机手动设置。\n\n确认导入吗？",
+                                    + "出于安全考虑，导入时不会应用启动前命令、Java 路径、代理、镜像、"
+                                    + "更新源、自动进服、代理密码与第三方 Key、账号令牌与认证服务器，"
+                                    + "以及 JVM / 游戏附加参数，"
+                                    + "这些只能在本机手动设置。\n\n确认导入吗？",
                                     file.getName()),
                             () -> {
                                 boolean ok = data.importConfig(file.toPath());
@@ -1556,7 +1588,7 @@ public class PageSetup implements Page {
     private static void copyLangFile(Path target) throws Exception {
         Files.createDirectories(target.getParent());
         try (java.io.InputStream in = Theme.resStream("LangTables.txt")) {
-            if (in == null) throw new Exception("找不到语言表");
+            if (in == null) throw new Exception(Lang.t("找不到语言表"));
             Files.copy(in, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         }
     }
@@ -1597,7 +1629,8 @@ public class PageSetup implements Page {
             javafx.application.Platform.runLater(() -> {
                 win.refreshRight();
                 if (found.isEmpty()) {
-                    win.toast("没有找到 Java", "换个目录再试，或直接选择 bin\\java.exe", 3);
+                    win.toast("没有找到 Java", Lang.tf("换个目录再试，或直接选择 %s",
+                            Shell.windows() ? "bin\\java.exe" : "bin/java"), 3);
                 } else {
                     win.toast(Lang.tf("找到 %d 个 Java", found.size()), found.get(0).path(), 1);
                 }
@@ -1651,13 +1684,19 @@ public class PageSetup implements Page {
         ComboBox<String> level = Ui.combo(new String[]{"全部级别", "警告及错误", "仅错误"}, 0);
         TextField filter = Ui.field("搜索日志内容");
         Ui.Check autoScroll = Ui.checkBox("自动滚动", true);
-        HBox controls = new HBox(10, level, filter, autoScroll);
+        Ui.Check wrap = Ui.checkBox("自动换行", true);
+        wrap.setSelected(data.getBool("UiLogWrap", true));
+        HBox controls = new HBox(10, level, filter, autoScroll, wrap);
         controls.setAlignment(Pos.CENTER_LEFT);
         HBox.setHgrow(filter, Priority.ALWAYS);
         live.add(controls);
         TextArea view = new TextArea();
         view.setEditable(false);
-        view.setWrapText(true);
+        view.setWrapText(wrap.isSelected());
+        wrap.setOnAction(() -> {
+            view.setWrapText(wrap.isSelected());
+            data.set("UiLogWrap", wrap.isSelected());
+        });
         view.setPrefHeight(300);
         view.setStyle("-fx-font-family: 'Consolas', 'Microsoft YaHei UI'; -fx-font-size: 11.5;"
                 + " -fx-control-inner-background: transparent;"
@@ -1887,7 +1926,6 @@ public class PageSetup implements Page {
         actions.getChildren().addAll(
                 Ui.button("清理所选缓存", Ui.BTN_RED, () ->
                         Dialogs.confirm(win, "清理所选缓存",
-                                // 组合文案分段翻译
                                 Lang.t("将删除：\n· ") + (cacheCheck.isSelected() ? Lang.t("启动器下载缓存") : Lang.t("（跳过）启动器下载缓存"))
                                         + "\n· " + (logCheck.isSelected() ? Lang.t("临时日志文件") : Lang.t("（跳过）临时日志文件"))
                                         + "\n· " + (tempCheck.isSelected() ? Lang.t("临时文件（.tmp / .part）") : Lang.t("（跳过）临时文件"))
@@ -1983,7 +2021,9 @@ public class PageSetup implements Page {
         for (Path root : new Path[]{cacheDir, base}) {
             if (!Files.isDirectory(root)) continue;
             try (var s = Files.walk(root, 4)) {
-                for (Path p : s.filter(Files::isRegularFile).toList()) {
+                var it = s.filter(Files::isRegularFile).iterator();
+                while (it.hasNext()) {
+                    Path p = it.next();
                     boolean junk = isTempFile(p);
                     try {
                         if (Files.size(p) == 0 || Files.getLastModifiedTime(p).toMillis() < cutoff) junk = true;
@@ -2004,7 +2044,9 @@ public class PageSetup implements Page {
         if (!Files.isDirectory(cacheDir)) return 0;
         long freed = 0;
         try (var s = Files.walk(cacheDir, 4)) {
-            for (Path p : s.filter(Files::isRegularFile).filter(this::isTempFile).toList()) {
+            var it = s.filter(Files::isRegularFile).filter(this::isTempFile).iterator();
+            while (it.hasNext()) {
+                Path p = it.next();
                 freed += fileSize(p);
                 try {
                     Files.deleteIfExists(p);
@@ -2053,17 +2095,36 @@ public class PageSetup implements Page {
     private static java.util.List<String> deleteDirCollect(Path dir, java.util.List<String> failedSink) {
         if (!Files.isDirectory(dir)) return failedSink;
         Path running = Resources.jar(); // 运行中的 jar 被 JVM 锁定 跳过
-        try (var stream = Files.walk(dir)) {
-            for (Path p : stream.sorted(Comparator.reverseOrder()).toList()) {
-                try {
-                    Path name = p.getFileName();
-                    if (name != null && "TCraftLauncher.jar".equals(name.toString())) continue;
-                    if (running != null && p.toAbsolutePath().normalize().equals(running)) continue;
-                    Files.deleteIfExists(p);
-                } catch (Exception e) {
-                    failedSink.add(p.toString());
+        try {
+            Files.walkFileTree(dir, new java.nio.file.SimpleFileVisitor<Path>() {
+                @Override
+                public java.nio.file.FileVisitResult visitFile(Path p,
+                        java.nio.file.attribute.BasicFileAttributes attrs) {
+                    try {
+                        Path name = p.getFileName();
+                        if (name != null && "TCraftLauncher.jar".equals(name.toString())) {
+                            return java.nio.file.FileVisitResult.CONTINUE;
+                        }
+                        if (running != null && p.toAbsolutePath().normalize().equals(running)) {
+                            return java.nio.file.FileVisitResult.CONTINUE;
+                        }
+                        Files.deleteIfExists(p);
+                    } catch (Exception e) {
+                        failedSink.add(p.toString());
+                    }
+                    return java.nio.file.FileVisitResult.CONTINUE;
                 }
-            }
+
+                @Override
+                public java.nio.file.FileVisitResult postVisitDirectory(Path folder, java.io.IOException exc) {
+                    try {
+                        Files.deleteIfExists(folder);
+                    } catch (Exception e) {
+                        failedSink.add(folder.toString());
+                    }
+                    return java.nio.file.FileVisitResult.CONTINUE;
+                }
+            });
         } catch (Exception e) {
             failedSink.add(dir.toString() + "（目录遍历失败）");
         }
@@ -2071,15 +2132,23 @@ public class PageSetup implements Page {
     }
 
     private void deleteDir(Path dir) {
+        if (Files.isSymbolicLink(dir)) {
+            try {
+                Files.deleteIfExists(dir);
+            } catch (Exception ignored) {
+            }
+            return;
+        }
         deleteDirCollect(dir, new java.util.ArrayList<>());
     }
 
     private void deleteContents(Path dir) {
-        if (!Files.isDirectory(dir)) return;
+        if (!Files.isDirectory(dir) || Files.isSymbolicLink(dir)) return;
         try (var stream = Files.list(dir)) {
-            for (Path child : stream.toList()) {
+            var it = stream.iterator();
+            while (it.hasNext()) {
                 try {
-                    deleteDir(child);
+                    deleteDir(it.next());
                 } catch (Exception ignored) {
                 }
             }
@@ -2106,18 +2175,21 @@ public class PageSetup implements Page {
         javafx.animation.PauseTransition proxyApply =
                 new javafx.animation.PauseTransition(javafx.util.Duration.millis(400));
         proxyApply.setOnFinished(e -> data.applyProxy());
-        java.util.function.Consumer<String> touchProxy = v -> {
-            data.save();
-            proxyApply.playFromStart();
-        };
+        java.util.function.Consumer<String> touchProxy = v -> proxyApply.playFromStart();
         TextField host = textRow(proxy, "主机", "例如 127.0.0.1", data.get("SystemProxyHost", ""),
                 s -> { data.set("SystemProxyHost", s); touchProxy.accept(s); });
         TextField port = textRow(proxy, "端口", "7890", data.get("SystemProxyPort", "7890"),
                 s -> { data.set("SystemProxyPort", s); touchProxy.accept(s); });
         TextField user = textRow(proxy, "用户名", "可选", data.get("SystemProxyUser", ""),
                 s -> { data.set("SystemProxyUser", s); touchProxy.accept(s); });
-        TextField pass = textRow(proxy, "密码", "可选", data.get("SystemProxyPass", ""),
-                s -> { data.set("SystemProxyPass", s); touchProxy.accept(s); });
+        javafx.scene.control.PasswordField pass = Ui.password("可选");
+        pass.setText(data.get("SystemProxyPass", ""));
+        pass.setPrefWidth(260);
+        pass.textProperty().addListener((o, a, b) -> {
+            data.set("SystemProxyPass", b);
+            touchProxy.accept(b);
+        });
+        proxy.add(Ui.settingRow("密码", pass));
         Ui.Check forGame = directCheck("启动游戏时使用此代理", "SystemHttpProxyForGame", false);
         proxy.add(forGame);
         Label proxyNote = Ui.label("", 12, Theme.gray3);
@@ -2268,7 +2340,7 @@ public class PageSetup implements Page {
                 int value = FILE_SOURCES[sourceIndex[idx]];
                 data.set("SystemDownloadSource", value);
                 data.set("SystemVersionSource", sourceIndex[idx]);
-                win.toast("已应用", Lang.t("下载源已切换为 ") + sources[idx], 1);
+                win.toast("已应用", Lang.t("下载源已切换为 ") + Lang.t(sources[idx]), 1);
             }
             data.save();
         });
@@ -2358,7 +2430,6 @@ public class PageSetup implements Page {
                         new java.net.InetSocketAddress(host, Integer.parseInt(port)));
             }
         } catch (Exception e) {
-            // 返回串创建处翻译
             return Lang.tf("代理参数无效：%s", e.getMessage());
         }
         long start = System.currentTimeMillis();
@@ -2416,6 +2487,28 @@ public class PageSetup implements Page {
         field.textProperty().addListener((o, a, b) -> onChange.accept(b));
         card.add(Ui.settingRow(label, field));
         return field;
+    }
+
+    private void commitCachePath(TextField field) {
+        String typed = field.getText() == null ? "" : field.getText().trim();
+        data.set("SystemSystemCache", typed);
+        try {
+            Path actual = data.cacheDir();
+            if (!typed.isEmpty()) {
+                Path wanted = Paths.get(typed).toAbsolutePath().normalize();
+                if (!wanted.equals(actual.toAbsolutePath().normalize())) {
+                    // 非空且无缓存标记的目录不接管 防止清理缓存误删用户文件
+                    field.clear();
+                    data.set("SystemSystemCache", "");
+                    win.toast("缓存目录未启用", "该目录非空且不是缓存目录，已回退到默认目录。", 3);
+                }
+            }
+        } catch (Exception e) {
+            field.clear();
+            data.set("SystemSystemCache", "");
+            win.toast("缓存目录无效", "已回退到默认目录。", 3);
+        }
+        RemoteImages.resetCacheDir();
     }
 
     private Ui.SliderBar sliderRow(Ui.Card card, String label, double min, double max, double value,

@@ -221,7 +221,7 @@ public final class Dialogs {
             String n = (name.getText() == null ? "" : name.getText().replace("¨", "").trim());
             Runnable doAdd = () -> {
                 Data d = Data.get();
-                d.accounts.add(new Data.Account(n, Data.offlineUuid(n), selectedSkin, false));
+                d.accounts.add(new Data.Account(n, Data.offlineUuid(n), "Steve.png", false));
                 d.selectedAccount = d.accounts.size() - 1;
                 d.save();
                 win.refreshAccountBadge();
@@ -230,7 +230,6 @@ public final class Dialogs {
                 win.toast("已添加账户", n, 1);
             };
             if (!isValidMcName(n)) {
-                // 两段独立词条 分别翻译
                 confirm(win, "警告", Lang.t("离线模式账户用户名建议仅使用英文字符、数字以及下划线，")
                         + Lang.t("且长度不超过 16 个字符。确定要继续吗？"), doAdd);
                 return;
@@ -242,7 +241,7 @@ public final class Dialogs {
         name.textProperty().addListener((o, a, b) -> {
             boolean ok = b != null && !b.trim().isEmpty();
             loginBtn.setDisable(!ok);
-            error.setText(ok ? "" : "必填项");
+            error.setText(ok ? "" : Lang.t("必填项"));
         });
         HBox actions = new HBox(12);
         actions.setAlignment(Pos.CENTER_RIGHT);
@@ -304,7 +303,6 @@ public final class Dialogs {
             VBox card = msgCard("登录微软账号");
             VBox form = new VBox(10);
             form.setPadding(new Insets(15, 7, 0, 7));
-            // 拼接串先分段翻译
             form.getChildren().add(Ui.hint(Lang.t("这个版本没有内置微软登录凭据，开源版不含正版登录。")
                     + Lang.t("要用正版登录，请自行构建完整版并注入自己的 client id，构建说明见 README。"), 0));
             HBox actions = new HBox(12);
@@ -465,13 +463,18 @@ public final class Dialogs {
     }
 
     public static void yggdrasilCard(MainWindow win) {
+        yggdrasilCard(win, null);
+    }
+
+    public static void yggdrasilCard(MainWindow win, String presetServer) {
         VBox card = msgCard("登录第三方账户");
         final Data d = Data.get();
         VBox form = new VBox(8);
         form.setPadding(new Insets(15, 7, 0, 7));
         form.getChildren().add(Ui.hint("皮肤站 API 地址，一般以 /api/yggdrasil 结尾（如 LittleSkin）。", 0));
         TextField server = Ui.field("认证服务器，例如 https://littleskin.cn/api/yggdrasil");
-        server.setText("https://littleskin.cn/api/yggdrasil");
+        server.setText(presetServer == null || presetServer.isBlank()
+                ? "https://littleskin.cn/api/yggdrasil" : presetServer);
         server.setPrefHeight(32);
         TextField email = Ui.field("用户名");
         email.setPrefHeight(32);
@@ -480,6 +483,7 @@ public final class Dialogs {
         password.setFont(Theme.font(13));
         password.setPrefHeight(32);
         final StackPane[] lRef = new StackPane[1];
+        final java.util.concurrent.atomic.AtomicBoolean cancelled = new java.util.concurrent.atomic.AtomicBoolean();
         Runnable submitAction = () -> {
             String srv = (server.getText() == null ? "" : server.getText().trim());
             String usr = (email.getText() == null ? "" : email.getText().trim());
@@ -492,18 +496,22 @@ public final class Dialogs {
             lRef[0].setDisable(true);
             Thread worker = new Thread(() -> {
                 try {
+                    if (cancelled.get()) return;
                     Yggdrasil.Server auth = Yggdrasil.locate(srv);
                     Yggdrasil.Session session = Yggdrasil.authenticate(auth, usr, pwd,
                             java.util.UUID.randomUUID().toString());
+                    if (cancelled.get()) return;
                     Yggdrasil.Profile profile = session.selected;
                     if (profile == null) {
                         if (session.available.isEmpty()) {
                             throw new Yggdrasil.AuthException(0, "这个账号还没有游戏角色，请先在皮肤站创建角色");
                         }
                         profile = session.available.size() == 1
-                                ? session.available.get(0) : chooseProfile(win, session.available);
+                                ? session.available.get(0) : chooseProfile(win, session.available, cancelled::get);
                         if (profile == null) {
-                            javafx.application.Platform.runLater(() -> lRef[0].setDisable(false));
+                            javafx.application.Platform.runLater(() -> {
+                                if (!cancelled.get() && lRef[0] != null) lRef[0].setDisable(false);
+                            });
                             return;
                         }
                         Yggdrasil.Session picked = Yggdrasil.refresh(auth, session.accessToken,
@@ -520,6 +528,7 @@ public final class Dialogs {
                     final String fsite = auth.display();
                     final String fskin = fetchYggdrasilSkin(auth, profile);
                     javafx.application.Platform.runLater(() -> {
+                        if (cancelled.get()) return;
                         Data.Account a = new Data.Account(fname, fuuid, fskin, true);
                         a.accessToken = ftoken;
                         a.clientToken = fclient;
@@ -535,12 +544,15 @@ public final class Dialogs {
                     });
                 } catch (Yggdrasil.AuthException e) {
                     javafx.application.Platform.runLater(() -> {
+                        if (cancelled.get()) return;
                         win.toast("登录失败", e.getMessage(), 3);
-                        lRef[0].setDisable(false);
+                        if (lRef[0] != null) lRef[0].setDisable(false);
                     });
                 } catch (Exception e) {
-                    javafx.application.Platform.runLater(() -> lRef[0].setDisable(false));
-                    Errors.error("第三方 Yggdrasil 登录失败", e);
+                    javafx.application.Platform.runLater(() -> {
+                        if (!cancelled.get() && lRef[0] != null) lRef[0].setDisable(false);
+                    });
+                    if (!cancelled.get()) Errors.error("第三方 Yggdrasil 登录失败", e);
                 }
             }, "TCL-Ygg");
             worker.setDaemon(true);
@@ -551,20 +563,35 @@ public final class Dialogs {
         server.setOnAction(e -> submitAction.run());
         email.setOnAction(e -> submitAction.run());
         password.setOnAction(e -> submitAction.run());
-        HBox actions = new HBox();
+        card.addEventFilter(javafx.scene.input.DragEvent.DRAG_OVER, AuthlibInjectorDnD.dragOverHandler());
+        card.addEventFilter(javafx.scene.input.DragEvent.DRAG_DROPPED, AuthlibInjectorDnD.dragDroppedHandler(url -> {
+            server.setText(url);
+            if (!email.getText().isBlank() && !password.getText().isEmpty()) {
+                submitAction.run();
+            } else {
+                email.requestFocus();
+            }
+        }));
+        HBox actions = new HBox(8);
         actions.setAlignment(Pos.CENTER_RIGHT);
-        actions.getChildren().add(login);
+        actions.getChildren().addAll(Ui.button("取消", Ui.BTN_NORMAL, win::closeModal), login);
         form.getChildren().addAll(server, email, password, actions);
         card.getChildren().add(form);
         win.showModal(card);
+        win.setModalCloseHook(() -> cancelled.set(true));
     }
 
-    private static Yggdrasil.Profile chooseProfile(MainWindow win, java.util.List<Yggdrasil.Profile> list)
+    private static Yggdrasil.Profile chooseProfile(MainWindow win, java.util.List<Yggdrasil.Profile> list,
+                                                     java.util.function.BooleanSupplier cancelled)
             throws InterruptedException {
         java.util.concurrent.atomic.AtomicReference<Yggdrasil.Profile> picked =
                 new java.util.concurrent.atomic.AtomicReference<>();
         java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
         javafx.application.Platform.runLater(() -> {
+            if (cancelled.getAsBoolean()) {
+                latch.countDown();
+                return;
+            }
             VBox card = msgCard("选择角色");
             VBox box = new VBox(8);
             box.setPadding(new Insets(15, 7, 0, 7));
@@ -584,11 +611,19 @@ public final class Dialogs {
             actions.setAlignment(Pos.CENTER_RIGHT);
             box.getChildren().add(actions);
             card.getChildren().add(box);
+            // 顶掉登录弹窗时不要触发登录取消
+            win.setModalCloseHook(null);
             win.showModal(card);
             // 遮罩/ESC 关闭也放行
             win.setModalCloseHook(latch::countDown);
         });
         latch.await(120, java.util.concurrent.TimeUnit.SECONDS);
+        if (picked.get() == null) {
+            javafx.application.Platform.runLater(() -> {
+                win.setModalCloseHook(null);
+                if (win.hasOpenModal()) win.closeModal();
+            });
+        }
         return picked.get();
     }
 
@@ -625,10 +660,11 @@ public final class Dialogs {
         linkRow.setAlignment(Pos.CENTER_LEFT);
         linkRow.getChildren().addAll(Ui.label("没有账号？", 12, Theme.gray2), link);
         final StackPane[] lRef = new StackPane[1];
+        final java.util.concurrent.atomic.AtomicBoolean cancelled = new java.util.concurrent.atomic.AtomicBoolean();
         StackPane login = Ui.button("登录并添加", Ui.BTN_HIGHLIGHT, () -> {
             String c = normalizeNideCode(code.getText());
             String usr = (email.getText() == null ? "" : email.getText().trim());
-            String pwd = password.getText() == null ? "" : password.getText().trim();
+            String pwd = password.getText() == null ? "" : password.getText();
             if (c.isEmpty() || usr.isEmpty() || pwd.isEmpty()) {
                 win.toast("请完整填写", "服务器码、用户名与密码均不能为空。", 2);
                 return;
@@ -636,6 +672,7 @@ public final class Dialogs {
             lRef[0].setDisable(true);
             Thread worker = new Thread(() -> {
                 try {
+                    if (cancelled.get()) return;
                     Yggdrasil.Server auth = new Yggdrasil.Server(
                             "https://auth.mc-user.com:233/" + c + "/", "统一通行证");
                     Yggdrasil.Session session = Yggdrasil.authenticate(auth, usr, pwd,
@@ -646,13 +683,15 @@ public final class Dialogs {
                         session = Yggdrasil.refresh(auth, session.accessToken, session.clientToken, profile);
                         if (session.selected != null) profile = session.selected;
                     }
-                    final String fname = profile == null ? usr : profile.name;
-                    String uuid = profile == null ? "" : formatUuid(profile.id);
+                    if (profile == null) throw new Yggdrasil.AuthException(0, "这个账号还没有游戏角色，请先创建角色");
+                    final String fname = profile.name;
+                    String uuid = formatUuid(profile.id);
                     final String fuuid = uuid.isEmpty() ? Data.offlineUuid(fname) : uuid;
                     final String ftoken = session.accessToken;
                     final String fclient = session.clientToken;
                     final String fskin = fetchYggdrasilSkin(auth, profile);
                     javafx.application.Platform.runLater(() -> {
+                        if (cancelled.get()) return;
                         Data.Account a = new Data.Account(fname, fuuid, fskin, true);
                         a.accessToken = ftoken;
                         a.clientToken = fclient;
@@ -670,24 +709,28 @@ public final class Dialogs {
                     });
                 } catch (Yggdrasil.AuthException e) {
                     javafx.application.Platform.runLater(() -> {
+                        if (cancelled.get()) return;
                         win.toast("登录失败", e.getMessage(), 3);
-                        lRef[0].setDisable(false);
+                        if (lRef[0] != null) lRef[0].setDisable(false);
                     });
                 } catch (Exception e) {
-                    javafx.application.Platform.runLater(() -> lRef[0].setDisable(false));
-                    Errors.error("统一通行证登录失败", e);
+                    javafx.application.Platform.runLater(() -> {
+                        if (!cancelled.get() && lRef[0] != null) lRef[0].setDisable(false);
+                    });
+                    if (!cancelled.get()) Errors.error("统一通行证登录失败", e);
                 }
             }, "TCL-Nide-Login");
             worker.setDaemon(true);
             worker.start();
         });
         lRef[0] = login;
-        HBox actions = new HBox();
+        HBox actions = new HBox(8);
         actions.setAlignment(Pos.CENTER_RIGHT);
-        actions.getChildren().add(login);
+        actions.getChildren().addAll(Ui.button("取消", Ui.BTN_NORMAL, win::closeModal), login);
         form.getChildren().addAll(code, email, password, linkRow, actions);
         card.getChildren().add(form);
         win.showModal(card);
+        win.setModalCloseHook(() -> cancelled.set(true));
     }
 
     private static String normalizeNideCode(String raw) {
@@ -705,11 +748,12 @@ public final class Dialogs {
         if (cut >= 0) s = s.substring(0, cut);
         int q = s.indexOf('?');
         if (q >= 0) s = s.substring(0, q);
-        return s.trim();
+        return s.trim().replaceAll("[^A-Za-z0-9._-]", "");
     }
 
     private static String importLocalSkin(String playerName, java.nio.file.Path source) throws Exception {
-        if (!java.nio.file.Files.isRegularFile(source)) throw new Exception("皮肤文件不存在");
+        if (!java.nio.file.Files.isRegularFile(source)) throw new Exception(Lang.t("皮肤文件不存在"));
+        if (java.nio.file.Files.size(source) > 8L * 1024 * 1024) throw new Exception(Lang.t("皮肤文件过大"));
         return Skins.save(playerName, java.nio.file.Files.readAllBytes(source));
     }
 
@@ -727,8 +771,6 @@ public final class Dialogs {
         body.setPadding(new Insets(15, 7, 0, 7));
 
         final int[] type = {0};
-        final String[] pName = {readonly ? account.name : ""};
-        final String[] pApi = {""};
         final String[] skinRes = {account.skin == null ? "" : account.skin};
         final int[] ticket = {0};
 
@@ -745,8 +787,8 @@ public final class Dialogs {
         TextField nameField = Ui.field(readonly ? "玩家名" : "玩家名 / 角色名");
         TextField apiField = Ui.field("皮肤站地址，例如 https://littleskin.cn/csl");
         hide(apiField);
-        StackPane fetchBtn = Ui.button("获取皮肤", Ui.BTN_THEME, () -> fetchSource(win, type, pName, pApi, nameField, apiField,
-                skinRes, ticket, viewer, readonly, account));
+        StackPane fetchBtn = Ui.button("获取皮肤", Ui.BTN_THEME, () -> fetchSource(win, type, nameField, apiField,
+                skinRes, ticket, viewer, account));
         VBox inputArea = new VBox(6);
         inputArea.setPadding(new Insets(8, 10, 10, 10));
         inputArea.setBackground(Ui.fill(Theme.fieldBg, 4));
@@ -799,7 +841,7 @@ public final class Dialogs {
                     Ui.button("确定", Ui.BTN_HIGHLIGHT, () -> {
                         if (skinRes[0].isEmpty()) {
                             Errors.error("还没有可用的皮肤预览",
-                                    new IllegalStateException("先选择一个来源并获取成功后，再点「确定」。"),
+                                    new IllegalStateException(Lang.t("先选择一个来源并获取成功后，再点「确定」。")),
                                     Errors.Behavior.ALERT);
                             return;
                         }
@@ -904,21 +946,19 @@ public final class Dialogs {
         viewer.setSkinFile(res);
     }
 
-    private static void fetchSource(MainWindow win, int[] type, String[] pName, String[] pApi,
+    private static void fetchSource(MainWindow win, int[] type,
                                     javafx.scene.control.TextField nameField,
                                     javafx.scene.control.TextField apiField,
                                     String[] skinRes, int[] ticket, Skin3D viewer,
-                                    boolean readonly, Data.Account account) {
+                                    Data.Account account) {
         String who = nameField.getText() == null ? "" : nameField.getText().trim();
         if (who.isEmpty()) {
             Errors.error("缺少玩家名",
-                    new IllegalArgumentException("请先填写玩家名 / 角色名再获取皮肤。"),
+                    new IllegalArgumentException(Lang.t("请先填写玩家名 / 角色名再获取皮肤。")),
                     Errors.Behavior.ALERT);
             return;
         }
-        pName[0] = who;
         String api = apiField.getText() == null ? "" : apiField.getText().trim();
-        pApi[0] = type[0] == 5 ? "https://littleskin.cn" : api;
         int t = type[0];
         int my = ++ticket[0];
         Thread worker = new Thread(() -> {
@@ -959,7 +999,7 @@ public final class Dialogs {
         }
         String profile = httpGetString("https://sessionserver.mojang.com/session/minecraft/profile/" + uuid);
         String skinUrl = parseMojangSkinUrl(profile);
-        if (skinUrl.isEmpty()) throw new Exception("没取到皮肤地址，该玩家可能用的是默认皮肤");
+        if (skinUrl.isEmpty()) throw new Exception(Lang.t("没取到皮肤地址，该玩家可能用的是默认皮肤"));
         if (skinUrl.contains("http://")) skinUrl = skinUrl.replace("http://", "https://");
         return Skins.download(accountName, skinUrl);
     }
@@ -971,10 +1011,10 @@ public final class Dialogs {
                     + java.net.URLEncoder.encode(name, "UTF-8"));
         } catch (Exception e) {
             // 不存在的玩家返回 204 Http 会抛异常
-            throw new Exception("查不到这个正版玩家：" + name + "（ID 不存在或网络不通）");
+            throw new Exception(Lang.t("查不到这个正版玩家：") + name + Lang.t("（ID 不存在或网络不通）"));
         }
         String id = Json.str(Json.obj(Json.parse(j)), "id", "");
-        if (id.isEmpty()) throw new Exception("查不到这个正版玩家：" + name);
+        if (id.isEmpty()) throw new Exception(Lang.t("查不到这个正版玩家：") + name);
         return id;
     }
 
@@ -986,7 +1026,7 @@ public final class Dialogs {
                 if (!"textures".equals(Json.str(p, "name", ""))) continue;
                 String b64 = Json.str(p, "value", "");
                 if (b64.isEmpty()) continue;
-                String decoded = new String(java.util.Base64.getDecoder().decode(b64),
+                String decoded = new String(Base64Safe.decode(b64),
                         java.nio.charset.StandardCharsets.UTF_8);
                 Map<String, Object> tx = Json.obj(Json.obj(Json.parse(decoded), "textures"));
                 String url = Json.str(Json.obj(tx, "SKIN"), "url", "");
@@ -1007,7 +1047,7 @@ public final class Dialogs {
         String body = httpGetString(cslBase + "/" + java.net.URLEncoder.encode(who, "UTF-8") + ".json");
         Map<String, Object> json = Json.obj(Json.parse(body));
         if (Json.str(json, "username", "").isEmpty()) {
-            throw new Exception("皮肤站上没有这个角色：" + who);
+            throw new Exception(Lang.t("皮肤站上没有这个角色：") + who);
         }
         Map<String, Object> textures = Json.obj(json, "textures");
         if (textures.isEmpty()) textures = Json.obj(json, "skins");
@@ -1026,7 +1066,7 @@ public final class Dialogs {
             else if (raw != null) url = Json.str(Json.obj(raw), "url", "");
         }
         if (url.isEmpty() && !hash.isEmpty()) url = cslBase + "/textures/" + hash;
-        if (url.isEmpty()) throw new Exception("皮肤站返回里没有皮肤地址，这个角色可能还没上传皮肤");
+        if (url.isEmpty()) throw new Exception(Lang.t("皮肤站返回里没有皮肤地址，这个角色可能还没上传皮肤"));
         return Skins.download(accountName, url);
     }
 
@@ -1063,8 +1103,6 @@ public final class Dialogs {
             return "Steve";
         }
     }
-
-    private static String selectedSkin = "Steve.png";
 
     private static String formatUuid(String u) {
         String s = (u == null ? "" : u.replace("-", ""));

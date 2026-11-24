@@ -31,7 +31,7 @@ public final class Music {
                     stream.filter(Files::isRegularFile).filter(p -> {
                         String n = p.getFileName().toString().toLowerCase();
                         return n.endsWith(".mp3") || n.endsWith(".wav") || n.endsWith(".m4a") || n.endsWith(".aac");
-                    }).sorted().forEach(FILES::add);
+                    }).limit(1000).sorted().forEach(FILES::add);
                 }
             }
         } catch (Exception ignored) {
@@ -88,24 +88,6 @@ public final class Music {
 
     public static int trackCount() {
         return FILES.size();
-    }
-
-    public static java.util.List<Path> tracks(String gameDir) {
-        java.util.List<Path> out = new ArrayList<>();
-        Path dir = folder(gameDir);
-        try {
-            if (Files.isDirectory(dir)) {
-                try (var stream = Files.list(dir)) {
-                    stream.filter(Files::isRegularFile).filter(p -> {
-                        String n = p.getFileName().toString().toLowerCase();
-                        return n.endsWith(".mp3") || n.endsWith(".wav")
-                                || n.endsWith(".m4a") || n.endsWith(".aac");
-                    }).sorted().forEach(out::add);
-                }
-            }
-        } catch (Exception ignored) {
-        }
-        return out;
     }
 
     public static boolean isPaused() {

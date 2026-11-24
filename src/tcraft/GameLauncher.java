@@ -50,21 +50,53 @@ public final class GameLauncher {
         }
     }
 
-    private static List<Map<String, Object>> readChain(Path game, String version) throws Exception {
-        List<Map<String, Object>> chain = new ArrayList<>();
+    // 版本 JSON 内的 id 也要当成不可信输入
+    private static Path safeVersionDir(Path game, String id) {
+        if (id == null || id.isBlank()) return null;
+        for (int i = 0; i < id.length(); i++) {
+            char c = id.charAt(i);
+            if (c < 32 || c == 127) return null;
+        }
+        if (id.contains("\\") || id.contains("/") || id.contains("..") || id.contains(":")) return null;
+        Path versions = game.resolve("versions").toAbsolutePath().normalize();
+        Path dir = versions.resolve(id).normalize();
+        return dir.startsWith(versions) && !dir.equals(versions) ? dir : null;
+    }
+
+    private static Path safeAssetIndex(Path game, String id) {
+        if (id == null || id.isBlank()) return null;
+        for (int i = 0; i < id.length(); i++) {
+            char c = id.charAt(i);
+            if (c < 32 || c == 127) return null;
+        }
+        if (id.contains("\\") || id.contains("/") || id.contains("..") || id.contains(":")) return null;
+        Path indexes = game.resolve("assets").resolve("indexes").toAbsolutePath().normalize();
+        Path file = indexes.resolve(id + ".json").normalize();
+        return file.startsWith(indexes) && !file.equals(indexes) ? file : null;
+    }
+
+    private static List<Map<String, Object>> readChain(Path game, String version) throws Exception {        List<Map<String, Object>> chain = new ArrayList<>();
         String current = version;
         java.util.Set<String> visited = new java.util.HashSet<>();
         while (current != null && !current.isEmpty()) {
             // 版本 ID 直接拿来拼路径 带分隔符或 .. 的都当伪造版本处理
-            if (current.contains("\\") || current.contains("/") || current.contains("..")) {
+            if (current.contains("\\") || current.contains("/") || current.contains("..") || current.contains(":")) {
                 throw new Exception(Lang.t("版本 ID 含非法字符：") + current);
+            }
+            for (int i = 0; i < current.length(); i++) {
+                char c = current.charAt(i);
+                if (c < 32 || c == 127) throw new Exception(Lang.t("版本 ID 含非法字符：") + current);
             }
             if (!visited.add(current) || visited.size() > 16) {
                 throw new Exception(Lang.t("版本继承链存在循环或过深：") + current);
             }
             Path p = game.resolve("versions").resolve(current).resolve(current + ".json");
             if (!Files.isRegularFile(p)) break;
-            Map<String, Object> json = Json.obj(Json.parse(Files.readString(p, StandardCharsets.UTF_8)));
+            String text;
+            try (java.io.InputStream in = Files.newInputStream(p)) {
+                text = new String(Io.read(in, 10L * 1024 * 1024), StandardCharsets.UTF_8);
+            }
+            Map<String, Object> json = Json.obj(Json.parse(text));
             chain.add(0, json);
             current = Json.str(json, "inheritsFrom", "");
         }
@@ -179,7 +211,7 @@ public final class GameLauncher {
         // 按 target 去重
         Map<Path, MissingFile> out = new java.util.LinkedHashMap<>();
         List<Map<String, Object>> chain = readChain(game, instance.version);
-        if (chain.isEmpty()) throw new Exception("版本 JSON 无效或不存在：" + instance.version);
+        if (chain.isEmpty()) throw new Exception(Lang.t("版本 JSON 无效或不存在：") + instance.version);
         List<String> allLibNames = new ArrayList<>();
         for (Map<String, Object> j : chain) {
             for (Object o : Json.arr(j.get("libraries"))) {
@@ -235,7 +267,8 @@ public final class GameLauncher {
         boolean clientOk = false;
         for (Map<String, Object> j : chain) {
             String id = Json.str(j, "id", "");
-            if (!id.isEmpty() && Files.isRegularFile(game.resolve("versions").resolve(id).resolve(id + ".jar"))) {
+            Path dir = safeVersionDir(game, id);
+            if (dir != null && Files.isRegularFile(dir.resolve(id + ".jar"))) {
                 clientOk = true;
                 break;
             }
@@ -243,12 +276,13 @@ public final class GameLauncher {
         if (!clientOk) {
             for (Map<String, Object> j : chain) {
                 String id = Json.str(j, "id", instance.version);
+                Path dir = safeVersionDir(game, id);
+                if (dir == null) continue;
                 Map<String, Object> client = Json.obj(Json.obj(j.get("downloads")).get("client"));
                 String url = Json.str(client, "url", "");
                 if (!url.isEmpty()) {
-                    out.putIfAbsent(game.resolve("versions").resolve(id).resolve(id + ".jar")
-                                    .toAbsolutePath().normalize(),
-                            new MissingFile(url, game.resolve("versions").resolve(id).resolve(id + ".jar"),
+                    out.putIfAbsent(dir.resolve(id + ".jar").toAbsolutePath().normalize(),
+                            new MissingFile(url, dir.resolve(id + ".jar"),
                                     (long) parseNum(Json.str(client, "size", "0"), 0), "客户端 " + id + ".jar",
                                     Json.str(client, "sha1", "")));
                     break;
@@ -259,11 +293,10 @@ public final class GameLauncher {
             Map<String, Object> assetIndex = Json.obj(j.get("assetIndex"));
             String id = Json.str(assetIndex, "id", "");
             String url = Json.str(assetIndex, "url", "");
-            if (!id.isEmpty() && !url.isEmpty()
-                    && !Files.isRegularFile(game.resolve("assets").resolve("indexes").resolve(id + ".json"))) {
-                out.putIfAbsent(game.resolve("assets").resolve("indexes").resolve(id + ".json")
-                                .toAbsolutePath().normalize(),
-                        new MissingFile(url, game.resolve("assets").resolve("indexes").resolve(id + ".json"),
+            Path file = safeAssetIndex(game, id);
+            if (file != null && !url.isEmpty() && !Files.isRegularFile(file)) {
+                out.putIfAbsent(file.toAbsolutePath().normalize(),
+                        new MissingFile(url, file,
                                 (long) parseNum(Json.str(assetIndex, "size", "0"), 0), "资源索引 " + id + ".json",
                                 Json.str(assetIndex, "sha1", "")));
                 break;
@@ -292,7 +325,7 @@ public final class GameLauncher {
         try {
             for (MissingFile f : files) {
                 futures.add(pool.submit(() -> {
-                    if (cancelled.getAsBoolean()) throw new java.util.concurrent.CancellationException("已取消");
+                    if (cancelled.getAsBoolean()) throw new java.util.concurrent.CancellationException(Lang.t("已取消"));
                     Downloader.downloadFileTo(null, f.url, f.target, f.desc, f.sha1);
                     int n = done.incrementAndGet();
                     progress.accept(n / (double) files.size());
@@ -339,6 +372,8 @@ public final class GameLauncher {
     // ≤1.12 options.txt 用 ANSI
     static java.nio.charset.Charset optionsCharset(Path options) {
         try {
+            // 正常 options.txt 只有几百 KB 超大文件不参与探测
+            if (Files.size(options) > 4L * 1024 * 1024) return java.nio.charset.StandardCharsets.UTF_8;
             byte[] raw = Files.readAllBytes(options);
             try {
                 java.nio.charset.StandardCharsets.UTF_8.newDecoder()
@@ -365,6 +400,7 @@ public final class GameLauncher {
         Path options = run.resolve("options.txt");
         if (!Files.isRegularFile(options)) return;
         try {
+            if (Files.size(options) > 4L * 1024 * 1024) return;
             java.nio.charset.Charset cs = optionsCharset(options);
             List<String> lines = Files.readAllLines(options, cs);
             boolean changed = false;
@@ -393,7 +429,7 @@ public final class GameLauncher {
         Data data = Data.get();
         String javaExe = resolvedJava;
         if (javaExe == null || javaExe.isEmpty() || !Files.isRegularFile(Paths.get(javaExe))) {
-            throw new Exception("未找到可用的 Java，自动下载 Java 也没有成功");
+            throw new Exception(Lang.t("未找到可用的 Java，自动下载 Java 也没有成功"));
         }
         boolean showConsole = data.getInstanceBool("Console", false)
                 || data.getBool("LaunchAdvanceNoJavaw", false);
@@ -404,6 +440,9 @@ public final class GameLauncher {
             Path w = Paths.get(javaExe.substring(0, javaExe.length() - 8) + "javaw.exe");
             if (Files.isRegularFile(w)) javaExe = w.toString();
         }
+        if (data.getBool("LaunchHighPerformanceGpu", false)) {
+            Shell.setHighPerformanceGpu(javaExe);
+        }
         Path game = gameDirOf(instance);
         Path run = runDirOf(instance);
         try {
@@ -411,14 +450,18 @@ public final class GameLauncher {
         } catch (Exception e) {
             throw new Exception(Lang.t("无法创建游戏目录：") + run, e);
         }
-        Path versionDir = game.resolve("versions").resolve(instance.version);
+        Path versions = game.resolve("versions").normalize();
+        Path versionDir = versions.resolve(instance.version == null ? "" : instance.version).normalize();
+        if (versionDir.equals(versions) || !versionDir.startsWith(versions)) {
+            throw new Exception(Lang.t("版本目录不合法"));
+        }
         applyGameLanguage(run);
         Path jsonPath = versionDir.resolve(instance.version + ".json");
         if (!Files.isRegularFile(jsonPath)) {
-            throw new Exception("未找到版本文件：" + jsonPath);
+            throw new Exception(Lang.t("未找到版本文件：") + jsonPath);
         }
         List<Map<String, Object>> chain = readChain(game, instance.version);
-        if (chain.isEmpty()) throw new Exception("版本 JSON 无效");
+        if (chain.isEmpty()) throw new Exception(Lang.t("版本 JSON 无效"));
 
         Map<String, Object> merged = new LinkedHashMap<>();
         for (Map<String, Object> j : chain) merged.putAll(j);
@@ -431,8 +474,8 @@ public final class GameLauncher {
         if (requiredJava > 0) {
             int currentJava = Data.javaMajor(javaExe);
             if (currentJava > 0 && currentJava < requiredJava) {
-                throw new Exception("Minecraft " + instance.version + " 需要 Java " + requiredJava
-                        + "，自动选择的 Java 为 " + currentJava);
+                throw new Exception("Minecraft " + instance.version + Lang.t(" 需要 Java ") + requiredJava
+                        + Lang.t("，自动选择的 Java 为 ") + currentJava);
             }
         }
 
@@ -485,7 +528,7 @@ public final class GameLauncher {
         if (!missingLibs.isEmpty()) {
             throw new Exception(Lang.t("缺少 ") + missingLibs.size()
                     + Lang.t(" 个依赖库（重新启动一次将自动补全）：")
-                    + String.join("、", missingLibs.subList(0, Math.min(3, missingLibs.size()))));
+                    + String.join(Lang.t("、"), missingLibs.subList(0, Math.min(3, missingLibs.size()))));
         }
 
         Path clientJar = null;
@@ -497,11 +540,11 @@ public final class GameLauncher {
                 break;
             }
         }
-        if (clientJar == null) throw new Exception("未找到客户端 jar，请先下载该版本");
+        if (clientJar == null) throw new Exception(Lang.t("未找到客户端 jar，请先下载该版本"));
         classpath.add(clientJar);
 
         String mainClass = Json.str(merged, "mainClass", "");
-        if (mainClass.isEmpty()) throw new Exception("版本 JSON 缺少主类");
+        if (mainClass.isEmpty()) throw new Exception(Lang.t("版本 JSON 缺少主类"));
         String assetIndex = Json.str(Json.obj(merged.get("assetIndex")), "id", "legacy");
         String assetsDir = prepareAssetsRoot(game, assetIndex).toAbsolutePath().toString();
         String classpathStr = String.join(File.pathSeparator, classpath.stream().map(Path::toString).toList());
@@ -563,6 +606,7 @@ public final class GameLauncher {
         int insRam = data.getInstanceInt("Ram", 0);
         int ramType = data.getInstanceInt("RamType", data.getInt("LaunchRamType", 0));
         int ram = Math.max(512, insRam > 0 ? insRam : data.getInt("LaunchRam", 4096));
+        ram = Math.min(131072, ram);
         if (ramType == 0) {
             long totalMb = physicalMemoryMb();
             ram = (int) Math.max(2048, Math.min(8192, totalMb / 4));
@@ -572,7 +616,7 @@ public final class GameLauncher {
             ram = (int) (Math.round(ram / 512.0) * 512);
         }
         int initialRam = data.getInstanceInt("RamInitial", data.getInt("LaunchRamInitial", 0));
-        if (initialRam > ram) initialRam = 0;
+        initialRam = Math.max(0, Math.min(ram, initialRam));
 
         int winType = data.getInstanceInt("WindowType", -1);
         if (winType < 0) winType = data.getInt("LaunchWindowType", 1);
@@ -594,6 +638,8 @@ public final class GameLauncher {
                 winH = 1080;
             }
         }
+        winW = Math.max(320, Math.min(16384, winW));
+        winH = Math.max(240, Math.min(16384, winH));
         boolean customResolution = (winType == 2 || winType == 3 || winType == 4)
                 && winW > 0 && winH > 0;
 
@@ -743,7 +789,11 @@ public final class GameLauncher {
             cmd.add("-cp");
             cmd.add(classpathStr);
         } else {
-            for (String arg : resolveArgs(jvmArgs, vars, features)) cmd.add(arg);
+            List<String> resolvedJvm = safeJvmArgs(resolveArgs(jvmArgs, vars, features));
+            resolvedJvm.add("-cp");
+            resolvedJvm.add(classpathStr);
+            resolvedJvm.add("-Djava.library.path=" + javaNativeFolder.toAbsolutePath());
+            for (String arg : resolvedJvm) cmd.add(arg);
         }
         String extraJvm = data.getInstance("JvmArgs", data.get("InstanceJvmArgs", data.get("LaunchJvmArgs", "")));
         if (!extraJvm.isEmpty()) {
@@ -918,10 +968,6 @@ public final class GameLauncher {
         return !lwjgl2 || lwjgl3;
     }
 
-    private static List<String> resolveArgs(List<Object> list, Map<String, String> vars) {
-        return resolveArgs(list, vars, java.util.Collections.emptyMap());
-    }
-
     private static List<String> resolveArgs(List<Object> list, Map<String, String> vars,
                                             Map<String, Boolean> features) {
         List<String> out = new ArrayList<>();
@@ -991,7 +1037,11 @@ public final class GameLauncher {
         Path indexFile = assets.resolve("indexes").resolve(assetId + ".json");
         if (!Files.isRegularFile(indexFile)) return assets;
         try {
-            Map<String, Object> index = Json.obj(Json.parse(Files.readString(indexFile, StandardCharsets.UTF_8)));
+            String text;
+            try (java.io.InputStream in = Files.newInputStream(indexFile)) {
+                text = new String(Io.read(in, 10L * 1024 * 1024), StandardCharsets.UTF_8);
+            }
+            Map<String, Object> index = Json.obj(Json.parse(text));
             boolean virtual = Json.bool(index, "virtual", false);
             boolean mapToResources = Json.bool(index, "map_to_resources", false);
             if (!virtual && !mapToResources) return assets;
@@ -1048,19 +1098,59 @@ public final class GameLauncher {
         }
     }
 
+    // 版本 JSON 的 JVM 参数不可信 只允许正常运行所需项
+    private static List<String> safeJvmArgs(List<String> args) {
+        List<String> out = new ArrayList<>();
+        for (int i = 0; i < args.size(); i++) {
+            String arg = args.get(i);
+            if (arg == null || arg.isEmpty()) continue;
+            String lower = arg.toLowerCase(java.util.Locale.ROOT);
+            if (lower.equals("-cp") || lower.equals("-classpath") || lower.equals("--class-path")) {
+                i++;
+                continue;
+            }
+            if (lower.startsWith("-cp=") || lower.startsWith("-classpath=")
+                    || lower.startsWith("--class-path=")) {
+                continue;
+            }
+            if (lower.equals("-jar") || lower.startsWith("-javaagent:") || lower.startsWith("-agentlib:")
+                    || lower.startsWith("-agentpath:") || lower.startsWith("-xrunjdwp")
+                    || lower.startsWith("-xbootclasspath") || lower.startsWith("-xx:onerror")
+                    || lower.startsWith("-xx:onoutofmemoryerror")
+                    || lower.startsWith("-djava.library.path=") || lower.startsWith("-djava.system.class.loader=")
+                    || lower.startsWith("-djava.security.manager") || lower.startsWith("-djava.endorsed.dirs=")
+                    || lower.startsWith("-djava.ext.dirs=") || lower.startsWith("-djava.class.path=")
+                    || lower.startsWith("-dsun.boot.class.path=")
+                    || lower.startsWith("-djava.security.properties=")
+                    || lower.startsWith("-djava.security.policy=")) {
+                continue;
+            }
+            out.add(arg);
+        }
+        return out;
+    }
+
     private static void extractNatives(Path jar, Path dir) throws Exception {
-        Files.createDirectories(dir);
+        Path base = dir.toAbsolutePath().normalize();
+        Files.createDirectories(base);
+        long total = 0;
+        int count = 0;
         try (ZipInputStream zip = new ZipInputStream(Files.newInputStream(jar))) {
             ZipEntry entry;
             while ((entry = zip.getNextEntry()) != null) {
+                if (++count > 4096) throw new Exception(Lang.t("natives 压缩包条目过多"));
                 if (entry.isDirectory()) continue;
                 String name = entry.getName();
                 if (name.contains("/") || name.contains("\\")) continue;
                 if (!name.endsWith(".dll") && !name.endsWith(".so") && !name.endsWith(".dylib")
                         && !name.endsWith(".jnilib")) continue;
-                Path out = dir.resolve(name).normalize();
-                if (!out.startsWith(dir)) throw new Exception("natives 压缩包含非法路径：" + name);
-                Files.copy(zip, out, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                Path out = base.resolve(name).normalize();
+                if (!out.startsWith(base)) throw new Exception(Lang.t("natives 压缩包含非法路径：") + name);
+                try (java.io.OutputStream os = Files.newOutputStream(out,
+                        java.nio.file.StandardOpenOption.CREATE,
+                        java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)) {
+                    total += Io.copy(zip, os, 256L * 1024 * 1024 - total);
+                }
             }
         }
     }
@@ -1076,10 +1166,13 @@ public final class GameLauncher {
                 Data.get().log("获取统一通行证下载信息失败，使用本地 jar：" + Log.describe(e));
                 return;
             }
-            throw new Exception("获取统一通行证下载信息失败：" + e.getMessage());
+            throw new Exception(Lang.t("获取统一通行证下载信息失败：") + e.getMessage());
         }
-        // 无 hash 用本地缓存
-        if (Files.isRegularFile(jar) && jarHash.isEmpty()) return;
+        // 无校验值时只允许使用本地缓存 不从网络拉取未校验的代码
+        if (jarHash.isEmpty()) {
+            if (Files.isRegularFile(jar)) return;
+            throw new Exception(Lang.t("统一通行证缺少校验值"));
+        }
         if (Files.isRegularFile(jar) && sha1Of(jar).equalsIgnoreCase(jarHash)) return;
         try {
             Modrinth.downloadUrl(probe, "https://login.mc-user.com:233/index/jar", jar, jarHash);
@@ -1088,7 +1181,7 @@ public final class GameLauncher {
                 Data.get().log("统一通行证 jar 下载失败，使用本地旧版本：" + Log.describe(e));
                 return;
             }
-            throw new Exception("下载统一通行证运行时失败：" + e.getMessage());
+            throw new Exception(Lang.t("下载统一通行证运行时失败：") + e.getMessage());
         }
     }
 
@@ -1106,11 +1199,14 @@ public final class GameLauncher {
         java.util.Map<String, Object> artifact = Json.obj(Json.obj(Json.parse(text)).get("artifact"));
         String sha1 = Json.str(Json.obj(artifact.get("checksums")), "sha1", "").toLowerCase();
         String url = Json.str(artifact, "downloadUrl", "");
-        if (Files.isRegularFile(jar) && sha1.isEmpty()) return;
+        if (sha1.isEmpty()) {
+            if (Files.isRegularFile(jar)) return;
+            throw new Exception(Lang.t("authlib-injector 缺少校验值"));
+        }
         if (Files.isRegularFile(jar) && sha1Of(jar).equalsIgnoreCase(sha1)) return;
         if (url.isEmpty()) {
             if (Files.isRegularFile(jar)) return;
-            throw new Exception("获取 authlib-injector 下载地址失败");
+            throw new Exception(Lang.t("获取 authlib-injector 下载地址失败"));
         }
         Modrinth.downloadUrl(probe, url, jar, sha1);
     }

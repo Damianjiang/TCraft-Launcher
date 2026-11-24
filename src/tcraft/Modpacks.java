@@ -30,12 +30,14 @@ public final class Modpacks {
         public String mcVersion = "";
         public String loader = "";
         public String loaderVersion = "";
+        public boolean genericLayout;
+        public boolean mmcLayout;
         public List<String> unsupportedLoaders = new ArrayList<>();
         public long sizeBytes;
         public String readError = "";
     }
 
-    // readError 供调用方区分文案 须恒等比较
+    // readError 用于区分文案 须恒等比较
     static String unrecognizedError() {
         return Lang.t("无法识别整合包格式（压缩包里没有清单文件）");
     }
@@ -53,17 +55,18 @@ public final class Modpacks {
             ZipEntry mmc = entry(zip, base + "mmc-pack.json");
             ZipEntry index = entry(zip, base + "modrinth.index.json");
             ZipEntry manifest = entry(zip, base + "manifest.json");
-            ZipEntry hmcl = entry(zip, base + "modpack.json");
+            ZipEntry genericPack = entry(zip, base + "modpack.json");
             if (mcbbs != null) {
                 info.typeName = "MCBBS";
                 parseMcbbs(readJson(zip, mcbbs), info);
             } else if (mmc != null) {
-                info.typeName = "MultiMC";
+                info.typeName = "通用整合包";
+                info.mmcLayout = true;
                 parseMmc(readJson(zip, mmc), info);
                 ZipEntry cfg = entry(zip, base + "instance.cfg");
                 if (cfg != null) {
                     try (InputStream in = zip.getInputStream(cfg)) {
-                        for (String line : new String(in.readAllBytes(), StandardCharsets.UTF_8).split("\n")) {
+                        for (String line : new String(Io.read(in, 1024L * 1024), StandardCharsets.UTF_8).split("\n")) {
                             if (line.startsWith("name=")) {
                                 info.name = line.substring(5).trim();
                                 break;
@@ -71,10 +74,11 @@ public final class Modpacks {
                         }
                     }
                 }
-            } else if (hmcl != null) {
-                info.typeName = "HMCL";
-                parseHmcl(readJson(zip, hmcl), info);
-                parseHmclPack(zip, base, info);
+            } else if (genericPack != null) {
+                info.typeName = "通用整合包";
+                info.genericLayout = true;
+                parseGenericPack(readJson(zip, genericPack), info);
+                parseGenericManifest(zip, base, info);
             } else if (index != null) {
                 info.typeName = "Modrinth";
                 parseModrinth(readJson(zip, index), info);
@@ -95,9 +99,13 @@ public final class Modpacks {
                 info.name = file.getFileName().toString().replaceAll("\\.(zip|mrpack|rar)$", "");
             }
             normalizeLoaderVersion(info);
+            if (!safePackVersion(info.mcVersion) || !safePackVersion(info.loaderVersion)) {
+                info.valid = false;
+                info.readError = Lang.t("整合包版本号包含非法字符");
+                return info;
+            }
             info.valid = !info.mcVersion.isEmpty();
         } catch (Exception e) {
-            // readError 创建处翻译
             info.readError = Lang.tf("压缩包损坏或读取失败：%s", e.getMessage() == null ? e.toString() : e.getMessage());
             Data.get().log("预读整合包失败：" + Log.describe(e));
         }
@@ -234,13 +242,13 @@ public final class Modpacks {
         }
     }
 
-    private static void parseHmcl(java.util.Map<String, Object> json, PackInfo info) {
+    private static void parseGenericPack(java.util.Map<String, Object> json, PackInfo info) {
         if (json == null) return;
         info.name = Json.str(json, "name", info.name);
         info.mcVersion = Json.str(json, "gameVersion", "").trim();
     }
 
-    private static void parseHmclPack(ZipFile zip, String base, PackInfo info) {
+    private static void parseGenericManifest(ZipFile zip, String base, PackInfo info) {
         try {
             ZipEntry pack = entry(zip, base + "minecraft/pack.json");
             if (pack == null) return;
@@ -310,7 +318,7 @@ public final class Modpacks {
                 info.loaderVersion = dash > 0 ? rest.substring(0, dash) : rest;
             }
         } catch (Exception e) {
-            Data.get().log("读取 HMCL pack.json 失败：" + Log.describe(e));
+            Data.get().log("读取整合包 pack.json 失败：" + Log.describe(e));
         }
     }
 
@@ -343,7 +351,6 @@ public final class Modpacks {
             } catch (Exception e) {
                 failTask(win, task, data, name, e);
             } finally {
-                Tasks.INSTANCE.changed();
             }
         }, "TCL-Modpack-Network-" + name);
         thread.setDaemon(true);
@@ -370,11 +377,18 @@ public final class Modpacks {
             } catch (Exception e) {
                 failTask(win, task, data, name, e);
             } finally {
-                Tasks.INSTANCE.changed();
             }
         }, "TCL-Modpack-Local-" + name);
         thread.setDaemon(true);
         thread.start();
+    }
+
+    // 版本号会拼进目录与下载地址 拒路径分隔与上跳
+    static boolean safePackVersion(String value) {
+        if (value == null || value.isEmpty()) return true;
+        if (value.length() > 64 || value.contains("..") || value.indexOf('/') >= 0
+                || value.indexOf('\\') >= 0 || value.indexOf(':') >= 0) return false;
+        return value.matches("[A-Za-z0-9._+~-]+");
     }
 
     static String instanceNameError(String name) {
@@ -384,6 +398,10 @@ public final class Modpacks {
         if (value.equals(".") || value.equals("..")) return "名称不合法。";
         for (char c : "\\/:*?\"<>|".toCharArray()) {
             if (value.indexOf(c) >= 0) return Lang.tf("名称不能包含字符：%s", c);
+        }
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c < 32 || c == 127) return Lang.t("名称不能包含控制字符。");
         }
         if (value.endsWith(".") || value.endsWith(" ")) return "名称不能以点或空格结尾。";
         String upper = value.toUpperCase(java.util.Locale.ROOT);
@@ -450,7 +468,7 @@ public final class Modpacks {
             ZipEntry index = entry(zip, base + "modrinth.index.json");
             ZipEntry manifest = entry(zip, base + "manifest.json");
             ZipEntry mmc = entry(zip, base + "mmc-pack.json");
-            ZipEntry hmcl = entry(zip, base + "modpack.json");
+            ZipEntry genericManifest = entry(zip, base + "modpack.json");
             PackInfo info = new PackInfo();
             List<String> contentDirs = new ArrayList<>();
             boolean isMcbbs = false;
@@ -460,15 +478,17 @@ public final class Modpacks {
                 mcbbsJson = readJson(zip, mcbbs);
                 parseMcbbs(mcbbsJson, info);
                 contentDirs.add(base + "overrides");
-            } else if (hmcl != null) {
-                info.typeName = "HMCL";
-                parseHmcl(readJson(zip, hmcl), info);
-                parseHmclPack(zip, base, info);
-                contentDirs.add(base + "minecraft");
             } else if (mmc != null) {
-                info.typeName = "MultiMC";
+                info.typeName = "通用整合包";
+                info.mmcLayout = true;
                 parseMmc(readJson(zip, mmc), info);
                 contentDirs.add(base + ".minecraft");
+            } else if (genericManifest != null) {
+                info.typeName = "通用整合包";
+                info.genericLayout = true;
+                parseGenericPack(readJson(zip, genericManifest), info);
+                parseGenericManifest(zip, base, info);
+                contentDirs.add(base.endsWith("minecraft/") ? base : base + "minecraft");
             } else if (index != null) {
                 parseModrinth(readJson(zip, index), info);
                 // client-overrides 优先于 overrides
@@ -488,26 +508,28 @@ public final class Modpacks {
                     contentDirs.add(base + "overrides");
                 }
             } else {
-                throw new Exception("无法识别整合包类型（缺少 modrinth.index.json / manifest.json / mcbbs.packmeta）");
+                throw new Exception(Lang.t("无法识别整合包类型（缺少 modrinth.index.json / manifest.json / mcbbs.packmeta）"));
             }
             normalizeLoaderVersion(info);
+            if (!safePackVersion(info.mcVersion) || !safePackVersion(info.loaderVersion)) {
+                throw new Exception(Lang.t("整合包版本号包含非法字符"));
+            }
             if (info.mcVersion.isEmpty()) {
-                throw new Exception(info.typeName + " 整合包未提供 Minecraft 版本信息");
+                throw new Exception(Lang.t("整合包未提供 Minecraft 版本信息"));
             }
             if (!info.unsupportedLoaders.isEmpty()) {
-                throw new Exception("该整合包使用了 TCL 不支持的加载器：" + String.join("、", info.unsupportedLoaders));
+                throw new Exception(Lang.t("该整合包使用了 TCL 不支持的加载器：") + String.join(Lang.t("、"), info.unsupportedLoaders));
             }
 
             task.stage = "解压整合包文件";
             task.progress = 0.05;
-            Tasks.INSTANCE.changed();
             extractContent(zip, tempDir, versionFolder, base, info, contentDirs);
             // 清包内危险设置
             sanitizeImportedInstanceSettings(versionFolder);
 
             if (index != null) {
                 downloadModrinthContent(win, zip, index, versionFolder, task);
-            } else if (info.typeName.equals("HMCL") || info.typeName.equals("MultiMC")) {
+            } else if (info.genericLayout || info.mmcLayout) {
                 // 这类包的内容全在覆盖目录里
                 task.progress = 0.6;
             } else if (isMcbbs) {
@@ -537,18 +559,24 @@ public final class Modpacks {
 
             String iconPath = "";
             java.util.List<String> iconCandidates = new ArrayList<>(java.util.List.of("icon.png", "pack.png", "logo.png", "icon.jpg", "logo.jpg"));
-            if (info.typeName.equals("MultiMC") && tempDir.resolve(base + "instance.cfg").toFile().exists()) {
-                for (String line : Files.readString(tempDir.resolve(base + "instance.cfg"), StandardCharsets.UTF_8).split("\n")) {
-                    if (line.startsWith("iconKey=") && !line.substring(8).isBlank()) {
-                        String key = safeIconName(line.substring(8));
-                        if (!key.isEmpty()) iconCandidates.add(0, key + ".png");
-                        break;
+            if (info.mmcLayout) {
+                Path tempBase = tempDir.toAbsolutePath().normalize();
+                Path cfg = tempBase.resolve(base + "instance.cfg").normalize();
+                if (cfg.startsWith(tempBase) && Files.isRegularFile(cfg)) {
+                    try (InputStream cin = Files.newInputStream(cfg)) {
+                        for (String line : new String(Io.read(cin, 1024L * 1024), StandardCharsets.UTF_8).split("\n")) {
+                            if (line.startsWith("iconKey=") && !line.substring(8).isBlank()) {
+                                String key = safeIconName(line.substring(8));
+                                if (!key.isEmpty()) iconCandidates.add(0, key + ".png");
+                                break;
+                            }
+                        }
                     }
                 }
             }
             for (String candidate : iconCandidates) {
                 Path p = versionFolder.resolve(candidate);
-                if (Files.isRegularFile(p)) {
+                if (Files.isRegularFile(p) && Files.size(p) <= 8L * 1024 * 1024) {
                     Path logoDir = versionFolder.resolve("TCL");
                     Files.createDirectories(logoDir);
                     Path logo = logoDir.resolve("Logo.png");
@@ -557,7 +585,7 @@ public final class Modpacks {
                     break;
                 }
                 Path fromTemp = tempDir.resolve(candidate);
-                if (Files.isRegularFile(fromTemp)) {
+                if (Files.isRegularFile(fromTemp) && Files.size(fromTemp) <= 8L * 1024 * 1024) {
                     Path logoDir = versionFolder.resolve("TCL");
                     Files.createDirectories(logoDir);
                     Path logo = logoDir.resolve("Logo.png");
@@ -567,8 +595,7 @@ public final class Modpacks {
                 }
             }
 
-            // desc 创建时翻译
-            String desc = info.typeName + Lang.t(" 整合包 · MC ") + info.mcVersion
+            String desc = info.typeName + Lang.t(" · MC ") + info.mcVersion
                     + (info.loader.isEmpty() ? "" : Lang.t("，") + info.loader + " " + info.loaderVersion);
             Data.Instance instance = new Data.Instance(instanceName, instanceName,
                     info.loader.isEmpty() ? "原版" : info.loader, info.loaderVersion, desc,
@@ -588,7 +615,6 @@ public final class Modpacks {
             task.stage = "安装游戏版本 " + info.mcVersion
                     + (info.loader.isEmpty() ? "" : " · " + info.loader);
             task.progress = 0.92;
-            Tasks.INSTANCE.changed();
 
             // 确保版本 json 存在
             String loader = info.loader.isEmpty() ? "原版" : info.loader;
@@ -641,6 +667,11 @@ public final class Modpacks {
         try {
             Path ini = versionFolder.resolve("TCL").resolve("Setup.ini");
             if (!Files.isRegularFile(ini)) return;
+            if (Files.size(ini) > 1024L * 1024) {
+                Files.deleteIfExists(ini);
+                Data.get().log("整合包自带实例设置文件过大，已删除");
+                return;
+            }
             List<String> lines = Files.readAllLines(ini, StandardCharsets.UTF_8);
             List<String> kept = new ArrayList<>();
             List<String> dropped = new ArrayList<>();
@@ -649,7 +680,9 @@ public final class Modpacks {
                 int eq = t.indexOf('=');
                 String key = eq > 0 ? t.substring(0, eq).trim().toLowerCase(java.util.Locale.ROOT) : "";
                 if (eq > 0 && (key.equals("precommand") || key.equals("precommandwait")
-                        || key.equals("jvmargs") || key.equals("gameargs"))) {
+                        || key.equals("jvmargs") || key.equals("gameargs")
+                        || key.equals("java") || key.equals("classpathhead")
+                        || key.equals("serverenter"))) {
                     dropped.add(key);
                     continue;
                 }
@@ -678,10 +711,9 @@ public final class Modpacks {
                                                 Path versionFolder, Tasks.Task task) throws Exception {
         java.util.Map<String, Object> json = readJson(zip, indexEntry);
         List<Object> files = Json.arr(json.get("files"));
-        int total = Math.max(1, files.size());
-        int done = 0;
+        List<DownloadJob> jobs = new ArrayList<>();
         for (Object o : files) {
-            if (task.canceled) throw new java.io.IOException("已取消");
+            if (task.canceled) throw new java.io.IOException(Lang.t("已取消"));
             java.util.Map<String, Object> f = Json.obj(o);
             java.util.Map<String, Object> env = Json.obj(f.get("env"));
             if (!env.isEmpty() && "unsupported".equalsIgnoreCase(Json.str(env, "client", ""))) continue;
@@ -698,19 +730,14 @@ public final class Modpacks {
             }
             List<String> urls = new ArrayList<>();
             for (Object u : Json.arr(f.get("downloads"))) urls.add(String.valueOf(u));
-            if (!Files.isRegularFile(target)) {
-                if (urls.isEmpty()) {
-                    throw new java.io.IOException(Lang.tf("整合包缺少文件下载地址：%s", relPath));
-                }
-                Files.createDirectories(target.getParent());
-                tryDownload(task, urls, target, sha1);
+            if (Downloader.existingDownloadValid(target, sha1)) continue;
+            if (urls.isEmpty()) {
+                throw new java.io.IOException(Lang.tf("整合包缺少文件下载地址：%s", relPath));
             }
-            done++;
-            task.progress = 0.15 + 0.6 * done / (double) total;
-            task.stage = "下载整合包内容 " + done + " / " + total;
-            task.remainingFiles = total - done;
-            Tasks.INSTANCE.changed();
+            Files.createDirectories(target.getParent());
+            jobs.add(new DownloadJob(urls, target, sha1));
         }
+        downloadAll(task, jobs, 0.15, 0.75);
     }
 
     private static void downloadCurseForgeContent(MainWindow win, java.util.Map<String, Object> manifest, Path versionFolder,
@@ -719,7 +746,6 @@ public final class Modpacks {
         List<Long> optional = new ArrayList<>();
         for (Object o : Json.arr(manifest.get("files"))) {
             java.util.Map<String, Object> f = Json.obj(o);
-            long projectId = (long) Json.num(f, "projectID", 0);
             long fileId = (long) Json.num(f, "fileID", 0);
             if (fileId <= 0) continue;
             boolean req = !"false".equalsIgnoreCase(Json.str(f, "required", "true"));
@@ -729,40 +755,38 @@ public final class Modpacks {
         all.addAll(optional);
         if (all.isEmpty()) return;
         List<Object> fileInfos = CurseForge.filesByIds(all);
-        if (fileInfos.size() < all.size()) {
-            java.util.Set<String> found = new java.util.HashSet<>();
+        if (!required.isEmpty()) {
+            java.util.Set<String> foundRequired = new java.util.HashSet<>();
             for (Object o : fileInfos) {
-                found.add(String.valueOf((long) Json.num(Json.obj(o), "id", -1)));
+                foundRequired.add(String.valueOf((long) Json.num(Json.obj(o), "id", -1)));
             }
-            List<Long> missing = new ArrayList<>();
-            for (Long id : all) {
-                if (!found.contains(String.valueOf(id))) missing.add(id);
+            List<Long> missingRequired = new ArrayList<>();
+            for (Long id : required) {
+                if (!foundRequired.contains(String.valueOf(id))) missingRequired.add(id);
             }
-            if (!missing.isEmpty()) {
-                logSkipped("整合包缺失以下文件（可能已被原作者删除）：" + missing);
+            if (!missingRequired.isEmpty()) {
+                logSkipped("整合包缺失以下必需文件（可能已被原作者删除）：" + missingRequired);
                 boolean go = askInBackground(win, "整合包内容缺失",
                         Lang.tf("未找到该整合包所需的 %d 个内容，它们可能已被原作者删除。\n"
-                                + "缺失这些内容可能导致整合包出现异常！是否继续安装？", missing.size()));
-                if (!go) throw new java.io.IOException("已取消");
+                                + "缺失这些内容可能导致整合包出现异常！是否继续安装？", missingRequired.size()));
+                if (!go) throw new java.io.IOException(Lang.t("已取消"));
             }
         }
         java.util.Set<Long> skipOptional = new java.util.HashSet<>();
         if (!optional.isEmpty()) {
-            boolean dl = askInBackground(win, "下载可选文件",
-                    Lang.tf("该整合包包含 %d 个标记为可选的文件，是否一并下载？", optional.size()));
-            if (!dl) skipOptional.addAll(optional);
+            skipOptional = askOptionalInBackground(win, fileInfos, optional);
+            if (skipOptional == null) throw new java.io.IOException(Lang.t("已取消"));
         }
         List<Object> installFiles = new ArrayList<>();
         for (Object o : fileInfos) {
             long fileId = (long) Json.num(Json.obj(o), "id", 0);
             if (!skipOptional.contains(fileId)) installFiles.add(o);
         }
-        int total = Math.max(1, installFiles.size());
-        int done = 0;
         int noUrl = 0;
+        List<DownloadJob> jobs = new ArrayList<>();
         java.util.Map<Long, Integer> classCache = new java.util.HashMap<>();
         for (Object o : installFiles) {
-            if (task.canceled) throw new java.io.IOException("已取消");
+            if (task.canceled) throw new java.io.IOException(Lang.t("已取消"));
             java.util.Map<String, Object> f = Json.obj(o);
             ResourceVersion rv = ResourceVersion.fromCurseForgeJson(f, "mod");
             if (rv.fileName.isEmpty()) continue;
@@ -770,7 +794,6 @@ public final class Modpacks {
                 // 作者禁止分发时不返回下载地址
                 noUrl++;
                 logSkipped("整合包内容没有下载地址：" + rv.fileName);
-                done++;
                 continue;
             }
             List<String> modules = new ArrayList<>();
@@ -789,12 +812,11 @@ public final class Modpacks {
                             try {
                                 return CurseForge.projectInfo(id).classId;
                             } catch (Exception e) {
-                                throw new RuntimeException(e.getMessage() == null ? "网络错误" : e.getMessage(), e);
+                                throw new RuntimeException(e.getMessage() == null ? Lang.t("网络错误") : e.getMessage(), e);
                             }
                         });
                     } catch (RuntimeException re) {
                         Throwable cause = re.getCause() != null ? re.getCause() : re;
-                        // task.error 创建处翻译
                         throw new java.io.IOException(Lang.tf("项目分类获取失败（id=%s）：%s", modId,
                                 cause.getMessage() == null ? Lang.t("网络错误") : cause.getMessage()), cause);
                     }
@@ -808,16 +830,11 @@ public final class Modpacks {
                 logSkipped("跳过写向 TCL 目录的整合包内容：" + target.getFileName());
                 continue;
             }
-            if (!Files.isRegularFile(target)) {
-                Files.createDirectories(target.getParent());
-                tryDownload(task, rv.downloadUrls, target, rv.hash);
-            }
-            done++;
-            task.progress = 0.15 + 0.6 * done / (double) total;
-            task.stage = "下载整合包内容 " + done + " / " + total;
-            task.remainingFiles = total - done;
-            Tasks.INSTANCE.changed();
+            if (Downloader.existingDownloadValid(target, rv.hash)) continue;
+            Files.createDirectories(target.getParent());
+            jobs.add(new DownloadJob(rv.downloadUrls, target, rv.hash));
         }
+        downloadAll(task, jobs, 0.15, 0.75);
         if (noUrl > 0 && win != null) {
             final int n = noUrl;
             javafx.application.Platform.runLater(() -> win.toast("整合包内容缺失",
@@ -827,10 +844,9 @@ public final class Modpacks {
 
     private static void downloadMcbbsContent(MainWindow win, java.util.Map<String, Object> json, Path versionFolder, Tasks.Task task) throws Exception {
         List<Object> files = Json.arr(json.get("files"));
-        int total = Math.max(1, files.size());
-        int done = 0;
+        List<DownloadJob> jobs = new ArrayList<>();
         for (Object o : files) {
-            if (task.canceled) throw new java.io.IOException("已取消");
+            if (task.canceled) throw new java.io.IOException(Lang.t("已取消"));
             java.util.Map<String, Object> f = Json.obj(o);
             java.util.Map<String, Object> source = Json.obj(f.get("source"));
             String url = Json.str(source, "url", "");
@@ -844,18 +860,15 @@ public final class Modpacks {
                 logSkipped("跳过写向 TCL 目录的整合包内容：" + relPath);
                 continue;
             }
-            if (!Files.isRegularFile(target)) {
-                if (url.isEmpty()) {
-                    throw new java.io.IOException(Lang.tf("整合包缺少文件下载地址：%s", relPath));
-                }
-                Files.createDirectories(target.getParent());
-                tryDownload(task, List.of(url), target, Json.str(hashes, "sha1", ""));
+            String sha1 = Json.str(hashes, "sha1", "");
+            if (Downloader.existingDownloadValid(target, sha1)) continue;
+            if (url.isEmpty()) {
+                throw new java.io.IOException(Lang.tf("整合包缺少文件下载地址：%s", relPath));
             }
-            done++;
-            task.progress = 0.15 + 0.6 * done / (double) total;
-            task.stage = "下载整合包内容 " + done + " / " + total;
-            Tasks.INSTANCE.changed();
+            Files.createDirectories(target.getParent());
+            jobs.add(new DownloadJob(List.of(url), target, sha1));
         }
+        downloadAll(task, jobs, 0.15, 0.75);
     }
 
     static String inferModuleTarget(List<String> modules, String fileName) {
@@ -893,11 +906,18 @@ public final class Modpacks {
             // 10 分钟超时按取消
             if (!latch.await(10, java.util.concurrent.TimeUnit.MINUTES)) {
                 alive.set(false);
-                Platform.runLater(() -> win.setModalCloseHook(null));
+                Platform.runLater(() -> {
+                    win.setModalCloseHook(null);
+                    if (win.hasOpenModal()) win.closeModal();
+                });
                 return false;
             }
         } catch (InterruptedException e) {
             alive.set(false);
+            Platform.runLater(() -> {
+                win.setModalCloseHook(null);
+                if (win.hasOpenModal()) win.closeModal();
+            });
             Thread.currentThread().interrupt();
             return false;
         }
@@ -949,6 +969,119 @@ public final class Modpacks {
         });
     }
 
+    // 返回未勾选的可选文件 id
+    private static java.util.Set<Long> askOptionalInBackground(MainWindow win, List<Object> fileInfos,
+                                                               List<Long> optional) {
+        java.util.Map<Long, String> names = new java.util.HashMap<>();
+        for (Object o : fileInfos) {
+            java.util.Map<String, Object> f = Json.obj(o);
+            long id = (long) Json.num(f, "id", 0);
+            if (id <= 0) continue;
+            String name = Json.str(f, "displayName", "");
+            if (name.isEmpty()) name = Json.str(f, "fileName", "");
+            if (name.isEmpty()) name = String.valueOf(id);
+            names.put(id, name);
+        }
+        List<Long> ids = new ArrayList<>();
+        for (Long id : optional) if (names.containsKey(id)) ids.add(id);
+        java.util.Set<Long> skipped = new java.util.HashSet<>(ids);
+        if (ids.isEmpty()) return skipped;
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicBoolean alive = new AtomicBoolean(true);
+        java.util.concurrent.atomic.AtomicReference<java.util.Set<Long>> result =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        showOptional(win, latch, result, alive, ids, names, 1);
+        try {
+            if (!latch.await(10, java.util.concurrent.TimeUnit.MINUTES)) {
+                alive.set(false);
+                Platform.runLater(() -> {
+                    win.setModalCloseHook(null);
+                    if (win.hasOpenModal()) win.closeModal();
+                });
+            }
+        } catch (InterruptedException e) {
+            alive.set(false);
+            Platform.runLater(() -> {
+                win.setModalCloseHook(null);
+                if (win.hasOpenModal()) win.closeModal();
+            });
+            Thread.currentThread().interrupt();
+        }
+        return result.get();
+    }
+
+    private static void showOptional(MainWindow win, CountDownLatch latch,
+                                     java.util.concurrent.atomic.AtomicReference<java.util.Set<Long>> result,
+                                     AtomicBoolean alive, List<Long> ids,
+                                     java.util.Map<Long, String> names, int attempt) {
+        Platform.runLater(() -> {
+            if (!alive.get()) {
+                latch.countDown();
+                return;
+            }
+            if (win.hasOpenModal()) {
+                if (attempt <= 0) {
+                    latch.countDown();
+                    return;
+                }
+                javafx.animation.PauseTransition retry =
+                        new javafx.animation.PauseTransition(javafx.util.Duration.seconds(3));
+                retry.setOnFinished(e -> showOptional(win, latch, result, alive, ids, names, attempt - 1));
+                retry.play();
+                return;
+            }
+            VBox card = new VBox(12);
+            card.setPadding(new Insets(20, 22, 16, 22));
+            card.setPrefWidth(480);
+            card.setMaxWidth(480);
+            card.setBackground(Ui.fill(Theme.dialogBg, 12));
+            card.setEffect(Theme.shadow(22, 4, 0.32, Theme.text));
+            javafx.scene.control.Label title = Ui.bold("选择可选文件", 17, Theme.text);
+            javafx.scene.control.Label body = Ui.label(
+                    Lang.tf("共 %d 个可选文件，取消勾选的不安装。", ids.size()), 12.5, Theme.gray1);
+            body.setWrapText(true);
+            VBox rows = new VBox(7);
+            java.util.Map<Long, javafx.scene.control.CheckBox> boxes = new java.util.LinkedHashMap<>();
+            for (Long id : ids) {
+                javafx.scene.control.CheckBox box = new javafx.scene.control.CheckBox(names.get(id));
+                box.setSelected(true);
+                box.setWrapText(true);
+                boxes.put(id, box);
+                rows.getChildren().add(box);
+            }
+            javafx.scene.control.ScrollPane scroll = new javafx.scene.control.ScrollPane(rows);
+            scroll.setFitToWidth(true);
+            scroll.setPrefHeight(Math.min(260, 34 * ids.size() + 12));
+            scroll.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
+            HBox tools = new HBox(8);
+            tools.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+            tools.getChildren().addAll(
+                    Ui.button("全选", Ui.BTN_NORMAL, () -> boxes.values().forEach(b -> b.setSelected(true))),
+                    Ui.button("全不选", Ui.BTN_NORMAL, () -> boxes.values().forEach(b -> b.setSelected(false))));
+            HBox actions = new HBox(10);
+            actions.setAlignment(javafx.geometry.Pos.CENTER_RIGHT);
+            actions.getChildren().addAll(
+                    Ui.button("取消", Ui.BTN_NORMAL, () -> {
+                        win.setModalCloseHook(null);
+                        win.closeModal();
+                        latch.countDown();
+                    }),
+                    Ui.button("安装", Ui.BTN_THEME, () -> {
+                        java.util.Set<Long> skip = new java.util.HashSet<>();
+                        for (java.util.Map.Entry<Long, javafx.scene.control.CheckBox> e : boxes.entrySet()) {
+                            if (!e.getValue().isSelected()) skip.add(e.getKey());
+                        }
+                        result.set(skip);
+                        win.setModalCloseHook(null);
+                        win.closeModal();
+                        latch.countDown();
+                    }));
+            card.getChildren().addAll(title, body, scroll, tools, actions);
+            win.showModal(card, false);
+            win.setModalCloseHook(latch::countDown);
+        });
+    }
+
     private static String baseFolder(ZipFile zip) {
         String[] markers = {"modrinth.index.json", "manifest.json", "mcbbs.packmeta",
                 "mmc-pack.json", "modpack.json", "instance.cfg"};
@@ -959,8 +1092,10 @@ public final class Modpacks {
             String name = entries.nextElement().getName().replace('\\', '/');
             String[] parts = name.split("/");
             if (parts.length == 2) {
+                String folder = parts[0];
+                if (folder.isEmpty() || folder.contains("..") || folder.contains(":")) continue;
                 for (String marker : markers) {
-                    if (parts[1].equals(marker)) return parts[0] + "/";
+                    if (parts[1].equals(marker)) return folder + "/";
                 }
             }
         }
@@ -1007,13 +1142,14 @@ public final class Modpacks {
     static void extractContent(ZipFile zip, Path tempDir, Path versionFolder, String base,
                                PackInfo info, List<String> contentDirs) throws Exception {
         extractZip(zip, tempDir);
+        Path tempBase = tempDir.toAbsolutePath().normalize();
         for (String dir : contentDirs) {
-            Path overrideHome = tempDir.resolve(dir).normalize();
-            if (!overrideHome.startsWith(tempDir)) {
-                throw new Exception("整合包的覆盖目录超出了解压目录，请向整合包作者反馈此问题！");
+            Path overrideHome = tempBase.resolve(dir).normalize();
+            if (!overrideHome.startsWith(tempBase)) {
+                throw new Exception(Lang.t("整合包的覆盖目录超出了解压目录，请向整合包作者反馈此问题！"));
             }
             if (!Files.isDirectory(overrideHome)) continue;
-            if ("HMCL".equals(info.typeName)) {
+            if (info.genericLayout) {
                 // pack.json 是清单 不是实例内容
                 copyDirectory(overrideHome, versionFolder, rel -> rel.equalsIgnoreCase("pack.json"));
             } else {
@@ -1023,8 +1159,10 @@ public final class Modpacks {
     }
 
     private static void extractZip(ZipFile zip, Path targetDir) throws java.io.IOException {
+        Path base = targetDir.toAbsolutePath().normalize();
         // 限制条目数与解压总量
         long totalBytes = 0;
+        long written = 0;
         int entries = 0;
         for (java.util.Enumeration<? extends ZipEntry> it = zip.entries(); it.hasMoreElements(); ) {
             ZipEntry e = it.nextElement();
@@ -1038,21 +1176,14 @@ public final class Modpacks {
                     throw new java.io.IOException(Lang.t("整合包解压后体积过大，已中止解压"));
                 }
             }
-            Path out = targetDir.resolve(e.getName().replace('\\', '/')).normalize();
-            if (!out.startsWith(targetDir)) continue;
+            Path out = base.resolve(e.getName().replace('\\', '/')).normalize();
+            if (!out.startsWith(base)) continue;
             if (e.isDirectory()) {
                 Files.createDirectories(out);
             } else {
                 Files.createDirectories(out.getParent());
                 try (InputStream in = zip.getInputStream(e); OutputStream outStream = Files.newOutputStream(out)) {
-                    long copied = in.transferTo(outStream);
-                    // 无尺寸条目按实写补算
-                    if (size <= 0) {
-                        totalBytes += copied;
-                        if (totalBytes > MAX_ZIP_BYTES) {
-                            throw new java.io.IOException(Lang.t("整合包解压后体积过大，已中止解压"));
-                        }
-                    }
+                    written += Io.copy(in, outStream, MAX_ZIP_BYTES - written);
                 }
             }
         }
@@ -1069,7 +1200,10 @@ public final class Modpacks {
             throws java.io.IOException {
         if (!Files.isDirectory(from)) return;
         try (var stream = Files.walk(from)) {
-            for (Path src : stream.toList()) {
+            var it = stream.iterator();
+            while (it.hasNext()) {
+                Path src = it.next();
+                if (Files.isSymbolicLink(src)) continue;
                 String rel = from.relativize(src).toString().replace('\\', '/');
                 if (!rel.isEmpty() && skip.test(rel)) continue;
                 Path dest = to.resolve(from.relativize(src).toString());
@@ -1090,23 +1224,129 @@ public final class Modpacks {
     }
 
     private static void deleteRecursive(Path dir) {
-        if (!Files.isDirectory(dir)) return;
-        try (var stream = Files.walk(dir)) {
-            for (Path p : stream.sorted(java.util.Comparator.reverseOrder()).toList()) {
-                try {
-                    Files.deleteIfExists(p);
-                } catch (Exception ignored) {
-                }
+        if (dir == null || !Files.exists(dir, java.nio.file.LinkOption.NOFOLLOW_LINKS)) return;
+        if (Files.isSymbolicLink(dir)) {
+            try {
+                Files.deleteIfExists(dir);
+            } catch (Exception ignored) {
             }
+            return;
+        }
+        try {
+            Files.walkFileTree(dir, new java.nio.file.SimpleFileVisitor<Path>() {
+                @Override
+                public java.nio.file.FileVisitResult visitFile(Path file,
+                        java.nio.file.attribute.BasicFileAttributes attrs) throws java.io.IOException {
+                    Files.deleteIfExists(file);
+                    return java.nio.file.FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public java.nio.file.FileVisitResult postVisitDirectory(Path folder, java.io.IOException exc)
+                        throws java.io.IOException {
+                    if (exc != null) throw exc;
+                    Files.deleteIfExists(folder);
+                    return java.nio.file.FileVisitResult.CONTINUE;
+                }
+            });
         } catch (Exception ignored) {
         }
     }
 
+    private static final class DownloadJob {
+        final List<String> urls;
+        final Path target;
+        final String sha1;
+
+        DownloadJob(List<String> urls, Path target, String sha1) {
+            this.urls = List.copyOf(urls);
+            this.target = target;
+            this.sha1 = sha1;
+        }
+    }
+
+    private static void downloadAll(Tasks.Task task, List<DownloadJob> jobs,
+                                    double from, double to) throws Exception {
+        if (task.canceled) throw new java.io.IOException(Lang.t("已取消"));
+        if (jobs.isEmpty()) {
+            task.progress = to;
+            task.remainingFiles = 0;
+            return;
+        }
+        if (jobs.size() > 50_000) throw new java.io.IOException(Lang.t("整合包文件数量过多"));
+        int threads = Math.max(1, Math.min(32, Math.min(jobs.size(),
+                Data.get().getInt("SystemMaxThreads", 64))));
+        task.threads = threads;
+        task.remainingFiles = jobs.size();
+        task.progress = from;
+        task.stage = "下载整合包内容 0 / " + jobs.size();
+        task.speed = "";
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(
+                threads, r -> {
+                    Thread t = new Thread(r, "TCL-Modpack");
+                    t.setDaemon(true);
+                    return t;
+                });
+        java.util.concurrent.atomic.AtomicInteger done = new java.util.concurrent.atomic.AtomicInteger();
+        java.util.concurrent.atomic.AtomicLong bytesDone = new java.util.concurrent.atomic.AtomicLong();
+        java.util.concurrent.atomic.AtomicReference<Exception> failure =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicBoolean stopping = new java.util.concurrent.atomic.AtomicBoolean();
+        List<java.util.concurrent.Future<?>> futures = new ArrayList<>();
+        long started = System.nanoTime();
+        try {
+            for (DownloadJob job : jobs) {
+                futures.add(pool.submit(() -> {
+                    if (task.canceled || stopping.get()) return;
+                    boolean ok = false;
+                    try {
+                        tryDownload(task, job.urls, job.target, job.sha1, false);
+                        ok = true;
+                    } catch (Exception e) {
+                        if (!task.canceled) {
+                            stopping.set(true);
+                            failure.compareAndSet(null, e);
+                        }
+                    } finally {
+                        if (ok) {
+                            try {
+                                bytesDone.addAndGet(Files.size(job.target));
+                            } catch (Exception ignored) {
+                            }
+                        }
+                        int n = done.incrementAndGet();
+                        task.remainingFiles = Math.max(0, jobs.size() - n);
+                        task.progress = from + (to - from) * n / jobs.size();
+                        task.stage = "下载整合包内容 " + n + " / " + jobs.size();
+                        long elapsed = Math.max(1, (System.nanoTime() - started) / 1_000_000);
+                        task.speed = Downloader.speed(bytesDone.get() * 1000 / elapsed);
+                    }
+                }));
+            }
+            for (java.util.concurrent.Future<?> f : futures) {
+                try {
+                    f.get();
+                } catch (Exception ignored) {
+                }
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+        if (task.canceled) throw new java.io.IOException(Lang.t("已取消"));
+        Exception err = failure.get();
+        if (err != null) throw err;
+    }
+
     private static void tryDownload(Tasks.Task task, List<String> urls, Path target, String sha1) throws Exception {
+        tryDownload(task, urls, target, sha1, true);
+    }
+
+    private static void tryDownload(Tasks.Task task, List<String> urls, Path target, String sha1,
+                                    boolean report) throws Exception {
         Exception last = null;
-        for (String url : urls) {
+        for (String url : Sources.rank(urls)) {
             try {
-                Modrinth.downloadUrl(task, url, target, sha1);
+                Modrinth.downloadUrl(task, url, target, sha1, report);
                 return;
             } catch (Exception e) {
                 if (task.canceled) throw e;
@@ -1114,7 +1354,7 @@ public final class Modpacks {
             }
         }
         if (last != null) throw last;
-        throw new java.io.IOException("没有可用的下载地址：" + target.getFileName());
+        throw new java.io.IOException(Lang.t("没有可用的下载地址：") + target.getFileName());
     }
 
     private static void logSkipped(Object msg) {

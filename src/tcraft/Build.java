@@ -12,10 +12,12 @@ public final class Build {
     static {
         Properties p = new Properties();
         try (InputStream in = Build.class.getResourceAsStream("/build.properties")) {
-            if (in == null) {
-                p.load(Build.class.getResourceAsStream("/tcraft/build.properties"));
-            } else {
+            if (in != null) {
                 p.load(in);
+            } else {
+                try (InputStream fallback = Build.class.getResourceAsStream("/tcraft/build.properties")) {
+                    if (fallback != null) p.load(fallback);
+                }
             }
         } catch (Exception ignored) {
         }

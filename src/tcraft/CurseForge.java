@@ -3,7 +3,6 @@ package tcraft;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -61,6 +60,16 @@ public final class CurseForge {
                 }
             });
 
+    private static String section(int classId) {
+        return switch (classId) {
+            case 12 -> "resourcepacks";
+            case 17 -> "worlds";
+            case 4471 -> "modpacks";
+            case 6552 -> "shaders";
+            default -> "mods";
+        };
+    }
+
     public static void clearCache() {
         FILES_CACHE.clear();
         INFO_CACHE.clear();
@@ -74,12 +83,21 @@ public final class CurseForge {
     }
 
     public static List<Project> search(String query, int classId, int limit, int categoryId, int offset) throws IOException {
+        return search(query, classId, limit, categoryId, offset, "", -1);
+    }
+
+    public static List<Project> search(String query, int classId, int limit, int categoryId, int offset,
+                                       String gameVersion, int modLoaderType) throws IOException {
         String key = apiKey();
-        if (key.isEmpty()) throw new IOException("尚未填写 CurseForge API Key");
+        if (key.isEmpty()) throw new IOException(Lang.t("尚未填写 CurseForge API Key"));
         StringBuilder url = new StringBuilder(API + "/mods/search?gameId=432&classId=").append(classId)
                 .append("&sortField=2&sortOrder=desc&pageSize=").append(limit)
                 .append("&offset=").append(Math.max(0, offset));
         if (categoryId > 0) url.append("&categoryId=").append(categoryId);
+        if (gameVersion != null && !gameVersion.isEmpty()) {
+            url.append("&gameVersion=").append(URLEncoder.encode(gameVersion, StandardCharsets.UTF_8));
+        }
+        if (modLoaderType > 0) url.append("&modLoaderType=").append(modLoaderType);
         if (query != null && !query.isEmpty()) {
             url.append("&searchFilter=").append(URLEncoder.encode(query, StandardCharsets.UTF_8));
         }
@@ -106,7 +124,7 @@ public final class CurseForge {
             Map<String, Object> links = m.get("links") instanceof Map ? Json.obj(m.get("links")) : null;
             if (links != null) p.website = Json.str(links, "websiteUrl", "");
             if (p.website.isEmpty() && !p.slug.isEmpty()) {
-                p.website = "https://www.curseforge.com/minecraft/worlds/" + p.slug;
+                p.website = "https://www.curseforge.com/minecraft/" + section(p.classId) + "/" + p.slug;
             }
             out.add(p);
         }
@@ -118,7 +136,7 @@ public final class CurseForge {
         List<Object> cached = FILES_CACHE.get(id);
         if (cached != null) return cached;
         String key = apiKey();
-        if (key.isEmpty()) throw new IOException("尚未填写 CurseForge API Key");
+        if (key.isEmpty()) throw new IOException(Lang.t("尚未填写 CurseForge API Key"));
         Map<String, Object> root = Json.obj(Json.parse(get(API + "/mods/" + id + "/files?pageSize=10000", key)));
         List<Object> data = Json.arr(root.get("data"));
         FILES_CACHE.put(id, data);
@@ -129,7 +147,7 @@ public final class CurseForge {
         Project cached = INFO_CACHE.get(id);
         if (cached != null) return cached;
         String key = apiKey();
-        if (key.isEmpty()) throw new IOException("尚未填写 CurseForge API Key");
+        if (key.isEmpty()) throw new IOException(Lang.t("尚未填写 CurseForge API Key"));
         Map<String, Object> root = Json.obj(Json.parse(get(API + "/mods/" + id, key)));
         Map<String, Object> m = Json.obj(root.get("data"));
         Project p = new Project();
@@ -144,7 +162,7 @@ public final class CurseForge {
         Map<String, Object> links = m.get("links") instanceof Map ? Json.obj(m.get("links")) : null;
         if (links != null) p.website = Json.str(links, "websiteUrl", "");
         if (p.website.isEmpty() && !p.slug.isEmpty()) {
-            p.website = "https://www.curseforge.com/minecraft/mods/" + p.slug;
+            p.website = "https://www.curseforge.com/minecraft/" + section(p.classId) + "/" + p.slug;
         }
         INFO_CACHE.put(id, p);
         return p;
@@ -152,7 +170,7 @@ public final class CurseForge {
 
     public static List<Object> filesByIds(List<Long> ids) throws IOException {
         String key = apiKey();
-        if (key.isEmpty()) throw new IOException("尚未填写 CurseForge API Key");
+        if (key.isEmpty()) throw new IOException(Lang.t("尚未填写 CurseForge API Key"));
         StringBuilder body = new StringBuilder("{\"fileIds\": [");
         for (int i = 0; i < ids.size(); i++) {
             if (i > 0) body.append(",");
@@ -164,17 +182,34 @@ public final class CurseForge {
     }
 
     private static String post(String url, String body, String key) throws IOException {
+        for (String candidate : Mirrors.apiCandidates(url)) {
+            try {
+                return Http.postOnce(candidate, body, headers(candidate, key), candidate.equals(url) ? 4 : 10);
+            } catch (IOException ignored) {
+            }
+        }
         return Http.post(url, body, Map.of("Accept", "application/json", "x-api-key", key));
     }
 
     private static String get(String url, String key) throws IOException {
-        Map<String, String> headers = Map.of("Accept", "application/json", "x-api-key", key);
         for (String candidate : Mirrors.apiCandidates(url)) {
             try {
-                return Http.getOnce(candidate, headers, candidate.equals(url) ? 4 : 10);
+                return Http.getOnce(candidate, headers(candidate, key), candidate.equals(url) ? 4 : 10);
             } catch (IOException ignored) {
             }
         }
-        return Http.get(url, headers);
+        return Http.get(url, Map.of("Accept", "application/json", "x-api-key", key));
+    }
+
+    // API Key 只发给 CurseForge 官方域 镜像不接触个人凭据
+    private static Map<String, String> headers(String url, String key) {
+        Map<String, String> out = new java.util.LinkedHashMap<>();
+        out.put("Accept", "application/json");
+        try {
+            String host = java.net.URI.create(url).getHost();
+            if (host != null && host.equalsIgnoreCase("api.curseforge.com")) out.put("x-api-key", key);
+        } catch (Exception ignored) {
+        }
+        return out;
     }
 }

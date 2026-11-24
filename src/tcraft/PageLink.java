@@ -16,7 +16,6 @@ import javafx.scene.shape.Rectangle;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 
@@ -729,7 +728,7 @@ public class PageLink implements Page {
     private static Map<String, Object> decodePayload(String token) {
         if (token == null || token.length() < 8 || token.length() > 4096) return null;
         try {
-            byte[] bytes = Base64.getUrlDecoder().decode(
+            byte[] bytes = Base64Safe.decodeUrl(
                     token.replace('+', '-').replace('/', '_'));
             String text = new String(bytes, StandardCharsets.UTF_8);
             try {
@@ -737,7 +736,6 @@ public class PageLink implements Page {
                 lastDecodeError = "";
                 return payload.containsKey("v") ? payload : null;
             } catch (Json.MalformedException e) {
-                // lastDecodeError 创建处翻译
                 lastDecodeError = Lang.tf("联机码内容不是合法 JSON：%s",
                         e.getMessage() == null ? Lang.t("格式损坏") : e.getMessage());
                 return null;
@@ -1038,7 +1036,7 @@ public class PageLink implements Page {
                 for (EasyTier.Node n : nodes) {
                     if (!n.allowRelay && !candidates.contains(n.address)) candidates.add(n.address);
                 }
-                if (candidates.isEmpty()) throw new Exception("没有可用的发现节点");
+                if (candidates.isEmpty()) throw new Exception(Lang.t("没有可用的发现节点"));
                 String best = rankByLatency(candidates).get(0);
                 if (latencyOf(best) < 0) nodeLatency.put(best, EasyTier.measureNode(best, 1200));
                 for (EasyTier.Node n : nodes) {
@@ -1064,7 +1062,7 @@ public class PageLink implements Page {
                         }
                     }
                     if (discover == null) {
-                        throw new Exception("房间已过期：联机码里的发现节点已下线，请让房主重新创建房间！");
+                        throw new Exception(Lang.t("房间已过期：联机码里的发现节点已下线，请让房主重新创建房间！"));
                     }
                     out.add(discover.address);
                     selectedNode = discover.address;
@@ -1096,7 +1094,7 @@ public class PageLink implements Page {
                     want--;
                 }
             }
-            if (out.isEmpty()) throw new Exception("没有可用的发现节点");
+            if (out.isEmpty()) throw new Exception(Lang.t("没有可用的发现节点"));
             return out;
         } catch (Exception e) {
             Data.get().log("联机：节点列表不可用，改用内置节点（" + Log.describe(e) + "）");
@@ -1125,14 +1123,15 @@ public class PageLink implements Page {
 
     private static String buildLinkCode() {
         StringBuilder sb = new StringBuilder();
-        sb.append("TCL联机码 ").append(LINK_CODE_VERSION).append('\n');
-        sb.append("房间：").append(networkName).append('\n');
-        sb.append("密钥：").append(networkSecret).append('\n');
-        sb.append("端口：").append(serverPort).append('\n');
+        boolean en = Lang.mode == 1;
+        sb.append(en ? "TCL Link Code " : "TCL联机码 ").append(LINK_CODE_VERSION).append('\n');
+        sb.append(en ? "room: " : "房间：").append(networkName).append('\n');
+        sb.append(en ? "secret: " : "密钥：").append(networkSecret).append('\n');
+        sb.append(en ? "port: " : "端口：").append(serverPort).append('\n');
         if (selectedNode != null && !selectedNode.isEmpty()) {
-            sb.append("节点：").append(selectedNode).append('\n');
+            sb.append(en ? "node: " : "节点：").append(selectedNode).append('\n');
         }
-        sb.append("节点ID：").append(Math.max(0, discoverNodeId));
+        sb.append(en ? "nodeid: " : "节点ID：").append(Math.max(0, discoverNodeId));
         return sb.toString();
     }
 

@@ -3,7 +3,6 @@ package tcraft;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.file.AccessDeniedException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -52,7 +51,7 @@ public final class SelfUpdate {
         }
         String dir = System.getProperty("tcraft.dir", "");
         if (dir.isEmpty() || !jar.toAbsolutePath().startsWith(Paths.get(dir).toAbsolutePath())) {
-            return jar;
+            return Files.isRegularFile(jar) ? jar : null;
         }
         // 本体是 .tcl 上级目录中的 exe
         Path parent = Paths.get(dir).toAbsolutePath().getParent();
@@ -180,7 +179,7 @@ public final class SelfUpdate {
                 : name.endsWith(".sh") || name.endsWith(".command") ? SH_HEADER : null;
         if (res == null) return new byte[0];
         try (InputStream in = SelfUpdate.class.getResourceAsStream(res)) {
-            if (in != null) return in.readAllBytes();
+            if (in != null) return Io.read(in, 1024L * 1024);
         }
         // 过渡构建没内置外壳 沿用旧文件的外壳
         int header = headerLength(oldFile);

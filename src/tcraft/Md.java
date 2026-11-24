@@ -14,6 +14,7 @@ public final class Md {
 
     public static Node render(String markdown) {
         VBox box = new VBox(4);
+        markdown = plainText(markdown);
         if (markdown == null || markdown.trim().isEmpty()) {
             box.getChildren().add(Ui.label("该版本未填写更新日志。", 12.5, Theme.gray2));
             return box;
@@ -39,6 +40,25 @@ public final class Md {
             box.getChildren().add(flow);
         }
         return box;
+    }
+
+    // 更新日志常带 HTML 先转换成 Markdown 再渲染
+    private static String plainText(String markdown) {
+        if (markdown == null) return null;
+        String text = markdown.replace("\r\n", "\n");
+        java.util.regex.Pattern tag = java.util.regex.Pattern.compile(
+                "(?is)<\\s*(br|p|li|ul|ol|h[1-6]|div|span|a|strong|em|img|pre|code)[\\s>/]");
+        if (!tag.matcher(text).find()) return text;
+        text = text.replaceAll("(?i)<\\s*br\\s*/?>", "\n");
+        text = text.replaceAll("(?i)<\\s*li[^>]*>", "- ");
+        text = text.replaceAll("(?i)<\\s*h[1-6][^>]*>", "\n# ");
+        text = text.replaceAll("(?i)</\\s*(p|li|ul|ol|h[1-6]|div|pre)\\s*>", "\n");
+        text = text.replaceAll("<[^>]+>", "");
+        text = text.replace("&nbsp;", " ").replace("&amp;", "&")
+                .replace("&lt;", "<").replace("&gt;", ">")
+                .replace("&quot;", "\"").replace("&#39;", "'").replace("&apos;", "'");
+        text = text.replaceAll("[ \\t]+\\n", "\n").replaceAll("\\n{3,}", "\n\n");
+        return text.trim();
     }
 
     private static TextFlow inline(String text) {

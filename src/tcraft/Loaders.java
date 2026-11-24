@@ -160,7 +160,7 @@ public final class Loaders {
                 out.add(fileName.toLowerCase(java.util.Locale.ROOT).replace("optifabric-", "").replace(".jar", "").trim());
             }
         }
-        if (out.isEmpty()) throw new Exception("OptiFabric 没有可下载的版本（需填写 CurseForge Key）");
+        if (out.isEmpty()) throw new Exception(Lang.t("OptiFabric 没有可下载的版本（需填写 CurseForge Key）"));
         return out;
     }
 
@@ -228,7 +228,7 @@ public final class Loaders {
             String tag = Json.str(Json.obj(o), "tag_name", "");
             if (!tag.isEmpty()) out.add(tag);
         }
-        if (out.isEmpty()) throw new Exception("Cleanroom 获取到的列表为空");
+        if (out.isEmpty()) throw new Exception(Lang.t("Cleanroom 获取到的列表为空"));
         return out;
     }
 
@@ -273,7 +273,7 @@ public final class Loaders {
 
     private static List<String> neoforge(String mc) throws Exception {
         String prefix = neoforgePrefix(mc);
-        if (prefix == null) throw new Exception("NeoForge 只支持 1.20.2 及之后的版本");
+        if (prefix == null) throw new Exception(Lang.t("NeoForge 只支持 1.20.2 及之后的版本"));
         List<String> out = new ArrayList<>();
         try {
             String xml = get(Downloader.bmcl() + "/maven/net/neoforged/neoforge/maven-metadata.xml",
@@ -329,7 +329,7 @@ public final class Loaders {
             String v = Json.str(loader, "version", "");
             if (!v.isEmpty()) out.add(v);
         }
-        if (out.isEmpty()) throw new Exception("Fabric 没有适用于 Minecraft " + mc + " 的加载器版本");
+        if (out.isEmpty()) throw new Exception(Lang.t("Fabric 没有适用于 Minecraft ") + mc + Lang.t(" 的加载器版本"));
         Collections.reverse(out);
         return out;
     }

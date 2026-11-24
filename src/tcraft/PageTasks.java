@@ -28,7 +28,7 @@ public class PageTasks implements Page {
     private static final String[] PREFIXES = {
             "整合包安装：", "Mod 更新 · ", "导出存档 · ", "下载整合包资源 ", "复制实例 · ",
             "导出整合包：", "备份实例 · ", "安装游戏版本 ", "正在运行 ", "预下载 ",
-            "安装 ", "下载 ", "运行 "
+            "安装 ", "下载 ", "运行 ", "更新 "
     };
 
     private final MainWindow win;
@@ -39,6 +39,10 @@ public class PageTasks implements Page {
     private Label threadLabel;
     private final List<TaskCard> cards = new ArrayList<>();
     private Timeline timer;
+    private boolean hadActive;
+    private long inactiveSince;
+    private final java.util.Set<Tasks.Task> tracked = new java.util.HashSet<>();
+    private static final long RETURN_DELAY_MS = 1000;
 
     public PageTasks(MainWindow win) {
         this.win = win;
@@ -61,9 +65,6 @@ public class PageTasks implements Page {
         Region sp = new Region();
         VBox.setVgrow(sp, Priority.ALWAYS);
         panel.getChildren().add(sp);
-        Ui.ListItem back = new Ui.ListItem(Theme.icon("arrow-left", 16, Theme.text), "返回", null, 34);
-        back.setOnMouseClicked(e -> win.openPage("launch", true));
-        panel.getChildren().add(back);
         updateStats();
         return panel;
     }
@@ -113,6 +114,13 @@ public class PageTasks implements Page {
         VBox.setVgrow(scroll, Priority.ALWAYS);
         page.getChildren().addAll(head, scroll);
         rebuild();
+        lastCount = Tasks.INSTANCE.list.size();
+        lastStateSig = stateSignature();
+        tracked.clear();
+        trackActive();
+        hadActive = Tasks.INSTANCE.hasActive();
+        inactiveSince = 0;
+        NetSpeed.reset();
 
         timer = new Timeline(new KeyFrame(Duration.millis(450), e -> tick()));
         timer.setCycleCount(Timeline.INDEFINITE);
@@ -146,24 +154,79 @@ public class PageTasks implements Page {
             taskList.getChildren().add(empty);
             return;
         }
-        for (Tasks.Task task : Tasks.INSTANCE.list) {
+        for (Tasks.Task task : sortedTasks()) {
             TaskCard card = new TaskCard(task);
             cards.add(card);
             taskList.getChildren().add(card.root);
         }
     }
 
+    private List<Tasks.Task> sortedTasks() {
+        List<Tasks.Task> out = new ArrayList<>(Tasks.INSTANCE.list);
+        out.sort((a, b) -> {
+            int aa = a.state == Tasks.State.RUNNING ? 0 : 1;
+            int bb = b.state == Tasks.State.RUNNING ? 0 : 1;
+            if (aa != bb) return Integer.compare(aa, bb);
+            return Long.compare(b.created, a.created);
+        });
+        return out;
+    }
+
+    private String stateSignature() {
+        StringBuilder sig = new StringBuilder();
+        for (Tasks.Task t : Tasks.INSTANCE.list) sig.append(t.state).append('|');
+        return sig.toString();
+    }
+
     private int lastCount = -1;
+    private String lastStateSig = "";
 
     private void tick() {
         if (taskList == null) return;
         int count = Tasks.INSTANCE.list.size();
-        if (count != lastCount) {
+        String sig = stateSignature();
+        if (count != lastCount || !sig.equals(lastStateSig)) {
             lastCount = count;
+            lastStateSig = sig;
             rebuild();
         }
         for (TaskCard card : cards) card.update();
         updateStats();
+
+        boolean active = Tasks.INSTANCE.hasActive();
+        if (active) {
+            if (!hadActive || inactiveSince > 0) tracked.clear();
+            trackActive();
+            hadActive = true;
+            inactiveSince = 0;
+        } else if (hadActive) {
+            long now = System.currentTimeMillis();
+            if (inactiveSince == 0) inactiveSince = now;
+            if (now - inactiveSince >= RETURN_DELAY_MS
+                    && "tasks".equals(win.currentKey) && trackedDone()) {
+                tracked.clear();
+                hadActive = false;
+                inactiveSince = 0;
+                NetSpeed.reset();
+                win.openPage("launch", true);
+            }
+        } else {
+            inactiveSince = 0;
+        }
+    }
+
+    private void trackActive() {
+        for (Tasks.Task t : Tasks.INSTANCE.list) {
+            if (t.state == Tasks.State.RUNNING) tracked.add(t);
+        }
+    }
+
+    private boolean trackedDone() {
+        if (tracked.isEmpty()) return false;
+        for (Tasks.Task t : tracked) {
+            if (t.state != Tasks.State.DONE) return false;
+        }
+        return true;
     }
 
     private void updateStats() {
@@ -173,13 +236,16 @@ public class PageTasks implements Page {
         String speed = "0 B/s";
         int files = 0;
         int threads = 0;
+        int active = 0;
         for (Tasks.Task t : Tasks.INSTANCE.list) {
             if (t.state == Tasks.State.RUNNING) {
-                if (t.speed != null && !t.speed.isEmpty()) speed = t.speed;
+                active++;
                 files += t.remainingFiles;
                 threads += t.threads;
             }
         }
+        if (active > 0) speed = Downloader.speed(NetSpeed.current());
+        else NetSpeed.reset();
         speedLabel.setText(speed);
         fileLabel.setText(String.valueOf(files));
         threadLabel.setText(String.valueOf(threads));
@@ -196,6 +262,7 @@ public class PageTasks implements Page {
         final VBox subs;
         final StackPane cancel;
         private String subSig = "";
+        private boolean pendingAdded;
 
         TaskCard(Tasks.Task task) {
             this.task = task;
@@ -224,7 +291,7 @@ public class PageTasks implements Page {
             bar.setHeight(6);
             bar.setFill(Theme.accent);
             track.widthProperty().addListener((o, a, b) ->
-                    bar.setWidth(Math.max(0, b.doubleValue() * task.progress)));
+                    bar.setWidth(Math.max(0, b.doubleValue() * displayProgress())));
             StackPane progress = new StackPane(track, bar);
             StackPane.setAlignment(bar, Pos.CENTER_LEFT);
             progress.setMaxWidth(Double.MAX_VALUE);
@@ -240,8 +307,12 @@ public class PageTasks implements Page {
             root.getChildren().addAll(head, progress, stageLabel, subs);
         }
 
-        private Node subRow(Tasks.SubTask sub) {
-            HBox row = new HBox(7);
+        private double displayProgress() {
+            if (task.state == Tasks.State.DONE) return 1;
+            return Math.max(0, Math.min(1, task.progress));
+        }
+
+        private Node subRow(Tasks.SubTask sub) {            HBox row = new HBox(7);
             row.setAlignment(Pos.CENTER_LEFT);
             Node icon;
             switch (sub.state) {
@@ -256,12 +327,26 @@ public class PageTasks implements Page {
         }
 
         void update() {
-            bar.setWidth(Math.max(0, track.getWidth() * Math.max(0, Math.min(1, task.progress))));
+            bar.setWidth(Math.max(0, track.getWidth() * displayProgress()));
             stateLabel.setText(stateText(task.state));
             stateLabel.setTextFill(stateColor(task.state));
             stageLabel.setText(taskText(task.state == Tasks.State.FAILED && task.error != null ? task.error : task.stage));
             speedLabel.setText(task.speed == null ? "" : task.speed);
             cancel.setVisible(task.state == Tasks.State.RUNNING);
+            if (!pendingAdded && task.state == Tasks.State.DONE && task.pendingAction != null) {
+                pendingAdded = true;
+                StackPane btn = Ui.button(task.pendingText.isEmpty() ? Lang.t("打开") : taskText(task.pendingText),
+                        Ui.BTN_NORMAL, () -> {
+                            Runnable action = task.pendingAction;
+                            task.pendingAction = null;
+                            if (action != null) action.run();
+                        });
+                btn.setMaxWidth(Region.USE_PREF_SIZE);
+                HBox row = new HBox(btn);
+                row.setAlignment(Pos.CENTER_LEFT);
+                VBox.setMargin(row, new Insets(4, 0, 0, 0));
+                root.getChildren().add(row);
+            }
             StringBuilder sig = new StringBuilder();
             for (Tasks.SubTask sub : task.subs) sig.append(sub.state).append(':').append(sub.name).append('|');
             if (sig.toString().equals(subSig)) return;

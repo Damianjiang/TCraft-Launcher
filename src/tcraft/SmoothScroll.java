@@ -317,7 +317,7 @@ final class SmoothScroll {
     // 特效变更时重扫
     private boolean staleCache() {
         for (EffectNode node : effectCache) {
-            if (holdsNode(node.node)) continue; // 挂起中被我们置空的 不算失效
+            if (holdsNode(node.node)) continue; // 挂起中被置空的 不算失效
             if (node.node.getEffect() != node.effect) return true;
         }
         return false;

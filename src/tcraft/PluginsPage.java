@@ -119,8 +119,8 @@ public final class PluginsPage {
             if (filtered.isEmpty()) {
                 String text;
                 if (all.isEmpty()) {
-                    text = "还没有安装任何插件。\n点击「导入插件」选择 .zip 或 .jar；也可以把插件文件夹放进 "
-                            + Plugins.get().dir() + " 后点击刷新。";
+                    text = Lang.tf("还没有安装任何插件。\n点击「导入插件」选择 .zip 或 .jar；也可以把插件文件夹放进 %s 后点击刷新。",
+                            Plugins.get().dir());
                 } else {
                     text = "没有匹配的插件。";
                 }
@@ -344,7 +344,7 @@ public final class PluginsPage {
             win.toast("没有命令", Lang.tf("插件「%s」没有注册命令。", p.manifest.name), 0);
             return;
         }
-        VBox card = dialogCard("插件命令 · " + p.manifest.name, 560);
+        VBox card = dialogCard(Lang.t("插件命令 · ") + p.manifest.name, 560);
         for (Plugins.CommandInfo c : list) {
             VBox row = new VBox(3);
             HBox top = new HBox(10);
