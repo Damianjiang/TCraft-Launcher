@@ -281,7 +281,15 @@ public final class SelfUpdate {
     }
 
     static void startJava(Path file, String... appArgs) throws IOException {
-        spawn(buildCommand(file, appArgs));
+        String name = file.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
+        if (name.endsWith(".exe") || name.endsWith(".sh") || name.endsWith(".command")) {
+            java.util.List<String> cmd = new java.util.ArrayList<>();
+            cmd.add(file.toAbsolutePath().toString());
+            cmd.addAll(Arrays.asList(appArgs));
+            spawn(cmd, file.toAbsolutePath().getParent());
+            return;
+        }
+        spawn(buildCommand(file, appArgs), null);
     }
 
     // 先构建命令再 spawn 构建失败不释放锁
@@ -311,6 +319,12 @@ public final class SelfUpdate {
     }
 
     static Process spawn(java.util.List<String> cmd) throws IOException {
-        return new ProcessBuilder(cmd).inheritIO().start();
+        return spawn(cmd, null);
+    }
+
+    static Process spawn(java.util.List<String> cmd, Path dir) throws IOException {
+        ProcessBuilder pb = new ProcessBuilder(cmd).inheritIO();
+        if (dir != null) pb.directory(dir.toFile());
+        return pb.start();
     }
 }

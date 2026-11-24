@@ -255,10 +255,12 @@ public final class Resources {
             ui.setStatus(Lang.t("正在启动主界面…"), 95);
             relaunch(jar(), rt, platform(), args);
         } else {
-            // 内置 JavaFX 不能套外部 module-path 否则找不到模块
-            ensureWebp(ui);
-            ui.setStatus(Lang.t("正在启动主界面…"), 95);
-            relaunchBuiltin(jar(), args);
+            // 已有 JavaFX 直接起主界面 只有刚补 WebP 才重拉一次
+            boolean webpReady = ensureWebp(ui);
+            if (webpReady) {
+                ui.setStatus(Lang.t("正在启动主界面…"), 95);
+                relaunchBuiltin(jar(), args);
+            }
         }
         ui.setStatus(Lang.t("正在启动主界面…"), 90);
     }
