@@ -1,6 +1,7 @@
 package tcraft;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -69,7 +70,7 @@ public final class Yggdrasil {
             throw new AuthException(0, Lang.t("认证服务器地址格式不正确：") + url);
         }
 
-        HttpResponse<String> resp = request("GET", url, null);
+        Reply resp = request("GET", url, null);
         resp = followRedirect(resp, url);
         String moved = resp.headers().firstValue("x-authlib-injector-api-location").orElse("");
         if (!moved.isEmpty()) {
@@ -125,7 +126,7 @@ public final class Yggdrasil {
         requireSecure(server);
         String body = "{\"accessToken\":" + Json.quote(accessToken)
                 + ",\"clientToken\":" + Json.quote(clientToken == null ? "" : clientToken) + "}";
-        HttpResponse<String> resp = request("POST", server.apiRoot + "authserver/validate", body);
+        Reply resp = request("POST", server.apiRoot + "authserver/validate", body);
         return resp.statusCode() == 200 || resp.statusCode() == 204;
     }
 
@@ -150,7 +151,7 @@ public final class Yggdrasil {
     private static Session send(Server server, String path, String body, String clientToken)
             throws IOException, AuthException {
         requireSecure(server);
-        HttpResponse<String> resp = request("POST", server.apiRoot + path, body);
+        Reply resp = request("POST", server.apiRoot + path, body);
         Map<String, Object> m = parseObject(resp.body(), resp.statusCode());
         String error = Json.str(m, "error", "");
         if (resp.statusCode() != 200 || !error.isEmpty()) {
@@ -258,7 +259,10 @@ public final class Yggdrasil {
         return Lang.t("认证服务器返回 HTTP ") + status;
     }
 
-    private static HttpResponse<String> request(String method, String url, String body) throws IOException {
+    private record Reply(int statusCode, String body, java.net.http.HttpHeaders headers) {
+    }
+
+    private static Reply request(String method, String url, String body) throws IOException {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(url))
                 .timeout(Duration.ofSeconds(20))
                 .header("User-Agent", "TCraftLauncher")
@@ -271,19 +275,31 @@ public final class Yggdrasil {
                     .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
         }
         try {
-            return Http.client().send(b.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            HttpResponse<InputStream> resp = Http.noRedirectClient().send(
+                    b.build(), HttpResponse.BodyHandlers.ofInputStream());
+            try (InputStream in = resp.body()) {
+                // 认证服务器也可能返回超大/恶意响应，限制 20MB 防止直接 OOM。
+                String text = new String(Fetch.readAll(in, 20_000, 20L * 1024 * 1024),
+                        StandardCharsets.UTF_8);
+                return new Reply(resp.statusCode(), text, resp.headers());
+            }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IOException(Lang.t("请求被中断"), e);
         }
     }
 
-    private static HttpResponse<String> followRedirect(HttpResponse<String> resp, String url) throws IOException {
+    private static Reply followRedirect(Reply resp, String url) throws IOException {
         int code = resp.statusCode();
         if (code != 301 && code != 302 && code != 307 && code != 308) return resp;
         String location = resp.headers().firstValue("location").orElse("");
         if (location.isEmpty()) return resp;
-        String next = URI.create(url).resolve(location).toString();
+        String next;
+        try {
+            next = URI.create(url).resolve(location).toString();
+        } catch (Exception e) {
+            throw new IOException("认证服务器重定向地址无效", e);
+        }
         return request("GET", next, null);
     }
 

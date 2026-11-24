@@ -408,9 +408,9 @@ public final class Data {
             Path p = Paths.get(path).toAbsolutePath().normalize();
             String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
             Path stock;
-            if (os.contains("win") && System.getenv("APPDATA") != null) {
+            if (os.contains("windows") && System.getenv("APPDATA") != null) {
                 stock = Paths.get(System.getenv("APPDATA"), ".minecraft");
-            } else if (os.contains("mac")) {
+            } else if (os.contains("mac") || os.contains("darwin")) {
                 stock = Paths.get(System.getProperty("user.home"), "Library", "Application Support", "minecraft");
             } else {
                 stock = Paths.get(System.getProperty("user.home"), ".minecraft");
@@ -424,9 +424,9 @@ public final class Data {
     private String detectGameDir() {
         String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
         Path legacy;
-        if (os.contains("mac")) {
+        if (os.contains("mac") || os.contains("darwin")) {
             legacy = Paths.get(System.getProperty("user.home"), "Library", "Application Support", "minecraft");
-        } else if (os.contains("win") && System.getenv("APPDATA") != null) {
+        } else if (os.contains("windows") && System.getenv("APPDATA") != null) {
             legacy = Paths.get(System.getenv("APPDATA"), ".minecraft");
         } else if (System.getenv("XDG_DATA_HOME") != null) {
             legacy = Paths.get(System.getenv("XDG_DATA_HOME"), "minecraft");
@@ -631,7 +631,7 @@ public final class Data {
 
     private List<String> javaCandidates() {
         String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
-        boolean win = os.contains("win");
+        boolean win = os.contains("windows");
         boolean mac = os.contains("mac") || os.contains("darwin");
         List<String> out = new ArrayList<>();
 
@@ -1170,6 +1170,9 @@ public final class Data {
                 props.setProperty("SystemLanguage", "0");
                 props.setProperty("SystemMaxThreads", "64");
                 props.setProperty("SystemDownloadSource", "0");
+                // 默认自动测速：更新源走镜像测速，资源镜像同时准备官方与内置镜像
+                props.setProperty("SystemUpdateMirrorMode", "1");
+                props.setProperty("SystemMirrorMode", "3");
                 return;
             }
             if (Files.size(configPath) > 16L * 1024 * 1024) {
@@ -1177,6 +1180,23 @@ public final class Data {
             }
             try (InputStream in = Files.newInputStream(configPath)) {
                 props.load(in);
+            }
+            // 老配置补齐默认：更新源和资源镜像都默认自动测速
+            if (!props.containsKey("SystemUpdateMirrorMode")) {
+                props.setProperty("SystemUpdateMirrorMode", "1");
+            }
+            if (!props.containsKey("SystemMirrorMode")) {
+                props.setProperty("SystemMirrorMode", "3");
+            }
+            // 老版本默认是官方源（0），升级后一次性切到自动测速；用户之后仍可手动改回
+            if (!getBool("SystemAutoSpeedMigrated", false)) {
+                if ("0".equals(props.getProperty("SystemMirrorMode", "0"))) {
+                    props.setProperty("SystemMirrorMode", "3");
+                }
+                if ("0".equals(props.getProperty("SystemUpdateMirrorMode", "0"))) {
+                    props.setProperty("SystemUpdateMirrorMode", "1");
+                }
+                props.setProperty("SystemAutoSpeedMigrated", "true");
             }
             if (!getBool("LaunchVisibilityMigrated", false)) {
                 int old = getInt("LaunchVisibility", -1);
@@ -1366,10 +1386,7 @@ public final class Data {
             synchronized (saveWriteLock) {
                 Files.createDirectories(configPath.getParent());
                 tmp = configPath.resolveSibling(configPath.getFileName() + ".tmp");
-                try (OutputStream out = Files.newOutputStream(tmp,
-                        java.nio.file.StandardOpenOption.CREATE,
-                        java.nio.file.StandardOpenOption.TRUNCATE_EXISTING,
-                        java.nio.file.StandardOpenOption.WRITE)) {
+                try (OutputStream out = privateOutput(tmp)) {
                     out.write(payload);
                 }
                 restrictPermissions(tmp);
@@ -1407,6 +1424,24 @@ public final class Data {
                 props.remove(key);
             }
         }
+    }
+
+    // 先以 600/仅当前用户创建临时文件，再写入令牌；普通 newOutputStream 会先按 umask 建 644。
+    private static OutputStream privateOutput(Path tmp) throws IOException {
+        try {
+            Files.deleteIfExists(tmp);
+        } catch (Exception e) {
+            throw new IOException("无法清理配置临时文件", e);
+        }
+        try {
+            Files.createFile(tmp, java.nio.file.attribute.PosixFilePermissions.asFileAttribute(
+                    java.nio.file.attribute.PosixFilePermissions.fromString("rw-------")));
+        } catch (UnsupportedOperationException e) {
+            // Windows 没有 POSIX 权限，创建后再用 ACL 收紧。
+            Files.createFile(tmp);
+        }
+        return Files.newOutputStream(tmp, java.nio.file.StandardOpenOption.WRITE,
+                java.nio.file.StandardOpenOption.TRUNCATE_EXISTING);
     }
 
     private static void restrictPermissions(Path file) {
@@ -1565,10 +1600,7 @@ public final class Data {
             }
             Files.createDirectories(outPath.getParent());
             tmp = outPath.resolveSibling(outPath.getFileName() + ".tmp");
-            try (OutputStream os = Files.newOutputStream(tmp,
-                    java.nio.file.StandardOpenOption.CREATE,
-                    java.nio.file.StandardOpenOption.TRUNCATE_EXISTING,
-                    java.nio.file.StandardOpenOption.WRITE)) {
+            try (OutputStream os = privateOutput(tmp)) {
                 out.store(os, "TCraft Launcher JavaFX export (tokens removed)");
             }
             restrictPermissions(tmp);
@@ -1637,10 +1669,7 @@ public final class Data {
                 return false;
             }
             Files.createDirectories(configPath.getParent());
-            try (OutputStream out = Files.newOutputStream(importTmp,
-                    java.nio.file.StandardOpenOption.CREATE,
-                    java.nio.file.StandardOpenOption.TRUNCATE_EXISTING,
-                    java.nio.file.StandardOpenOption.WRITE)) {
+            try (OutputStream out = privateOutput(importTmp)) {
                 incoming.store(out, "TCraft Launcher JavaFX");
             }
             restrictPermissions(importTmp);

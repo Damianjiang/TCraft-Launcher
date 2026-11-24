@@ -45,11 +45,12 @@ public final class Shell {
     }
 
     private static boolean isMac() {
-        return System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("mac");
+        String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
+        return os.contains("mac") || os.contains("darwin");
     }
 
     public static boolean windows() {
-        return System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win");
+        return System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("windows");
     }
 
     public static boolean mac() {
@@ -209,19 +210,68 @@ public final class Shell {
         }
     }
 
-    public static boolean openUrl(String url) {
-        if (url == null || url.isBlank()) return false;
+    // 打开外部程序时不能只看“进程起来了”，Linux 没有 xdg-open、
+    // macOS 的 open 失败都会立刻返回非 0；等退出码能避免假成功。
+    private static boolean openExternally(String... cmd) {
         try {
-            if (isMac()) {
-                new ProcessBuilder("open", url).redirectErrorStream(true)
-                        .redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+            Process p = new ProcessBuilder(cmd)
+                    .redirectErrorStream(true)
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                    .start();
+            if (fxThread()) {
+                // 浏览器/文件管理器可能一直挂着，FX 线程不能等 2 秒。
+                if (p.waitFor(200, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                    return p.exitValue() == 0;
+                }
+                Threads.start("TCL-Open-Check", () -> {
+                    try {
+                        p.waitFor(2, java.util.concurrent.TimeUnit.SECONDS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                });
                 return true;
             }
-            if (isLinux()) {
-                new ProcessBuilder("xdg-open", url).redirectErrorStream(true)
-                        .redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+            if (!p.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)) {
+                // 有的桌面 open/xdg-open 会把进程挂到浏览器退出为止，
+                // 只要已经拉起来就按成功处理，不能把调用线程卡住。
                 return true;
             }
+            return p.exitValue() == 0;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private static boolean fxThread() {
+        try {
+            return javafx.application.Platform.isFxApplicationThread();
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    // 只允许网页协议，防止远端资源把 file:/javascript:/自定义 handler 塞进系统打开。
+    private static boolean webUrl(String url) {
+        try {
+            java.net.URI uri = java.net.URI.create(url.trim());
+            String scheme = uri.getScheme();
+            if (scheme == null) return false;
+            scheme = scheme.toLowerCase(java.util.Locale.ROOT);
+            return ("http".equals(scheme) || "https".equals(scheme))
+                    && uri.getHost() != null && !uri.getHost().isBlank();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public static boolean openUrl(String url) {
+        if (url == null || url.isBlank() || !webUrl(url)) return false;
+        if (isMac()) return openExternally("open", url);
+        if (isLinux()) {
+            return openExternally("xdg-open", url) || openExternally("gio", "open", url);
+        }
+        try {
             if (java.awt.Desktop.isDesktopSupported()) {
                 java.awt.Desktop d = java.awt.Desktop.getDesktop();
                 if (d.isSupported(java.awt.Desktop.Action.BROWSE)) {
@@ -233,9 +283,7 @@ public final class Shell {
                     }
                 }
             }
-            new ProcessBuilder("rundll32", "url.dll,FileProtocolHandler", url).redirectErrorStream(true)
-                    .redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
-            return true;
+            return openExternally("rundll32", "url.dll,FileProtocolHandler", url);
         } catch (Exception e) {
             return false;
         }
@@ -248,26 +296,20 @@ public final class Shell {
     public static boolean openFile(String path) {
         if (path == null || path.isBlank()) return false;
         File f = new File(path);
+        if (isMac()) return openExternally("open", f.getAbsolutePath());
+        if (isLinux()) {
+            return openExternally("xdg-open", f.getAbsolutePath())
+                    || openExternally("gio", "open", f.getAbsolutePath())
+                    || desktopOpen(f);
+        }
         try {
-            if (isMac()) {
-                new ProcessBuilder("open", f.getAbsolutePath()).redirectErrorStream(true)
-                        .redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
-                return true;
-            }
-            if (isLinux()) {
-                new ProcessBuilder("xdg-open", f.getAbsolutePath()).redirectErrorStream(true)
-                        .redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
-                return true;
-            }
             if (desktopOpen(f)) return true;
             // 不走 cmd.exe &|^ 会被当命令分隔符
             if (f.isDirectory()) {
                 new ProcessBuilder("explorer.exe", f.getAbsolutePath()).redirectErrorStream(true)
                         .redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
             } else {
-                new ProcessBuilder("rundll32.exe", "url.dll,FileProtocolHandler", f.getAbsolutePath())
-                        .redirectErrorStream(true)
-                        .redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+                return openExternally("rundll32.exe", "url.dll,FileProtocolHandler", f.getAbsolutePath());
             }
             return true;
         } catch (Exception e) {
@@ -291,7 +333,7 @@ public final class Shell {
     public static boolean deleteToRecycleBin(String path) {
         if (path == null || path.isBlank()) return false;
         String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
-        if (os.contains("mac")) {
+        if (os.contains("mac") || os.contains("darwin")) {
             try {
                 String script = "tell application \"Finder\" to delete POSIX file \""
                         + path.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
@@ -307,7 +349,7 @@ public final class Shell {
                 return false;
             }
         }
-        if (!os.contains("win")) {
+        if (!os.contains("windows")) {
             // gio 失败即失败 不可回退成永久删除
             try {
                 Process p = new ProcessBuilder("gio", "trash", path)

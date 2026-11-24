@@ -69,7 +69,7 @@ public final class EasyTier {
     }
 
     public static boolean isWindows() {
-        return os().contains("win");
+        return os().contains("windows");
     }
 
     public static boolean isMac() {
@@ -311,6 +311,9 @@ public final class EasyTier {
         int code = c.getResponseCode();
         if (code != 200) throw new Exception("HTTP " + code);
         long total = c.getContentLengthLong();
+        // 联机核心是固定 SHA-256 的二进制，先限制体积，防止坏镜像把磁盘写满。
+        long maxBytes = 256L * 1024 * 1024;
+        if (total > maxBytes) throw new Exception(Lang.t("联机模块体积异常"));
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         try (InputStream in = c.getInputStream();
              DigestOutputStream out = new DigestOutputStream(Files.newOutputStream(target), digest)) {
@@ -322,8 +325,9 @@ public final class EasyTier {
                 if (Thread.currentThread().isInterrupted()) {
                     throw new InterruptedException(Lang.t("联机模块下载已取消"));
                 }
-                out.write(buf, 0, n);
                 read += n;
+                if (read > maxBytes) throw new Exception(Lang.t("联机模块体积异常"));
+                out.write(buf, 0, n);
                 if (total > 0) {
                     int percent = (int) (read * 100 / total);
                     if (percent != lastPercent) {
@@ -332,6 +336,9 @@ public final class EasyTier {
                     }
                 }
             }
+        } catch (Exception e) {
+            Files.deleteIfExists(target);
+            throw e;
         }
         String actual = HexFormat.of().formatHex(digest.digest());
         if (!expected.equalsIgnoreCase(actual)) {

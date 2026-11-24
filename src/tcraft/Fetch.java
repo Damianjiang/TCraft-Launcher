@@ -32,6 +32,15 @@ public final class Fetch {
     // 并发下载时进度由调用方汇总 单文件不再抢写
     static void file(Tasks.Task task, String url, Path target, String sha1,
                      double from, double to, boolean report) throws IOException {
+        fileCandidates(task, java.util.List.of(url), target, sha1, from, to, report);
+    }
+
+    // HMCL 同款候选源循环：每个源先少量重试，失败立刻换下一个源
+    static void fileCandidates(Tasks.Task task, java.util.List<String> urls, Path target, String sha1,
+                               double from, double to, boolean report) throws IOException {
+        java.util.List<String> candidates = urls == null ? java.util.List.of()
+                : urls.stream().filter(u -> u != null && !u.isEmpty()).distinct().toList();
+        if (candidates.isEmpty()) throw new IOException(Lang.t("没有可用的下载地址：") + target.getFileName());
         Path part = target.resolveSibling(target.getFileName() + ".part");
         Files.createDirectories(target.toAbsolutePath().getParent());
 
@@ -54,71 +63,77 @@ public final class Fetch {
                 if (digest != null && done > 0) replay(part, digest);
             }
 
-            for (int attempt = 0; attempt <= DEFAULT_RETRY; attempt++) {
-                if (attempt > 0) {
-                    // 分段退避 可取消
-                    long left = BACKOFF_MS[Math.min(attempt - 1, BACKOFF_MS.length - 1)];
-                    while (left > 0) {
-                        if (task != null && task.canceled) throw new IOException(Lang.t("已取消"));
-                        sleep(Math.min(200, left));
-                        left -= 200;
-                    }
-                }
-                if (task != null && task.canceled) throw new IOException(Lang.t("已取消"));
-                try {
-                    transfer(task, url, part, done, digest, from, to, report);
-                    if (digest != null) {
-                        String actual = HexFormat.of().formatHex(digest.digest());
-                        if (!expect.equals(actual)) {
-                            Files.deleteIfExists(part);
-                            digest = sha1();
-                            done = 0;
-                            last = new IOException(Lang.t("文件校验失败（SHA-1 不匹配）"));
-                            continue;
+            candidateLoop:
+            for (String url : candidates) {
+                // 多源时每个源快速失败 单源保留原有耐心
+                int retries = candidates.size() > 1 ? 2 : DEFAULT_RETRY;
+                for (int attempt = 0; attempt <= retries; attempt++) {
+                    if (attempt > 0) {
+                        // 分段退避 可取消
+                        long left = BACKOFF_MS[Math.min(attempt - 1, BACKOFF_MS.length - 1)];
+                        while (left > 0) {
+                            if (task != null && task.canceled) throw new IOException(Lang.t("已取消"));
+                            sleep(Math.min(200, left));
+                            left -= 200;
                         }
                     }
-                    // 无哈希只认 zip 魔数
-                    if (expect == null && !Downloader.jarLooksValid(part, target)) {
-                        Files.deleteIfExists(part);
-                        done = 0;
-                        last = new IOException(Lang.t("下载内容不是有效的 jar：") + target.getFileName());
-                        continue;
-                    }
-                } catch (IOException e) {
-                    if (task != null && task.canceled) throw e;
-                    last = e;
-                    if (e instanceof Http.StatusException se && se.code == 416) {
-                        Files.deleteIfExists(part);
-                        if (digest != null) digest.reset();
-                        done = 0;
-                        continue;
-                    }
+                    if (task != null && task.canceled) throw new IOException(Lang.t("已取消"));
                     try {
-                        done = Files.isRegularFile(part) ? Files.size(part) : 0;
-                    } catch (Exception ignored) {
-                        done = 0;
+                        transfer(task, url, part, done, digest, from, to, report);
+                        if (digest != null) {
+                            String actual = HexFormat.of().formatHex(digest.digest());
+                            if (!expect.equals(actual)) {
+                                Files.deleteIfExists(part);
+                                digest = sha1();
+                                done = 0;
+                                last = new IOException(Lang.t("文件校验失败（SHA-1 不匹配）"));
+                                // 内容不对 换源比原地重试有效
+                                continue candidateLoop;
+                            }
+                        }
+                        // 无哈希只认 zip 魔数
+                        if (expect == null && !Downloader.jarLooksValid(part, target)) {
+                            Files.deleteIfExists(part);
+                            done = 0;
+                            last = new IOException(Lang.t("下载内容不是有效的 jar：") + target.getFileName());
+                            continue candidateLoop;
+                        }
+                    } catch (IOException e) {
+                        if (task != null && task.canceled) throw e;
+                        last = e;
+                        if (e instanceof Http.StatusException se && se.code == 416) {
+                            Files.deleteIfExists(part);
+                            if (digest != null) digest.reset();
+                            done = 0;
+                        } else {
+                            try {
+                                done = Files.isRegularFile(part) ? Files.size(part) : 0;
+                            } catch (Exception ignored) {
+                                done = 0;
+                            }
+                        }
+                        continue;
                     }
-                    continue;
+                    // 占用类错误不重试
+                    try {
+                        Files.move(part, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    } catch (java.nio.file.FileSystemException e) {
+                        throw new IOException(Lang.t("文件被占用，请关闭正在运行的游戏后重试：") + target.getFileName(), e);
+                    }
+                    return;
                 }
-                // 占用类错误不重试
-                try {
-                    Files.move(part, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                } catch (java.nio.file.FileSystemException e) {
-                    throw new IOException(Lang.t("文件被占用，请关闭正在运行的游戏后重试：") + target.getFileName(), e);
-                }
-                return;
             }
         } finally {
             PART_LOCKS.remove(lockKey, lock);
         }
-        throw last != null ? last : new IOException(Lang.t("下载失败：") + url);
+        throw last != null ? last : new IOException(Lang.t("下载失败：") + target.getFileName());
     }
 
     private static void transfer(Tasks.Task task, String url, Path part, long done,
                                  MessageDigest digest, double from, double to,
                                  boolean report) throws IOException {
-        Http.Body body = done > 0 ? Http.open(url, Duration.ofSeconds(60), done)
-                : Http.open(url, Duration.ofSeconds(60));
+        Http.Body body = done > 0 ? Http.openOnce(url, Duration.ofSeconds(60), done)
+                : Http.openOnce(url, Duration.ofSeconds(60));
         IdleGuard guard = new IdleGuard(body.in, IDLE_TIMEOUT_MS);
         guard.start();
         try (InputStream in = body.in) {

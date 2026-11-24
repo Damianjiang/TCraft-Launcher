@@ -429,9 +429,12 @@ public final class MsAuth {
     }
 
     private static Resp post(String url, String body, String contentType, int timeout) throws Exception {
+        if (!isHttpsUrl(url)) throw new java.io.IOException("认证地址必须是 HTTPS");
         HttpURLConnection c = (HttpURLConnection) URI.create(url).toURL().openConnection();
         c.setConnectTimeout(timeout);
         c.setReadTimeout(timeout);
+        // 认证请求不跟随重定向，避免 POST body 或 Bearer token 被带到别的 host。
+        c.setInstanceFollowRedirects(false);
         c.setRequestMethod("POST");
         c.setDoOutput(true);
         c.setRequestProperty("Accept", "application/json");
@@ -445,9 +448,11 @@ public final class MsAuth {
     }
 
     private static Resp get(String url, String bearer, int timeout) throws Exception {
+        if (!isHttpsUrl(url)) throw new java.io.IOException("认证地址必须是 HTTPS");
         HttpURLConnection c = (HttpURLConnection) URI.create(url).toURL().openConnection();
         c.setConnectTimeout(timeout);
         c.setReadTimeout(timeout);
+        c.setInstanceFollowRedirects(false);
         c.setRequestProperty("Accept", "application/json");
         c.setRequestProperty("Authorization", "Bearer " + bearer);
         c.setRequestProperty("User-Agent", AGENT);
@@ -463,14 +468,20 @@ public final class MsAuth {
     }
 
     public static void openBrowser(String url) {
+        if (!isHttpsUrl(url)) {
+            Errors.error("拒绝打开非 HTTPS 验证地址", new IllegalArgumentException("invalid verification url"));
+            return;
+        }
         try {
-            Shell.openUrl(url);
+            if (!Shell.openUrl(url)) {
+                throw new java.io.IOException("没有找到可用的浏览器打开方式");
+            }
         } catch (Exception e) {
             try {
                 String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
-                if (os.contains("win")) {
+                if (os.contains("windows")) {
                     new ProcessBuilder("rundll32", "url.dll,FileProtocolHandler", url).start();
-                } else if (os.contains("mac")) {
+                } else if (os.contains("mac") || os.contains("darwin")) {
                     new ProcessBuilder("open", url).start();
                 } else {
                     new ProcessBuilder("xdg-open", url).start();
@@ -478,6 +489,16 @@ public final class MsAuth {
             } catch (Exception fallback) {
                 Errors.error("无法打开浏览器完成微软登录", fallback);
             }
+        }
+    }
+
+    private static boolean isHttpsUrl(String url) {
+        try {
+            java.net.URI uri = java.net.URI.create(url);
+            return "https".equalsIgnoreCase(uri.getScheme()) && uri.getHost() != null
+                    && !uri.getHost().isBlank();
+        } catch (Exception e) {
+            return false;
         }
     }
 }

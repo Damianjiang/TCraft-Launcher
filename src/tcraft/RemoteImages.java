@@ -290,6 +290,7 @@ public final class RemoteImages {
 
     private static Image decode(byte[] bytes, int px) {
         try {
+            if (ImageSafety.tooLarge(bytes)) return null;
             // 缺 WebP 库时静默降级
             if (isWebp(bytes)) return decodeWebp(bytes, px);
             Image img = new Image(new ByteArrayInputStream(bytes), px, px, true, true);
@@ -305,27 +306,40 @@ public final class RemoteImages {
         return decode(bytes, decodePx(size));
     }
 
-    private static java.lang.reflect.Method webpRead;
+    private static volatile java.lang.reflect.Method webpRead;
     private static java.lang.reflect.Constructor<?> webpOptions;
     private static java.lang.reflect.Constructor<?> webpImage;
     private static boolean webpUnavailable;
 
-    private static Image decodeWebp(byte[] bytes, int px) {
-        if (webpUnavailable) return null;
-        try {
-            if (webpRead == null) {
+    private static boolean webpReady() {
+        if (webpRead != null) return true;
+        if (webpUnavailable) return false;
+        synchronized (RemoteImages.class) {
+            if (webpRead != null) return true;
+            if (webpUnavailable) return false;
+            try {
                 Class<?> optionsClass = Class.forName("org.glavo.webp.WebPImageLoadOptions");
                 webpOptions = optionsClass.getConstructor(double.class, double.class, boolean.class, boolean.class);
                 Class<?> imageClass = Class.forName("org.glavo.webp.WebPImage");
                 webpRead = imageClass.getMethod("read", java.io.InputStream.class, optionsClass);
                 webpImage = Class.forName("org.glavo.webp.javafx.WebPFXImage")
                         .getConstructor(imageClass);
+                return true;
+            } catch (Throwable t) {
+                // 只有“解码器加载失败”才全局降级；单张坏图不能让后续 WebP 全部失效。
+                webpUnavailable = true;
+                return false;
             }
+        }
+    }
+
+    private static Image decodeWebp(byte[] bytes, int px) {
+        if (!webpReady()) return null;
+        try {
             Object options = webpOptions.newInstance((double) px, (double) px, true, true);
             Object decoded = webpRead.invoke(null, new ByteArrayInputStream(bytes), options);
             return (Image) webpImage.newInstance(decoded);
         } catch (Throwable t) {
-            webpUnavailable = true;
             return null;
         }
     }

@@ -7,7 +7,6 @@
 #include <wchar.h>
 
 #define APP_NAME "TCraft Launcher"
-#define JAR_NAME L"TCraftLauncher.jar"
 // 数据固定在 exe 同目录 .tcl 不用 TEMP
 #define HOME_SUB L".tcl"
 #define CFG_NAME L"launcher.cfg"
@@ -21,6 +20,18 @@
 int __stdcall MultiByteToWideChar(unsigned int, unsigned long, const char *, int, wchar_t *, int);
 int __stdcall WideCharToMultiByte(unsigned int, unsigned long, const wchar_t *, int, char *, int, const char *, int *);
 unsigned int __stdcall GetACP(void);
+
+// TCC 没有导出的 InterlockedExchangeAdd，用 CompareExchange 补一个等价实现
+#ifdef __TINYC__
+static LONG tcl_atomic_add(volatile LONG *p, LONG v) {
+    LONG old;
+    do {
+        old = *p;
+    } while (InterlockedCompareExchange(p, old + v, old) != old);
+    return old;
+}
+#define InterlockedExchangeAdd(p, v) tcl_atomic_add((p), (v))
+#endif
 
 static wchar_t self_path[MAX_PATH_LEN];
 static wchar_t home_dir[MAX_PATH_LEN];
@@ -211,6 +222,12 @@ static void cleanup_legacy_home(void) {
     wchar_t alt[MAX_PATH_LEN];
     wchar_t old[MAX_PATH_LEN];
 
+    // 旧外壳在 .tcl 留的本体缓存 新版直接启动自身
+    copy_str(old, home_dir, MAX_PATH_LEN);
+    cat_str(old, L"\\TCraftLauncher.jar", MAX_PATH_LEN);
+    SetFileAttributesW(old, FILE_ATTRIBUTE_NORMAL);
+    DeleteFileW(old);
+
     if (!GetEnvironmentVariableW(L"LOCALAPPDATA", alt, MAX_PATH_LEN) || !alt[0]) return;
     copy_str(old, alt, MAX_PATH_LEN);
     cat_str(old, L"\\TCraftLauncher", MAX_PATH_LEN);
@@ -341,37 +358,6 @@ static unsigned long long jar_offset(const wchar_t *exe, unsigned long long *siz
     free(tail);
     CloseHandle(fh);
     return offset;
-}
-
-static int copy_range(const wchar_t *src, unsigned long long from, unsigned long long len,
-                      const wchar_t *dst) {
-    HANDLE in, out;
-    unsigned char *buf = (unsigned char *)malloc(65536);
-    int ok = 0;
-
-    if (!buf) return 0;
-    in = CreateFileW(src, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
-                     FILE_ATTRIBUTE_NORMAL, NULL);
-    if (in == INVALID_HANDLE_VALUE) { free(buf); return 0; }
-
-    out = CreateFileW(dst, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
-                      FILE_ATTRIBUTE_NORMAL, NULL);
-    if (out == INVALID_HANDLE_VALUE) { CloseHandle(in); free(buf); return 0; }
-
-    SetFilePointer(in, (LONG)from, NULL, FILE_BEGIN);
-
-    while (len > 0) {
-        DWORD want = len > 65536 ? 65536 : (DWORD)len;
-        DWORD got = 0, wrote = 0;
-        if (!ReadFile(in, buf, want, &got, NULL) || got == 0) break;
-        if (!WriteFile(out, buf, got, &wrote, NULL) || wrote != got) break;
-        len -= got;
-        if (len == 0) ok = 1;
-    }
-    CloseHandle(in);
-    CloseHandle(out);
-    free(buf);
-    return ok;
 }
 
 #define MAX_CAND 128
@@ -2176,8 +2162,6 @@ static void enable_dpi_awareness(void) {
 int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR args, int show) {
     unsigned long long size = 0, offset = 0;
     wchar_t java[MAX_PATH_LEN];
-    DWORD jar_size_low = 0, jar_size_high = 0;
-    HANDLE probe;
 
     (void)inst; (void)prev; (void)args; (void)show;
 
@@ -2211,25 +2195,8 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR args, int show) {
         return 0;
     }
     cleanup_legacy_home();
-    copy_str(jar_path, home_dir, MAX_PATH_LEN);
-    cat_str(jar_path, L"\\" JAR_NAME, MAX_PATH_LEN);
-
-    probe = CreateFileW(jar_path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
-                        FILE_ATTRIBUTE_NORMAL, NULL);
-    if (probe != INVALID_HANDLE_VALUE) {
-        jar_size_low = GetFileSize(probe, &jar_size_high);
-        CloseHandle(probe);
-    }
-    if ((unsigned long long)jar_size_low
-        + ((unsigned long long)jar_size_high << 32) != (size - offset)) {
-        if (!copy_range(self_path, offset, size - offset, jar_path)) {
-            stub_log("解包内置 jar 失败");
-            alert("释放内置 jar 失败：.tcl 目录写不进去。\n\n"
-                  "常见原因：安全软件拦截、磁盘已满、或 exe 放在只读位置。\n"
-                  "请换个位置放 exe 后重试。");
-            return 1;
-        }
-    }
+    // HMCL 同款：不落 .tcl 缓存 jar，直接 java -jar 自身
+    copy_str(jar_path, self_path, MAX_PATH_LEN);
 
     load_cfg();
 

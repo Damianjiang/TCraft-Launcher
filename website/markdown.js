@@ -1,4 +1,4 @@
-// 轻量 Markdown 渲染 标题 列表 粗体 行内代码 链接
+// Markdown 渲染 标题 列表 粗体 行内代码 链接
 (function () {
     function esc(s) {
         return s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));

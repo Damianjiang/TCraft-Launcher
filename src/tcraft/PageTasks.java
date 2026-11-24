@@ -122,7 +122,7 @@ public class PageTasks implements Page {
         inactiveSince = 0;
         NetSpeed.reset();
 
-        timer = new Timeline(new KeyFrame(Duration.millis(450), e -> tick()));
+        timer = new Timeline(new KeyFrame(Duration.millis(300), e -> tick()));
         timer.setCycleCount(Timeline.INDEFINITE);
         // 节点离开场景即停表
         page.sceneProperty().addListener((o, oldScene, newScene) -> {
@@ -258,7 +258,7 @@ public class PageTasks implements Page {
         final Rectangle bar;
         final Rectangle track;
         final Label stageLabel;
-        final Label speedLabel;
+        final Label detail;
         final VBox subs;
         final StackPane cancel;
         private String subSig = "";
@@ -297,14 +297,27 @@ public class PageTasks implements Page {
             progress.setMaxWidth(Double.MAX_VALUE);
 
             stageLabel = Ui.label(taskText(task.stage), 11.5, Theme.gray2);
-            speedLabel = Ui.label(task.speed == null ? "" : task.speed, 11.5, Theme.gray3);
-
+            detail = Ui.label("", 11, Theme.red);
+            detail.setWrapText(true);
+            detail.setVisible(false);
+            detail.setManaged(false);
+            detail.setOnMouseClicked(e -> {
+                if (task.error == null || task.error.isEmpty()) return;
+                javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
+                content.putString(task.error);
+                javafx.scene.input.Clipboard.getSystemClipboard().setContent(content);
+                win.toast("已复制错误详情", "完整错误已写入剪贴板", 1);
+            });
             subs = new VBox(3);
+            boolean active = false;
             for (Tasks.SubTask sub : task.subs) {
-                subs.getChildren().add(subRow(sub));
+                boolean running = sub.state == Tasks.State.RUNNING;
+                boolean isActive = !active && running;
+                if (isActive) active = true;
+                subs.getChildren().add(subRow(sub, isActive));
             }
             if (!task.subs.isEmpty()) VBox.setMargin(subs, new Insets(4, 0, 0, 0));
-            root.getChildren().addAll(head, progress, stageLabel, subs);
+            root.getChildren().addAll(head, progress, stageLabel, detail, subs);
         }
 
         private double displayProgress() {
@@ -312,16 +325,28 @@ public class PageTasks implements Page {
             return Math.max(0, Math.min(1, task.progress));
         }
 
-        private Node subRow(Tasks.SubTask sub) {            HBox row = new HBox(7);
+        private Node subRow(Tasks.SubTask sub, boolean active) {
+            HBox row = new HBox(7);
             row.setAlignment(Pos.CENTER_LEFT);
             Node icon;
             switch (sub.state) {
                 case DONE -> icon = Theme.icon("circle-check", 14, Theme.green);
                 case FAILED -> icon = Theme.icon("circle-minus", 14, Theme.red);
                 case CANCELED -> icon = Theme.icon("x", 14, Theme.gray3);
-                default -> icon = Theme.icon("refresh-cw", 14, Theme.accent);
+                default -> {
+                    if (sub.progress > 0) {
+                        Label percent = Ui.label(Math.round(sub.progress * 100) + "%", 11.5, Theme.gray3);
+                        percent.setMinWidth(30);
+                        percent.setAlignment(Pos.CENTER_RIGHT);
+                        icon = percent;
+                    } else {
+                        icon = active ? Theme.icon("refresh-cw", 14, Theme.accent)
+                                : Theme.icon("circle", 7, Theme.gray4);
+                    }
+                }
             }
-            Label name = Ui.label(taskText(sub.name), 11.5, sub.state == Tasks.State.RUNNING ? Theme.text : Theme.gray2);
+            Label name = Ui.label(taskText(sub.name), 11.5,
+                    active || sub.state == Tasks.State.DONE ? Theme.text : Theme.gray2);
             row.getChildren().addAll(icon, name);
             return row;
         }
@@ -330,8 +355,11 @@ public class PageTasks implements Page {
             bar.setWidth(Math.max(0, track.getWidth() * displayProgress()));
             stateLabel.setText(stateText(task.state));
             stateLabel.setTextFill(stateColor(task.state));
-            stageLabel.setText(taskText(task.state == Tasks.State.FAILED && task.error != null ? task.error : task.stage));
-            speedLabel.setText(task.speed == null ? "" : task.speed);
+            stageLabel.setText(taskText(task.stage));
+            boolean failedDetail = task.state == Tasks.State.FAILED && task.error != null && !task.error.isEmpty();
+            detail.setText(failedDetail ? task.error : "");
+            detail.setVisible(failedDetail);
+            detail.setManaged(failedDetail);
             cancel.setVisible(task.state == Tasks.State.RUNNING);
             if (!pendingAdded && task.state == Tasks.State.DONE && task.pendingAction != null) {
                 pendingAdded = true;
@@ -348,11 +376,21 @@ public class PageTasks implements Page {
                 root.getChildren().add(row);
             }
             StringBuilder sig = new StringBuilder();
-            for (Tasks.SubTask sub : task.subs) sig.append(sub.state).append(':').append(sub.name).append('|');
+            for (Tasks.SubTask sub : task.subs) {
+                sig.append(sub.state).append(':')
+                        .append(sub.progress > 0 ? Math.round(sub.progress * 100) : 0).append(':')
+                        .append(sub.name).append('|');
+            }
             if (sig.toString().equals(subSig)) return;
             subSig = sig.toString();
             subs.getChildren().clear();
-            for (Tasks.SubTask sub : task.subs) subs.getChildren().add(subRow(sub));
+            boolean active = false;
+            for (Tasks.SubTask sub : task.subs) {
+                boolean running = sub.state == Tasks.State.RUNNING;
+                boolean isActive = !active && running;
+                if (isActive) active = true;
+                subs.getChildren().add(subRow(sub, isActive));
+            }
         }
     }
 

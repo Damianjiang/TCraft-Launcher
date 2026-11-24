@@ -23,6 +23,20 @@ obj/
 # 运行与日志
 *.log
 hs_err_pid*
+.tcl/
+.tcraft-launcher-javafx/
+config.properties
+launcher.lock
+
+# 密钥/本地环境
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+*.keystore
 
 # 系统杂项
 .DS_Store
@@ -40,3 +54,4 @@ tools/tcc/
 plugin-docs/node_modules/
 plugin-docs/docs/.vitepress/cache/
 plugin-docs/docs/.vitepress/dist/
+website/wiki/

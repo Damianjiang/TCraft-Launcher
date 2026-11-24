@@ -656,6 +656,9 @@ public final class Modpacks {
             task.progress = 1;
             task.state = Tasks.State.DONE;
             task.stage = "整合包安装完成";
+            task.speed = "";
+            task.remainingFiles = 0;
+            task.threads = 0;
             data.log("整合包安装完成：" + instanceName + " → " + actual);
         } finally {
             deleteRecursive(tempDir);
@@ -1190,7 +1193,7 @@ public final class Modpacks {
     }
 
     private static final int MAX_ZIP_ENTRIES = 200_000;
-    private static final long MAX_ZIP_BYTES = 16L * 1024 * 1024 * 1024;
+    private static final long MAX_ZIP_BYTES = 4L * 1024 * 1024 * 1024;
 
     private static void copyDirectory(Path from, Path to) throws java.io.IOException {
         copyDirectory(from, to, rel -> false);
@@ -1281,60 +1284,81 @@ public final class Modpacks {
         task.progress = from;
         task.stage = "下载整合包内容 0 / " + jobs.size();
         task.speed = "";
-        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(
-                threads, r -> {
-                    Thread t = new Thread(r, "TCL-Modpack");
-                    t.setDaemon(true);
-                    return t;
-                });
+
         java.util.concurrent.atomic.AtomicInteger done = new java.util.concurrent.atomic.AtomicInteger();
+        java.util.concurrent.atomic.AtomicInteger succeeded = new java.util.concurrent.atomic.AtomicInteger();
         java.util.concurrent.atomic.AtomicLong bytesDone = new java.util.concurrent.atomic.AtomicLong();
-        java.util.concurrent.atomic.AtomicReference<Exception> failure =
+        java.util.concurrent.atomic.AtomicReference<Exception> firstError =
                 new java.util.concurrent.atomic.AtomicReference<>();
-        java.util.concurrent.atomic.AtomicBoolean stopping = new java.util.concurrent.atomic.AtomicBoolean();
-        List<java.util.concurrent.Future<?>> futures = new ArrayList<>();
+        java.util.concurrent.atomic.AtomicReference<Exception> finalError =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        List<DownloadJob> failed = java.util.Collections.synchronizedList(new ArrayList<>());
         long started = System.nanoTime();
-        try {
-            for (DownloadJob job : jobs) {
-                futures.add(pool.submit(() -> {
-                    if (task.canceled || stopping.get()) return;
-                    boolean ok = false;
-                    try {
-                        tryDownload(task, job.urls, job.target, job.sha1, false);
-                        ok = true;
-                    } catch (Exception e) {
-                        if (!task.canceled) {
-                            stopping.set(true);
-                            failure.compareAndSet(null, e);
-                        }
-                    } finally {
-                        if (ok) {
-                            try {
-                                bytesDone.addAndGet(Files.size(job.target));
-                            } catch (Exception ignored) {
+        List<DownloadJob> batch = jobs;
+        // HMCL 同款：先全部尝试，再补抓失败项，不因一个文件失败放弃其余任务
+        for (int round = 0; round <= 2 && !batch.isEmpty(); round++) {
+            failed.clear();
+            if (round > 0) {
+                task.stage = "补抓整合包内容 0 / " + batch.size();
+                task.remainingFiles = batch.size();
+            }
+            java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(
+                    Math.max(1, Math.min(threads, batch.size())), r -> {
+                        Thread t = new Thread(r, "TCL-Modpack");
+                        t.setDaemon(true);
+                        return t;
+                    });
+            final int roundNow = round;
+            final int batchSize = batch.size();
+            List<java.util.concurrent.Future<?>> futures = new ArrayList<>();
+            try {
+                for (DownloadJob job : batch) {
+                    futures.add(pool.submit(() -> {
+                        if (task.canceled) return;
+                        boolean ok = false;
+                        try {
+                            tryDownload(task, job.urls, job.target, job.sha1, false);
+                            ok = true;
+                        } catch (Exception e) {
+                            failed.add(job);
+                            firstError.compareAndSet(null, e);
+                            if (roundNow == 2) finalError.compareAndSet(null, e);
+                        } finally {
+                            if (ok) {
+                                succeeded.incrementAndGet();
+                                try {
+                                    bytesDone.addAndGet(Files.size(job.target));
+                                } catch (Exception ignored) {
+                                }
                             }
+                            int n = done.incrementAndGet();
+                            task.remainingFiles = Math.max(0, jobs.size() - succeeded.get());
+                            task.progress = from + (to - from) * succeeded.get() / jobs.size();
+                            task.stage = (roundNow == 0 ? "下载整合包内容 " : "补抓整合包内容 ")
+                                    + n + " / " + batchSize;
+                            long elapsed = Math.max(1, (System.nanoTime() - started) / 1_000_000);
+                            task.speed = Downloader.speed(bytesDone.get() * 1000 / elapsed);
                         }
-                        int n = done.incrementAndGet();
-                        task.remainingFiles = Math.max(0, jobs.size() - n);
-                        task.progress = from + (to - from) * n / jobs.size();
-                        task.stage = "下载整合包内容 " + n + " / " + jobs.size();
-                        long elapsed = Math.max(1, (System.nanoTime() - started) / 1_000_000);
-                        task.speed = Downloader.speed(bytesDone.get() * 1000 / elapsed);
-                    }
-                }));
-            }
-            for (java.util.concurrent.Future<?> f : futures) {
-                try {
-                    f.get();
-                } catch (Exception ignored) {
+                    }));
                 }
+                for (java.util.concurrent.Future<?> f : futures) {
+                    try {
+                        f.get();
+                    } catch (Exception ignored) {
+                    }
+                }
+            } finally {
+                pool.shutdownNow();
             }
-        } finally {
-            pool.shutdownNow();
+            if (task.canceled) throw new java.io.IOException(Lang.t("已取消"));
+            if (failed.isEmpty()) break;
+            batch = new ArrayList<>(failed);
         }
-        if (task.canceled) throw new java.io.IOException(Lang.t("已取消"));
-        Exception err = failure.get();
-        if (err != null) throw err;
+        if (!failed.isEmpty()) {
+            Exception first = finalError.get() != null ? finalError.get() : firstError.get();
+            throw new java.io.IOException(Lang.tf("%d 个文件下载失败：%s", failed.size(),
+                    first == null || first.getMessage() == null ? "网络异常" : first.getMessage()));
+        }
     }
 
     private static void tryDownload(Tasks.Task task, List<String> urls, Path target, String sha1) throws Exception {

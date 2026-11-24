@@ -30,7 +30,6 @@ import java.util.zip.ZipOutputStream;
 public class PageInstanceSetup implements Page {
 
     private static final long PACK_JSON_MAX = 10L * 1024 * 1024;
-    private static final long JIJ_MAX = 32L * 1024 * 1024;
     private static final long JIJ_EXPORT_ENTRY_MAX = 256L * 1024 * 1024;
     private static final long JIJ_EXPORT_TOTAL_MAX = 2L * 1024 * 1024 * 1024;
 
@@ -3547,7 +3546,7 @@ public class PageInstanceSetup implements Page {
                     if (++scanned > 4096) throw new java.io.IOException("Mod 内条目过多");
                     String n = e.getName();
                     if (!n.startsWith("META-INF/jars/") || !n.endsWith(".jar")) continue;
-                    String[] info = jijReadNestedInfo(Io.read(zip, JIJ_MAX));
+                    String[] info = jijReadNestedInfo(zip);
                     jars.add(new String[]{n, String.valueOf(e.getSize()), info[0], info[1]});
                 }
             } catch (Exception ex) {
@@ -3559,12 +3558,22 @@ public class PageInstanceSetup implements Page {
         });
     }
 
-    private static String[] jijReadNestedInfo(byte[] nestedJar) {
-        try (java.util.zip.ZipInputStream nested = new java.util.zip.ZipInputStream(
-                new java.io.ByteArrayInputStream(nestedJar))) {
+    // 直接在父 ZipInputStream 的当前条目上顺序读嵌套 jar，只取 fabric.mod.json，
+    // 不再把 32MB 内嵌 jar 整个读进 byte[]（大量 mod 时会造成明显 GC 峰值）。
+    private static String[] jijReadNestedInfo(java.io.InputStream raw) {
+        java.io.InputStream nonClosing = new java.io.FilterInputStream(raw) {
+            @Override
+            public void close() {
+                // 不能关父流，否则外层 ZipInputStream 无法继续下一个条目。
+            }
+        };
+        try (java.util.zip.ZipInputStream nested = new java.util.zip.ZipInputStream(nonClosing)) {
             java.util.zip.ZipEntry e;
+            int scanned = 0;
             while ((e = nested.getNextEntry()) != null) {
+                if (++scanned > 4096) break;
                 if (!e.getName().equals("fabric.mod.json")) continue;
+                if (e.getSize() > MOD_META_MAX) return new String[]{"", ""};
                 java.util.Map<String, Object> json = Json.obj(Json.parse(
                         new String(Io.read(nested, MOD_META_MAX), StandardCharsets.UTF_8)));
                 String name = Json.str(json, "name", "");

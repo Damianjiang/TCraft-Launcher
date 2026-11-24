@@ -274,9 +274,9 @@ public final class Theme {
         }
         String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
         String[] candidates;
-        if (os.contains("mac")) {
+        if (os.contains("mac") || os.contains("darwin")) {
             candidates = new String[]{"PingFang SC", "Hiragino Sans GB", "Heiti SC", "Helvetica Neue", "Arial"};
-        } else if (os.contains("win")) {
+        } else if (os.contains("windows")) {
             candidates = new String[]{"Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", "Arial"};
         } else {
             candidates = new String[]{"Noto Sans CJK SC", "Noto Sans CJK", "Source Han Sans CN",

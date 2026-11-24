@@ -4,7 +4,7 @@
 
 # TCraft Launcher
 
-**全新重写，轻装上阵。**
+**开源、绿色、单文件。**
 
 开源的 Minecraft Java 版启动器。绿色单文件，无捆绑、不上报数据；支持微软登录、EasyTier 联机、整合包与 Mod 下载，兼容 Windows / macOS / Linux。
 
@@ -67,7 +67,11 @@
 | macOS | `TCraftLauncher-<版本>.jar` | `java -jar` |
 | Linux | `TCraftLauncher-<版本>-linux.sh` | `chmod +x` 后执行 |
 
-需要 Java 17+；首次启动按平台下载 JavaFX 与 WebP 解码库到 `.tcl`。配置、日志和数据都在 `.tcl` 内，不写注册表、不装服务。
+需要 Java 17+；首次启动按平台下载 JavaFX 与 WebP 解码库到 `.tcl`。配置、日志和数据都在 `.tcl` 内，不写注册表、不装服务。放在 `/Applications`、`Program Files` 等只读目录时，配置会退回 `~/.tcraft-launcher-javafx`。
+
+macOS 首次运行若被 Gatekeeper 拦截，右键打开；或在终端执行 `xattr -dr com.apple.quarantine TCraftLauncher-<版本>.jar`。
+
+启动器只支持 64 位：JavaFX 17 的官方原生包覆盖 Windows x64、Linux x64、macOS x64/arm64；32 位 Windows/Linux 和 Windows ARM64 没有官方原生包，会直接提示不支持。Linux arm64 有 OpenJFX 构建，但官方未列入正式支持平台；Linux 还需要系统提供 GTK 运行库。
 
 ## 编译
 
@@ -83,6 +87,16 @@ javac --release 17 --module-path lib --add-modules javafx.controls,javafx.media 
 
 打包：class 与 `res/` 打成一个 jar（`Main-Class: tcraft.Boot`）。Windows 单文件 exe：编译 `tools/launcher.c` → `python tools/add-icon.py` 注入图标 → 追加 jar。
 
+插件文档站：
+
+```bash
+cd plugin-docs
+npm ci
+npm run docs:build
+```
+
+产物生成到 `website/wiki/`，该目录已加入 `.gitignore`，由 GitHub Actions 部署时重新构建，不提交到仓库。
+
 ## 项目结构
 
 ```
@@ -91,9 +105,7 @@ javac --release 17 --module-path lib --add-modules javafx.controls,javafx.media 
 ├── lib/            JavaFX 编译依赖
 ├── tools/          Windows 单文件外壳与 WebP 解码库
 ├── plugin-docs/    插件文档源码（VitePress + Teek）
-└── website/        官网与插件开发文档站
-    ├── wiki/       构建后的文档
-    └── ...         页面、样式、下载脚本、静态资源
+└── website/        官网源文件；wiki/ 由文档构建生成，不提交
 ```
 
 ## 致谢

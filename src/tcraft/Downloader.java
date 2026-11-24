@@ -77,6 +77,8 @@ public final class Downloader {
                 task.state = Tasks.State.DONE;
                 task.stage = "安装完成";
                 task.speed = "";
+                task.remainingFiles = 0;
+                task.threads = 0;
                 javafx.application.Platform.runLater(() ->
                         win.toast("安装完成", version.id + ("原版".equals(loader) ? "" : " · " + Lang.t(loader)), 1));
                 data.log("安装完成：" + version.id + "（" + loader + "）");
@@ -252,6 +254,7 @@ public final class Downloader {
                         }
                         int n = libDone.incrementAndGet();
                         task.progress = 0.28 + 0.22 * n / (double) total;
+                        if (task.subs.size() > 2) task.subs.get(2).progress = n / (double) total;
                         task.remainingFiles = Math.max(0, total - n);
                         task.stage = "下载依赖库 " + n + " / " + total;
                     }));
@@ -322,6 +325,7 @@ public final class Downloader {
                     int n = assetDone.incrementAndGet();
                     task.remainingFiles = Math.max(0, totalAssets - n);
                     task.progress = 0.55 + 0.40 * n / (double) totalAssets;
+                    if (task.subs.size() > 4) task.subs.get(4).progress = n / (double) totalAssets;
                     task.stage = "下载资源文件 " + n + " / " + totalAssets;
                 }));
             }
@@ -603,8 +607,8 @@ public final class Downloader {
 
     private static void transferOnce(java.util.function.DoubleConsumer progress, String url, Path part,
                                      long done, java.security.MessageDigest digest) throws IOException {
-        Http.Body body = done > 0 ? Http.open(url, java.time.Duration.ofSeconds(60), done)
-                : Http.open(url, java.time.Duration.ofSeconds(60));
+        Http.Body body = done > 0 ? Http.openOnce(url, java.time.Duration.ofSeconds(60), done)
+                : Http.openOnce(url, java.time.Duration.ofSeconds(60));
         IdleCloser guard = new IdleCloser(body.in, 20_000);
         guard.start();
         try (InputStream in = body.in) {
@@ -694,7 +698,7 @@ public final class Downloader {
 
     private static String nativeOsName() {
         String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
-        if (os.contains("win")) return "windows";
+        if (os.contains("windows")) return "windows";
         if (os.contains("mac") || os.contains("darwin")) return "osx";
         return "linux";
     }
@@ -1282,17 +1286,12 @@ public final class Downloader {
             if (existingDownloadValid(target, sha1)) return;
         }
         Files.createDirectories(target.getParent());
-        Exception last = null;
-        for (String candidate : Sources.rank(mirrors(url))) {
-            try {
-                Fetch.file(task, candidate, target, sha1, progressFrom, progressTo);
-                return;
-            } catch (Exception e) {
-                last = e;
-            }
+        try {
+            Fetch.fileCandidates(task, Sources.rank(mirrors(url)), target, sha1, progressFrom, progressTo, true);
+        } catch (Exception e) {
+            throw new IOException(Lang.t("下载失败：") + (sha1 != null ? label + "（SHA-1 " + sha1 + "）" : label)
+                    + (e.getMessage() == null ? "" : "（" + e.getMessage() + "）"));
         }
-        throw new IOException(Lang.t("下载失败：") + (sha1 != null ? label + "（SHA-1 " + sha1 + "）" : label)
-                + (last == null ? "" : "（" + last.getMessage() + "）"));
     }
 
     private static void downloadTo(Tasks.Task task, String primary, String fallback, Path target,

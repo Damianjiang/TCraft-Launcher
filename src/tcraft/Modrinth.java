@@ -193,20 +193,10 @@ public final class Modrinth {
     }
 
     static void downloadUrl(Tasks.Task task, String url, Path target, String sha1, boolean report) throws IOException {
-        IOException last = null;
         // 资源镜像同样走候选 并按域名测速排序
-        for (String candidate : Sources.rank(Mirrors.images(url))) {
-            try {
-                Fetch.file(task, candidate, target, sha1, 0, report ? 0.98 : 0, report);
-                if (report && task != null) task.remainingFiles = 1;
-                return;
-            } catch (IOException e) {
-                if (task != null && task.canceled) throw e;
-                last = e;
-            }
-        }
-        if (last != null) throw last;
-        throw new IOException(Lang.t("下载失败：") + target.getFileName());
+        Fetch.fileCandidates(task, Sources.rank(Mirrors.images(url)), target, sha1,
+                0, report ? 0.98 : 0, report);
+        if (report && task != null) task.remainingFiles = 1;
     }
 
     private static String get(String url) throws IOException {

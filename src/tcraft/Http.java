@@ -143,6 +143,11 @@ public final class Http {
         return client;
     }
 
+    // 认证/带密码请求使用不自动跟随重定向的 client，调用方自行处理 Location。
+    static HttpClient noRedirectClient() {
+        return clientNoRedirect;
+    }
+
     public static ExecutorService pool() {
         return POOL;
     }
@@ -170,7 +175,7 @@ public final class Http {
             // 手动重定向 跨域剥凭证
             return sendRedirectAware("GET", url, null, Duration.ofSeconds(20), headers, null, true);
         }
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(url))
+        HttpRequest.Builder b = HttpRequest.newBuilder(httpUri(url))
                 .timeout(Duration.ofSeconds(20))
                 .header("User-Agent", UA)
                 .header("Accept-Encoding", "gzip")
@@ -194,7 +199,7 @@ public final class Http {
         if (hasCredentialHeader(headers)) {
             return sendRedirectAware("POST", url, body, Duration.ofSeconds(25), headers, "application/json", false);
         }
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(url))
+        HttpRequest.Builder b = HttpRequest.newBuilder(httpUri(url))
                 .timeout(Duration.ofSeconds(25))
                 .header("User-Agent", UA)
                 .header("Content-Type", "application/json")
@@ -203,21 +208,41 @@ public final class Http {
         return send(b.build(), url);
     }
 
-    private static final java.util.Set<String> CREDENTIAL_HEADERS =
-            java.util.Set.of("x-api-key", "authorization", "cookie");
+    private static java.net.URI httpUri(String url) throws IOException {
+        try {
+            java.net.URI uri = java.net.URI.create(url);
+            String scheme = uri.getScheme();
+            if (scheme == null || !("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme))
+                    || uri.getHost() == null || uri.getHost().isBlank()) {
+                throw new IOException("仅支持 HTTP/HTTPS 地址");
+            }
+            return uri;
+        } catch (IOException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IOException("地址格式无效：" + url, e);
+        }
+    }
 
     private static boolean hasCredentialHeader(Map<String, String> headers) {
         for (String k : headers.keySet()) {
-            if (k != null && CREDENTIAL_HEADERS.contains(k.toLowerCase(java.util.Locale.ROOT))) return true;
+            if (sensitiveHeader(k)) return true;
         }
         return false;
+    }
+
+    private static boolean sensitiveHeader(String key) {
+        if (key == null) return false;
+        String k = key.toLowerCase(java.util.Locale.ROOT).trim();
+        return k.equals("authorization") || k.equals("cookie") || k.equals("x-api-key")
+                || k.contains("api-key") || k.contains("token") || k.contains("secret");
     }
 
     private static Map<String, String> stripCredentials(Map<String, String> headers) {
         Map<String, String> out = new java.util.LinkedHashMap<>();
         for (Map.Entry<String, String> e : headers.entrySet()) {
             String k = e.getKey();
-            if (k == null || CREDENTIAL_HEADERS.contains(k.toLowerCase(java.util.Locale.ROOT))) continue;
+            if (sensitiveHeader(k)) continue;
             out.put(k, e.getValue());
         }
         return out;
@@ -243,8 +268,9 @@ public final class Http {
     }
 
     private static HttpRequest newRequest(String method, String url, String body, Duration timeout,
-                                          Map<String, String> headers, String contentType, boolean gzip) {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(url))
+                                          Map<String, String> headers, String contentType, boolean gzip)
+            throws IOException {
+        HttpRequest.Builder b = HttpRequest.newBuilder(httpUri(url))
                 .timeout(timeout)
                 .header("User-Agent", UA);
         if (gzip) b.header("Accept-Encoding", "gzip");
@@ -296,7 +322,23 @@ public final class Http {
                 } catch (IOException ignored) {
                 }
                 if (location.isEmpty()) throw new IOException("HTTP " + code);
-                String next = URI.create(current).resolve(location).toString();
+                String next;
+                try {
+                    next = URI.create(current).resolve(location).toString();
+                } catch (Exception e) {
+                    throw new IOException("重定向地址格式无效：" + location, e);
+                }
+                java.net.URI nextUri;
+                try {
+                    nextUri = httpUri(next);
+                } catch (IOException e) {
+                    throw new IOException("重定向目标不是 HTTP/HTTPS：" + next, e);
+                }
+                // 不允许从 HTTPS 降级到 HTTP，避免凭据/内容在明文链路上被截获。
+                if ("https".equalsIgnoreCase(URI.create(current).getScheme())
+                        && !"https".equalsIgnoreCase(nextUri.getScheme())) {
+                    throw new IOException("拒绝 HTTPS 降级重定向：" + next);
+                }
                 if (!sameOrigin(current, next)) {
                     hdrs = stripCredentials(hdrs);
                 }
@@ -397,7 +439,7 @@ public final class Http {
         IOException last = null;
         for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
             if (attempt > 0) sleep(BACKOFF_MS[Math.min(attempt - 1, BACKOFF_MS.length - 1)]);
-            HttpRequest req = HttpRequest.newBuilder(URI.create(url))
+            HttpRequest req = HttpRequest.newBuilder(httpUri(url))
                     .timeout(Duration.ofSeconds(15))
                     .header("User-Agent", UA)
                     .GET()
@@ -430,11 +472,16 @@ public final class Http {
     }
 
     public static CompletableFuture<byte[]> getBytesOnce(String url, int timeoutSec) {
-        HttpRequest req = HttpRequest.newBuilder(URI.create(url))
-                .timeout(Duration.ofSeconds(timeoutSec))
-                .header("User-Agent", UA)
-                .GET()
-                .build();
+        HttpRequest req;
+        try {
+            req = HttpRequest.newBuilder(httpUri(url))
+                    .timeout(Duration.ofSeconds(timeoutSec))
+                    .header("User-Agent", UA)
+                    .GET()
+                    .build();
+        } catch (IOException e) {
+            return CompletableFuture.failedFuture(e);
+        }
         return client.sendAsync(req, HttpResponse.BodyHandlers.ofInputStream())
                 .thenApply(resp -> {
                     int code = resp.statusCode();
@@ -452,11 +499,16 @@ public final class Http {
     }
 
     private static CompletableFuture<byte[]> bytesAttempt(String url, int attempt) {
-        HttpRequest req = HttpRequest.newBuilder(URI.create(url))
-                .timeout(Duration.ofSeconds(15))
-                .header("User-Agent", UA)
-                .GET()
-                .build();
+        HttpRequest req;
+        try {
+            req = HttpRequest.newBuilder(httpUri(url))
+                    .timeout(Duration.ofSeconds(15))
+                    .header("User-Agent", UA)
+                    .GET()
+                    .build();
+        } catch (IOException e) {
+            return CompletableFuture.failedFuture(e);
+        }
         return client.sendAsync(req, HttpResponse.BodyHandlers.ofInputStream())
                 .handle((resp, err) -> {
                     if (err != null) throw new CompletionException(unwrap(err));
@@ -537,12 +589,21 @@ public final class Http {
         return openAttempt(url, timeout, rangeStart, rangeEnd, MAX_ATTEMPTS);
     }
 
+    // 单次连接 由 Fetch 的候选源循环负责重试 避免内外层叠加
+    static Body openOnce(String url, Duration timeout, long rangeStart) throws IOException {
+        return openAttempt(url, timeout, rangeStart, -1, 1);
+    }
+
+    static Body openOnce(String url, Duration timeout) throws IOException {
+        return openAttempt(url, timeout, -1, -1, 1);
+    }
+
     private static Body openAttempt(String url, Duration timeout, long rangeStart, long rangeEnd,
                                     int maxAttempts) throws IOException {
         IOException last = null;
         for (int attempt = 0; attempt < maxAttempts; attempt++) {
             if (attempt > 0) sleep(BACKOFF_MS[Math.min(attempt - 1, BACKOFF_MS.length - 1)]);
-            HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url))
+            HttpRequest.Builder builder = HttpRequest.newBuilder(httpUri(url))
                     .timeout(timeout)
                     .header("User-Agent", UA)
                     .GET();

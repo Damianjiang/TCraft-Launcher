@@ -56,7 +56,7 @@ public final class Updates {
     };
 
     private static String updateMirror() {
-        if (Data.get().getInt("SystemUpdateMirrorMode", 0) != 7) return "";
+        if (Data.get().getInt("SystemUpdateMirrorMode", 1) != 7) return "";
         String url = Data.get().get("SystemUpdateMirrorUrl", "");
         if (url == null) return "";
         url = url.trim();
@@ -68,7 +68,7 @@ public final class Updates {
     // 0 官方 / 1 测速 / 2..6 节点 / 7 自定义
     private static java.util.List<String> apiBases() {
         java.util.List<String> out = new java.util.ArrayList<>();
-        int mode = Data.get().getInt("SystemUpdateMirrorMode", 0);
+        int mode = Data.get().getInt("SystemUpdateMirrorMode", 1);
         if (mode == 0) return out;
         if (mode == 1) {
             out.addAll(java.util.Arrays.asList(MIRRORS));
@@ -104,6 +104,13 @@ public final class Updates {
                 }
             }
         } catch (Exception ignored) {
+        }
+        UpgradeState.Notice notice = UpgradeState.readAndClear();
+        if (notice == null) notice = UpgradeState.detectFromLog();
+        if (notice != null) {
+            showUpgradeNotice(win, notice);
+            // 本次先展示升级结果，更新检查交给下次启动，避免两个弹窗叠在一起
+            return;
         }
         if (!Data.get().getBool("CheckUpdateOnStartup", true)) return;
         if (!Data.get().getBool("ToolUpdateRelease", true)
@@ -257,7 +264,7 @@ public final class Updates {
         if (msg.contains("超时") || low.contains("timed out") || low.contains("timeout")) {
             return Lang.t("连接 GitHub 超时，请检查网络后再试。");
         }
-        if (Data.get().getInt("SystemUpdateMirrorMode", 0) >= 2) {
+        if (Data.get().getInt("SystemUpdateMirrorMode", 1) >= 2) {
             return Lang.t("选中的更新源连不上，可在 设置 → 网络 里换一个源再试。");
         }
         return Lang.t("GitHub 可能连接不稳定，你可以使用瓦特工具箱等工具开个加速或来个 VPN。");
@@ -360,6 +367,46 @@ public final class Updates {
             return;
         }
         showUpdate(win, release);
+    }
+
+    private static void showUpgradeNotice(MainWindow win, UpgradeState.Notice notice) {
+        Data.get().log("展示升级完成提示：" + notice.from + " -> " + notice.to);
+        VBox card = Dialogs.msgCard("更新完成");
+        card.setPrefWidth(520);
+        card.setMinWidth(480);
+
+        VBox body = new VBox(8);
+        body.setPadding(new Insets(14, 7, 0, 7));
+        Label title = Ui.bold(Lang.tf("已从 v%s 升级到 v%s", clean(notice.from), clean(notice.to)),
+                15, Theme.accentDark);
+        title.setWrapText(true);
+        Label sub = Ui.label(notice.versions > 1
+                ? Lang.tf("本次跨越 %d 个版本，以下是这段时间的全部更新内容。", notice.versions)
+                : Lang.t("本次更新内容如下。"), 12.5, Theme.gray2);
+        sub.setWrapText(true);
+        Label logTitle = Ui.semi(Lang.t("本次更新日志"), 12.5, Theme.text);
+        VBox logContent = new VBox(Md.render(notice.changelog));
+        logContent.setMaxWidth(470);
+        logContent.setPadding(new Insets(7, 9, 7, 9));
+        logContent.setBackground(Ui.fill(Theme.fieldBg, 6));
+        logContent.setBorder(Ui.border(Theme.gray6, 6, 1));
+        if (notice.changelog.trim().isEmpty()) {
+            logContent.getChildren().add(Ui.label(Lang.t("这个版本没有附带更新说明。"), 12, Theme.gray2));
+        }
+        ScrollPane logScroll = Ui.scroll(logContent, 2.1);
+        logScroll.setPrefViewportHeight(230);
+        logScroll.setMinHeight(140);
+        logScroll.setMaxHeight(300);
+        VBox.setMargin(logScroll, new Insets(3, 0, 0, 0));
+
+        HBox actions = new HBox(12);
+        actions.setAlignment(Pos.CENTER_RIGHT);
+        actions.setPadding(new Insets(15, 7, 0, 7));
+        actions.getChildren().add(Ui.button("知道了", Ui.BTN_HIGHLIGHT, win::closeModal));
+
+        body.getChildren().addAll(title, sub, logTitle, logScroll);
+        card.getChildren().addAll(body, actions);
+        win.showModal(card, true);
     }
 
     private static void showUpdate(MainWindow win, Release release) {
@@ -532,6 +579,7 @@ public final class Updates {
                 task.stage = Lang.t("正在校验…");
                 verify(file, release, release.source, () -> task.canceled);
                 if (task.canceled) return;
+                UpgradeState.pending(Build.VERSION, ver, release.versions, release.changelog);
                 task.state = Tasks.State.DONE;
                 // 窗口关闭时在 worker 安装
                 if (!windowAlive(win)) {
@@ -612,7 +660,7 @@ public final class Updates {
     // 换源后以当前设置为准
     static List<String> downloadBases(String source) {
         List<String> out = new ArrayList<>();
-        int mode = Data.get().getInt("SystemUpdateMirrorMode", 0);
+        int mode = Data.get().getInt("SystemUpdateMirrorMode", 1);
         if (mode == 1) {
             out.add(source == null ? "" : source);
             if (!out.contains("")) out.add("");
@@ -678,7 +726,7 @@ public final class Updates {
 
     // 检查更新跟随选中源
     static Release fetchLatest() throws Exception {
-        int mode = Data.get().getInt("SystemUpdateMirrorMode", 0);
+        int mode = Data.get().getInt("SystemUpdateMirrorMode", 1);
         if (mode == 1) return fetchFastest();
         if (mode >= 2) {
             Exception last = null;

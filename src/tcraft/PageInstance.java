@@ -770,8 +770,8 @@ public class PageInstance implements Page {
         Threads.start("TCL-Shortcut", () -> {
             try {
                 String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
-                boolean windows = os.contains("win");
-                boolean mac = os.contains("mac");
+                boolean windows = os.contains("windows");
+                boolean mac = os.contains("mac") || os.contains("darwin");
                 java.nio.file.Path script = Resources.launchTarget();
                 // 裸 jar 统一回退到当前 Java 运行 覆盖 Windows/Linux/macOS
                 java.nio.file.Path jar = script == null ? Resources.jar() : null;
@@ -873,9 +873,14 @@ public class PageInstance implements Page {
     private static java.nio.file.Path uniquePath(java.nio.file.Path dir, String base, String ext) {
         java.nio.file.Path candidate = dir.resolve(base + ext);
         int index = 2;
-        while (java.nio.file.Files.exists(candidate) && index <= 999) {
+        // 用 NOFOLLOW：桌面上的断链符号链接也算“已存在”，不能顺着它写外部文件。
+        while (java.nio.file.Files.exists(candidate, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                && index <= 999) {
             candidate = dir.resolve(base + " (" + index + ")" + ext);
             index++;
+        }
+        if (java.nio.file.Files.exists(candidate, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+            candidate = dir.resolve(base + " (" + System.nanoTime() + ")" + ext);
         }
         return candidate;
     }
@@ -892,6 +897,7 @@ public class PageInstance implements Page {
         String value = s == null ? "" : s;
         value = value.replace("\\", "\\\\").replace("\"", "\\\"")
                 .replace("`", "\\`").replace("$", "\\$")
+                .replace("%", "%%")
                 .replace("\r", " ").replace("\n", " ");
         return "\"" + value + "\"";
     }
@@ -919,17 +925,25 @@ public class PageInstance implements Page {
         }
         java.nio.file.Path outPath = out.toPath().toAbsolutePath().normalize();
         final java.nio.file.Path partZip = outPath.resolveSibling(outPath.getFileName() + ".part");
+        final java.nio.file.Path launcherHome = Resources.home().toAbsolutePath().normalize();
         win.toast("开始备份", ins.name + " → " + out.getName(), 1);
         Thread worker = new Thread(() -> {
             java.util.concurrent.atomic.AtomicInteger skipped = new java.util.concurrent.atomic.AtomicInteger();
             try (java.util.zip.ZipOutputStream zos = new java.util.zip.ZipOutputStream(
                     new java.io.BufferedOutputStream(java.nio.file.Files.newOutputStream(partZip)));
                  var walk = java.nio.file.Files.walk(src)) {
-                walk.filter(java.nio.file.Files::isRegularFile).forEach(f -> {
+                walk.filter(p -> !java.nio.file.Files.isSymbolicLink(p)
+                                && java.nio.file.Files.isRegularFile(p, java.nio.file.LinkOption.NOFOLLOW_LINKS))
+                        .forEach(f -> {
                     try {
                         // 输出文件本身不能进压缩包
                         java.nio.file.Path current = f.toAbsolutePath().normalize();
                         if (current.equals(outPath) || current.equals(partZip)) return;
+                        // 不把 .tcl/config.properties（含令牌）和日志打进可转发备份。
+                        if (current.startsWith(launcherHome)) {
+                            skipped.incrementAndGet();
+                            return;
+                        }
                         String rel = src.relativize(f).toString().replace('\\', '/');
                         zos.putNextEntry(new java.util.zip.ZipEntry(rel));
                         java.nio.file.Files.copy(f, zos);
@@ -1016,7 +1030,7 @@ public class PageInstance implements Page {
         java.nio.file.Path versions = gameDir.resolve("versions");
         if (!java.nio.file.Files.isDirectory(versions)) return "";
         String folderKey = gameDir.toAbsolutePath().normalize().toString();
-        boolean windows = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win");
+        boolean windows = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("windows");
         try (var stream = java.nio.file.Files.list(versions)) {
             stream.limit(10000).filter(java.nio.file.Files::isDirectory).forEach(dir -> {
                 String name = dir.getFileName().toString();
@@ -1117,7 +1131,7 @@ public class PageInstance implements Page {
             return;
         }
         String path = target.toAbsolutePath().normalize().toString();
-        boolean windows = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win");
+        boolean windows = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("windows");
         Data.FolderItem existing = null;
         for (Data.FolderItem folder : data.folders) {
             String known = java.nio.file.Paths.get(folder.path).toAbsolutePath().normalize().toString();

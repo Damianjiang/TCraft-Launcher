@@ -177,9 +177,9 @@ public class PageSetup implements Page {
                 data.set("SystemMaxThreads", "64");
                 data.set("SystemSpeedLimit", "");
                 data.set("SystemCurseKey", "");
-                data.set("SystemMirrorMode", 0);
+                data.set("SystemMirrorMode", 3);
                 data.set("SystemMirrorUrl", "");
-                data.set("SystemUpdateMirrorMode", 0);
+                data.set("SystemUpdateMirrorMode", 1);
                 data.set("SystemUpdateMirrorUrl", "");
                 data.set("SystemHttpProxyType", 1);
                 data.set("SystemProxyAddress", "");
@@ -1277,7 +1277,7 @@ public class PageSetup implements Page {
         header(page, "系统", "下载、网络、语言与启动器行为。");
         Ui.Card download = addCard(page, "下载");
         // 0/2 仅是首选顺序
-        String[] sourceNames = {"镜像优先（下载时按测速结果择优）", "官方优先（下载时按测速结果择优）", "仅使用官方源"};
+        String[] sourceNames = {"自动选择（下载时按测速结果择优）", "官方优先（下载时按测速结果择优）", "仅使用官方源"};
         int fileCur = data.getInt("SystemDownloadSource", 0);
         int fileIndex = 1;
         for (int i = 0; i < FILE_SOURCES.length; i++) if (FILE_SOURCES[i] == fileCur) fileIndex = i;
@@ -1596,7 +1596,7 @@ public class PageSetup implements Page {
     private void importJava() {
         FileChooser chooser = new FileChooser();
         chooser.setTitle(Lang.t("选择 Java 可执行文件"));
-        boolean winOs = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win");
+        boolean winOs = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("windows");
         chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(Lang.t("Java 可执行文件"),
                 winOs ? new String[]{"javaw.exe", "java.exe"} : new String[]{"java"}));
         chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(Lang.t("所有文件"), "*.*"));
@@ -2242,24 +2242,33 @@ public class PageSetup implements Page {
 
         Ui.Card update = addCard(page, "TCL 检查更新");
         update.add(directCheck("启动时自动检查更新", "CheckUpdateOnStartup", true));
-        ComboBox<String> combo = Ui.combo(
-                new String[]{"官方（默认）", "自动测速选最快", "gh-proxy.com", "gh-proxy.org",
-                        "ghfast.top", "ghproxy.net", "ghproxy.imciel.com", "自定义镜像"},
-                Math.max(0, Math.min(7, data.getInt("SystemUpdateMirrorMode", 0))));
+        String[] updateNames = {"自动测速选最快（默认）", "官方源", "gh-proxy.com", "gh-proxy.org",
+                "ghfast.top", "ghproxy.net", "ghproxy.imciel.com", "自定义镜像"};
+        int[] updateModes = {1, 0, 2, 3, 4, 5, 6, 7};
+        int updateMode = Math.max(0, Math.min(7, data.getInt("SystemUpdateMirrorMode", 1)));
+        int updateIndex = 0;
+        for (int i = 0; i < updateModes.length; i++) {
+            if (updateModes[i] == updateMode) {
+                updateIndex = i;
+                break;
+            }
+        }
+        ComboBox<String> combo = Ui.combo(updateNames, updateIndex);
         combo.setPrefWidth(220);
         combo.setMaxWidth(Double.MAX_VALUE);
         update.add(Ui.settingRow("更新源", combo));
         TextField updateUrl = textRow(update, "自定义地址", "https://gh-proxy.com/",
                 data.get("SystemUpdateMirrorUrl", ""),
                 s1 -> data.set("SystemUpdateMirrorUrl", s1 == null ? "" : s1.trim()));
-        updateUrl.setDisable(data.getInt("SystemUpdateMirrorMode", 0) != 7);
+        updateUrl.setDisable(updateMode != 7);
         combo.setOnAction(e -> {
             int i = combo.getSelectionModel().getSelectedIndex();
             if (i < 0) return;
-            data.set("SystemUpdateMirrorMode", i);
-            updateUrl.setDisable(i != 7);
+            int chosenMode = updateModes[i];
+            data.set("SystemUpdateMirrorMode", chosenMode);
+            updateUrl.setDisable(chosenMode != 7);
         });
-        update.add(Ui.hint("只影响版本号与更新日志的读取；点「前往下载」统一跳官网，由用户自己选节点下载。", 0));
+        update.add(Ui.hint("默认自动测速选最快节点；只影响版本号与更新日志的读取；点「前往下载」统一跳官网，由用户自己选节点下载。", 0));
 
         Ui.Card mirror = addCard(page, "资源镜像");
         TextField mirrorUrl = textRow(mirror, "镜像地址", "https://mod.mcimirror.top",
@@ -2268,16 +2277,17 @@ public class PageSetup implements Page {
                     clearMirrorCaches();
                 });
         comboRow(mirror, "Mod 镜像源",
-                new String[]{"官方源（默认）", "内置镜像（mod.mcimirror.top）", "手动填写"},
-                Math.max(0, Math.min(2, data.getInt("SystemMirrorMode", 0))),
+                new String[]{"官方源", "内置镜像（mod.mcimirror.top）", "手动填写", "自动测速（官方 / 内置镜像，默认）"},
+                Math.max(0, Math.min(3, data.getInt("SystemMirrorMode", 3))),
                 i -> {
-                    data.set("SystemMirrorMode", i);
-                    mirrorUrl.setDisable(i != 2);
+                    int mirrorModeValue = Math.max(0, Math.min(3, i));
+                    data.set("SystemMirrorMode", mirrorModeValue);
+                    mirrorUrl.setDisable(mirrorModeValue != 2);
                     clearMirrorCaches();
                     data.save();
                 });
-        mirrorUrl.setDisable(data.getInt("SystemMirrorMode", 0) != 2);
-        Label mirrorHint = Ui.label("影响 Modrinth / CurseForge 的接口、图标与文件下载。默认只走官方；选了镜像后优先走镜像，失败自动回退官方。"
+        mirrorUrl.setDisable(data.getInt("SystemMirrorMode", 3) != 2);
+        Label mirrorHint = Ui.label("影响 Modrinth / CurseForge 的接口、图标与文件下载。默认自动测速，官方与内置镜像同时作为候选，下载时按测速结果择优；某个源失败会自动换另一个。"
                 + "内置镜像为第三方公益服务，也可以填自己的反代地址。", 12, Theme.gray3);
         mirrorHint.setWrapText(true);
         mirror.add(mirrorHint);

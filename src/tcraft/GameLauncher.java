@@ -847,7 +847,7 @@ public final class GameLauncher {
         String pre = data.getInstance("PreCommand", data.get("LaunchPreCommand", ""));
         if (!pre.isEmpty()) {
             try {
-                boolean win = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win");
+                boolean win = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("windows");
                 String shell = win ? "cmd.exe" : "/bin/sh";
                 String arg = win ? "/c" : "-c";
                 Process preProcess = new ProcessBuilder(shell, arg, pre).directory(run.toFile())
@@ -942,7 +942,7 @@ public final class GameLauncher {
 
     private static String osName() {
         String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
-        if (os.contains("win")) return "windows";
+        if (os.contains("windows")) return "windows";
         if (os.contains("mac") || os.contains("darwin")) return "osx";
         return "linux";
     }
@@ -1034,6 +1034,11 @@ public final class GameLauncher {
 
     private static Path prepareAssetsRoot(Path game, String assetId) {
         Path assets = game.resolve("assets");
+        // assetId 来自版本 JSON，会拼进 indexes/virtual 路径；不允许路径分隔符和 ..
+        if (assetId == null || !assetId.matches("[A-Za-z0-9][A-Za-z0-9._-]{0,127}")) {
+            Data.get().log("资源索引 id 不合法，已忽略：" + assetId);
+            return assets;
+        }
         Path indexFile = assets.resolve("indexes").resolve(assetId + ".json");
         if (!Files.isRegularFile(indexFile)) return assets;
         try {

@@ -987,8 +987,8 @@ public class PageResourceDetail implements Page {
     }
 
     private static void unzipTo(Path zip, Path targetDir) throws java.io.IOException {
-        final long maxBytes = 8L * 1024 * 1024 * 1024;
-        final long maxEntry = 4L * 1024 * 1024 * 1024;
+        final long maxBytes = 4L * 1024 * 1024 * 1024;
+        final long maxEntry = 2L * 1024 * 1024 * 1024;
         final int maxEntries = 200000;
         Path base = targetDir.toAbsolutePath().normalize();
         long total = 0;

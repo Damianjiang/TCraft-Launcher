@@ -1,7 +1,7 @@
 # TCraft Launcher 插件开发者文档
 
 与 [TCWiki](https://github.com/Damianjiang/TCWiki) 同架构：VitePress 1.6.4 + `vitepress-theme-teek`。
-构建输出到 `website/wiki/`，随 `website/` 一起发布到 GitHub Pages 的 `/wiki/`。
+构建输出到 `website/wiki/`，该目录是构建产物、已加入 `.gitignore`；GitHub Actions 部署时重新构建，不提交到仓库。
 
 ## 本地开发
 

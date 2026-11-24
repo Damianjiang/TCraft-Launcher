@@ -31,7 +31,7 @@ public final class JavaInstaller {
         boolean arm64 = arch.contains("aarch64") || arch.contains("arm64");
         boolean arm32 = arch.contains("arm") && !arm64;
         boolean x86 = arch.equals("x86") || arch.equals("i386") || arch.equals("i686") || arch.equals("ia32");
-        if (os.contains("win")) {
+        if (os.contains("windows")) {
             if (arm32) return "";
             return arm64 ? "windows-arm64" : x86 ? "windows-x86" : "windows-x64";
         }

@@ -89,11 +89,42 @@ public final class Resources {
         Path legacy = Paths.get(System.getProperty("user.home"), ".tcraft-launcher-javafx");
         String explicit = System.getProperty("tcraft.dir");
         if (explicit == null || explicit.trim().isEmpty()) explicit = System.getenv("TCRAFT_HOME");
-        if (explicit == null || explicit.trim().isEmpty()) return legacy;
+        if (explicit != null && !explicit.trim().isEmpty()) {
+            Path dir = Paths.get(explicit.trim()).toAbsolutePath().normalize();
+            try {
+                Files.createDirectories(dir);
+                if (Files.isWritable(dir)) {
+                    migrateLegacy(legacy, dir);
+                    return dir;
+                }
+            } catch (Exception ignored) {
+                // 外壳目录只读时退回用户目录
+            }
+            return legacy;
+        }
+        // 单 jar 启动时和带壳版本一样落在启动器旁边的 .tcl，
+        // 目录只读（例如 macOS 的 /Applications）再退回用户目录。
+        Path portable = portableHome();
+        if (portable != null) {
+            migrateLegacy(legacy, portable);
+            return portable;
+        }
+        return legacy;
+    }
 
-        Path dir = Paths.get(explicit.trim()).toAbsolutePath().normalize();
-        migrateLegacy(legacy, dir);
-        return dir;
+    private static Path portableHome() {
+        try {
+            // 老用户已经把配置放在 ~/.tcraft-launcher-javafx，继续沿用；
+            // 新安装（没有旧目录）才落到启动器旁边的 .tcl。
+            Path legacy = Paths.get(System.getProperty("user.home"), ".tcraft-launcher-javafx");
+            if (Files.isDirectory(legacy)) return null;
+            if (jar() == null) return null;
+            Path dir = appDir().resolve(".tcl");
+            Files.createDirectories(dir);
+            return Files.isWritable(dir) ? dir : null;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private static void migrateLegacy(Path legacy, Path target) {
@@ -119,13 +150,17 @@ public final class Resources {
 
     private static void copyDir(Path src, Path dst) {
         if (!Files.isDirectory(src)) return;
+        Path base = dst.toAbsolutePath().normalize();
         try (java.util.stream.Stream<Path> walk = Files.walk(src)) {
             walk.forEach(p -> {
                 try {
-                    Path out = dst.resolve(src.relativize(p).toString());
+                    // 不跟随符号链接，避免把用户目录外的文件复制进启动器数据目录。
+                    if (Files.isSymbolicLink(p)) return;
+                    Path out = base.resolve(src.relativize(p).toString()).normalize();
+                    if (!out.startsWith(base)) return;
                     if (Files.isDirectory(p)) {
                         Files.createDirectories(out);
-                    } else if (!Files.exists(out)) {
+                    } else if (!Files.exists(out, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
                         Path parent = out.getParent();
                         if (parent != null) Files.createDirectories(parent);
                         Files.copy(p, out, StandardCopyOption.COPY_ATTRIBUTES);
@@ -143,8 +178,9 @@ public final class Resources {
         boolean arm64 = arch.contains("aarch64") || arch.contains("arm64");
         boolean arm32 = arch.contains("arm") && !arm64;
         boolean x86 = arch.equals("x86") || arch.equals("i386") || arch.equals("i686") || arch.equals("ia32");
-        if (os.contains("win")) return arm64 ? "win-arm64" : arm32 ? "win-arm" : x86 ? "win-x86" : "win";
-        if (os.contains("mac")) return arm64 ? "mac-aarch64" : "mac";
+        if (os.contains("windows")) return arm64 ? "win-arm64" : arm32 ? "win-arm" : x86 ? "win-x86" : "win";
+        if (os.contains("mac") || os.contains("darwin")) return arm64 ? "mac-aarch64" : "mac";
+        if (!os.contains("linux")) return "unsupported";
         if (arm32) return "linux-arm";
         if (arm64) return "linux-aarch64";
         if (x86) return "linux-x86";
@@ -194,6 +230,10 @@ public final class Resources {
 
     public static Path webpJar() {
         return home().resolve("dependencies").resolve("libs").resolve(WEBP_JAR);
+    }
+
+    private static boolean webpOnClasspath() {
+        return Resources.class.getClassLoader().getResource("org/glavo/webp/WebPImage.class") != null;
     }
 
     // 首启补 WebP 库 失败不拦启动
@@ -246,7 +286,27 @@ public final class Resources {
     public static void bootstrap(String[] args, StartupWindow ui) throws Exception {
         if (jar() == null) return; // 开发模式由 IDE 提供 JavaFX
         ui.setStatus(Lang.t("检查运行环境…"), 10);
+        Path deps = home().resolve("dependencies").resolve(platform()).resolve("openjfx");
+        boolean deployedReady = false;
         boolean fxReady = fxPresent();
+        if (fxReady) {
+            // classpath 里已有 JavaFX，但原生库可能被误删；缺失时重新解压
+            try {
+                if (Files.isDirectory(deps) && nativesPresent(deps, platform(), JFX_VERSION)) {
+                    boolean jars = true;
+                    for (String module : JFX_MODULES) {
+                        if (!Files.isRegularFile(deps.resolve(jarName(module, platform(), JFX_VERSION)))) {
+                            jars = false;
+                            break;
+                        }
+                    }
+                    deployedReady = jars && Files.isRegularFile(deps.resolve(".ready"));
+                }
+                if (Files.isDirectory(deps) && !nativesPresent(deps, platform(), JFX_VERSION)) fxReady = false;
+            } catch (Exception e) {
+                fxReady = false;
+            }
+        }
         if (!fxReady) {
             // 只有内置 JavaFX 缺失时才需要下载运行库
             Path rt = ensureJavaFx(ui);
@@ -255,9 +315,12 @@ public final class Resources {
             ui.setStatus(Lang.t("正在启动主界面…"), 95);
             relaunch(jar(), rt, platform(), args);
         } else {
-            // 已有 JavaFX 直接起主界面 只有刚补 WebP 才重拉一次
+            // 已有 JavaFX 直接起主界面；WebP 已存在但当前 classpath 没有时也要重拉。
+            // 只有 .tcl 内的运行库完整时才允许重拉，否则 new JVM 没有 --module-path 会找不到 JavaFX。
             boolean webpReady = ensureWebp(ui);
-            if (webpReady) {
+            if (deployedReady && (webpReady || (!webpOnClasspath()
+                    && !Boolean.getBoolean("tcl.webpRetry")
+                    && Files.isRegularFile(webpJar())))) {
                 ui.setStatus(Lang.t("正在启动主界面…"), 95);
                 relaunchBuiltin(jar(), args);
             }
@@ -282,7 +345,7 @@ public final class Resources {
     public static Path launchTarget() {
         Path dir = appDir();
         String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
-        String[] names = os.contains("win")
+        String[] names = os.contains("windows")
                 ? new String[]{"TCraftLauncher.exe", "TCraftLauncher.bat"}
                 : new String[]{"TCraftLauncher.sh", "TCraftLauncher.command"};
         for (String n : names) {
@@ -304,19 +367,19 @@ public final class Resources {
     // 自更新后直接带运行库拉起
     static List<String> directLaunchCommand(Path app, String... appArgs) throws IOException {
         String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
-        String exe = os.contains("win") ? "javaw.exe" : "java";
+        String exe = os.contains("windows") ? "javaw.exe" : "java";
         List<String> cmd = new ArrayList<>();
         cmd.add(Paths.get(System.getProperty("java.home"), "bin", exe).toString());
         cmd.add("-Dfile.encoding=UTF-8");
         cmd.add("-Dtcraft.dir=" + home());
         String self = System.getProperty("tcraft.exe", "");
         if (!self.isEmpty()) cmd.add("-Dtcraft.exe=" + self);
-        if (os.contains("mac")) cmd.add("-Xdock:name=TCraft Launcher");
+        if (os.contains("mac") || os.contains("darwin")) cmd.add("-Xdock:name=TCraft Launcher");
         String plat = platform();
         Path deps = home().resolve("dependencies").resolve(plat).resolve("openjfx");
-        boolean builtinFx = Files.isRegularFile(
-                Paths.get(System.getProperty("java.home"), "lib", "javafx.properties"));
-        // .ready 不可信 缺 jar 时走 bootstrap
+        boolean builtinFx = fxPresent()
+                && ModuleLayer.boot().findModule("javafx.controls").isPresent();
+        // .ready 不可信 缺 jar 或原生库时走 bootstrap
         boolean depsReady = Files.isRegularFile(deps.resolve(".ready"));
         if (depsReady) {
             for (String module : JFX_MODULES) {
@@ -326,18 +389,26 @@ public final class Resources {
                 }
             }
         }
+        if (depsReady) {
+            try {
+                if (!nativesPresent(deps, plat, JFX_VERSION)) depsReady = false;
+            } catch (Exception ignored) {
+                depsReady = false;
+            }
+        }
         String cp = Files.isRegularFile(webpJar())
                 ? app + File.pathSeparator + webpJar()
                 : app.toString();
-        if (builtinFx) {
+        if (depsReady) {
+            // 优先使用 .tcl 内运行库；不能因为当前 JVM 恰好从外部 module-path 启动就省掉路径。
+            cmd.add("-Djava.library.path=" + deps);
+            cmd.add("--module-path=" + modulePath(deps, plat));
             cmd.add("--add-modules=" + MODULES);
             cmd.add("--add-exports=javafx.graphics/com.sun.prism=ALL-UNNAMED");
             cmd.add("-cp");
             cmd.add(cp);
             cmd.add("tcraft.Boot");
-        } else if (depsReady) {
-            cmd.add("-Djava.library.path=" + deps);
-            cmd.add("--module-path=" + modulePath(deps, plat));
+        } else if (builtinFx) {
             cmd.add("--add-modules=" + MODULES);
             cmd.add("--add-exports=javafx.graphics/com.sun.prism=ALL-UNNAMED");
             cmd.add("-cp");
@@ -443,14 +514,92 @@ public final class Resources {
     private static void extractAllNatives(Path dir, String classifier, String version) throws IOException {
         Path marker = dir.resolve(".natives");
         String expected = version + "-" + classifier;
-        if (Files.isRegularFile(marker) && Files.size(marker) <= 64L * 1024
-                && expected.equals(Files.readString(marker).trim())) {
+        if (readNativeManifest(dir, expected) != null && nativesPresent(dir, classifier, version)) {
             return;
         }
+        Files.createDirectories(dir);
+        java.util.Set<String> names = new java.util.LinkedHashSet<>();
         for (String module : JFX_MODULES) {
-            extractNatives(dir.resolve(jarName(module, classifier, version)), dir);
+            names.addAll(extractNatives(dir.resolve(jarName(module, classifier, version)), dir));
         }
-        Files.writeString(marker, expected);
+        if (names.isEmpty()) throw new IOException(Lang.t("JavaFX 包中没有找到原生库"));
+        // 把文件名一起写进 marker，后续启动只做文件存在性检查，不再打开 4 个 jar 扫中央目录。
+        writeNativeManifest(dir.resolve(".natives"), expected, names);
+    }
+
+    // .natives 只能证明“解压过”，不能证明文件还在；
+    // 缺一个原生库时 JavaFX 会在启动后才报 UnsatisfiedLinkError，这里提前补。
+    private static boolean nativesPresent(Path dir, String classifier, String version) throws IOException {
+        String expected = version + "-" + classifier;
+        java.util.List<String> manifest = readNativeManifest(dir, expected);
+        if (manifest != null) {
+            for (String name : manifest) {
+                if (!validNativeName(name) || !Files.isRegularFile(dir.resolve(name),
+                        java.nio.file.LinkOption.NOFOLLOW_LINKS)) return false;
+            }
+            return true;
+        }
+        // 老版本 marker 只有版本串，或 marker 缺失：扫描一次并补写名单。
+        java.util.List<String> names = nativeNamesFromJars(dir, classifier, version);
+        for (String name : names) {
+            if (!Files.isRegularFile(dir.resolve(name), java.nio.file.LinkOption.NOFOLLOW_LINKS)) return false;
+        }
+        if (!names.isEmpty()) {
+            writeNativeManifest(dir.resolve(".natives"), expected, names);
+        }
+        return !names.isEmpty();
+    }
+
+    private static void writeNativeManifest(Path marker, String expected, java.util.Collection<String> names)
+            throws IOException {
+        // marker 若被换成符号链接，直接写入会落到缓存目录外。
+        Files.deleteIfExists(marker);
+        Files.write(marker, java.util.List.of(expected, String.join("\n", names)),
+                java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    // marker 第一行是版本-平台，其余为原生库文件名；没有名单时返回 null 走扫描兜底。
+    private static java.util.List<String> readNativeManifest(Path dir, String expected) {
+        try {
+            Path marker = dir.resolve(".natives");
+            if (!Files.isRegularFile(marker) || Files.size(marker) > 256L * 1024) return null;
+            java.util.List<String> lines = Files.readAllLines(marker, java.nio.charset.StandardCharsets.UTF_8);
+            if (lines.size() < 2 || !expected.equals(lines.get(0).trim())) return null;
+            java.util.List<String> names = new java.util.ArrayList<>();
+            for (int i = 1; i < lines.size(); i++) {
+                String name = lines.get(i).trim();
+                if (!name.isEmpty()) names.add(name);
+            }
+            return names.isEmpty() ? null : names;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static java.util.List<String> nativeNamesFromJars(Path dir, String classifier, String version)
+            throws IOException {
+        java.util.List<String> names = new java.util.ArrayList<>();
+        for (String module : JFX_MODULES) {
+            Path jar = dir.resolve(jarName(module, classifier, version));
+            if (!Files.isRegularFile(jar)) throw new IOException(Lang.t("缺少 JavaFX 包：") + jar.getFileName());
+            try (JarFile jf = new JarFile(jar.toFile())) {
+                var entries = jf.entries();
+                while (entries.hasMoreElements()) {
+                    JarEntry en = entries.nextElement();
+                    String name = en.getName();
+                    if (en.isDirectory() || !validNativeName(name)) continue;
+                    names.add(name);
+                }
+            }
+        }
+        return names;
+    }
+
+    private static boolean validNativeName(String name) {
+        if (name == null || name.isEmpty() || name.indexOf('/') >= 0 || name.indexOf('\\') >= 0
+                || name.contains("..")) return false;
+        String low = name.toLowerCase(java.util.Locale.ROOT);
+        return low.endsWith(".dll") || low.endsWith(".dylib") || low.endsWith(".so") || low.endsWith(".jnilib");
     }
 
     private static boolean jarVersionMatches(Path jar, String expected) {
@@ -552,7 +701,8 @@ public final class Resources {
                 String text = new String(Io.read(in, 64L * 1024), java.nio.charset.StandardCharsets.UTF_8).trim();
                 int space = text.indexOf(' ');
                 if (space > 0) text = text.substring(0, space);
-                return text.length() >= 40 ? text.substring(0, 40) : null;
+                text = text.trim();
+                return text.matches("[0-9a-fA-F]{40}") ? text : null;
             } finally {
                 c.disconnect();
             }
@@ -585,24 +735,29 @@ public final class Resources {
         return java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(data));
     }
 
-    private static void extractNatives(Path jar, Path dir) throws IOException {
-        if (!Files.isRegularFile(jar)) return;
+    private static java.util.List<String> extractNatives(Path jar, Path dir) throws IOException {
+        if (!Files.isRegularFile(jar)) throw new IOException(Lang.t("缺少 JavaFX 包：") + jar.getFileName());
+        java.util.List<String> written = new java.util.ArrayList<>();
+        Path base = dir.toAbsolutePath().normalize();
+        Files.createDirectories(base);
         try (JarFile jf = new JarFile(jar.toFile())) {
             var entries = jf.entries();
             while (entries.hasMoreElements()) {
                 JarEntry en = entries.nextElement();
                 String name = en.getName();
-                if (en.isDirectory() || name.contains("/")) continue;
-                String low = name.toLowerCase(java.util.Locale.ROOT);
-                if (!low.endsWith(".dll") && !low.endsWith(".dylib") && !low.endsWith(".so")
-                        && !low.endsWith(".jnilib")) continue;
-                Path out = dir.resolve(name);
-                // 同名 DLL 覆盖
+                // Windows 把 \ 当分隔符；仅检查 / 会让 ..\evil.dll 逃出缓存目录。
+                if (en.isDirectory() || !validNativeName(name)) continue;
+                Path out = base.resolve(name).normalize();
+                if (!base.equals(out.getParent())) continue;
+                // 先删符号链接，防止覆盖到缓存目录外的目标。
+                if (Files.isSymbolicLink(out)) Files.deleteIfExists(out);
                 try (InputStream in = jf.getInputStream(en)) {
                     Files.copy(in, out, StandardCopyOption.REPLACE_EXISTING);
                 }
+                written.add(name);
             }
         }
+        return written;
     }
 
     private static String modulePath(Path rt, String plat) throws IOException {
@@ -625,7 +780,7 @@ public final class Resources {
     private static void relaunch(Path jar, Path rt, String plat, String[] args)
             throws IOException {
         String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
-        String exe = os.contains("win") ? "javaw.exe" : "java";
+        String exe = os.contains("windows") ? "javaw.exe" : "java";
         List<String> cmd = new ArrayList<>();
         cmd.add(Paths.get(System.getProperty("java.home"), "bin", exe).toString());
         cmd.add("-Dtcl.runtime=" + plat);
@@ -633,7 +788,7 @@ public final class Resources {
         cmd.add("-Dtcraft.dir=" + home());
         String self = System.getProperty("tcraft.exe", "");
         if (!self.isEmpty()) cmd.add("-Dtcraft.exe=" + self);
-        if (os.contains("mac")) cmd.add("-Xdock:name=TCraft Launcher");
+        if (os.contains("mac") || os.contains("darwin")) cmd.add("-Xdock:name=TCraft Launcher");
         cmd.add("-Dfile.encoding=UTF-8");
         cmd.add("-Djava.library.path=" + rt);
         cmd.add("--module-path=" + modulePath(rt, plat));
@@ -651,7 +806,9 @@ public final class Resources {
     }
 
     private static void relaunchBuiltin(Path jar, String[] args) throws IOException {
-        startBootProcess(directLaunchCommand(jar, args));
+        List<String> cmd = directLaunchCommand(jar, args);
+        cmd.add(1, "-Dtcl.webpRetry=true");
+        startBootProcess(cmd);
     }
 
     private static void startBootProcess(List<String> cmd) throws IOException {
@@ -663,7 +820,7 @@ public final class Resources {
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.redirectErrorStream(true);
         pb.redirectInput(ProcessBuilder.Redirect.from(
-                new File(System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win")
+                new File(System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("windows")
                         ? "NUL" : "/dev/null")));
         // 诊断输出追加
         pb.redirectOutput(ProcessBuilder.Redirect.appendTo(log.toFile()));

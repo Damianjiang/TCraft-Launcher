@@ -59,6 +59,7 @@ public final class Boot {
             Shell.linuxNotify("TCraft Launcher", Lang.t("启动器已在运行，请切换到已打开的窗口。"));
             return;
         }
+        cleanupLegacyCache();
         // 仅缺 JavaFX/需下载时显示进度窗
         StartupWindow ui = hasFx() ? StartupWindow.none() : StartupWindow.open();
         startupWindow = ui;
@@ -90,10 +91,16 @@ public final class Boot {
     private static boolean acquireInstanceLock() {
         // stub 互斥量已失效 长期单实例靠此文件锁
         Path lockFile = Resources.home().resolve("launcher.lock");
+        try {
+            // 锁文件若被替换成符号链接，不能顺着它锁外部文件。
+            if (Files.isSymbolicLink(lockFile)) Files.deleteIfExists(lockFile);
+        } catch (Exception ignored) {
+        }
         for (int attempt = 0; attempt < 20; attempt++) {
             FileChannel ch;
             try {
-                ch = FileChannel.open(lockFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+                ch = FileChannel.open(lockFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE,
+                        java.nio.file.LinkOption.NOFOLLOW_LINKS);
             } catch (Exception e) {
                 // 目录不可写不拦启动
                 return true;
@@ -129,6 +136,26 @@ public final class Boot {
         try {
             ch.close();
         } catch (Exception ignored) {
+        }
+    }
+
+    // 旧外壳在 .tcl 落过本体缓存 新版不再使用
+    private static void cleanupLegacyCache() {
+        Path cache = Resources.home().resolve("TCraftLauncher.jar");
+        if (!Files.exists(cache)) return;
+        for (int attempt = 0; attempt < 20; attempt++) {
+            try {
+                Files.deleteIfExists(cache);
+                return;
+            } catch (Throwable ignored) {
+                // 旧进程可能还压着 jar 稍后再删
+            }
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
         }
     }
 
