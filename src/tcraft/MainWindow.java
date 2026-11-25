@@ -3374,6 +3374,10 @@ public final class MainWindow {
         cover.setMouseTransparent(true);
         cover.setManaged(false);
         cover.resize(snap.getWidth(), snap.getHeight());
+        // 快照含 root 外边距，而 StackPane 按 padding 摆放子节点，回移避免淡出时整页偏移
+        Insets pad = root.getPadding();
+        cover.setTranslateX(-pad.getLeft());
+        cover.setTranslateY(-pad.getTop());
         root.getChildren().add(cover);
         javafx.animation.FadeTransition fade = new javafx.animation.FadeTransition(
                 javafx.util.Duration.millis(160), cover);
