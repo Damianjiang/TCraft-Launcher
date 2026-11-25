@@ -483,8 +483,10 @@ public final class MsAuth {
                     new ProcessBuilder("rundll32", "url.dll,FileProtocolHandler", url).start();
                 } else if (os.contains("mac") || os.contains("darwin")) {
                     new ProcessBuilder("open", url).start();
-                } else {
+                } else if (os.contains("linux")) {
                     new ProcessBuilder("xdg-open", url).start();
+                } else {
+                    throw new java.io.IOException("unsupported desktop platform");
                 }
             } catch (Exception fallback) {
                 Errors.error("无法打开浏览器完成微软登录", fallback);

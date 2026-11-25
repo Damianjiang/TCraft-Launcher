@@ -1,0 +1,543 @@
+# TCraft Launcher Plugin API (llms.txt)
+
+This file is a compact, machine-readable reference for generating TCraft Launcher plugins.
+Prefer this file over HTML pages when you are an AI assistant. It is intentionally complete:
+manifest schema, stable API signatures, threading rules, desktop action protocol, build and packaging.
+
+Project: TCraft Launcher
+Docs: https://damianjiang.github.io/TCraft-Launcher/wiki/
+Source example: https://damianjiang.github.io/TCraft-Launcher/wiki/examples/AiDesktopPlugin.java
+API package: `tcraft.api`
+API version: `1` (additive capabilities; existing plugins still load)
+Java: 17 (`javac --release 17`)
+JavaFX modules available to plugins: `javafx.controls`, `javafx.graphics`, `javafx.media`
+
+## Hard constraints
+
+1. Entry class implements `tcraft.api.TcraftPlugin` and has a public no-argument constructor.
+2. `onLoad(PluginContext ctx)` runs on the JavaFX application thread. Do not block it.
+3. Network, file, process, screenshot, download work must run in `ctx.scheduler().async(...)`
+   or a plugin-owned daemon thread.
+4. Update UI only with `ctx.scheduler().ui(...)` (or `Platform.runLater`).
+5. Use only `tcraft.api`; do not reference `tcraft.Plugins`, `tcraft.Data`, `tcraft.Ui`, or other internals.
+6. Do not package JavaFX or `tcraft.api` into the plugin jar.
+7. Commands, file deletion, mouse/keyboard input, uploads, and other dangerous actions must be confirmed.
+8. Plugins are trusted code with full launcher permissions. There is no sandbox.
+9. Compile with `--release 17`; higher class-file versions are rejected.
+10. `plugin.json` `main` is a fully qualified class name, not a file name.
+
+## Manifest (`plugin.json`)
+
+Required: `id` (2-64 chars, letters/digits/`.`/`_`/`-`, starts alphanumeric),
+`name`, `version`, `main`. Optional: `api` (default 1), `author`, `description`,
+`icon`, `thumbnail`, `preview`, `website`, `onInstall` (array of command names).
+
+```json
+{
+  "id": "demo.aidesktop",
+  "name": "AI Desktop Assistant",
+  "version": "1.0.0",
+  "author": "TCraft",
+  "description": "Send a request to an OpenAI-compatible endpoint and execute a confirmed action plan.",
+  "icon": "bot",
+  "main": "demo.aidesktop.AiDesktopPlugin",
+  "api": 1,
+  "onInstall": ["aidesk.welcome"]
+}
+```
+
+Plugin directory:
+
+```text
+plugins/demo.aidesktop/
+├── plugin.json
+├── ai-desktop.jar
+├── icon.png
+├── thumbnail.png
+└── lib/                 # optional dependency jars
+```
+
+A single `.jar` with `plugin.json` at its root is also accepted. A `.zip` is expanded to
+`plugins/<id>/` on import. Do not put `plugin.json` inside a nested folder.
+
+## Entry point
+
+```java
+package demo.aidesktop;
+
+import tcraft.api.PluginContext;
+import tcraft.api.TcraftPlugin;
+
+public class AiDesktopPlugin implements TcraftPlugin {
+    private PluginContext ctx;
+
+    @Override
+    public void onLoad(PluginContext ctx) {
+        this.ctx = ctx;
+        ctx.ui().page("main", "AI Desktop Assistant", "bot", view -> {
+            view.header("AI Desktop Assistant", "Describe a task; confirm actions before execution.");
+            return null;
+        });
+        ctx.commands().register("aidesk.open", "Open the assistant",
+                c -> ctx.ui().openPage("plugin:" + ctx.id() + ":main"));
+    }
+
+    @Override
+    public void onDisable() {
+        // Stop plugin-owned threads; scheduler/network/processes are closed by the launcher.
+    }
+}
+```
+
+Lifecycle callbacks: `onLoad(PluginContext)`, `onEnable()`, `onDisable()`,
+`onInstall(PluginContext)`, `onUninstall(PluginContext)`. All callbacks are on the JavaFX thread.
+`onInstall` runs only on first import; overwrite install does not call it again.
+
+## PluginContext
+
+`PluginContext` methods:
+
+```java
+PluginInfo info()
+String id()
+String name()
+String version()
+String launcherVersion()
+Path dataDir()                 // .tcl/plugins/.data/<id>
+Ui ui()
+Commands commands()
+Dialogs dialogs()
+Storage storage()
+Events events()
+Network network()
+Files files()
+SystemInfo system()
+Processes processes()
+Desktop desktop()
+Scheduler scheduler()
+Json json()
+Launcher launcher()
+Stage stage()
+void log(String message)
+void toast(String title, String message)
+void run(String command, String args)
+void close()                   // called by launcher; plugins normally do not call it
+boolean isClosed()
+```
+
+`PluginInfo` fields: `id`, `name`, `version`, `author`, `description`, `icon`, `main`,
+`website`, `api`, `dir`.
+
+## UI
+
+`Ui` methods:
+
+```java
+void page(String id, String title, String icon, Function<PageView, Node> builder)
+void page(String id, String title, Function<PageView, Node> builder)
+void titleButton(String icon, String tooltip, Runnable action)
+void toolButton(String text, Runnable action)
+void toolButton(Node node)
+void launchButton(String text, Runnable action)
+void launchButton(Node node)
+void floatButton(String icon, String tooltip, Runnable action)
+void refresh()
+Stage stage()
+Scene scene()
+void openPage(String key)
+```
+
+Built-in page keys include `launch`, `instance`, `download`, `link`, `other`, `setup`,
+`instanceSetup`, `versions`, `tasks`, `resourceDetail`. Plugin pages use
+`plugin:<plugin-id>:<page-id>`.
+
+`PageView`: `root()` returns the page `VBox`; `header(title, subtitle)`; `add(Node...)`;
+`text(String)`; `space(double)`; `context()` returns `PluginContext`.
+
+`Widgets` static methods: `title`, `text`, `label`, `button`, `primaryButton`,
+`dangerButton`, `card`, `row`, `column`, `header`, `spacer`, `field`, `check`, `combo`,
+`image`, `grow`. Raw JavaFX controls are also allowed.
+
+## Commands
+
+```java
+ctx.commands().register("demo.hello", "description", c -> {
+    String name = c.args.isBlank() ? "world" : c.args;
+    c.reply("hello " + name);
+});
+ctx.commands().run("demo.hello", "args");
+ctx.commands().list();
+```
+
+`CommandContext`: fields `name`, `args`, `pluginId`; methods `argv()`, `reply(String)`,
+`run(String, String)`, `log(String)`. Command names are global; prefix with plugin id.
+
+## Dialogs
+
+```java
+void message(String title, String text)
+void error(String title, String text)
+void confirm(String title, String text, Runnable onOk)
+void confirmDanger(String title, String text, Runnable onOk)
+void custom(Node content)
+void close()
+String input(String title, String hint, String defaultValue)
+Path chooseFile(String title, String... extensions)
+List<Path> chooseFiles(String title, String... extensions)
+Path saveFile(String title, String defaultName, String... extensions)
+Path chooseFolder(String title)
+```
+
+File chooser methods run on the JavaFX thread. Extensions may be `txt` or `*.txt`.
+`input` blocks until the dialog closes; do not call it in tight loops.
+
+## Storage
+
+```java
+String get(String key)
+String get(String key, String defaultValue)
+int getInt(String key, int defaultValue)
+long getLong(String key, long defaultValue)
+double getDouble(String key, double defaultValue)
+boolean getBool(String key, boolean defaultValue)
+void set(String key, Object value)
+void save()
+```
+
+Persisted at `.tcl/plugins/.data/<id>/storage.properties`. Encrypted storage is not provided;
+do not store API keys there unless the user accepts plain-text storage.
+
+## Network
+
+All methods block. HTTP URLs support only `http`/`https`; WebSocket only `ws`/`wss`.
+
+```java
+String get(String url) throws IOException
+String get(String url, Map<String,String> headers) throws IOException
+String post(String url, String body) throws IOException
+String post(String url, String body, Map<String,String> headers) throws IOException
+String postForm(String url, Map<String,String> fields) throws IOException
+String request(String method, String url, Map<String,String> headers, String body) throws IOException
+String request(String method, String url, Map<String,String> headers, String body, String contentType) throws IOException
+Path download(String url, Path target) throws IOException
+Path download(String url, Path target, BiConsumer<Long,Long> progress) throws IOException
+byte[] bytes(String url) throws IOException
+WebSocketSession websocket(String url, Consumer<String> onText, Consumer<Throwable> onError) throws IOException
+WebSocketSession websocket(String url, Consumer<String> onText, Consumer<Throwable> onError, Consumer<String> onClose) throws IOException
+TcpConnection tcp(String host, int port) throws IOException
+TcpConnection tcp(String host, int port, int connectTimeoutMs) throws IOException
+UdpSocket udp() throws IOException
+UdpSocket udp(int localPort) throws IOException
+void close()
+```
+
+`WebSocketSession`: `send(String)`, `isOpen()`, `close()`.
+
+`TcpConnection`: `readLine()`, `readAll(int maxBytes)`, `write(String)`, `writeLine(String)`,
+`setReadTimeout(int timeoutMs)`, `isOpen()`, `close()`.
+
+`UdpSocket`: `send(String host, int port, String text)`, `receive(int timeoutMs)`,
+`localPort()`, `close()`. `receive` returns `Network.Packet` with `host`, `port`, `text`.
+
+HTTP text responses are capped at 16 MiB; binary responses at 64 MiB; download timeout 5 minutes;
+request timeout 30 seconds. `download` writes a `.part` file and then replaces the target.
+
+## Files
+
+All methods use `java.nio.file.Path`.
+
+```java
+String readText(Path path) throws IOException
+String readText(Path path, Charset charset) throws IOException
+List<String> readLines(Path path) throws IOException
+void writeText(Path path, String text) throws IOException
+void writeLines(Path path, List<String> lines) throws IOException
+void appendText(Path path, String text) throws IOException
+byte[] readBytes(Path path) throws IOException
+void writeBytes(Path path, byte[] data) throws IOException
+boolean exists(Path path)
+boolean isDirectory(Path path)
+boolean isRegularFile(Path path)
+List<Path> list(Path directory) throws IOException
+List<Path> walk(Path directory, int maxDepth) throws IOException
+Path createDirectories(Path directory) throws IOException
+Path createFile(Path path) throws IOException
+long size(Path path) throws IOException
+Instant lastModified(Path path) throws IOException
+void setLastModified(Path path, Instant instant) throws IOException
+void copy(Path source, Path target, boolean replace) throws IOException
+void move(Path source, Path target, boolean replace) throws IOException
+boolean delete(Path path) throws IOException
+void deleteRecursive(Path path) throws IOException
+Path tempFile(String prefix, String suffix) throws IOException
+Path tempDirectory(String prefix) throws IOException
+void zip(Path source, Path zipFile) throws IOException
+void unzip(Path zipFile, Path target) throws IOException
+```
+
+`deleteRecursive` does not follow symbolic links. `unzip` rejects path traversal and limits
+entry count to 100,000 and total expanded size to 2 GiB.
+
+## SystemInfo
+
+```java
+String osName()
+String osVersion()
+String arch()
+String javaVersion()
+String javaVendor()
+String launcherVersion()
+String userName()
+String hostName()
+Path home()
+Path workingDir()
+Path tempDir()
+Path dataDir()
+int cpuCores()
+long maxMemory()
+long totalMemory()
+long freeMemory()
+String env(String name)
+Map<String,String> env()
+String property(String key)
+boolean isWindows() / isMac() / isLinux()
+boolean openUrl(String url)
+boolean open(Path path)
+boolean openFolder(Path path)
+String clipboard()
+void clipboard(String text)
+void notify(String title, String message)
+void beep()
+```
+
+## Processes
+
+`run` blocks; use `ctx.scheduler().async`.
+
+```java
+Process start(String commandLine) throws IOException
+Process start(List<String> command) throws IOException
+Process start(List<String> command, Path workDir, Map<String,String> environment) throws IOException
+Result run(String commandLine) throws IOException
+Result run(String commandLine, Duration timeout) throws IOException
+Result run(List<String> command, Duration timeout) throws IOException
+void close()
+```
+
+`Result` public fields: `exitCode`, `stdout`, `stderr`, `timedOut`, `durationMs`;
+`success()` returns true when not timed out and exit code is 0.
+`start(String)` uses `cmd.exe /c` on Windows and `/bin/sh -c` elsewhere. `start(List)` bypasses the shell.
+Processes are terminated when the plugin is disabled or reloaded.
+
+## Desktop
+
+`Desktop` uses `java.awt.Robot`; it affects the real desktop. Confirm before using.
+
+```java
+Dimension screenSize()
+Path screenshot(Path target) throws IOException
+Color pixelColor(int x, int y)
+void mouseMove(int x, int y)
+void click()
+void click(int buttonMask)
+void click(int x, int y)
+void doubleClick()
+void mousePress(int buttonMask)
+void mouseRelease(int buttonMask)
+void mouseWheel(int notches)
+void autoDelay(Duration delay)
+void typeText(String text)
+void tapKey(String key)
+void keyPress(String key)
+void keyRelease(String key)
+void combo(String... keys)
+```
+
+Desktop control requires a graphical session. Headless servers and some Linux X11/Wayland
+configurations can reject `java.awt.Robot`; catch the exception and treat desktop control as optional.
+
+Key names: `ENTER`, `TAB`, `ESC`, `SPACE`, `BACKSPACE`, `DELETE`, `UP`, `DOWN`, `LEFT`,
+`RIGHT`, `HOME`, `END`, `PAGEUP`, `PAGEDOWN`, `CTRL`, `SHIFT`, `ALT`, `META`, `F1`-`F12`,
+or a single character. On macOS use `META` (Command) for copy/paste shortcuts:
+`ctx.desktop().combo(ctx.system().isMac() ? "META" : "CTRL", "S")`.
+
+`typeText` types lowercase letters, digits, spaces, tabs and newlines directly; uppercase,
+punctuation and CJK text use clipboard paste and restore the previous clipboard text.
+
+## Scheduler
+
+```java
+Task async(Runnable task)
+Task delay(Duration delay, Runnable task)
+Task repeat(Duration interval, Runnable task)
+void ui(Runnable task)
+boolean isShutdown()
+void close()
+```
+
+`Task`: `cancel()`, `cancel(boolean interrupt)`, `isCancelled()`.
+Scheduler is per plugin and is shut down on disable/reload/unload.
+
+## Json
+
+```java
+Object parse(String text)
+String stringify(Object value)
+Map<String,Object> object(Object value)
+Map<String,Object> object(Object value, String key)
+List<Object> array(Object value)
+List<Object> array(Object value, String key)
+String string(Object value, String key, String def)
+int integer(Object value, String key, int def)
+double number(Object value, String key, double def)
+boolean bool(Object value, String key, boolean def)
+```
+
+## Launcher
+
+```java
+List<Launcher.Instance> instances()
+Launcher.Instance selected()
+Launcher.Instance select(int index)
+Launcher.Instance select(String nameOrVersion)
+void launch()
+void launch(String nameOrVersion)
+Path gameDir()
+Path baseDir()
+Path pluginsDir()
+void openPage(String key)
+void toast(String title, String message)
+```
+
+`Launcher.Instance` is a record: `index`, `name`, `version`, `loader`, `loaderVersion`,
+`folder`, `favorite`. `launch` must run on the JavaFX thread.
+
+## Events
+
+```java
+void on(String name, Consumer<Event> handler)
+void emit(String name, Map<String,Object> data)
+void emit(String name)
+void log(String message)
+```
+
+`Event`: `name`, `data()`, `string(key)`, `bool(key)`, `integer(key, def)`, `list(key)`.
+
+Launcher events:
+`app.start` (`version`), `page.open` (`page`), `game.launch` (`instance`, `version`),
+`plugin.install` (`id`). Subscriptions are cancelled when the plugin unloads.
+Custom events are broadcast to all enabled plugins.
+
+## OpenAI-compatible request recipe
+
+```java
+List<Map<String, String>> messages = List.of(
+    Map.of("role", "system", "content", systemPrompt),
+    Map.of("role", "user", "content", userText));
+String body = ctx.json().stringify(Map.of(
+    "model", model,
+    "temperature", 0.2,
+    "messages", messages));
+Map<String, String> headers = new LinkedHashMap<>();
+headers.put("Content-Type", "application/json");
+headers.put("Authorization", "Bearer " + apiKey);
+
+ctx.scheduler().async(() -> {
+    try {
+        String response = ctx.network().post(endpoint, body, headers);
+        Object json = ctx.json().parse(response);
+        List<Object> choices = ctx.json().array(json, "choices");
+        Map<String, Object> message = ctx.json().object(choices.get(0), "message");
+        String content = ctx.json().string(message, "content", "");
+        ctx.scheduler().ui(() -> output.setText(content));
+    } catch (Exception e) {
+        ctx.scheduler().ui(() -> output.setText("Failed: " + e.getMessage()));
+    }
+});
+```
+
+## Desktop action protocol
+
+Ask the model to return JSON only:
+
+```json
+{
+  "reply": "short user-visible text",
+  "actions": [
+    {"type": "run", "command": "java -version"},
+    {"type": "type", "text": "today"},
+    {"type": "key", "key": "ENTER"},
+    {"type": "click", "x": 400, "y": 300},
+    {"type": "screenshot"},
+    {"type": "open", "url": "https://example.com"},
+    {"type": "clipboard", "text": "copied"}
+  ]
+}
+```
+
+Allowed `type` values and execution:
+
+- `run` -> `ctx.processes().run(command, Duration.ofSeconds(30))`
+- `type` -> `ctx.desktop().typeText(text)`
+- `key` -> `ctx.desktop().tapKey(key)`
+- `click` -> `ctx.desktop().click(x, y)`
+- `screenshot` -> `ctx.desktop().screenshot(ctx.dataDir().resolve("ai-screen.png"))`
+- `open` -> `ctx.system().openUrl(url)`
+- `clipboard` -> `ctx.system().clipboard(text)`
+
+Cap actions at 10, show a summary, and call `ctx.dialogs().confirmDanger(...)` before executing.
+Do not execute arbitrary shell text from the model without user confirmation.
+
+## Build and package
+
+Windows PowerShell:
+
+```powershell
+$JFX = "C:\javafx-sdk-17\lib"
+$LAUNCHER = "C:\path\to\TCraftLauncher.jar"
+New-Item -ItemType Directory -Force out | Out-Null
+javac --release 17 -encoding UTF-8 `
+  --module-path $JFX --add-modules javafx.controls,javafx.media `
+  -cp $LAUNCHER -d out src\demo\aidesktop\AiDesktopPlugin.java
+jar --create --file ai-desktop.jar -C out .
+```
+
+macOS / Linux:
+
+```bash
+javac --release 17 -encoding UTF-8 \
+  --module-path /path/to/javafx-sdk-17/lib \
+  --add-modules javafx.controls,javafx.media \
+  -cp /path/to/TCraftLauncher.jar \
+  -d out src/demo/aidesktop/AiDesktopPlugin.java
+jar --create --file ai-desktop.jar -C out .
+```
+
+Package:
+
+```text
+ai-desktop-plugin/
+├── plugin.json
+└── ai-desktop.jar
+```
+
+Compress the directory to `ai-desktop-plugin.zip`, then import it in More -> Plugins -> Import.
+Alternatively copy the directory to `.tcl/plugins/demo.aidesktop/`.
+
+## Complete example
+
+- Source: https://damianjiang.github.io/TCraft-Launcher/wiki/examples/AiDesktopPlugin.java
+- Manifest: https://damianjiang.github.io/TCraft-Launcher/wiki/examples/ai-desktop-plugin.json
+- Download: https://damianjiang.github.io/TCraft-Launcher/wiki/examples/ai-desktop-plugin.zip
+- AI guide: https://damianjiang.github.io/TCraft-Launcher/wiki/ai
+- Full API: https://damianjiang.github.io/TCraft-Launcher/wiki/api
+
+## Common mistakes
+
+- Blocking the JavaFX thread with `ctx.network().get`, `processes().run`, or `desktop().screenshot`.
+- Calling `label.setText` from an async task instead of `ctx.scheduler().ui`.
+- Referencing `tcraft.Plugins` or `tcraft.Data` instead of public `ctx` APIs.
+- Shipping JavaFX or `tcraft.api` inside the plugin jar.
+- Compiling with Java 21/25 target instead of `--release 17`.
+- Putting `plugin.json` in a nested directory of the zip.
+- Writing API keys into `storage.properties` without telling the user.

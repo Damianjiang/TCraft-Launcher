@@ -1,5 +1,6 @@
 package tcraft;
 
+import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
@@ -44,6 +45,14 @@ public final class Boot {
                 System.exit(1);
             }
             return;
+        }
+        // 数据导入先落位 再读导入后的配置启动
+        if (args.length == 2 && args[0].equals("--apply-data-import")) {
+            if (!applyDataImport(Paths.get(args[1]))) {
+                dataImportFail();
+                return;
+            }
+            args = new String[0];
         }
         // 语言先于一切 UI
         applySystemProperties();
@@ -216,6 +225,97 @@ public final class Boot {
             return true;
         } catch (Throwable t) {
             return false;
+        }
+    }
+
+    private static boolean applyDataImport(Path staging) {
+        Path stage = staging.toAbsolutePath().normalize();
+        Path base = Resources.home().toAbsolutePath().normalize();
+        Path payload = stage.resolve("data").normalize();
+        try {
+            // 只接受 DataBackup 生成的临时目录，防止任意目录被当成导入源
+            Path parent = base.getParent();
+            if (parent == null || stage.getParent() == null || !stage.getParent().equals(parent)) {
+                throw new IOException("导入临时目录不在启动器数据目录旁");
+            }
+            String prefix = "." + base.getFileName() + "-import-";
+            if (!stage.getFileName().toString().startsWith(prefix)) {
+                throw new IOException("导入临时目录名称不正确");
+            }
+            if (Files.isSymbolicLink(stage) || Files.isSymbolicLink(base)
+                    || Files.isSymbolicLink(payload)) {
+                throw new IOException("数据导入路径不能是符号链接");
+            }
+            if (!Files.isDirectory(payload)) throw new IOException("导入临时目录不完整");
+            String marker = Files.readString(stage.resolve("import.json"), java.nio.charset.StandardCharsets.UTF_8);
+            java.util.Map<String, Object> root = Json.obj(Json.parse(marker));
+            if (!"tcraft-backup-import".equals(Json.str(root, "type", ""))) {
+                throw new IOException("导入标记类型不正确");
+            }
+            // 旧窗口退出和文件锁释放需要时间；Windows 上旧进程可能还会占用日志/配置文件
+            Thread.sleep(1200);
+            Path backup = base.resolveSibling(base.getFileName() + ".pre-import-"
+                    + System.currentTimeMillis());
+            if (Files.exists(base)) {
+                IOException last = null;
+                for (int i = 0; i < 120; i++) {
+                    try {
+                        moveDir(base, backup);
+                        last = null;
+                        break;
+                    } catch (IOException e) {
+                        last = e;
+                        Thread.sleep(250);
+                    }
+                }
+                if (last != null) throw last;
+            }
+            try {
+                moveDir(payload, base);
+            } catch (IOException e) {
+                if (!Files.exists(base) && Files.exists(backup)) moveDir(backup, base);
+                throw e;
+            }
+            deleteTree(stage);
+            return true;
+        } catch (Throwable t) {
+            System.err.println("[TCL] 应用数据导入失败：" + t);
+            t.printStackTrace();
+            return false;
+        }
+    }
+
+    private static void dataImportFail() {
+        String text = "启动器数据导入失败。\n\n"
+                + "旧数据没有被删除；如果目录已改名，会保留为 .tcl.pre-import-*。\n"
+                + "请检查磁盘权限和剩余空间后重试。";
+        System.err.println("[TCL] " + text);
+        try {
+            javax.swing.JOptionPane.showMessageDialog(null, text, "TCraft Launcher",
+                    javax.swing.JOptionPane.ERROR_MESSAGE);
+        } catch (Throwable ignored) {
+        }
+        System.exit(1);
+    }
+
+    private static void moveDir(Path from, Path to) throws IOException {
+        try {
+            Files.move(from, to, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+        } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+            Files.move(from, to);
+        }
+    }
+
+    private static void deleteTree(Path dir) {
+        if (dir == null || !Files.exists(dir, java.nio.file.LinkOption.NOFOLLOW_LINKS)) return;
+        try (java.util.stream.Stream<Path> stream = Files.walk(dir)) {
+            stream.sorted(java.util.Comparator.reverseOrder()).forEach(p -> {
+                try {
+                    Files.deleteIfExists(p);
+                } catch (Throwable ignored) {
+                }
+            });
+        } catch (Throwable ignored) {
         }
     }
 

@@ -1,5 +1,6 @@
 package tcraft;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -9,6 +10,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -217,8 +219,11 @@ public final class Downloader {
             // 旧版 natives 仅当前平台
             Map<String, Object> nativesMap = Json.obj(lib.get("natives"));
             if (!nativesMap.isEmpty()) {
-                String classifier = Json.str(nativesMap, nativeOsName(), "")
+                String nativeOs = nativeOsName();
+                if (nativeOs.isEmpty()) continue;
+                String classifier = Json.str(nativesMap, nativeOs, "")
                         .replace("${arch}", is64Bit() ? "64" : "32");
+                if (classifier.isEmpty()) continue;
                 Map<String, Object> nat = Json.obj(Json.obj(downloadsLib.get("classifiers")).get(classifier));
                 String nrel = Json.str(nat, "path", "");
                 String nurl = Json.str(nat, "url", "");
@@ -231,7 +236,7 @@ public final class Downloader {
         }
         int total = Math.max(1, libFiles.size());
         if (!libFiles.isEmpty()) {
-            int threads = Math.max(1, Math.min(64, Data.get().getInt("SystemMaxThreads", 64)));
+            int threads = downloadThreads(64);
             task.threads = threads;
             ExecutorService libPool = Executors.newFixedThreadPool(threads, r -> {
                 Thread t = new Thread(r, "TCL-Lib");
@@ -292,7 +297,7 @@ public final class Downloader {
         final AtomicInteger assetDone = new AtomicInteger();
         final java.util.concurrent.ConcurrentLinkedQueue<String[]> retryQueue =
                 new java.util.concurrent.ConcurrentLinkedQueue<>();
-        int threads = Math.max(1, Math.min(64, Data.get().getInt("SystemMaxThreads", 64)));
+        int threads = downloadThreads(64);
         task.threads = threads;
         task.remainingFiles = totalAssets;
         ExecutorService pool = Executors.newFixedThreadPool(threads, r -> {
@@ -700,7 +705,9 @@ public final class Downloader {
         String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
         if (os.contains("windows")) return "windows";
         if (os.contains("mac") || os.contains("darwin")) return "osx";
-        return "linux";
+        if (os.contains("linux")) return "linux";
+        // 未知系统不冒充 Linux，避免装错 LWJGL 原生库
+        return "";
     }
 
     private static boolean is64Bit() {
@@ -780,17 +787,37 @@ public final class Downloader {
         // 安装器日志落文件
         Path logFile = installer.getParent().resolve(loader.toLowerCase() + "-" + mc + ".log");
         Files.createDirectories(logFile.getParent());
+        ForgePrefetch prefetch = prefetchInstallerLibraries(task, installer, game, loader, mc);
+        if (task.canceled) throw new IOException(Lang.t("已取消"));
+
         List<String> cmd = new ArrayList<>();
         cmd.add(javaExe);
         cmd.add("-Dfile.encoding=UTF-8");
         cmd.addAll(data.proxyJvmArgs());
-        cmd.add("-jar");
-        cmd.add(installer.toString());
-        cmd.add("--installClient");
-        cmd.add(game.toString());
-        prefetchInstallerLibraries(task, installer, game, loader);
-        if (task.canceled) throw new IOException(Lang.t("已取消"));
-        task.stage = "正在运行 " + Lang.t(loader) + " 安装器";
+        Path self = launcherClassPath();
+        Path bridgeCp = bridgeClassPath(self);
+        boolean bridge = prefetch.modern && bridgeCp != null;
+        if (bridge) {
+            // 桥接类只依赖 JDK 反射，和安装器 jar 一起进 classpath
+            cmd.add("-cp");
+            cmd.add(bridgeCp + File.pathSeparator + installer);
+            cmd.add(ForgeInstallerBridge.class.getName());
+            cmd.add(game.toString());
+            cmd.add(installer.toString());
+            cmd.add(installerMirrorUrl());
+            cmd.add(prefetch.mojmapsReady ? "1" : "0");
+        } else {
+            // 旧 Forge 没有 spec 1 清单，继续用官方安装器入口
+            cmd.add("-jar");
+            cmd.add(installer.toString());
+            cmd.add("--installClient");
+            cmd.add(game.toString());
+        }
+        task.stage = "正在运行 " + Lang.t(loader) + " 安装器" + (bridge ? "（镜像）" : "");
+        // 安装器子进程的下载不计入 NetSpeed，先清掉预下载留下的速度
+        task.speed = "";
+        task.remainingFiles = 0;
+        task.threads = 0;
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.directory(game.toFile());
         pb.redirectErrorStream(true);
@@ -844,60 +871,112 @@ public final class Downloader {
         }
     }
 
-    private static void prefetchInstallerLibraries(Tasks.Task task, Path installer, Path game, String loader) {
+    private static String installerMirrorUrl() {
+        String source = Data.get().get("SystemDownloadSource", "0");
+        if ("1".equals(source)) return "";
+        return bmcl() + "/maven/";
+    }
+
+    private static Path launcherClassPath() {
+        try {
+            Path path = Paths.get(Downloader.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+            if (Files.isDirectory(path) || path.toString().endsWith(".jar")) return path;
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
+    private static Path bridgeClassPath(Path self) {
+        if (self != null) {
+            if (Files.isDirectory(self)
+                    && Files.isRegularFile(self.resolve("tcraft").resolve("ForgeInstallerBridge.class"))) {
+                return self;
+            }
+            if (self.toString().endsWith(".jar")) return self;
+        }
+        // exe 外壳无法直接当 classpath，桥接类单独落到临时目录
+        try {
+            Path dir = Files.createTempDirectory("tcl-forge-bridge-");
+            Path classFile = dir.resolve("tcraft").resolve("ForgeInstallerBridge.class");
+            Files.createDirectories(classFile.getParent());
+            try (InputStream in = ForgeInstallerBridge.class
+                    .getResourceAsStream("/tcraft/ForgeInstallerBridge.class")) {
+                if (in == null) return null;
+                Files.copy(in, classFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+            dir.toFile().deleteOnExit();
+            classFile.toFile().deleteOnExit();
+            return dir;
+        } catch (Exception e) {
+            Data.get().log("准备 Forge 桥接类失败：" + Log.describe(e));
+            return null;
+        }
+    }
+
+    private static final class ForgePrefetch {
+        private final boolean modern;
+        private final boolean mojmapsReady;
+
+        private ForgePrefetch(boolean modern, boolean mojmapsReady) {
+            this.modern = modern;
+            this.mojmapsReady = mojmapsReady;
+        }
+    }
+
+    private static ForgePrefetch prefetchInstallerLibraries(Tasks.Task task, Path installer, Path game,
+                                                            String loader, String mc) {
+        boolean modern = false;
+        boolean mojmapsReady = false;
         try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(installer.toFile())) {
             java.util.zip.ZipEntry entry = zip.getEntry("install_profile.json");
-            if (entry == null) return;
+            if (entry == null) return new ForgePrefetch(false, false);
             String text = readZipText(zip, entry);
             Map<String, Object> profile = Json.obj(Json.parse(text));
-            List<Map<String, Object>> libs = new ArrayList<>();
-            for (Object o : Json.arr(profile.get("libraries"))) libs.add(Json.obj(o));
-            for (Object o : Json.arr(Json.obj(profile.get("versionInfo")).get("libraries"))) libs.add(Json.obj(o));
+            modern = isModernForgeProfile(profile);
+            try {
+                copyInstallerMaven(zip, game);
+            } catch (Exception e) {
+                Data.get().log("复制安装器内嵌库失败：" + Log.describe(e));
+            }
+
+            Map<String, Object[]> prefetch = new LinkedHashMap<>();
+            addPrefetchLibraries(prefetch, Json.arr(profile.get("libraries")));
+            addPrefetchLibraries(prefetch, Json.arr(Json.obj(profile.get("versionInfo")).get("libraries")));
             // spec 1 的客户端库在 jar 内的 version.json 里
             String jsonPath = Json.str(profile, "json", "");
             if (!jsonPath.isEmpty()) {
                 java.util.zip.ZipEntry versionEntry = zip.getEntry(jsonPath.replaceFirst("^/", ""));
                 if (versionEntry != null) {
                     String versionText = readZipText(zip, versionEntry);
-                    for (Object o : Json.arr(Json.obj(Json.parse(versionText)).get("libraries"))) {
-                        libs.add(Json.obj(o));
-                    }
+                    addPrefetchLibraries(prefetch,
+                            Json.arr(Json.obj(Json.parse(versionText)).get("libraries")));
                 }
             }
-            if (libs.isEmpty()) return;
-            List<Object[]> prefetch = new ArrayList<>();
-            for (Map<String, Object> lib : libs) {
-                Map<String, Object> artifact = Json.obj(Json.obj(lib.get("downloads")).get("artifact"));
-                String path = Json.str(artifact, "path", "");
-                String url = Json.str(artifact, "url", "");
-                if (path.isEmpty()) {
-                    // 旧 Forge 仅 name + url
-                    String name = Json.str(lib, "name", "");
-                    String base = Json.str(lib, "url", "");
-                    if (name.isEmpty() || base.isEmpty()) continue;
-                    path = nameToPath(name);
-                    if (!base.endsWith("/")) base += "/";
-                    url = base + path;
-                }
-                if (url.isEmpty()) continue;
-                prefetch.add(new Object[]{url, path, Json.str(artifact, "sha1", "")});
+
+            String minecraft = Json.str(profile, "minecraft", mc);
+            String mojmaps = Json.str(Json.obj(Json.obj(profile.get("data")).get("MOJMAPS")), "client", "");
+            if (!mojmaps.isEmpty()) {
+                mojmapsReady = prefetchMojmaps(task, game, minecraft, mojmaps);
             }
-            if (prefetch.isEmpty()) return;
+
+            if (prefetch.isEmpty()) return new ForgePrefetch(modern, mojmapsReady);
             task.stage = "预下载 " + Lang.t(loader) + " 依赖";
-            ExecutorService pool = Executors.newFixedThreadPool(
-                    Math.max(1, Math.min(8, prefetch.size())), r -> {
-                        Thread t = new Thread(r, "TCL-Prefetch");
-                        t.setDaemon(true);
-                        return t;
-                    });
+            int threadCount = Math.max(1, Math.min(16, prefetch.size()));
+            task.threads = threadCount;
+            task.remainingFiles = prefetch.size();
+            ExecutorService pool = Executors.newFixedThreadPool(threadCount, r -> {
+                Thread t = new Thread(r, "TCL-Prefetch");
+                t.setDaemon(true);
+                return t;
+            });
             AtomicInteger done = new AtomicInteger();
             List<Future<?>> futures = new ArrayList<>();
+            Path libraries = game.resolve("libraries").toAbsolutePath().normalize();
             try {
-                for (Object[] p : prefetch) {
+                for (Object[] p : prefetch.values()) {
                     futures.add(pool.submit(() -> {
                         if (task.canceled) return;
                         String path = (String) p[1];
-                        Path libraries = game.resolve("libraries").toAbsolutePath().normalize();
                         Path target = libraries.resolve(path).normalize();
                         if (!target.startsWith(libraries)) {
                             Data.get().log("预下载跳过非法路径：" + path);
@@ -911,10 +990,11 @@ public final class Downloader {
                                 downloadFile(task, (String) p[0], target, 0.97, 0.99, label, sha1);
                             }
                         } catch (Exception e) {
-                            // 预下载失败不拦安装器
+                            // 预下载失败不拦安装器，桥接安装器会用镜像补齐
                             Data.get().log("预下载失败：" + path + " " + Log.describe(e));
                         }
                         int n = done.incrementAndGet();
+                        task.remainingFiles = Math.max(0, prefetch.size() - n);
                         task.stage = "预下载 " + Lang.t(loader) + " 依赖 " + n + " / " + prefetch.size();
                     }));
                 }
@@ -926,16 +1006,126 @@ public final class Downloader {
                 }
             } finally {
                 pool.shutdownNow();
+                task.threads = 0;
+                task.remainingFiles = 0;
+            }
+
+            int missing = 0;
+            for (Object[] p : prefetch.values()) {
+                Path target = libraries.resolve((String) p[1]).normalize();
+                if (!Files.isRegularFile(target) || Files.size(target) <= 0) missing++;
+            }
+            if (missing > 0) {
+                Data.get().log("预下载后仍有 " + missing + " 个 " + loader + " 依赖缺失，安装器将通过镜像补齐");
             }
         } catch (Exception e) {
             Data.get().log("读取 " + loader + " 安装器清单失败：" + Log.describe(e));
         }
+        return new ForgePrefetch(modern, mojmapsReady);
     }
+
+    private static boolean isModernForgeProfile(Map<String, Object> profile) {
+        Object spec = profile.get("spec");
+        boolean hasSpec = spec instanceof Number n && n.intValue() >= 1;
+        boolean hasVersionJson = !Json.str(profile, "json", "").isEmpty();
+        return hasSpec && hasVersionJson;
+    }
+
+    private static void addPrefetchLibraries(Map<String, Object[]> out, List<Object> libs) {
+        for (Object o : libs) {
+            Map<String, Object> lib = Json.obj(o);
+            Map<String, Object> artifact = Json.obj(Json.obj(lib.get("downloads")).get("artifact"));
+            String path = Json.str(artifact, "path", "");
+            String url = Json.str(artifact, "url", "");
+            String sha1 = Json.str(artifact, "sha1", "");
+            if (path.isEmpty()) {
+                // 旧 Forge 只有 name + url，坐标里可能带 classifier 或 @zip
+                String name = Json.str(lib, "name", "");
+                String base = Json.str(lib, "url", "");
+                if (name.isEmpty() || base.isEmpty()) continue;
+                path = mavenPath(name);
+                if (path == null) continue;
+                if (!base.endsWith("/")) base += "/";
+                url = base + path;
+            } else if (url.isEmpty()) {
+                String base = Json.str(lib, "url", "");
+                if (!base.isEmpty()) {
+                    if (!base.endsWith("/")) base += "/";
+                    url = base + path;
+                }
+            }
+            if (url.isEmpty() || path.startsWith("/") || path.contains("..")) continue;
+            out.putIfAbsent(path, new Object[]{url, path, sha1});
+        }
+    }
+
+    private static boolean prefetchMojmaps(Tasks.Task task, Path game, String mc, String descriptor) {
+        String path = mavenPath(descriptor);
+        if (path == null) return false;
+        Path target = game.resolve("libraries").resolve(path).normalize();
+        Path versionJson = game.resolve("versions").resolve(mc).resolve(mc + ".json");
+        if (!Files.isRegularFile(versionJson)) return false;
+        try {
+            Map<String, Object> version = Json.obj(Json.parse(readFileText(versionJson, ZIP_TEXT_MAX)));
+            Map<String, Object> mappings = Json.obj(Json.obj(version.get("downloads")).get("client_mappings"));
+            String url = Json.str(mappings, "url", "");
+            String sha1 = Json.str(mappings, "sha1", "");
+            if (url.isEmpty()) return false;
+            downloadFile(task, url, target, 0.97, 0.99, "Mojmaps", sha1);
+            return Files.isRegularFile(target) && Files.size(target) > 0;
+        } catch (Exception e) {
+            Data.get().log("预下载 Mojmaps 失败：" + Log.describe(e));
+            return false;
+        }
+    }
+
+    private static void copyInstallerMaven(java.util.zip.ZipFile zip, Path game) throws IOException {
+        Path libraries = game.resolve("libraries").toAbsolutePath().normalize();
+        var entries = zip.entries();
+        while (entries.hasMoreElements()) {
+            java.util.zip.ZipEntry entry = entries.nextElement();
+            String name = entry.getName().replace('\\', '/');
+            if (!name.startsWith("maven/") || entry.isDirectory()) continue;
+            Path target = libraries.resolve(name.substring("maven/".length())).normalize();
+            if (!target.startsWith(libraries)) continue;
+            if (Files.isRegularFile(target) && Files.size(target) > 0) continue;
+            Files.createDirectories(target.getParent());
+            try (InputStream in = zip.getInputStream(entry);
+                 OutputStream out = Files.newOutputStream(target)) {
+                Io.copy(in, out, Long.MAX_VALUE);
+            }
+        }
+    }
+
+    private static String mavenPath(String coordinate) {
+        String text = coordinate == null ? "" : coordinate.trim();
+        if (text.startsWith("[") && text.endsWith("]")) {
+            text = text.substring(1, text.length() - 1).trim();
+        }
+        int at = text.lastIndexOf('@');
+        String ext = "jar";
+        if (at > 0) {
+            ext = text.substring(at + 1).trim();
+            text = text.substring(0, at).trim();
+        }
+        String[] parts = text.split(":");
+        if (parts.length < 3 || parts[0].isEmpty() || parts[1].isEmpty() || parts[2].isEmpty()) {
+            return null;
+        }
+        String group = parts[0].replace('.', '/');
+        String artifact = parts[1];
+        String version = parts[2];
+        String classifier = parts.length > 3 ? parts[3] : "";
+        String file = artifact + "-" + version + (classifier.isEmpty() ? "" : "-" + classifier) + "." + ext;
+        return group + "/" + artifact + "/" + version + "/" + file;
+    }
+
 
     private static void runInstaller(Tasks.Task task, Process process, Path logFile, String loader) throws Exception {
         long start = System.currentTimeMillis();
         long lastChange = start;
         String lastLine = "";
+        task.speed = "";
         while (true) {
             if (task.canceled) {
                 killTree(process);
@@ -947,16 +1137,62 @@ public final class Downloader {
             if (!line.isEmpty() && !line.equals(lastLine)) {
                 lastLine = line;
                 lastChange = now;
-                task.stage = "运行 " + Lang.t(loader) + " 安装器：" + (line.length() > 70 ? line.substring(0, 70) + "…" : line);
-            } else if (now - lastChange > 3000) {
-                task.stage = "运行 " + Lang.t(loader) + " 安装器（" + ((now - start) / 1000) + " 秒，下载依赖较慢请稍候）";
+                if (!applyInstallerStage(task, line)) {
+                    task.stage = "运行 " + Lang.t(loader) + " 安装器：" + (line.length() > 70 ? line.substring(0, 70) + "…" : line);
+                }
+            } else if (now - lastChange > 5000) {
+                task.stage = "运行 " + Lang.t(loader) + " 安装器（" + ((now - start) / 1000) + " 秒）";
                 lastChange = now;
             }
-            if (now - start > 20 * 60 * 1000L) {
+            if (now - start > 45 * 60 * 1000L) {
                 killTree(process);
-                throw new IOException(loader + Lang.t(" 安装器超过 20 分钟没有结束，请检查网络或改用镜像。日志：") + logFile);
+                throw new IOException(loader + Lang.t(" 安装器超过 45 分钟没有结束，请检查 Java、网络或安装器日志：") + logFile);
             }
         }
+    }
+
+    private static boolean applyInstallerStage(Tasks.Task task, String line) {
+        String text = line.trim();
+        double progress = 0;
+        String stage = "";
+        if (text.contains("Extracting json")) {
+            stage = "解压安装清单";
+            progress = 0.955;
+        } else if (text.contains("Downloading libraries")) {
+            stage = "下载 Forge 依赖";
+            progress = 0.96;
+        } else if (text.contains("Building Processors")) {
+            stage = "准备处理器";
+            progress = 0.97;
+        } else if (text.contains("DOWNLOAD_MOJMAPS")) {
+            stage = "下载 Mojmaps";
+            progress = 0.975;
+        } else if (text.contains("MERGE_MAPPING")) {
+            stage = "合并映射";
+            progress = 0.98;
+        } else if (text.contains("Splitting")) {
+            stage = "拆分 jar";
+            progress = 0.983;
+        } else if (text.contains("Parameter Annotations")) {
+            stage = "处理注解";
+            progress = 0.986;
+        } else if (text.contains("Processing Complete")) {
+            stage = "处理器完成";
+            progress = 0.988;
+        } else if (text.contains("Sorting")) {
+            stage = "整理 jar";
+            progress = 0.99;
+        } else if (text.contains("Remapping final jar")) {
+            stage = "重映射 jar";
+            progress = 0.992;
+        } else if (text.contains("Injecting profile")) {
+            stage = "写入版本信息";
+            progress = 0.995;
+        }
+        if (stage.isEmpty()) return false;
+        task.stage = stage;
+        task.progress = Math.max(task.progress, progress);
+        return true;
     }
 
     private static void killTree(Process process) {
@@ -1311,6 +1547,12 @@ public final class Downloader {
         }
     }
 
+    static int downloadThreads(int max) {
+        int threads = Math.max(1, Math.min(max, Data.get().getInt("SystemMaxThreads", 64)));
+        // 串行模式只保留一个下载线程，避免小文件把带宽和磁盘队列打满
+        return Data.get().getInt("SystemDownloadMode", 0) == 1 ? 1 : threads;
+    }
+
     private static void addMirror(List<String> out, String url, String officialBase, String mirrorBase) {
         if (!url.startsWith(officialBase)) return;
         out.add(mirrorBase + url.substring(officialBase.length()));
@@ -1388,8 +1630,8 @@ public final class Downloader {
     }
 
     static String speed(long bytesPerSec) {
-        if (bytesPerSec > 1024 * 1024) return String.format("%.1f M/s", bytesPerSec / 1024.0 / 1024);
-        if (bytesPerSec > 1024) return String.format("%.0f K/s", bytesPerSec / 1024.0);
+        if (bytesPerSec >= 1024 * 1024) return String.format("%.1f M/s", bytesPerSec / 1024.0 / 1024);
+        if (bytesPerSec >= 1024) return String.format("%.0f K/s", bytesPerSec / 1024.0);
         return bytesPerSec + " B/s";
     }
 

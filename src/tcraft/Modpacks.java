@@ -461,7 +461,6 @@ public final class Modpacks {
         int idx = fromSub;
         Path versionFolder = Paths.get(data.gameDir, "versions", instanceName);
         Files.createDirectories(versionFolder);
-        Path tempDir = Files.createTempDirectory("tcl-modpack-");
         try (ZipFile zip = new ZipFile(zipPath.toFile())) {
             String base = baseFolder(zip);
             ZipEntry mcbbs = entry(zip, base + "mcbbs.packmeta");
@@ -523,7 +522,7 @@ public final class Modpacks {
 
             task.stage = "解压整合包文件";
             task.progress = 0.05;
-            extractContent(zip, tempDir, versionFolder, base, info, contentDirs);
+            extractContent(zip, versionFolder, info, contentDirs, task);
             // 清包内危险设置
             sanitizeImportedInstanceSettings(versionFolder);
 
@@ -560,10 +559,9 @@ public final class Modpacks {
             String iconPath = "";
             java.util.List<String> iconCandidates = new ArrayList<>(java.util.List.of("icon.png", "pack.png", "logo.png", "icon.jpg", "logo.jpg"));
             if (info.mmcLayout) {
-                Path tempBase = tempDir.toAbsolutePath().normalize();
-                Path cfg = tempBase.resolve(base + "instance.cfg").normalize();
-                if (cfg.startsWith(tempBase) && Files.isRegularFile(cfg)) {
-                    try (InputStream cin = Files.newInputStream(cfg)) {
+                ZipEntry cfg = entry(zip, base + "instance.cfg");
+                if (cfg != null && !cfg.isDirectory() && cfg.getSize() <= 1024L * 1024) {
+                    try (InputStream cin = zip.getInputStream(cfg)) {
                         for (String line : new String(Io.read(cin, 1024L * 1024), StandardCharsets.UTF_8).split("\n")) {
                             if (line.startsWith("iconKey=") && !line.substring(8).isBlank()) {
                                 String key = safeIconName(line.substring(8));
@@ -584,12 +582,17 @@ public final class Modpacks {
                     iconPath = logo.toAbsolutePath().toString();
                     break;
                 }
-                Path fromTemp = tempDir.resolve(candidate);
-                if (Files.isRegularFile(fromTemp) && Files.size(fromTemp) <= 8L * 1024 * 1024) {
+                ZipEntry iconEntry = entry(zip, base + candidate);
+                if (iconEntry == null && !base.isEmpty()) iconEntry = entry(zip, candidate);
+                if (iconEntry != null && !iconEntry.isDirectory()
+                        && iconEntry.getSize() <= 8L * 1024 * 1024) {
                     Path logoDir = versionFolder.resolve("TCL");
                     Files.createDirectories(logoDir);
                     Path logo = logoDir.resolve("Logo.png");
-                    Files.copy(fromTemp, logo, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    try (InputStream in = zip.getInputStream(iconEntry);
+                         OutputStream out = Files.newOutputStream(logo)) {
+                        Io.copy(in, out, 8L * 1024 * 1024);
+                    }
                     iconPath = logo.toAbsolutePath().toString();
                     break;
                 }
@@ -659,8 +662,6 @@ public final class Modpacks {
             task.remainingFiles = 0;
             task.threads = 0;
             data.log("整合包安装完成：" + instanceName + " → " + actual);
-        } finally {
-            deleteRecursive(tempDir);
         }
     }
 
@@ -1141,21 +1142,47 @@ public final class Modpacks {
         }
     }
 
-    static void extractContent(ZipFile zip, Path tempDir, Path versionFolder, String base,
-                               PackInfo info, List<String> contentDirs) throws Exception {
-        extractZip(zip, tempDir);
-        Path tempBase = tempDir.toAbsolutePath().normalize();
+    static void extractContent(ZipFile zip, Path versionFolder, PackInfo info,
+                               List<String> contentDirs, Tasks.Task task) throws Exception {
+        Path root = versionFolder.toAbsolutePath().normalize();
+        long totalBytes = 0;
+        long written = 0;
+        int entries = 0;
         for (String dir : contentDirs) {
-            Path overrideHome = tempBase.resolve(dir).normalize();
-            if (!overrideHome.startsWith(tempBase)) {
-                throw new Exception(Lang.t("整合包的覆盖目录超出了解压目录，请向整合包作者反馈此问题！"));
-            }
-            if (!Files.isDirectory(overrideHome)) continue;
-            if (info.genericLayout) {
-                // pack.json 是清单 不是实例内容
-                copyDirectory(overrideHome, versionFolder, rel -> rel.equalsIgnoreCase("pack.json"));
-            } else {
-                copyDirectory(overrideHome, versionFolder);
+            if (dir == null || dir.isEmpty()) continue;
+            String prefix = dir.replace('\\', '/');
+            if (!prefix.endsWith("/")) prefix += "/";
+            for (java.util.Enumeration<? extends ZipEntry> it = zip.entries(); it.hasMoreElements(); ) {
+                ZipEntry e = it.nextElement();
+                String name = e.getName().replace('\\', '/');
+                if (!name.startsWith(prefix) || name.length() <= prefix.length()) continue;
+                String rel = name.substring(prefix.length());
+                if (info.genericLayout && rel.equalsIgnoreCase("pack.json")) continue;
+                Path out = root.resolve(rel).normalize();
+                if (!out.startsWith(root)) {
+                    throw new Exception(Lang.t("整合包的覆盖目录超出了解压目录，请向整合包作者反馈此问题！"));
+                }
+                if (++entries > MAX_ZIP_ENTRIES) {
+                    throw new Exception(Lang.t("整合包条目过多，已中止解压"));
+                }
+                long size = e.getSize();
+                if (size > 0) {
+                    totalBytes += size;
+                    if (totalBytes > MAX_ZIP_BYTES) {
+                        throw new Exception(Lang.t("整合包解压后体积过大，已中止解压"));
+                    }
+                }
+                if (e.isDirectory()) {
+                    Files.createDirectories(out);
+                    continue;
+                }
+                Files.createDirectories(out.getParent());
+                try (InputStream in = zip.getInputStream(e); OutputStream outStream = Files.newOutputStream(out)) {
+                    written += Io.copy(in, outStream, MAX_ZIP_BYTES - written);
+                }
+                if (task != null && entries % 200 == 0) {
+                    task.stage = "解压整合包文件 " + entries;
+                }
             }
         }
     }
@@ -1193,31 +1220,6 @@ public final class Modpacks {
 
     private static final int MAX_ZIP_ENTRIES = 200_000;
     private static final long MAX_ZIP_BYTES = 4L * 1024 * 1024 * 1024;
-
-    private static void copyDirectory(Path from, Path to) throws java.io.IOException {
-        copyDirectory(from, to, rel -> false);
-    }
-
-    private static void copyDirectory(Path from, Path to, java.util.function.Predicate<String> skip)
-            throws java.io.IOException {
-        if (!Files.isDirectory(from)) return;
-        try (var stream = Files.walk(from)) {
-            var it = stream.iterator();
-            while (it.hasNext()) {
-                Path src = it.next();
-                if (Files.isSymbolicLink(src)) continue;
-                String rel = from.relativize(src).toString().replace('\\', '/');
-                if (!rel.isEmpty() && skip.test(rel)) continue;
-                Path dest = to.resolve(from.relativize(src).toString());
-                if (Files.isDirectory(src)) {
-                    Files.createDirectories(dest);
-                } else {
-                    Files.createDirectories(dest.getParent());
-                    Files.copy(src, dest, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                }
-            }
-        }
-    }
 
     private static void unzipTo(Path zip, Path targetDir) throws java.io.IOException {
         try (ZipFile zf = new ZipFile(zip.toFile())) {
@@ -1276,8 +1278,7 @@ public final class Modpacks {
             return;
         }
         if (jobs.size() > 50_000) throw new java.io.IOException(Lang.t("整合包文件数量过多"));
-        int threads = Math.max(1, Math.min(32, Math.min(jobs.size(),
-                Data.get().getInt("SystemMaxThreads", 64))));
+        int threads = Math.max(1, Math.min(jobs.size(), Downloader.downloadThreads(32)));
         task.threads = threads;
         task.remainingFiles = jobs.size();
         task.progress = from;

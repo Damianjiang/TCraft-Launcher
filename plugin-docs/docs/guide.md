@@ -104,7 +104,9 @@ jar --create --file hello.jar -C out .
 ```
 
 ::: tip 不想下载 JavaFX SDK？
-启动器首次运行后，JavaFX 会下载到 `.tcl/dependencies/win/openjfx/`（Linux 为 `linux/openjfx/`）。
+启动器首次运行后，JavaFX 会下载到 `.tcl/dependencies/<platform>/openjfx/`：
+Windows 为 `win`，macOS Intel 为 `mac`，Apple Silicon 为 `mac-aarch64`，
+Linux x64 为 `linux`，Linux ARM64 为 `linux-aarch64`。
 把该目录下的 `javafx-*.jar` 全部加进 classpath，效果相同。
 :::
 
@@ -141,4 +143,6 @@ demo-hello/
 
 - [plugin.json 清单](/manifest)
 - [界面与布局](/ui)
-- [命令与事件](/commands)
+- [网络、系统与桌面能力](/capabilities)
+- [让 AI 写插件](/ai)
+- [完整 API](/api)

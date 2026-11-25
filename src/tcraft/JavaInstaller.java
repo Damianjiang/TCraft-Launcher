@@ -39,6 +39,7 @@ public final class JavaInstaller {
             if (arm32) return "";
             return arm64 ? "mac-os-arm64" : "mac-os";
         }
+        if (!os.contains("linux")) return "";
         // Mojang 没有发布 Linux ARM 运行时 走手动安装
         if (arm64 || arm32) return "";
         if (x86) return "linux-i386";
@@ -120,7 +121,7 @@ public final class JavaInstaller {
                 java.util.concurrent.atomic.AtomicReference<Exception> firstError =
                         new java.util.concurrent.atomic.AtomicReference<>();
                 ExecutorService pool = Executors.newFixedThreadPool(
-                        Math.max(1, Math.min(8, fileEntries.size())), r -> {
+                        Math.max(1, Math.min(fileEntries.size(), Downloader.downloadThreads(8))), r -> {
                             Thread t = new Thread(r, "TCL-JavaFile");
                             t.setDaemon(true);
                             return t;

@@ -53,6 +53,12 @@ import java.util.function.Consumer;
 
 public final class MainWindow {
 
+    private static final double DEFAULT_WINDOW_WIDTH = 850;
+    private static final double DEFAULT_WINDOW_HEIGHT = 500;
+    private static final double MIN_WINDOW_WIDTH = 760;
+    private static final double MIN_WINDOW_HEIGHT = 470;
+    private static final double SCREEN_EDGE_MARGIN = 16;
+
     public final Stage stage;
     public final Data data = Data.get();
     public final StackPane root;
@@ -68,6 +74,7 @@ public final class MainWindow {
     public StackPane toastLayer;
     public StackPane launchLayer;
     public ImportPanel importPanel;
+    public DataBackupPanel dataPanel;
     public StackPane modalLayer;
     public StackPane searchLayer;
 
@@ -103,6 +110,7 @@ public final class MainWindow {
 
     private Page currentPage;
     private Node curLeft, curRight;
+    private double pageLeftWidth;
     public String currentKey = "launch";
     public String pendingSetupSection = "launch";
     public ResourceInfo pendingResource = null;
@@ -188,9 +196,15 @@ public final class MainWindow {
             });
         });
         long tMusic = System.nanoTime();
-        Scene scene = new Scene(root, 850, 500, Color.TRANSPARENT);
+        double initialW = initialWindowWidth();
+        double initialH = initialWindowHeight();
+        Scene scene = new Scene(root, initialW, initialH, Color.TRANSPARENT);
         if (Theme.css() != null) scene.getStylesheets().add(Theme.css().toExternalForm());
         long tScene = System.nanoTime();
+        scene.widthProperty().addListener((o, a, b) -> {
+            updatePageWidth();
+            updateToastWidths();
+        });
         Theme.onCssReload(() -> {
             URL u = Theme.css();
             if (u != null) scene.getStylesheets().setAll(u.toExternalForm());
@@ -208,14 +222,23 @@ public final class MainWindow {
         };
         stage.initStyle(javafx.stage.StageStyle.TRANSPARENT);
         stage.setScene(scene);
+        if (dataPanel != null) {
+            dataPanel.minWidthProperty().bind(scene.widthProperty());
+            dataPanel.maxWidthProperty().bind(scene.widthProperty());
+        }
         stage.setTitle("TCraft Launcher");
         // 图标为空时跳过
         javafx.scene.image.Image winIcon = Theme.loadImage("logo.png");
         if (winIcon != null) stage.getIcons().add(winIcon);
-        stage.setMinWidth(810);
-        stage.setMinHeight(470);
+        stage.setMinWidth(MIN_WINDOW_WIDTH);
+        stage.setMinHeight(MIN_WINDOW_HEIGHT);
         stage.setAlwaysOnTop(false);
         restoreWindowBounds();
+        // 首次显示后按真实屏幕再校一次，避免窗口大于可用桌面被裁掉
+        stage.setOnShown(e -> {
+            fitWindowToScreen(true);
+            Platform.runLater(() -> fitWindowToScreen(true));
+        });
         lastScreenSignature = screenSignature();
         installResize(scene);
         installDropTarget(scene);
@@ -259,6 +282,16 @@ public final class MainWindow {
         Errors.attach(this);
     }
 
+    private static double initialWindowWidth() {
+        javafx.geometry.Rectangle2D vb = javafx.stage.Screen.getPrimary().getVisualBounds();
+        return Math.min(DEFAULT_WINDOW_WIDTH, Math.max(320, vb.getWidth() - SCREEN_EDGE_MARGIN));
+    }
+
+    private static double initialWindowHeight() {
+        javafx.geometry.Rectangle2D vb = javafx.stage.Screen.getPrimary().getVisualBounds();
+        return Math.min(DEFAULT_WINDOW_HEIGHT, Math.max(240, vb.getHeight() - SCREEN_EDGE_MARGIN));
+    }
+
     private void restoreWindowBounds() {
         double px = Double.NaN, py = Double.NaN;
         if (data.getBool("UiRememberWindowPos", false)) {
@@ -269,15 +302,19 @@ public final class MainWindow {
         javafx.geometry.Rectangle2D vb = Double.isNaN(px) || Double.isNaN(py)
                 ? javafx.stage.Screen.getPrimary().getVisualBounds()
                 : screenFor(px, py);
+        double maxW = Math.max(320, vb.getWidth() - SCREEN_EDGE_MARGIN);
+        double maxH = Math.max(240, vb.getHeight() - SCREEN_EDGE_MARGIN);
         // 最小尺寸不能超过屏幕
-        double minW = Math.min(810, Math.max(320, vb.getWidth() - 8));
-        double minH = Math.min(470, Math.max(240, vb.getHeight() - 8));
+        double minW = Math.min(MIN_WINDOW_WIDTH, maxW);
+        double minH = Math.min(MIN_WINDOW_HEIGHT, maxH);
         stage.setMinWidth(minW);
         stage.setMinHeight(minH);
-        double w = parseDouble(data.get("Window.Width", ""), 850);
-        double h = parseDouble(data.get("Window.Height", ""), 500);
-        w = Math.min(Math.max(minW, w), Math.max(minW, vb.getWidth() - 8));
-        h = Math.min(Math.max(minH, h), Math.max(minH, vb.getHeight() - 8));
+        double defW = Math.min(DEFAULT_WINDOW_WIDTH, maxW);
+        double defH = Math.min(DEFAULT_WINDOW_HEIGHT, maxH);
+        double w = parseDouble(data.get("Window.Width", ""), defW);
+        double h = parseDouble(data.get("Window.Height", ""), defH);
+        w = Math.min(Math.max(minW, w), maxW);
+        h = Math.min(Math.max(minH, h), maxH);
         root.setPrefSize(w, h);
         stage.setWidth(w);
         stage.setHeight(h);
@@ -295,10 +332,10 @@ public final class MainWindow {
         double x = stage.getX(), y = stage.getY(), w = stage.getWidth(), h = stage.getHeight();
         if (w <= 0 || h <= 0) return;
         javafx.geometry.Rectangle2D vb = screenForWindow(x, y, w, h);
-        double maxW = Math.max(320, vb.getWidth() - 8);
-        double maxH = Math.max(240, vb.getHeight() - 8);
-        double minW = Math.min(810, maxW);
-        double minH = Math.min(470, maxH);
+        double maxW = Math.max(320, vb.getWidth() - SCREEN_EDGE_MARGIN);
+        double maxH = Math.max(240, vb.getHeight() - SCREEN_EDGE_MARGIN);
+        double minW = Math.min(MIN_WINDOW_WIDTH, maxW);
+        double minH = Math.min(MIN_WINDOW_HEIGHT, maxH);
         if (Math.abs(stage.getMinWidth() - minW) > 1) stage.setMinWidth(minW);
         if (Math.abs(stage.getMinHeight() - minH) > 1) stage.setMinHeight(minH);
         double nw = Math.min(Math.max(w, minW), maxW);
@@ -312,9 +349,10 @@ public final class MainWindow {
             root.setPrefHeight(nh);
             stage.setHeight(nh);
         }
-        if (!forceVisible && !resized) return;
         double nx = clamp(x, vb.getMinX(), Math.max(vb.getMinX(), vb.getMaxX() - nw));
         double ny = clamp(y, vb.getMinY(), Math.max(vb.getMinY(), vb.getMaxY() - nh));
+        boolean moved = Math.abs(nx - x) > 1 || Math.abs(ny - y) > 1;
+        if (!forceVisible && !resized && !moved) return;
         if (Math.abs(nx - x) > 1) stage.setX(nx);
         if (Math.abs(ny - y) > 1) stage.setY(ny);
     }
@@ -838,6 +876,10 @@ public final class MainWindow {
         }, "TCL-CrashAnalyze");
         t.setDaemon(true);
         t.start();
+    }
+
+    public boolean isGameRunning() {
+        return gameProcess != null && gameProcess.isAlive();
     }
 
     public void onGameStarted(Process process) {
@@ -1588,7 +1630,10 @@ public final class MainWindow {
         b.getChildren().add(pageHost);
         importPanel = new ImportPanel();
         b.getChildren().add(importPanel);
-        // 绑 body 宽度会循环依赖
+        dataPanel = new DataBackupPanel(this);
+        b.getChildren().add(dataPanel);
+        // 宽度在 scene 建好后再绑，避免 body 的逻辑宽度把面板顶到窗口外
+        StackPane.setAlignment(dataPanel, Pos.TOP_LEFT);
 
         toastLayer = new StackPane();
         toastLayer.setAlignment(Pos.BOTTOM_RIGHT);
@@ -2053,11 +2098,7 @@ public final class MainWindow {
     private void applyPage(Page page) {
         Node left = page.left();
         Node right = page.right();
-        double w = page.leftWidth();
-        if (w > 0) {
-            // 窄窗口给右侧留出可读宽度
-            w = Math.min(w, Math.max(180, stage.getWidth() - 320));
-        }
+        pageLeftWidth = Math.max(0, page.leftWidth());
         leftHost.getChildren().clear();
         rightHost.getChildren().clear();
         if (left != null) leftHost.getChildren().add(left);
@@ -2070,12 +2111,8 @@ public final class MainWindow {
         if (left instanceof javafx.scene.layout.Region lr) {
             lr.setMinWidth(0);
         }
-        leftHost.setMinWidth(w);
-        leftHost.setPrefWidth(w);
-        leftHost.setMaxWidth(w);
-        leftHost.setVisible(w > 0);
-        leftHost.setManaged(w > 0);
-        animateCover(w);
+        updatePageWidth();
+        animateCover(leftHost.getWidth());
         pageHost.setOpacity(1);
         if (left != null) {
             setOpacitySafe(left, 0);
@@ -2094,6 +2131,24 @@ public final class MainWindow {
             }
         }
         bindBackToTop(right);
+    }
+
+    // 侧栏宽度随窗口实时收缩，避免拉宽后再缩回时右侧被固定侧栏挤没
+    private void updatePageWidth() {
+        if (leftHost == null) return;
+        double stageW = stage.getWidth();
+        if (stageW <= 1) stageW = DEFAULT_WINDOW_WIDTH;
+        double w = pageLeftWidth;
+        if (w > 0) {
+            double available = stageW - 340;
+            w = Math.min(w, Math.max(160, available));
+        }
+        leftHost.setMinWidth(w);
+        leftHost.setPrefWidth(w);
+        leftHost.setMaxWidth(w);
+        leftHost.setVisible(w > 0);
+        leftHost.setManaged(w > 0);
+        if (cover != null) cover.setWidth(w);
     }
 
     private void exitPage(Page page) {
@@ -2556,7 +2611,8 @@ public final class MainWindow {
         HBox card = new HBox(10);
         card.setAlignment(Pos.CENTER_LEFT);
         card.setPadding(new Insets(10, 12, 13, 12));
-        card.setMaxWidth(360);
+        double toastMax = toastMaxWidth();
+        card.setMaxWidth(toastMax);
         card.setBackground(Ui.fill(Theme.dialogBg, 8));
         card.setEffect(Theme.shadow(18, 3, 0.2, Theme.text));
         Color c;
@@ -2588,7 +2644,7 @@ public final class MainWindow {
         Label t = Ui.bold(title, 12.5, Theme.gray1);
         Label m = Ui.label(message == null ? "" : message, 11.5, Theme.gray2);
         m.setWrapText(true);
-        m.setMaxWidth(265);
+        m.setMaxWidth(Math.max(120, toastMax - 95));
         texts.getChildren().addAll(t, m);
         HBox.setHgrow(texts, Priority.ALWAYS);
         StackPane close = Ui.iconButton("x", 20, 12, null, null);
@@ -2597,7 +2653,7 @@ public final class MainWindow {
         progress.setMaxHeight(3);
         progress.setBackground(Ui.fill(c, 0));
         VBox stack = new VBox(card, progress);
-        stack.setMaxWidth(360);
+        stack.setMaxWidth(toastMax);
         stack.setOpacity(0);
         stack.setTranslateX(60);
         // 防 aniMs=0 时 toast 即逝
@@ -2658,6 +2714,31 @@ public final class MainWindow {
         };
         addRef[0].run();
         installToastDrag(card, stack, at, close);
+    }
+
+    private double toastMaxWidth() {
+        double host = body != null && body.getWidth() > 1 ? body.getWidth()
+                : (stage.getScene() != null ? stage.getScene().getWidth() : DEFAULT_WINDOW_WIDTH);
+        return Math.max(200, Math.min(360, host - 56));
+    }
+
+    private void updateToastWidths() {
+        if (toastList == null) return;
+        double max = toastMaxWidth();
+        double textMax = Math.max(120, max - 95);
+        for (Node n : toastList.getChildren()) {
+            if (n instanceof VBox stack) stack.setMaxWidth(max);
+            if (n instanceof VBox stack && !stack.getChildren().isEmpty()
+                    && stack.getChildren().get(0) instanceof HBox card) {
+                card.setMaxWidth(max);
+                for (Node c : card.getChildren()) {
+                    if (c instanceof VBox texts && texts.getChildren().size() > 1
+                            && texts.getChildren().get(1) instanceof Label message) {
+                        message.setMaxWidth(textMax);
+                    }
+                }
+            }
+        }
     }
 
     // 清理过期 toast
@@ -3870,8 +3951,34 @@ public final class MainWindow {
         rebuildUi();
     }
 
+    public void openDataPanel() {
+        if (dataPanel != null) dataPanel.open();
+    }
+
     public void requestClose() {
-        closeWindow();
+        if (closing) return;
+        List<Tasks.Task> active = Tasks.INSTANCE.active();
+        boolean transfer = importPanel != null && importPanel.isBusy();
+        int count = active.size() + (transfer ? 1 : 0);
+        if (count == 0) {
+            closeWindow();
+            return;
+        }
+        if (hasOpenModal()) return;
+        StringBuilder msg = new StringBuilder(Lang.tf("当前有 %d 个任务正在运行：\n", count));
+        int shown = 0;
+        for (Tasks.Task task : active) {
+            if (shown >= 5) break;
+            msg.append("· ").append(Lang.t(task.title));
+            if (task.stage != null && !task.stage.isBlank()) msg.append("（").append(Lang.t(task.stage)).append("）");
+            msg.append('\n');
+            shown++;
+        }
+        if (active.size() > shown) msg.append(Lang.tf("· 还有 %d 个任务\n", active.size() - shown));
+        if (transfer) msg.append(Lang.t("· 正在导入或导出数据\n"));
+        msg.append(Lang.t("\n退出会中断这些任务，未完成的下载、安装或导入可能留下不完整文件。确定要退出吗？"));
+        Dialogs.confirm(this, "退出启动器", msg.toString(), this::closeWindow, true, () -> {
+        });
     }
 
     public void closeWindow() {
@@ -4005,25 +4112,33 @@ public final class MainWindow {
             if (resizeEdge == 0) return;
             double dx = e.getScreenX() - pressSceneX;
             double dy = e.getScreenY() - pressSceneY;
+            javafx.geometry.Rectangle2D vb = screenForWindow(startX, startY, startW, startH);
             double minW = Math.max(320, stage.getMinWidth()), minH = Math.max(240, stage.getMinHeight());
+            double maxW = Math.max(minW, vb.getWidth() - SCREEN_EDGE_MARGIN);
+            double maxH = Math.max(minH, vb.getHeight() - SCREEN_EDGE_MARGIN);
             if ((resizeEdge & 1) != 0) {
-                stage.setWidth(Math.max(minW, startW + dx));
+                stage.setWidth(Math.min(maxW, Math.max(minW, startW + dx)));
             }
             if ((resizeEdge & 2) != 0) {
-                double nw = Math.max(minW, startW - dx);
-                stage.setX(startX + (startW - nw));
+                double nw = Math.min(maxW, Math.max(minW, startW - dx));
+                stage.setX(Math.max(vb.getMinX(), startX + (startW - nw)));
                 stage.setWidth(nw);
             }
             if ((resizeEdge & 4) != 0) {
-                stage.setHeight(Math.max(minH, startH + dy));
+                stage.setHeight(Math.min(maxH, Math.max(minH, startH + dy)));
             }
             if ((resizeEdge & 8) != 0) {
-                double nh = Math.max(minH, startH - dy);
-                stage.setY(startY + (startH - nh));
+                double nh = Math.min(maxH, Math.max(minH, startH - dy));
+                stage.setY(Math.max(vb.getMinY(), startY + (startH - nh)));
                 stage.setHeight(nh);
             }
         });
-        scene.addEventFilter(MouseEvent.MOUSE_RELEASED, e -> resizeEdge = 0);
+        scene.addEventFilter(MouseEvent.MOUSE_RELEASED, e -> {
+            if (resizeEdge != 0) {
+                resizeEdge = 0;
+                fitWindowToScreen(true);
+            }
+        });
     }
 
     private int edgeAt(double x, double y) {

@@ -28,19 +28,24 @@
 生命周期回调、页面构建、按钮与命令回调都在 **JavaFX Application Thread** 执行。
 
 ```java
-// 错误 在 UI 线程里同步下载 界面会卡住
-String json = Http.get(url);
+// 错误：在 UI 线程里同步下载，界面会卡住
+String json = ctx.network().get(url);
 
-// 正确 后台线程做 IO 回到 UI 线程更新控件
-new Thread(() -> {
-    String json = Http.get(url);
-    Platform.runLater(() -> label.setText(json));
-}, "my-plugin-io").start();
+// 正确：后台任务做 IO，回到 UI 线程更新控件
+ctx.scheduler().async(() -> {
+    try {
+        String json = ctx.network().get(url);
+        ctx.scheduler().ui(() -> label.setText(json));
+    } catch (IOException e) {
+        ctx.scheduler().ui(() -> ctx.dialogs().error("请求失败", e.getMessage()));
+    }
+});
 ```
 
 - 不要在 `onLoad` 里做耗时操作；启动器会等待它返回。
-- 后台线程不要直接改 JavaFX 节点，统一用 `Platform.runLater`。
-- 需要周期任务时使用单线程 `ScheduledExecutorService`，并在 `onDisable` 里关闭，避免重载后遗留线程。
+- 后台线程不要直接改 JavaFX 节点，统一用 `ctx.scheduler().ui(...)`。
+- 需要周期任务时用 `ctx.scheduler().repeat(...)`，插件禁用/重载会自动关闭。
+- 插件自己创建的线程要在 `onDisable` 里停止，否则重载会累积。
 
 ## 存储与数据目录
 
@@ -49,11 +54,14 @@ new Thread(() -> {
 ```java
 ctx.storage().set("lastLaunch", System.currentTimeMillis());
 ctx.storage().save();
-String name = ctx.storage().get("playerName", "Steve");
+ctx.storage().set("limit", 120);
+ctx.storage().save();
+int limit = ctx.storage().getInt("limit", 20);
+long last = ctx.storage().getLong("lastLaunch", 0L);
 ```
 
 - 存储按插件 id 隔离；覆盖安装会保留，删除插件也不会自动清空。
-- 值按字符串保存，数字/布尔请自行转换。
+- 值按字符串保存，`getInt/getLong/getDouble/getBool` 会自动转换。
 - 不要把大文件塞进 properties；图片、缓存、数据库放插件自己的数据目录，并在清单或文档中说明。
 - 写入后调用 `save()`；高频写入建议合并，避免每次点击都落盘。
 
@@ -119,9 +127,19 @@ WebP 解码库由启动器首次启动时自动补齐。
 - 长列表每页 10–20 项，分页或懒加载；不要一次创建上千个 JavaFX 节点。
 - 图片按显示尺寸解码并缓存，列表小图不要加载原图。
 - 避免在 `onLoad`、页面构建、按钮回调里同步访问网络或磁盘。
-- 事件监听在 `onDisable` 中取消；线程池要关闭，否则重载会累积。
+- 事件监听、线程池和定时任务在插件禁用时清理；`ctx.scheduler()` 会自动关闭。
 - 大量文本使用 `Label.setWrapText(true)` 并限制最大宽度，避免反复触发布局。
 - 需要动画时使用 `Timeline` / `Transition`，不要用忙循环。
+
+## AI 辅助开发
+
+给 AI 的材料优先级：
+
+1. [llms.txt](https://damianjiang.github.io/TCraft-Launcher/wiki/llms.txt)：全部公开方法签名、清单、线程规则、动作协议和打包命令。
+2. [AiDesktopPlugin.java](https://damianjiang.github.io/TCraft-Launcher/wiki/examples/AiDesktopPlugin.java)：完整可编译示例。
+3. [让 AI 写插件](/ai)：提示词、动作协议、常见错误和验收清单。
+
+AI 生成代码后必须实际执行 `javac --release 17`；不要只检查文本。
 
 ## 兼容性基线
 

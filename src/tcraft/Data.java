@@ -1174,6 +1174,7 @@ public final class Data {
                 props.setProperty("SystemLanguage", "0");
                 props.setProperty("SystemMaxThreads", "64");
                 props.setProperty("SystemDownloadSource", "0");
+                props.setProperty("SystemDownloadMode", "0");
                 // 默认自动测速 更新源测速 资源镜像同时准备官方与内置
                 props.setProperty("SystemUpdateMirrorMode", "1");
                 props.setProperty("SystemMirrorMode", "3");

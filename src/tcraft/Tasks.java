@@ -1,5 +1,6 @@
 package tcraft;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -71,8 +72,13 @@ public final class Tasks {
     }
 
     public boolean hasActive() {
-        for (Task t : list) if (t.state == State.RUNNING) return true;
-        return false;
+        return !active().isEmpty();
+    }
+
+    public List<Task> active() {
+        List<Task> out = new ArrayList<>();
+        for (Task t : list) if (t.state == State.RUNNING) out.add(t);
+        return out;
     }
 
     public double overall() {

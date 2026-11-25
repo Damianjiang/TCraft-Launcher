@@ -41,7 +41,8 @@ public final class PluginsPage {
         List<Plugins.LoadedPlugin> all = new ArrayList<>(Plugins.get().list());
         int loaded = 0;
         for (Plugins.LoadedPlugin p : all) if ("loaded".equals(p.state)) loaded++;
-        header(page, "插件管理", Lang.tf("共 %d 个，已启用 %d 个。插件可以添加页面、按钮、命令与弹窗。", all.size(), loaded));
+        header(page, "插件管理", Lang.tf("共 %d 个，已启用 %d 个。插件可以添加页面与命令，并调用网络、文件、进程和桌面能力。", all.size(), loaded));
+        PluginDev.buildCard(win, page);
 
         if (sidebarScan) {
             sidebarScan = false;
@@ -454,7 +455,7 @@ public final class PluginsPage {
         win.showModal(card);
     }
 
-    private static VBox dialogCard(String title, double width) {
+    static VBox dialogCard(String title, double width) {
         VBox card = new VBox(0);
         card.setPadding(new Insets(22, 22, 20, 22));
         card.setPrefWidth(width);

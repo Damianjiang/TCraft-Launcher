@@ -237,15 +237,20 @@ public class PageTasks implements Page {
         int files = 0;
         int threads = 0;
         int active = 0;
+        boolean downloading = false;
         for (Tasks.Task t : Tasks.INSTANCE.list) {
             if (t.state == Tasks.State.RUNNING) {
                 active++;
                 files += t.remainingFiles;
                 threads += t.threads;
+                if (t.remainingFiles > 0 || t.threads > 0) downloading = true;
             }
         }
-        if (active > 0) speed = Downloader.speed(NetSpeed.current());
-        else NetSpeed.reset();
+        if (active > 0 && downloading) {
+            speed = Downloader.speed(NetSpeed.current());
+        } else {
+            NetSpeed.reset();
+        }
         speedLabel.setText(speed);
         fileLabel.setText(String.valueOf(files));
         threadLabel.setText(String.valueOf(threads));

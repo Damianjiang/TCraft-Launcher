@@ -944,7 +944,8 @@ public final class GameLauncher {
         String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
         if (os.contains("windows")) return "windows";
         if (os.contains("mac") || os.contains("darwin")) return "osx";
-        return "linux";
+        if (os.contains("linux")) return "linux";
+        return "";
     }
 
     private static String osArch() {

@@ -25,7 +25,6 @@ public final class SelfUpdate {
     private static final Pattern VERSIONED = Pattern.compile(
             "^(TCraftLauncher-)(\\d+(?:\\.\\d+)*)(-win\\.exe|\\.exe|\\.jar|\\.sh|-linux\\.sh|\\.command)$",
             Pattern.CASE_INSENSITIVE);
-
     private SelfUpdate() {
     }
 
@@ -94,7 +93,7 @@ public final class SelfUpdate {
     private static Optional<String> headerLocation(String suffix) {
         return switch (suffix) {
             case "exe" -> Optional.of(WIN_STUB);
-            case "sh" -> Optional.of(SH_HEADER);
+            case "sh", "command" -> Optional.of(SH_HEADER);
             default -> Optional.empty();
         };
     }
@@ -112,7 +111,7 @@ public final class SelfUpdate {
     // 只按已知外壳字节判断源文件头长度
     private static int detectHeaderLength(ZipFile zip, FileChannel channel) throws IOException {
         ByteBuffer buf = channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size());
-        for (String suffix : new String[]{"exe", "sh"}) {
+        for (String suffix : new String[]{"exe", "sh", "command"}) {
             Optional<byte[]> header = readHeader(zip, suffix);
             if (header.isEmpty()) continue;
             ((Buffer) buf).rewind();
@@ -148,8 +147,9 @@ public final class SelfUpdate {
                 if (header.length > 0) out.write(ByteBuffer.wrap(header));
                 in.transferTo(detectHeaderLength(zip, in), Long.MAX_VALUE, out);
             }
-            // Linux 更新后保持可执行 否则下次双击打不开
-            if ("sh".equals(suffix.orElse("")) && !System.getProperty("os.name", "")
+            // Linux/macOS 更新后保持可执行 否则下次双击打不开
+            if (("sh".equals(suffix.orElse("")) || "command".equals(suffix.orElse("")))
+                    && !System.getProperty("os.name", "")
                     .toLowerCase(java.util.Locale.ROOT).contains("windows")) {
                 to.toFile().setExecutable(true);
             }

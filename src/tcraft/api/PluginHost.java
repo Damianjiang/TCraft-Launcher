@@ -46,6 +46,10 @@ public interface PluginHost {
 
     void log(String message);
 
+    void launchGame();
+
+    void refreshLauncher();
+
     javafx.stage.Stage stage();
 
     String launcherVersion();

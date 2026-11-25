@@ -27,3 +27,5 @@
 *.jpg binary
 *.ico binary
 *.ttf binary
+# 翻译表按列存原文，保留文案尾随空格，不做空白检查
+res/LangTables.txt whitespace=-blank-at-eol

@@ -1,0 +1,10 @@
+{
+  "id": "demo.aidesktop",
+  "name": "AI 桌面助手",
+  "version": "1.0.0",
+  "author": "TCraft",
+  "description": "向 OpenAI 兼容接口发送需求，解析模型返回的 JSON 动作，确认后操作桌面。",
+  "icon": "bot",
+  "main": "demo.aidesktop.AiDesktopPlugin",
+  "api": 1
+}

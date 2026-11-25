@@ -302,6 +302,16 @@ public final class Plugins {
         }
 
         @Override
+        public void launchGame() {
+            if (Plugins.get().win != null) Plugins.get().win.launchGame();
+        }
+
+        @Override
+        public void refreshLauncher() {
+            if (Plugins.get().win != null) Plugins.get().win.refreshRight();
+        }
+
+        @Override
         public javafx.stage.Stage stage() {
             return Plugins.get().win == null ? null : Plugins.get().win.stage;
         }
@@ -605,6 +615,14 @@ public final class Plugins {
         lp.toolButtons.clear();
         lp.launchButtons.clear();
         lp.floatButtons.clear();
+        if (lp.ctx != null) {
+            try {
+                lp.ctx.close();
+            } catch (Throwable t) {
+                log(lp.manifest.id, "关闭插件资源失败：" + Log.describe(t));
+            }
+            lp.ctx = null;
+        }
         if (lp.loader != null) {
             try {
                 lp.loader.close();

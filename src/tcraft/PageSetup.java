@@ -172,6 +172,7 @@ public class PageSetup implements Page {
             }
             case "system" -> {
                 data.set("SystemDownloadSource", 0);
+                data.set("SystemDownloadMode", 0);
                 data.set("SystemVersionSource", 1);
                 data.set("SystemBmclRoot", "");
                 data.set("SystemMaxThreads", "64");
@@ -1276,15 +1277,12 @@ public class PageSetup implements Page {
     private void buildSystem(VBox page) {
         header(page, "系统", "下载、网络、语言与启动器行为。");
         Ui.Card download = addCard(page, "下载");
-        // 0/2 仅是首选顺序
-        String[] sourceNames = {"自动选择（下载时按测速结果择优）", "官方优先（下载时按测速结果择优）", "仅使用官方源"};
-        int fileCur = data.getInt("SystemDownloadSource", 0);
-        int fileIndex = 1;
-        for (int i = 0; i < FILE_SOURCES.length; i++) if (FILE_SOURCES[i] == fileCur) fileIndex = i;
-        comboRow(download, "文件下载源", sourceNames, fileIndex,
-                i -> data.set("SystemDownloadSource", FILE_SOURCES[i]));
-        Label speedHint = Ui.label("首次下载时会各抓 128KB 测一次速（每个域名只测一次，结果缓存 10 分钟），"
-                + "实际按最快的源下载；某个源变慢或连不上会自动换另一个。", 12, Theme.gray3);
+        String[] sourceNames = {"自动选择（官方 / 镜像测速择优）", "仅使用官方源", "镜像源优先（BMCLAPI / 自定义，失败回退官方）"};
+        int fileCur = Math.max(0, Math.min(2, data.getInt("SystemDownloadSource", 0)));
+        comboRow(download, "文件下载源", sourceNames, fileCur,
+                i -> data.set("SystemDownloadSource", Math.max(0, Math.min(2, i))));
+        Label speedHint = Ui.label("自动模式会同时测试官方源与镜像源，按当前网络选择更快的源；"
+                + "仅官方源不会经过镜像，仅镜像源会优先走 BMCLAPI 或自定义镜像，失败时再回退官方。", 12, Theme.gray3);
         speedHint.setWrapText(true);
         download.add(speedHint);
         comboRow(download, "版本列表源", new String[]{
@@ -1296,6 +1294,14 @@ public class PageSetup implements Page {
         bmclHint.setWrapText(true);
         download.add(bmclHint);
 
+        comboRow(download, "下载方式", new String[]{
+                        "自动（并发下载，速度优先）", "串行（一次一个文件，稳定优先）"},
+                Math.max(0, Math.min(1, data.getInt("SystemDownloadMode", 0))),
+                i -> data.set("SystemDownloadMode", Math.max(0, Math.min(1, i))));
+        Label modeHint = Ui.label("自动模式按最大线程数并发；串行模式只保留一个文件下载，"
+                + "适合网络不稳定、并发下载容易超时或磁盘占用过高的情况，速度会更慢但更容易完成。", 12, Theme.gray3);
+        modeHint.setWrapText(true);
+        download.add(modeHint);
         textRow(download, "最大线程数", "64", data.get("SystemMaxThreads", "64"), s -> data.set("SystemMaxThreads", s));
         textRow(download, "速度限制", "不限", data.get("SystemSpeedLimit", ""), s -> data.set("SystemSpeedLimit", s));
         TextField cacheField = textRow(download, "缓存文件夹", "留空使用默认", data.get("SystemSystemCache", ""), s -> {
@@ -2163,8 +2169,6 @@ public class PageSetup implements Page {
         return b + " B";
     }
 
-    private static final int[] FILE_SOURCES = {2, 0, 1};
-
     private void buildNetwork(VBox page) {
         header(page, "网络", "代理、下载源连通性与测速。");
         Ui.Card proxy = addCard(page, "代理");
@@ -2303,7 +2307,7 @@ public class PageSetup implements Page {
         customHint.setWrapText(true);
         speed.add(customHint);
         String[] sources = {"官方源 (piston-meta.mojang.com)", "BMCLAPI (bmclapi2.bangbang93.com)", "自定义源"};
-        int[] sourceIndex = {2, 0};
+        int[] sourceIndex = {1, 2};
         VBox results = new VBox(2);
         Label[] values = new Label[sources.length];
         Label[] names = new Label[sources.length];
@@ -2347,9 +2351,9 @@ public class PageSetup implements Page {
                 data.set("SystemVersionSource", 0);
                 win.toast("已应用", Lang.t("下载源已切换为 ") + names[2].getText(), 1);
             } else {
-                int value = FILE_SOURCES[sourceIndex[idx]];
+                int value = sourceIndex[idx];
                 data.set("SystemDownloadSource", value);
-                data.set("SystemVersionSource", sourceIndex[idx]);
+                data.set("SystemVersionSource", idx == 0 ? 1 : 0);
                 win.toast("已应用", Lang.t("下载源已切换为 ") + Lang.t(sources[idx]), 1);
             }
             data.save();

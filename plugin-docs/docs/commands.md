@@ -99,7 +99,7 @@ ctx.storage().save();
 ```
 
 - 位置：`.tcl/plugins/.data/<id>/storage.properties`
-- 类型：字符串键值；数字和布尔用 `getInt` / `getBool` 转换
+- 类型：字符串键值；数字和布尔用 `getInt` / `getLong` / `getDouble` / `getBool` 转换
 - 自动保存：禁用、重载、卸载时启动器会调用 `save()`
 - 数据独立：删除插件不会删除数据目录，便于重新安装后恢复
 
@@ -132,23 +132,41 @@ ctx.events().on("plugin.install", e -> {
 
 所有监听在插件卸载时自动取消。
 
-## 后台任务
-
-生命周期与事件回调都在 JavaFX 线程。下载、解压、网络请求请放到后台线程：
+### 插件间广播
 
 ```java
-new Thread(() -> {
+ctx.events().emit("demo.status", Map.of("ready", true, "count", 3));
+ctx.events().on("demo.status", e -> {
+    ctx.log(e.string("ready") + " / " + e.integer("count", 0));
+});
+```
+
+自定义事件会广播给所有启用插件，包括发送者自己。事件名建议加插件 id 前缀，避免冲突。
+
+## 后台任务
+
+生命周期与事件回调都在 JavaFX 线程。下载、解压、网络请求请用插件自己的调度器：
+
+```java
+ctx.scheduler().async(() -> {
     try {
-        // 耗时操作
         String result = doHeavyWork();
-        javafx.application.Platform.runLater(() -> {
-            ctx.dialogs().message("完成", result);
-        });
+        ctx.scheduler().ui(() -> ctx.dialogs().message("完成", result));
     } catch (Exception e) {
         ctx.log("失败：" + e);
     }
-}, "demo-worker").start();
+});
 ```
+
+周期任务：
+
+```java
+ctx.scheduler().repeat(java.time.Duration.ofSeconds(30), () -> {
+    // 轮询接口、检查文件
+});
+```
+
+插件禁用或重载时调度器自动关闭；插件自己创建的线程仍需在 `onDisable` 中停止。
 
 ::: warning
 不要在 JavaFX 线程里 `Thread.sleep`、同步网络请求或解压大文件，否则界面会卡住。

@@ -4,7 +4,7 @@
 
 ## 能力
 
-| 能力 | 入口 | 位置 |
+| 能力 | 入口 | 位置 / 说明 |
 | --- | --- | --- |
 | 完整页面 | `ctx.ui().page(...)` | 「更多」左栏 |
 | 标题栏按钮 | `ctx.ui().titleButton(...)` | 窗口右上角 |
@@ -12,8 +12,16 @@
 | 工具按钮 | `ctx.ui().toolButton(...)` | 「更多 → 实用工具」 |
 | 悬浮按钮 | `ctx.ui().floatButton(...)` | 右下角 |
 | 命令 | `ctx.commands().register(...)` | 搜索、详情、插件按钮 |
-| 弹窗 | `ctx.dialogs()` | 消息、确认、输入、自定义节点 |
-| 事件 | `ctx.events().on(...)` | 启动、切页、开游戏、安装 |
+| 弹窗与文件选择 | `ctx.dialogs()` | 消息、确认、输入、原生选择器 |
+| 网络 | `ctx.network()` | HTTP、下载、WebSocket、TCP、UDP |
+| 文件 | `ctx.files()` | 文本/字节读写、遍历、复制、删除、zip |
+| 系统 | `ctx.system()` | 环境变量、剪贴板、打开文件、通知 |
+| 进程 | `ctx.processes()` | 执行命令、超时、stdout/stderr |
+| 桌面 | `ctx.desktop()` | 截图、鼠标、键盘、组合键 |
+| 调度 | `ctx.scheduler()` | 后台任务、延时、轮询、UI 回调 |
+| JSON | `ctx.json()` | 解析、序列化、安全取值 |
+| 启动器 | `ctx.launcher()` | 实例列表、选择、启动 |
+| 事件 | `ctx.events()` | 生命周期事件、插件间广播 |
 | 任意布局 | `ctx.stage()` | 直接改 `Stage` / `Scene` |
 
 ::: warning 安全边界
@@ -55,10 +63,11 @@ demo-hello.jar
 3. 创建独立 `URLClassLoader`，父加载器为启动器。
 4. 实例化 `main` 类并调用 `onLoad(ctx)`。
 5. 手动启用时再调用 `onEnable()`。
-6. 禁用或卸载时调用 `onDisable()`，关闭类加载器并移除页面、按钮、命令。
+6. 禁用或卸载时调用 `onDisable()`，关闭页面、命令、事件、调度器、网络连接、子进程和类加载器。
 
 ::: tip 线程模型
-回调和事件都在 JavaFX 线程执行。耗时任务放后台线程，再用 `Platform.runLater` 回到 UI。
+回调和事件都在 JavaFX 线程执行。耗时任务放 `ctx.scheduler().async(...)`，更新 UI 用
+`ctx.scheduler().ui(...)`。
 :::
 
 ## 确认加载

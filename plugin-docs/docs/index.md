@@ -4,7 +4,7 @@ layout: home
 hero:
   name: TCraft Launcher
   text: 插件开发文档站
-  tagline: Java + JavaFX 扩展页面、按钮和命令。
+  tagline: Java + JavaFX 扩展页面、命令、网络、文件、进程与桌面控制。
   image:
     src: /logo.png
     alt: TCraft Launcher
@@ -16,22 +16,28 @@ hero:
       text: API 参考
       link: /api
     - theme: alt
-      text: 下载示例
-      link: /examples
+      text: 让 AI 写插件
+      link: /ai
 
 features:
   - icon: ▤
-    title: 任意页面
-    details: 在「更多」添加 JavaFX 页面。
-  - icon: ▦
-    title: 四个按钮位
-    details: 标题栏、首页、工具、悬浮四个入口。
-  - icon: ⌘
-    title: 命令与弹窗
-    details: 命令，消息、确认、输入、自定义弹窗。
+    title: 页面与按钮
+    details: 在「更多」添加 JavaFX 页面，使用四个按钮位。
+  - icon: ⇄
+    title: 网络
+    details: HTTP、下载、WebSocket、TCP、UDP，连接随插件关闭。
   - icon: ⚙
-    title: 生命周期
-    details: 启停、重载、存储、事件、类加载器。
+    title: 系统与进程
+    details: 文件、环境变量、剪贴板、子进程、超时与输出捕获。
+  - icon: ⌨
+    title: 桌面控制
+    details: 截图、鼠标、键盘、组合键，适合做 AI 动作执行器。
+  - icon: ⏱
+    title: 后台任务
+    details: 每插件独立调度器，async、delay、repeat、UI 回调。
+  - icon: ⌘
+    title: 命令与事件
+    details: 命令、弹窗、自定义事件、插件间广播与生命周期清理。
 ---
 
 ## 最短路径
@@ -51,8 +57,15 @@ features:
 | 工具按钮 | `ctx.ui().toolButton(...)` | 「更多 → 实用工具」 |
 | 悬浮按钮 | `ctx.ui().floatButton(...)` | 窗口右下角 |
 | 命令 | `ctx.commands().register(...)` | 全局搜索、插件详情、按钮 |
-| 弹窗 | `ctx.dialogs()` | 消息、确认、输入、自定义节点 |
-| 事件 | `ctx.events().on(...)` | 启动、切页、开游戏、安装插件 |
+| 弹窗 | `ctx.dialogs()` | 消息、确认、输入、原生文件选择 |
+| 网络 | `ctx.network()` | HTTP、下载、WebSocket、TCP、UDP |
+| 文件 | `ctx.files()` | 读写、遍历、复制、删除、zip |
+| 系统 | `ctx.system()` | 环境变量、剪贴板、打开文件、通知 |
+| 进程 | `ctx.processes()` | 执行命令、超时、stdout/stderr |
+| 桌面 | `ctx.desktop()` | 截图、鼠标、键盘、组合键 |
+| 调度 | `ctx.scheduler()` | 后台任务、延时、轮询、UI 回调 |
+| 启动器 | `ctx.launcher()` | 实例列表、选择、启动 |
+| 事件 | `ctx.events()` | 生命周期事件、插件间广播 |
 
 ## 官方入口
 

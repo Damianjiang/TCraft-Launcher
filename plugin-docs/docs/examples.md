@@ -16,6 +16,22 @@
 源码：[HelloPlugin.java](https://damianjiang.github.io/TCraft-Launcher/wiki/examples/HelloPlugin.java){target="_blank"} ·
 清单：[plugin.json](https://damianjiang.github.io/TCraft-Launcher/wiki/examples/plugin.json){target="_blank"}
 
+## AI 桌面助手（网络 + 桌面动作）
+
+[下载 ai-desktop-plugin.zip](https://damianjiang.github.io/TCraft-Launcher/wiki/examples/ai-desktop-plugin.zip){target="_blank"}
+
+这是一个完整的 OpenAI 兼容客户端加桌面动作执行器：
+
+- 页面填写接口地址、模型、API Key 和需求
+- 后台请求 `/chat/completions`，解析 `choices[0].message.content`
+- 模型返回 `{"reply":"...","actions":[...]}`
+- 显示动作摘要，确认后执行 `run`、`type`、`key`、`click`、`screenshot`、`open`、`clipboard`
+- 最多执行 10 个动作，失败会写入回复框
+
+源码：[AiDesktopPlugin.java](https://damianjiang.github.io/TCraft-Launcher/wiki/examples/AiDesktopPlugin.java){target="_blank"} ·
+清单：[ai-desktop-plugin.json](https://damianjiang.github.io/TCraft-Launcher/wiki/examples/ai-desktop-plugin.json){target="_blank"} ·
+完整说明：[让 AI 写插件](/ai)
+
 ## 模板一：Hello 插件（最小可运行）
 
 `plugin.json`

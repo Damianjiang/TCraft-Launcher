@@ -269,6 +269,7 @@ public final class Shell {
         if (isLinux()) {
             return openExternally("xdg-open", url) || openExternally("gio", "open", url);
         }
+        if (!windows()) return false;
         try {
             if (java.awt.Desktop.isDesktopSupported()) {
                 java.awt.Desktop d = java.awt.Desktop.getDesktop();
@@ -300,6 +301,7 @@ public final class Shell {
                     || openExternally("gio", "open", f.getAbsolutePath())
                     || desktopOpen(f);
         }
+        if (!windows()) return false;
         try {
             if (desktopOpen(f)) return true;
             // 不走 cmd.exe &|^ 会被当命令分隔符

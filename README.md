@@ -45,15 +45,19 @@
 | 下载 | 原版与 Forge / NeoForge / Fabric / OptiFine；Mod、整合包、资源包、光影、世界 |
 | Java / 联机 | Java 8/17/21/25；EasyTier 用户态组网 |
 | 个性 / 其他 | 壁纸、主题、字体、音乐、皮肤；搜索、限速、三语、更新、错误导出 |
-| 插件 | 页面、按钮、命令、弹窗、存储、事件、JavaFX 布局 |
+| 插件 | 页面、命令、网络、文件、系统、进程、桌面、调度、JSON、启动器、事件 |
 
 ## 插件
 
 从 1.3.49 起支持第三方插件，入口为 `更多 → 插件`。1.3.50 起支持 `icon` / `thumbnail` 与统一分页。
+插件管理页内置“插件开发”卡片，可生成空白、系统助手、AI 助手三种项目模板；完整 API、网络/系统/桌面
+能力手册和 AI 提示词见文档站。
 
 - [插件开发文档站](https://damianjiang.github.io/TCraft-Launcher/wiki/)
+- [AI 开发手册](https://damianjiang.github.io/TCraft-Launcher/wiki/ai)
+- [llms.txt 全量接口](https://damianjiang.github.io/TCraft-Launcher/wiki/llms.txt)
+- [AI 桌面助手示例](https://damianjiang.github.io/TCraft-Launcher/wiki/examples/ai-desktop-plugin.zip)
 - [文档源码](plugin-docs)
-- [Hello 示例](https://damianjiang.github.io/TCraft-Launcher/wiki/examples/hello-plugin.zip)
 
 插件与启动器同进程，拥有完整权限；只安装可信来源的插件。
 

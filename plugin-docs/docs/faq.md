@@ -51,6 +51,24 @@ javac --release 17 -cp TCraftLauncher.jar -d out src/com/example/MyPlugin.java
 Windows 下 jar 被类加载器持有句柄时无法删除。先禁用插件，再删除；
 启动器会把文件移入回收站，失败时会提示具体文件。
 
+## 插件能联网、执行命令或控制鼠标吗
+
+可以。`ctx.network()` 支持 HTTP/下载/WebSocket/TCP/UDP，`ctx.processes()` 可以执行命令并读取输出，
+`ctx.desktop()` 可以截图、移动鼠标、点击和输入。它们都会在插件禁用/重载时回收连接和子进程。
+
+这些能力没有沙箱，执行前必须由插件自己确认。涉及删除、上传、键鼠操作时请使用
+`ctx.dialogs().confirmDanger(...)`。
+
+## 为什么回调里直接联网会卡住界面
+
+`onLoad`、页面 builder、按钮和命令回调都在 JavaFX 线程。网络、文件、进程和截图必须放进
+`ctx.scheduler().async(...)`，更新控件再用 `ctx.scheduler().ui(...)`。
+
+## 可以把文档直接给 AI 写插件吗
+
+可以。先给 AI [llms.txt](https://damianjiang.github.io/TCraft-Launcher/wiki/llms.txt) 和 [AI 桌面助手源码](https://damianjiang.github.io/TCraft-Launcher/wiki/examples/AiDesktopPlugin.java)，
+再使用[让 AI 写插件](/ai)里的提示词。不要只给首页 HTML，信息密度不够。
+
 ## 插件能访问哪些文件
 
 插件运行在启动器进程内，拥有和启动器相同的文件权限，没有沙箱。
