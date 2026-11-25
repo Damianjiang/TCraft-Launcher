@@ -51,11 +51,9 @@
 
 从 1.3.49 起支持第三方插件，入口为 `更多 → 插件`。1.3.50 起支持 `icon` / `thumbnail` 与统一分页。
 插件管理页内置“插件开发”卡片，可生成空白、系统助手、AI 助手三种项目模板；完整 API、网络/系统/桌面
-能力手册和 AI 提示词见文档站。
+能力手册和可运行示例见文档站。
 
 - [插件开发文档站](https://damianjiang.github.io/TCraft-Launcher/wiki/)
-- [AI 开发手册](https://damianjiang.github.io/TCraft-Launcher/wiki/ai)
-- [llms.txt 全量接口](https://damianjiang.github.io/TCraft-Launcher/wiki/llms.txt)
 - [AI 桌面助手示例](https://damianjiang.github.io/TCraft-Launcher/wiki/examples/ai-desktop-plugin.zip)
 - [文档源码](plugin-docs)
 

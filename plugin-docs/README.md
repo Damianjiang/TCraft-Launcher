@@ -37,13 +37,12 @@ BASE_PATH=/TCraft-Launcher/wiki/ npm run docs:build
 | `docs/manifest.md` | `plugin.json` 字段与校验规则 |
 | `docs/api.md` | 生命周期与完整 API |
 | `docs/capabilities.md` | 网络、文件、系统、进程、桌面、调度、启动器能力与代码配方 |
-| `docs/ai.md` | 给 AI 的提示词、动作协议、验收清单与常见错误 |
 | `docs/ui.md` | 页面、按钮位置与任意 JavaFX 布局 |
 | `docs/commands.md` | 命令、弹窗、存储、事件 |
 | `docs/examples.md` | 可直接导入的示例与模板 |
 | `docs/faq.md` | 常见问题 |
 
-`docs/public/llms.txt` 是给 AI 的单文件全量接口清单；`docs/public/examples/` 放可下载源码与 zip。
+`docs/public/examples/` 放可下载源码与 zip。
 
 ## 新增页面
 

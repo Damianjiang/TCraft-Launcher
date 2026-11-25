@@ -144,5 +144,4 @@ demo-hello/
 - [plugin.json 清单](/manifest)
 - [界面与布局](/ui)
 - [网络、系统与桌面能力](/capabilities)
-- [让 AI 写插件](/ai)
 - [完整 API](/api)

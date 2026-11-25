@@ -25,7 +25,10 @@ const teekConfig = defineTeekConfig({
 
   themeEnhance: {
     enabled: true,
-    position: 'top'
+    position: 'top',
+    layoutSwitch: {
+      defaultMode: 'fullWidth'
+    }
   },
 
   toComment: { enabled: false },
@@ -51,7 +54,7 @@ export default defineConfig({
   extends: teekConfig,
   lang: 'zh-CN',
   title: 'TCraft Launcher 插件开发文档站',
-  description: 'TCraft Launcher 插件开发文档站：清单、完整 API、网络/系统/桌面能力、AI 开发手册与可运行示例。',
+  description: 'TCraft Launcher 插件开发文档站：清单、完整 API、网络/系统/桌面能力与可运行示例。',
   base,
   // 文档成品直接放进官网目录 部署后从 /wiki/ 访问
   outDir: '../../website/wiki',
@@ -60,7 +63,7 @@ export default defineConfig({
     ['link', { rel: 'icon', href: base + 'logo.png' }],
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:title', content: 'TCraft Launcher 插件开发文档站' }],
-    ['meta', { property: 'og:description', content: '用 Java + JavaFX 扩展 TCraft Launcher：页面、命令、网络、文件、进程、桌面控制与 AI 动作。' }],
+    ['meta', { property: 'og:description', content: '用 Java + JavaFX 扩展 TCraft Launcher：页面、命令、网络、文件、进程与桌面控制。' }],
     ['link', { rel: 'preconnect', href: 'https://tcraft.pages.dev' }],
     ['link', { rel: 'dns-prefetch', href: 'https://tcraft.pages.dev' }]
   ],
@@ -94,7 +97,6 @@ export default defineConfig({
       { text: '快速开始', link: '/guide' },
       { text: 'API', link: '/api' },
       { text: '能力手册', link: '/capabilities' },
-      { text: 'AI 开发', link: '/ai' },
       { text: '示例', link: '/examples' },
       { text: '进阶参考', link: '/references' },
       { text: '官方网站', link: 'https://tcraft.pages.dev' }
@@ -116,13 +118,6 @@ export default defineConfig({
           { text: '网络、系统与桌面能力', link: '/capabilities' },
           { text: '界面与布局扩展', link: '/ui' },
           { text: '命令、弹窗与事件', link: '/commands' }
-        ]
-      },
-      {
-        text: 'AI 开发',
-        items: [
-          { text: '让 AI 写插件', link: '/ai' },
-          { text: 'llms.txt 全量接口', link: 'https://damianjiang.github.io/TCraft-Launcher/wiki/llms.txt', target: '_blank' }
         ]
       },
       {
@@ -175,7 +170,7 @@ export default defineConfig({
     },
 
     footer: {
-      message: 'TCraft Launcher 插件开发文档站 · API v1 · 网络 / 系统 / 桌面 / AI',
+      message: 'TCraft Launcher 插件开发文档站 · API v1 · 网络 / 系统 / 桌面',
       copyright: '© 2026 TCraft Launcher'
     },
 

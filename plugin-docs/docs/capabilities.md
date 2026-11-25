@@ -202,7 +202,7 @@ void execute(String reply) {
 }
 ```
 
-完整可运行版本见[让 AI 写插件](/ai)和
+完整可运行版本见
 [AiDesktopPlugin.java](https://damianjiang.github.io/TCraft-Launcher/wiki/examples/AiDesktopPlugin.java)。
 
 ## 当前没有开放的能力

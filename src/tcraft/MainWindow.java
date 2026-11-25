@@ -38,6 +38,7 @@ import javafx.scene.paint.Stop;
 import javafx.scene.shape.Arc;
 import javafx.scene.shape.ArcType;
 import javafx.scene.shape.Rectangle;
+import javafx.scene.text.Text;
 import javafx.scene.transform.Rotate;
 import javafx.stage.Stage;
 import javafx.util.Duration;
@@ -111,6 +112,7 @@ public final class MainWindow {
     private Page currentPage;
     private Node curLeft, curRight;
     private double pageLeftWidth;
+    private double currentLeftWidth;
     public String currentKey = "launch";
     public String pendingSetupSection = "launch";
     public ResourceInfo pendingResource = null;
@@ -203,6 +205,7 @@ public final class MainWindow {
         long tScene = System.nanoTime();
         scene.widthProperty().addListener((o, a, b) -> {
             updatePageWidth();
+            if (cover != null) cover.setWidth(currentLeftWidth);
             updateToastWidths();
         });
         Theme.onCssReload(() -> {
@@ -1036,7 +1039,7 @@ public final class MainWindow {
         overlayLayer.heightProperty().addListener((o, a, b) -> overlayClip.setHeight(b.doubleValue()));
         overlayLayer.setClip(overlayClip);
         frame.getChildren().addAll(frameBox, overlayLayer);
-        root.getChildren().setAll(frame);
+        root.getChildren().add(0, frame);
         applyWindowOpacity();
     }
 
@@ -2107,12 +2110,14 @@ public final class MainWindow {
         Lang.localize(right);
         curLeft = left;
         curRight = right;
+        pageLeftWidth = fitLeftWidth(left, pageLeftWidth);
         constrainRight(right);
         if (left instanceof javafx.scene.layout.Region lr) {
             lr.setMinWidth(0);
         }
         updatePageWidth();
-        animateCover(leftHost.getWidth());
+        // getWidth still reports the previous page before layout; size the cover from the computed width.
+        animateCover(currentLeftWidth);
         pageHost.setOpacity(1);
         if (left != null) {
             setOpacitySafe(left, 0);
@@ -2133,6 +2138,48 @@ public final class MainWindow {
         bindBackToTop(right);
     }
 
+    /// Fits the sidebar to the widest visible navigation label.
+    ///
+    /// Long labels keep the declared cap and are ellipsized by `Ui.ListItem`.
+    private double fitLeftWidth(Node left, double declared) {
+        if (left == null || declared <= 0 || declared > 220) return declared;
+        List<Ui.ListItem> items = new ArrayList<>();
+        collectListItems(left, items);
+        double textWidth = 0;
+        for (Ui.ListItem item : items) {
+            if (item == null || item.title == null || !item.isVisible()) continue;
+            String value = item.title.getText();
+            if (value == null || value.isEmpty()) continue;
+            Text probe = new Text(value);
+            probe.setFont(item.title.getFont());
+            textWidth = Math.max(textWidth, probe.getLayoutBounds().getWidth());
+        }
+        if (textWidth <= 0) return declared;
+        double padding = 0;
+        if (left instanceof Region region) {
+            Insets insets = region.getInsets();
+            if (insets != null) padding = insets.getLeft() + insets.getRight();
+        }
+        // ListItem chrome: 5 selection bar, 5 padding, 34 icon, 11 icon gaps, 22 action, 8 trailing.
+        double natural = Math.ceil(textWidth) + padding + 86;
+        return Math.max(136, Math.min(declared, natural));
+    }
+
+    private void collectListItems(Node node, List<Ui.ListItem> out) {
+        if (node == null) return;
+        if (node instanceof Ui.ListItem item) {
+            out.add(item);
+            return;
+        }
+        if (node instanceof ScrollPane scroll) {
+            collectListItems(scroll.getContent(), out);
+            return;
+        }
+        if (node instanceof Pane pane) {
+            for (Node child : pane.getChildren()) collectListItems(child, out);
+        }
+    }
+
     // 侧栏宽度随窗口实时收缩，避免拉宽后再缩回时右侧被固定侧栏挤没
     private void updatePageWidth() {
         if (leftHost == null) return;
@@ -2143,12 +2190,12 @@ public final class MainWindow {
             double available = stageW - 340;
             w = Math.min(w, Math.max(160, available));
         }
+        currentLeftWidth = w;
         leftHost.setMinWidth(w);
         leftHost.setPrefWidth(w);
         leftHost.setMaxWidth(w);
         leftHost.setVisible(w > 0);
         leftHost.setManaged(w > 0);
-        if (cover != null) cover.setWidth(w);
     }
 
     private void exitPage(Page page) {
@@ -3310,6 +3357,11 @@ public final class MainWindow {
         }
         java.util.List<double[]> scrolls = captureScrolls();
         javafx.scene.image.WritableImage snap = snapshotRoot();
+        javafx.scene.image.ImageView snapCover = snapshotCover(snap);
+        if (snapCover != null) {
+            // Cover the old UI so clearing the rebuild never exposes an empty frame.
+            root.getChildren().add(snapCover);
+        }
         String keep = currentKey;
         hidePage(currentPage);
         rightPendingHide = null;
@@ -3334,7 +3386,8 @@ public final class MainWindow {
         }
         // 播放器不重建 只摘画面再挂回
         detachVideoView();
-        root.getChildren().clear();
+        // Keep the old UI snapshot and remove everything else.
+        root.getChildren().removeIf(n -> n != snapCover);
         // 按悬浮按钮数量重算边距
         extraShown = -1;
         loadThemeFromSettings();
@@ -3353,7 +3406,7 @@ public final class MainWindow {
         else refreshVideoBackground(false);
         startWallpaperRotation();
         restoreScrolls(scrolls);
-        fadeSnapshot(snap);
+        commitSnapshot(snapCover);
     }
 
     private javafx.scene.image.WritableImage snapshotRoot() {
@@ -3367,29 +3420,27 @@ public final class MainWindow {
         }
     }
 
-    // 快照淡出 整页不闪
-    private void fadeSnapshot(javafx.scene.image.WritableImage snap) {
-        if (snap == null || animationsOff()) return;
+    /// Creates an unmanaged cover for the pre-rebuild snapshot.
+    ///
+    /// The snapshot already includes root padding; offsetting it would shift the old UI.
+    private javafx.scene.image.ImageView snapshotCover(javafx.scene.image.WritableImage snap) {
+        if (snap == null) return null;
         javafx.scene.image.ImageView cover = new javafx.scene.image.ImageView(snap);
         cover.setMouseTransparent(true);
         cover.setManaged(false);
         cover.resize(snap.getWidth(), snap.getHeight());
-        // 快照含 root 外边距，而 StackPane 按 padding 摆放子节点，回移避免淡出时整页偏移
-        Insets pad = root.getPadding();
-        cover.setTranslateX(-pad.getLeft());
-        cover.setTranslateY(-pad.getTop());
-        root.getChildren().add(cover);
-        javafx.animation.FadeTransition fade = new javafx.animation.FadeTransition(
-                javafx.util.Duration.millis(160), cover);
-        fade.setFromValue(1);
-        fade.setToValue(0);
-        fade.setInterpolator(Ui.EASE_OUT_FLUENT);
-        fade.setOnFinished(e -> root.getChildren().remove(cover));
-        fade.play();
+        // The snapshot already includes root padding; any offset would shift the old UI.
+        cover.setTranslateX(0);
+        cover.setTranslateY(0);
+        return cover;
     }
 
-    private boolean animationsOff() {
-        return data.getInt("UiAnimSpeed", 100) <= 0;
+    private void commitSnapshot(javafx.scene.image.ImageView cover) {
+        if (cover == null) return;
+        // Lay out the new UI before removing the cover; no fade, so the window never appears to move.
+        root.applyCss();
+        root.layout();
+        root.getChildren().remove(cover);
     }
 
     private java.util.List<double[]> captureScrolls() {

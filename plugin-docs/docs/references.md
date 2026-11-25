@@ -131,16 +131,6 @@ WebP 解码库由启动器首次启动时自动补齐。
 - 大量文本使用 `Label.setWrapText(true)` 并限制最大宽度，避免反复触发布局。
 - 需要动画时使用 `Timeline` / `Transition`，不要用忙循环。
 
-## AI 辅助开发
-
-给 AI 的材料优先级：
-
-1. [llms.txt](https://damianjiang.github.io/TCraft-Launcher/wiki/llms.txt)：全部公开方法签名、清单、线程规则、动作协议和打包命令。
-2. [AiDesktopPlugin.java](https://damianjiang.github.io/TCraft-Launcher/wiki/examples/AiDesktopPlugin.java)：完整可编译示例。
-3. [让 AI 写插件](/ai)：提示词、动作协议、常见错误和验收清单。
-
-AI 生成代码后必须实际执行 `javac --release 17`；不要只检查文本。
-
 ## 兼容性基线
 
 | 项目 | 版本 |

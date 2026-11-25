@@ -2288,7 +2288,6 @@ WScript.Shell 创建快捷方式超时	WScript.Shell timed out while creating th
 生成可编译的插件项目，查看客户端已开放的网络、系统、进程、桌面和启动器能力。	Generate a compilable plugin project and inspect the network, system, process, desktop, and launcher APIs exposed by the client.	產生可編譯的外掛專案，查看客戶端已開放的網路、系統、程序、桌面與啟動器能力。
 新建插件项目	New plugin project	新增外掛專案
 能力清单	Capabilities	能力清單
-复制 AI 提示词	Copy AI prompt	複製 AI 提示詞
 打开项目目录	Open project folder	開啟專案資料夾
 项目会生成在 .tcl/plugin-projects 下，不会直接装进插件列表；编译后把 dist 里的 zip 导入即可。	The project is created under .tcl/plugin-projects and is not installed automatically; build it and import the zip from dist.	專案會建立在 .tcl/plugin-projects 下，不會直接安裝到外掛清單；編譯後匯入 dist 裡的 zip 即可。
 我的插件	My plugin	我的外掛
@@ -2319,7 +2318,6 @@ HTTP、WebSocket、TCP、UDP；支持请求头、下载进度	HTTP, WebSocket, T
 启动器事件、自定义事件广播、插件间通信	Launcher events, custom event broadcast, and plugin-to-plugin messaging	啟動器事件、自訂事件廣播、外掛間通訊
 消息、确认、输入、文件选择、保存、目录选择	Messages, confirmations, input, file selection, save, and folder selection	訊息、確認、輸入、檔案選擇、儲存、目錄選擇
 打开文档	Open docs	開啟文件
-AI 提示词已写入剪贴板	AI prompt copied to the clipboard	AI 提示詞已寫入剪貼簿
 清理垃圾失败	Junk cleanup failed	清理垃圾失敗
 自定义下载失败	Custom download failed	自定義下載失敗
 刷新主页	Refresh Home	重新整理主頁

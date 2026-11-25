@@ -1260,9 +1260,17 @@ public final class Ui {
             }
             VBox texts = new VBox(1);
             texts.setAlignment(Pos.CENTER_LEFT);
+            texts.setMinWidth(0);
+            texts.setMaxWidth(Double.MAX_VALUE);
             title = label(text, height < 40 ? 13 : 14, Theme.text);
+            title.setMinWidth(0);
+            title.setMaxWidth(Double.MAX_VALUE);
+            title.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
             texts.getChildren().add(title);
             info = label(infoText == null ? "" : infoText, 11.5, Theme.gray2);
+            info.setMinWidth(0);
+            info.setMaxWidth(Double.MAX_VALUE);
+            info.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
             info.setVisible(infoText != null && !infoText.isEmpty());
             info.setManaged(info.isVisible());
             texts.getChildren().add(info);

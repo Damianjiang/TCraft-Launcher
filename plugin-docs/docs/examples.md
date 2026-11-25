@@ -29,8 +29,7 @@
 - 最多执行 10 个动作，失败会写入回复框
 
 源码：[AiDesktopPlugin.java](https://damianjiang.github.io/TCraft-Launcher/wiki/examples/AiDesktopPlugin.java){target="_blank"} ·
-清单：[ai-desktop-plugin.json](https://damianjiang.github.io/TCraft-Launcher/wiki/examples/ai-desktop-plugin.json){target="_blank"} ·
-完整说明：[让 AI 写插件](/ai)
+清单：[ai-desktop-plugin.json](https://damianjiang.github.io/TCraft-Launcher/wiki/examples/ai-desktop-plugin.json){target="_blank"}
 
 ## 模板一：Hello 插件（最小可运行）
 

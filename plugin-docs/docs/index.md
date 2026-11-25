@@ -15,9 +15,6 @@ hero:
     - theme: alt
       text: API 参考
       link: /api
-    - theme: alt
-      text: 让 AI 写插件
-      link: /ai
 
 features:
   - icon: ▤
@@ -31,7 +28,7 @@ features:
     details: 文件、环境变量、剪贴板、子进程、超时与输出捕获。
   - icon: ⌨
     title: 桌面控制
-    details: 截图、鼠标、键盘、组合键，适合做 AI 动作执行器。
+    details: 截图、鼠标、键盘、组合键，适合自动化操作。
   - icon: ⏱
     title: 后台任务
     details: 每插件独立调度器，async、delay、repeat、UI 回调。

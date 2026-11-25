@@ -7,8 +7,6 @@ import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
-import javafx.scene.input.Clipboard;
-import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
@@ -38,7 +36,6 @@ final class PluginDev {
         actions.getChildren().addAll(
                 Ui.button("新建插件项目", Ui.BTN_THEME, () -> newProject(win)),
                 Ui.button("能力清单", Ui.BTN_NORMAL, () -> showCapabilities(win)),
-                Ui.button("复制 AI 提示词", Ui.BTN_NORMAL, () -> copyPrompt(win)),
                 Ui.button("打开项目目录", Ui.BTN_NORMAL, () -> openProjects(win)));
         card.add(actions);
         page.getChildren().add(card);
@@ -481,51 +478,10 @@ final class PluginDev {
         actions.setAlignment(Pos.CENTER_RIGHT);
         VBox.setMargin(actions, new Insets(14, 0, 0, 0));
         actions.getChildren().addAll(
-                Ui.button("复制 AI 提示词", Ui.BTN_NORMAL, () -> copyPrompt(win)),
                 Ui.button("打开文档", Ui.BTN_THEME, () -> Shell.openUrl(DOCS)),
                 Ui.button("关闭", Ui.BTN_NORMAL, win::closeModal));
         card.getChildren().add(actions);
         win.showModal(card);
-    }
-
-    private static void copyPrompt(MainWindow win) {
-        String prompt = """
-                你是 TCraft Launcher 插件开发者。请只使用 `tcraft.api` 公开 API 写一个可编译的 Java 17 插件。
-                文档站：%s
-                优先阅读全量接口：%s
-                完整可运行示例：%s
-
-                硬约束：
-                1. 入口实现 `TcraftPlugin.onLoad(PluginContext ctx)`，用 `ctx.ui().page(...)` 注册页面，
-                   `ctx.commands().register(...)` 注册命令。
-                2. 所有回调默认在 JavaFX 线程；网络、文件、进程、截图放 `ctx.scheduler().async(...)`，
-                   更新 UI 用 `ctx.scheduler().ui(...)`。
-                3. 只用 ctx 公开能力，不引用 `tcraft.Plugins` / `tcraft.Data` 等内部类。
-                4. 编译必须 `javac --release 17`；不要把 JavaFX 或 tcraft.api 打进插件 jar。
-                5. 执行命令、删除文件、移动鼠标、输入文字、上传数据前必须让用户确认。
-
-                可用能力：
-                - `ctx.network()`：HTTP GET/POST/request/download、WebSocket、TCP、UDP
-                - `ctx.files()`：读写文件、遍历、复制、移动、删除、zip/unzip
-                - `ctx.system()`：系统信息、环境变量、剪贴板、打开文件/网址、通知
-                - `ctx.processes()`：执行命令、超时、stdout/stderr
-                - `ctx.desktop()`：截图、鼠标、键盘、组合键
-                - `ctx.scheduler()`：后台、延时、周期任务、UI 回调
-                - `ctx.json()`：JSON 解析与序列化
-                - `ctx.launcher()`：实例选择与启动
-                - `ctx.dialogs()`：消息、确认、输入、文件选择
-
-                如果要写“AI 操控电脑”插件，让模型只返回：
-                {"reply":"...","actions":[{"type":"run|type|key|click|screenshot|open|clipboard", ...}]}
-                最多 10 个动作；先显示动作摘要，调用 `ctx.dialogs().confirmDanger(...)` 后再执行。
-
-                请输出 `plugin.json`、入口类完整源码、编译命令、zip 目录结构（根目录直接包含 plugin.json 和 jar）。
-                不要输出解释，不要使用 Markdown 代码块之外的内容。
-                """.formatted(DOCS, DOCS + "llms.txt", DOCS + "examples/AiDesktopPlugin.java");
-        ClipboardContent content = new ClipboardContent();
-        content.putString(prompt);
-        Clipboard.getSystemClipboard().setContent(content);
-        win.toast("已复制", "AI 提示词已写入剪贴板", 1);
     }
 
     private static void openProjects(MainWindow win) {

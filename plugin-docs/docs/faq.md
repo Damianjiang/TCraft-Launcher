@@ -64,11 +64,6 @@ Windows 下 jar 被类加载器持有句柄时无法删除。先禁用插件，�
 `onLoad`、页面 builder、按钮和命令回调都在 JavaFX 线程。网络、文件、进程和截图必须放进
 `ctx.scheduler().async(...)`，更新控件再用 `ctx.scheduler().ui(...)`。
 
-## 可以把文档直接给 AI 写插件吗
-
-可以。先给 AI [llms.txt](https://damianjiang.github.io/TCraft-Launcher/wiki/llms.txt) 和 [AI 桌面助手源码](https://damianjiang.github.io/TCraft-Launcher/wiki/examples/AiDesktopPlugin.java)，
-再使用[让 AI 写插件](/ai)里的提示词。不要只给首页 HTML，信息密度不够。
-
 ## 插件能访问哪些文件
 
 插件运行在启动器进程内，拥有和启动器相同的文件权限，没有沙箱。
