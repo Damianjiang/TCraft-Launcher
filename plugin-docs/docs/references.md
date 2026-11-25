@@ -73,8 +73,8 @@ String name = ctx.storage().get("playerName", "Steve");
 plugins/com.example.stats/
 ├── plugin.json
 ├── stats.jar
-├── icon.png          # 列表小图标，建议 1:1，64×64 或 128×128
-├── thumbnail.png     # 详情页大图，建议 16:9 或 1:1，不小于 512×512
+├── icon.png          # 列表小图标 建议 1:1 64×64 或 128×128
+├── thumbnail.png     # 详情页大图 建议 16:9 或 1:1 不小于 512×512
 └── lib/
     └── gson-2.10.1.jar
 ```

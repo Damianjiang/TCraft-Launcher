@@ -311,7 +311,7 @@ public final class EasyTier {
         int code = c.getResponseCode();
         if (code != 200) throw new Exception("HTTP " + code);
         long total = c.getContentLengthLong();
-        // 联机核心是固定 SHA-256 的二进制，先限制体积，防止坏镜像把磁盘写满。
+        // 联机核心固定 SHA-256 先限体积 防坏镜像写满磁盘
         long maxBytes = 256L * 1024 * 1024;
         if (total > maxBytes) throw new Exception(Lang.t("联机模块体积异常"));
         MessageDigest digest = MessageDigest.getInstance("SHA-256");

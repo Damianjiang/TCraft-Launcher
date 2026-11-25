@@ -37,7 +37,7 @@ public final class Modpacks {
         public String readError = "";
     }
 
-    // readError 用于区分文案 须恒等比较
+    // readError 区分文案 须恒等比较
     static String unrecognizedError() {
         return Lang.t("无法识别整合包格式（压缩包里没有清单文件）");
     }
@@ -616,7 +616,6 @@ public final class Modpacks {
                     + (info.loader.isEmpty() ? "" : " · " + info.loader);
             task.progress = 0.92;
 
-            // 确保版本 json 存在
             String loader = info.loader.isEmpty() ? "原版" : info.loader;
             String actual;
             try {
@@ -1295,7 +1294,7 @@ public final class Modpacks {
         List<DownloadJob> failed = java.util.Collections.synchronizedList(new ArrayList<>());
         long started = System.nanoTime();
         List<DownloadJob> batch = jobs;
-        // HMCL 同款：先全部尝试，再补抓失败项，不因一个文件失败放弃其余任务
+        // 先全部尝试 再补抓失败项 单个文件失败不放弃其余
         for (int round = 0; round <= 2 && !batch.isEmpty(); round++) {
             failed.clear();
             if (round > 0) {

@@ -433,7 +433,7 @@ public final class MsAuth {
         HttpURLConnection c = (HttpURLConnection) URI.create(url).toURL().openConnection();
         c.setConnectTimeout(timeout);
         c.setReadTimeout(timeout);
-        // 认证请求不跟随重定向，避免 POST body 或 Bearer token 被带到别的 host。
+        // 认证请求不跟随重定向 防 POST body/Bearer token 被带到别的 host
         c.setInstanceFollowRedirects(false);
         c.setRequestMethod("POST");
         c.setDoOutput(true);

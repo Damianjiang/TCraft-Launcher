@@ -210,8 +210,7 @@ public final class Shell {
         }
     }
 
-    // 打开外部程序时不能只看“进程起来了”，Linux 没有 xdg-open、
-    // macOS 的 open 失败都会立刻返回非 0；等退出码能避免假成功。
+    // Linux/macOS 的 open 不能只看进程起来了 等退出码才算成功
     private static boolean openExternally(String... cmd) {
         try {
             Process p = new ProcessBuilder(cmd)
@@ -219,7 +218,7 @@ public final class Shell {
                     .redirectOutput(ProcessBuilder.Redirect.DISCARD)
                     .start();
             if (fxThread()) {
-                // 浏览器/文件管理器可能一直挂着，FX 线程不能等 2 秒。
+                // 浏览器/文件管理器可能一直挂着 FX 线程不能等
                 if (p.waitFor(200, java.util.concurrent.TimeUnit.MILLISECONDS)) {
                     return p.exitValue() == 0;
                 }
@@ -233,8 +232,7 @@ public final class Shell {
                 return true;
             }
             if (!p.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)) {
-                // 有的桌面 open/xdg-open 会把进程挂到浏览器退出为止，
-                // 只要已经拉起来就按成功处理，不能把调用线程卡住。
+                // 有的 open 会挂到浏览器退出 拉起就算成功 不卡调用线程
                 return true;
             }
             return p.exitValue() == 0;
@@ -251,7 +249,7 @@ public final class Shell {
         }
     }
 
-    // 只允许网页协议，防止远端资源把 file:/javascript:/自定义 handler 塞进系统打开。
+    // 只放行网页协议 防 file:/javascript:/自定义 handler 进系统打开
     private static boolean webUrl(String url) {
         try {
             java.net.URI uri = java.net.URI.create(url.trim());

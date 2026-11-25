@@ -18,7 +18,7 @@ public final class LevelDat {
     private LevelDat() {
     }
 
-    // 只读 level.dat 根复合标签 用于世界详情
+    // 世界详情用 只读根复合标签
     public static Map<String, Object> read(Path file) throws IOException {
         if (file == null || !Files.isRegularFile(file)) throw new IOException(Lang.t("找不到 level.dat"));
         if (Files.size(file) > 64L * 1024 * 1024) throw new IOException(Lang.t("level.dat 过大"));

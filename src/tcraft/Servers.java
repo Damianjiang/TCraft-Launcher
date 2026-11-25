@@ -434,7 +434,7 @@ public final class Servers {
         return String.valueOf(desc);
     }
 
-    // 统一拆分 IPv6 与端口
+    // 拆分 IPv6 与端口
     public static String[] splitAddress(String address) {
         String host = address == null ? "" : address.trim();
         String port = "";

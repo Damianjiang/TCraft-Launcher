@@ -102,8 +102,7 @@ public final class Resources {
             }
             return legacy;
         }
-        // 单 jar 启动时和带壳版本一样落在启动器旁边的 .tcl，
-        // 目录只读（例如 macOS 的 /Applications）再退回用户目录。
+        // 单 jar 与带壳版都落启动器旁 .tcl 目录只读时退回用户目录
         Path portable = portableHome();
         if (portable != null) {
             migrateLegacy(legacy, portable);
@@ -114,8 +113,7 @@ public final class Resources {
 
     private static Path portableHome() {
         try {
-            // 老用户已经把配置放在 ~/.tcraft-launcher-javafx，继续沿用；
-            // 新安装（没有旧目录）才落到启动器旁边的 .tcl。
+            // 老用户沿用 ~/.tcraft-launcher-javafx 新安装才用启动器旁 .tcl
             Path legacy = Paths.get(System.getProperty("user.home"), ".tcraft-launcher-javafx");
             if (Files.isDirectory(legacy)) return null;
             if (jar() == null) return null;
@@ -154,7 +152,7 @@ public final class Resources {
         try (java.util.stream.Stream<Path> walk = Files.walk(src)) {
             walk.forEach(p -> {
                 try {
-                    // 不跟随符号链接，避免把用户目录外的文件复制进启动器数据目录。
+                    // 不跟符号链接 防把用户目录外的文件复制进数据目录
                     if (Files.isSymbolicLink(p)) return;
                     Path out = base.resolve(src.relativize(p).toString()).normalize();
                     if (!out.startsWith(base)) return;
@@ -290,7 +288,7 @@ public final class Resources {
         boolean deployedReady = false;
         boolean fxReady = fxPresent();
         if (fxReady) {
-            // classpath 里已有 JavaFX，但原生库可能被误删；缺失时重新解压
+            // classpath 已有 JavaFX 原生库可能被误删 缺了就重新解压
             try {
                 if (Files.isDirectory(deps) && nativesPresent(deps, platform(), JFX_VERSION)) {
                     boolean jars = true;
@@ -315,8 +313,7 @@ public final class Resources {
             ui.setStatus(Lang.t("正在启动主界面…"), 95);
             relaunch(jar(), rt, platform(), args);
         } else {
-            // 已有 JavaFX 直接起主界面；WebP 已存在但当前 classpath 没有时也要重拉。
-            // 只有 .tcl 内的运行库完整时才允许重拉，否则 new JVM 没有 --module-path 会找不到 JavaFX。
+            // 已有 JavaFX 直接起 WebP 不在 classpath 或运行库不全时重拉
             boolean webpReady = ensureWebp(ui);
             if (deployedReady && (webpReady || (!webpOnClasspath()
                     && !Boolean.getBoolean("tcl.webpRetry")
@@ -400,7 +397,7 @@ public final class Resources {
                 ? app + File.pathSeparator + webpJar()
                 : app.toString();
         if (depsReady) {
-            // 优先使用 .tcl 内运行库；不能因为当前 JVM 恰好从外部 module-path 启动就省掉路径。
+            // 用 .tcl 内运行库 当前 JVM 从外部 module-path 启动也不能省
             cmd.add("-Djava.library.path=" + deps);
             cmd.add("--module-path=" + modulePath(deps, plat));
             cmd.add("--add-modules=" + MODULES);
@@ -523,12 +520,11 @@ public final class Resources {
             names.addAll(extractNatives(dir.resolve(jarName(module, classifier, version)), dir));
         }
         if (names.isEmpty()) throw new IOException(Lang.t("JavaFX 包中没有找到原生库"));
-        // 把文件名一起写进 marker，后续启动只做文件存在性检查，不再打开 4 个 jar 扫中央目录。
+        // marker 记文件名 后续只查存在性 不再扫 4 个 jar
         writeNativeManifest(dir.resolve(".natives"), expected, names);
     }
 
-    // .natives 只能证明“解压过”，不能证明文件还在；
-    // 缺一个原生库时 JavaFX 会在启动后才报 UnsatisfiedLinkError，这里提前补。
+    // .natives 只证明解压过 缺文件会在启动后报 UnsatisfiedLinkError 启动前补
     private static boolean nativesPresent(Path dir, String classifier, String version) throws IOException {
         String expected = version + "-" + classifier;
         java.util.List<String> manifest = readNativeManifest(dir, expected);
@@ -539,7 +535,7 @@ public final class Resources {
             }
             return true;
         }
-        // 老版本 marker 只有版本串，或 marker 缺失：扫描一次并补写名单。
+        // 旧 marker 只有版本串或缺失 扫一次并补写名单
         java.util.List<String> names = nativeNamesFromJars(dir, classifier, version);
         for (String name : names) {
             if (!Files.isRegularFile(dir.resolve(name), java.nio.file.LinkOption.NOFOLLOW_LINKS)) return false;
@@ -552,13 +548,13 @@ public final class Resources {
 
     private static void writeNativeManifest(Path marker, String expected, java.util.Collection<String> names)
             throws IOException {
-        // marker 若被换成符号链接，直接写入会落到缓存目录外。
+        // marker 可能是符号链接 先删再写 防落到缓存目录外
         Files.deleteIfExists(marker);
         Files.write(marker, java.util.List.of(expected, String.join("\n", names)),
                 java.nio.charset.StandardCharsets.UTF_8);
     }
 
-    // marker 第一行是版本-平台，其余为原生库文件名；没有名单时返回 null 走扫描兜底。
+    // marker 首行是版本-平台 其余是原生库 无名单返回 null 走扫描
     private static java.util.List<String> readNativeManifest(Path dir, String expected) {
         try {
             Path marker = dir.resolve(".natives");
@@ -745,11 +741,11 @@ public final class Resources {
             while (entries.hasMoreElements()) {
                 JarEntry en = entries.nextElement();
                 String name = en.getName();
-                // Windows 把 \ 当分隔符；仅检查 / 会让 ..\evil.dll 逃出缓存目录。
+                // Windows 把 \ 当分隔符 只查 / 会让 ..\evil.dll 逃出缓存
                 if (en.isDirectory() || !validNativeName(name)) continue;
                 Path out = base.resolve(name).normalize();
                 if (!base.equals(out.getParent())) continue;
-                // 先删符号链接，防止覆盖到缓存目录外的目标。
+                // 先删符号链接 防覆盖到缓存外的目标
                 if (Files.isSymbolicLink(out)) Files.deleteIfExists(out);
                 try (InputStream in = jf.getInputStream(en)) {
                     Files.copy(in, out, StandardCopyOption.REPLACE_EXISTING);

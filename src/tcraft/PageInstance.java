@@ -351,7 +351,7 @@ public class PageInstance implements Page {
     }
 
     private Node instanceRow(Data.Instance ins) {
-        Node icon = Ui.image(ins.icon, 30, 30, true);
+        Node icon = Ui.image(InstanceMeta.icon(ins), 30, 30, true);
         Ui.ListItem item = new Ui.ListItem(icon, ins.name, ins.subtitle(), 46);
         StackPane more = Ui.iconButton("more-vertical", 26, 15, "更多", null);
         more.setOnMouseClicked(e -> {
@@ -394,7 +394,7 @@ public class PageInstance implements Page {
         card.setCursor(Cursor.HAND);
         VBox inner = new VBox(5);
         inner.setPadding(new Insets(12));
-        StackPane iconBox = new StackPane(Ui.image(ins.icon, 38, 38, true));
+        StackPane iconBox = new StackPane(Ui.image(InstanceMeta.icon(ins), 38, 38, true));
         iconBox.setAlignment(Pos.CENTER_LEFT);
         Label name = Ui.bold(ins.name, 13, Theme.text);
         Label sub = Ui.label(ins.subtitle(), 11, Theme.gray2);
@@ -773,7 +773,7 @@ public class PageInstance implements Page {
                 boolean windows = os.contains("windows");
                 boolean mac = os.contains("mac") || os.contains("darwin");
                 java.nio.file.Path script = Resources.launchTarget();
-                // 裸 jar 统一回退到当前 Java 运行 覆盖 Windows/Linux/macOS
+                // 裸 jar 回退到当前 Java 运行 覆盖 Windows/Linux/macOS
                 java.nio.file.Path jar = script == null ? Resources.jar() : null;
                 if (script == null && jar == null) {
                     throw new Exception(Lang.t("找不到启动器程序（TCraftLauncher.exe / TCraftLauncher.sh），请确认使用的是完整版程序。"));
@@ -873,7 +873,7 @@ public class PageInstance implements Page {
     private static java.nio.file.Path uniquePath(java.nio.file.Path dir, String base, String ext) {
         java.nio.file.Path candidate = dir.resolve(base + ext);
         int index = 2;
-        // 用 NOFOLLOW：桌面上的断链符号链接也算“已存在”，不能顺着它写外部文件。
+        // NOFOLLOW 断链符号链接也算已存在 不能顺它写外部文件
         while (java.nio.file.Files.exists(candidate, java.nio.file.LinkOption.NOFOLLOW_LINKS)
                 && index <= 999) {
             candidate = dir.resolve(base + " (" + index + ")" + ext);
@@ -912,7 +912,7 @@ public class PageInstance implements Page {
         chooser.setInitialFileName(ins.name + "-备份-"
                 + java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
                 + ".zip");
-        // 过滤器描述用于 OS 对话框
+        // OS 对话框里的过滤器描述
         chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(Lang.t("压缩包"), "*.zip"));
         File out = chooser.showSaveDialog(win.stage);
         if (out == null) return;
@@ -939,7 +939,7 @@ public class PageInstance implements Page {
                         // 输出文件本身不能进压缩包
                         java.nio.file.Path current = f.toAbsolutePath().normalize();
                         if (current.equals(outPath) || current.equals(partZip)) return;
-                        // 不把 .tcl/config.properties（含令牌）和日志打进可转发备份。
+                        // .tcl/config.properties 含令牌 日志也不进可转发备份
                         if (current.startsWith(launcherHome)) {
                             skipped.incrementAndGet();
                             return;
@@ -1045,14 +1045,16 @@ public class PageInstance implements Page {
                 }
                 if (exists) return;
                 String lower = name.toLowerCase(java.util.Locale.ROOT);
-                String loader = lower.contains("fabric") ? "Fabric"
-                        : lower.contains("neoforge") ? "NeoForge"
-                        : lower.contains("forge") ? "Forge"
-                        : lower.contains("optifine") ? "OptiFine" : "原版";
-                String icon = "Fabric".equals(loader) ? "Fabric.png" : "Forge".equals(loader) ? "CobbleStone.png"
-                        : "NeoForge".equals(loader) ? "NeoForge.png" : "Grass.png";
+                String loader = InstanceMeta.detectLoader(dir);
+                if (loader.isEmpty()) {
+                    loader = lower.contains("fabric") ? "Fabric"
+                            : lower.contains("neoforge") ? "NeoForge"
+                            : lower.contains("forge") ? "Forge"
+                            : lower.contains("optifine") ? "OptiFine" : "原版";
+                }
                 Data.Instance imported = new Data.Instance(name, name, loader, "",
-                        "已导入的版本", icon, System.currentTimeMillis(), false, folderKey);
+                        "已导入的版本", "Grass.png", System.currentTimeMillis(), false, folderKey);
+                imported.icon = InstanceMeta.icon(imported);
                 imported.addedAt = System.currentTimeMillis();
                 data.instances.add(imported);
             });

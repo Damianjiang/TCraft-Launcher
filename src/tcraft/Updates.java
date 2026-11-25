@@ -109,7 +109,7 @@ public final class Updates {
         if (notice == null) notice = UpgradeState.detectFromLog();
         if (notice != null) {
             showUpgradeNotice(win, notice);
-            // 本次先展示升级结果，更新检查交给下次启动，避免两个弹窗叠在一起
+            // 先展示升级结果 更新检查留给下次启动 避免弹窗叠加
             return;
         }
         if (!Data.get().getBool("CheckUpdateOnStartup", true)) return;
@@ -656,8 +656,7 @@ public final class Updates {
         worker.start();
     }
 
-    // 严格跟随当前更新源
-    // 换源后以当前设置为准
+    // 跟随当前更新源 换源后以当前设置为准
     static List<String> downloadBases(String source) {
         List<String> out = new ArrayList<>();
         int mode = Data.get().getInt("SystemUpdateMirrorMode", 1);

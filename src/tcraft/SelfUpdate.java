@@ -15,8 +15,7 @@ import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-// 自更新链路按 HMCL 的 UpdateHandler / ExecutableHeaderHelper 实现
-// 更新包固定为跨平台 jar 目标本体后缀决定注入哪个头
+// 自更新链识别外壳头再拉起新本体 更新包是跨平台 jar 按后缀注入头
 public final class SelfUpdate {
 
     private static final String WIN_STUB = "res/launcher/win.exe";
@@ -64,11 +63,11 @@ public final class SelfUpdate {
                 moveWhenFree(oldFile, renamed.get());
                 target = renamed.get();
             } catch (IOException e) {
-                // 目标名已存在时保留原名 与 HMCL 一致
+                // 目标名已存在时保留原名
                 Log.info("更新后改名失败 " + Log.describe(e));
             }
         }
-        // 复制和改名都完成 才允许新本体展示“升级完成”
+        // 复制和改名都完成 才允许新本体展示升级完成
         UpgradeState.applied();
         startJavaAfterUpdate(target);
     }
@@ -110,7 +109,7 @@ public final class SelfUpdate {
         }
     }
 
-    // 与 HMCL 一样 只按已知外壳字节判断源文件头长度
+    // 只按已知外壳字节判断源文件头长度
     private static int detectHeaderLength(ZipFile zip, FileChannel channel) throws IOException {
         ByteBuffer buf = channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size());
         for (String suffix : new String[]{"exe", "sh"}) {
@@ -184,7 +183,7 @@ public final class SelfUpdate {
         throw last;
     }
 
-    // HMCL UpdateHandler.startJava 同款 复制 -D/-X 后 java -jar 目标文件
+    // 复制 -D/-X 后 java -jar 目标文件
     static void startJava(Path file, String... appArgs) throws IOException {
         spawn(buildCommand(file, appArgs));
     }
@@ -214,7 +213,7 @@ public final class SelfUpdate {
     }
 
     static Process spawn(java.util.List<String> cmd) throws IOException {
-        // HMCL 使用当前工作目录 不切到目标文件父目录
+        // 用当前工作目录 不切到目标文件父目录
         return new ProcessBuilder(cmd)
                 .directory(Paths.get("").toAbsolutePath().toFile())
                 .inheritIO()

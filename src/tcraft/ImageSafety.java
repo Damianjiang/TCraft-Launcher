@@ -1,9 +1,6 @@
 package tcraft;
 
-/**
- * 解码前做尺寸预检。远程图片只限制字节数不够：很小的压缩包可以解出上万像素的位图，
- * JavaFX/WebP 解码器会先分配整张图再缩放，足以把启动器拖进 OOM。
- */
+// 解码前预检尺寸 小字节流也能解出大位图把内存打满
 final class ImageSafety {
 
     private static final int MAX_DIM = 8192;
@@ -13,15 +10,15 @@ final class ImageSafety {
     }
 
     static boolean tooLarge(byte[] data) {
-        long[] size = dimensions(data);
+        long[] size = sizeOf(data);
         if (size == null) return false;
-        // 宽高字段被伪造成 0xFFFFFFFF 时不能靠 int 溢出绕过。
+        // 宽高伪造为 0xFFFFFFFF 时不能靠 int 溢出绕过
         if (size[0] <= 0 || size[1] <= 0) return true;
         long pixels = size[0] * size[1];
         return size[0] > MAX_DIM || size[1] > MAX_DIM || pixels > MAX_PIXELS;
     }
 
-    private static long[] dimensions(byte[] b) {
+    static long[] sizeOf(byte[] b) {
         if (b == null || b.length < 16) return null;
         try {
             if (b[0] == (byte) 0x89 && b[1] == 'P' && b[2] == 'N' && b[3] == 'G') {
@@ -102,10 +99,5 @@ final class ImageSafety {
 
     private static int le24(byte[] b, int i) {
         return (b[i] & 0xFF) | ((b[i + 1] & 0xFF) << 8) | ((b[i + 2] & 0xFF) << 16);
-    }
-
-    private static int le32(byte[] b, int i) {
-        return (b[i] & 0xFF) | ((b[i + 1] & 0xFF) << 8)
-                | ((b[i + 2] & 0xFF) << 16) | ((b[i + 3] & 0xFF) << 24);
     }
 }

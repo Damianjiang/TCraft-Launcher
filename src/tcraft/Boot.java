@@ -92,7 +92,7 @@ public final class Boot {
         // stub 互斥量已失效 长期单实例靠此文件锁
         Path lockFile = Resources.home().resolve("launcher.lock");
         try {
-            // 锁文件若被替换成符号链接，不能顺着它锁外部文件。
+            // 锁文件可能是符号链接 不能顺它锁外部文件
             if (Files.isSymbolicLink(lockFile)) Files.deleteIfExists(lockFile);
         } catch (Exception ignored) {
         }

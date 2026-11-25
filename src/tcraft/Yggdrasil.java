@@ -278,7 +278,7 @@ public final class Yggdrasil {
             HttpResponse<InputStream> resp = Http.noRedirectClient().send(
                     b.build(), HttpResponse.BodyHandlers.ofInputStream());
             try (InputStream in = resp.body()) {
-                // 认证服务器也可能返回超大/恶意响应，限制 20MB 防止直接 OOM。
+                // 认证响应也可能超大 限 20MB 防 OOM
                 String text = new String(Fetch.readAll(in, 20_000, 20L * 1024 * 1024),
                         StandardCharsets.UTF_8);
                 return new Reply(resp.statusCode(), text, resp.headers());

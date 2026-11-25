@@ -1173,7 +1173,6 @@ public final class Downloader {
         return id != null && id.matches("[A-Za-z0-9][A-Za-z0-9._-]{0,127}");
     }
 
-    // 库路径来自版本 JSON 必须落在 libraries 内 绝对路径或 ../ 一律拒绝
     // 版本 ID 会拼进目录和地址 不允许路径字符
     private static boolean safeVersionId(String id) {
         if (id == null || id.isBlank() || id.length() > 128) return false;

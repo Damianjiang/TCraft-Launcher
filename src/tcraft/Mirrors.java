@@ -14,7 +14,7 @@ public final class Mirrors {
     private static String base() {
         try {
             int mode = Data.get().getInt("SystemMirrorMode", 3);
-            // 3 = 自动测速：候选里同时给官方和内置镜像，由 Sources.rank 择优
+            // 3 = 自动测速 候选含官方和内置镜像 按 Sources.rank 排序
             if (mode == 1 || mode == 3) return PRESET;
             if (mode != 2) return null;
             String custom = Data.get().get("SystemMirrorUrl", "");

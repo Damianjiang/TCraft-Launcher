@@ -21,7 +21,7 @@ int __stdcall MultiByteToWideChar(unsigned int, unsigned long, const char *, int
 int __stdcall WideCharToMultiByte(unsigned int, unsigned long, const wchar_t *, int, char *, int, const char *, int *);
 unsigned int __stdcall GetACP(void);
 
-// TCC 没有导出的 InterlockedExchangeAdd，用 CompareExchange 补一个等价实现
+// TCC 没导出 InterlockedExchangeAdd 用 CompareExchange 补等价实现
 #ifdef __TINYC__
 static LONG tcl_atomic_add(volatile LONG *p, LONG v) {
     LONG old;
@@ -323,8 +323,7 @@ static unsigned long long jar_offset(const wchar_t *exe, unsigned long long *siz
             return 0;
         }
     }
-    // 从尾部扫 EOCD 最短 22 字节
-    // 候选处须为 PK\x03\x04 与 headerLength 对齐
+    // 从尾部扫 EOCD 最短 22 字节 候选须为 PK\x03\x04 且与 headerLength 对齐
     for (i = tail_len - 22; ; i--) {
         if (tail[i] == 0x50 && tail[i + 1] == 0x4b && tail[i + 2] == 0x05 && tail[i + 3] == 0x06) {
             unsigned long long cd_size = (unsigned long long)tail[i + 12]
@@ -2195,7 +2194,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR args, int show) {
         return 0;
     }
     cleanup_legacy_home();
-    // HMCL 同款：不落 .tcl 缓存 jar，直接 java -jar 自身
+    // 直接用自身作为运行 jar 不落 .tcl 缓存
     copy_str(jar_path, self_path, MAX_PATH_LEN);
 
     load_cfg();
@@ -2259,8 +2258,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR args, int show) {
             cat_str(logp, L"\\java-error.log", MAX_PATH_LEN);
             got = read_file(logp, head, sizeof(head) / 3);
             if (got > 0) {
-                // JDK 17/18 的 stderr 随 -Dfile.encoding 走 UTF-8 19+ 默认 ACP
-                // 先 UTF-8 严格解码 0x8=MB_ERR_INVALID_CHARS 失败再按 ACP
+                // JDK 17/18 stderr 随 -Dfile.encoding 走 UTF-8 19+ 默认 ACP 先严格 UTF-8 再按 ACP
                 wchar_t wtmp[400];
                 int n = MultiByteToWideChar(CP_UTF8, 0x8, head, got, wtmp, 400);
                 if (n <= 0) n = MultiByteToWideChar(GetACP(), 0, head, got, wtmp, 400);

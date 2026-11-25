@@ -143,7 +143,7 @@ public final class Http {
         return client;
     }
 
-    // 认证/带密码请求使用不自动跟随重定向的 client，调用方自行处理 Location。
+    // 认证/带密码请求不跟随重定向 Location 交给调用方
     static HttpClient noRedirectClient() {
         return clientNoRedirect;
     }
@@ -334,7 +334,7 @@ public final class Http {
                 } catch (IOException e) {
                     throw new IOException("重定向目标不是 HTTP/HTTPS：" + next, e);
                 }
-                // 不允许从 HTTPS 降级到 HTTP，避免凭据/内容在明文链路上被截获。
+                // 禁止 HTTPS 降到 HTTP 防凭据和内容走明文
                 if ("https".equalsIgnoreCase(URI.create(current).getScheme())
                         && !"https".equalsIgnoreCase(nextUri.getScheme())) {
                     throw new IOException("拒绝 HTTPS 降级重定向：" + next);

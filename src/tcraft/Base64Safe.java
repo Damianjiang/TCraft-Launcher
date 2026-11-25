@@ -10,7 +10,7 @@ public final class Base64Safe {
         return decode(text, '+', '/');
     }
 
-    // URL 安全字母表 用于 OAuth state
+    // OAuth state 用 URL 安全字母表
     public static byte[] decodeUrl(String text) {
         return decode(text, '-', '_');
     }

@@ -402,7 +402,7 @@ public final class Data {
         }
     }
 
-    // 用于旧配置迁移判断
+    // 旧配置迁移判断
     private static boolean isStockMinecraft(String path) {
         try {
             Path p = Paths.get(path).toAbsolutePath().normalize();
@@ -806,7 +806,7 @@ public final class Data {
         if (fast > 0) return fast;
         try {
             Path exe = Paths.get(javaExe);
-            // javaw 无控制台 探测统一用同目录 java.exe
+            // javaw 无控制台 探测都用同目录 java.exe
             String name = exe.getFileName() == null ? ""
                     : exe.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
             if (name.equals("javaw.exe") && exe.getParent() != null) {
@@ -910,11 +910,15 @@ public final class Data {
                 }
                 if (exists) return;
                 String lower = name.toLowerCase(java.util.Locale.ROOT);
-                String loader = lower.contains("fabric") ? "Fabric" : lower.contains("neoforge") ? "NeoForge"
-                        : lower.contains("forge") ? "Forge" : lower.contains("optifine") ? "OptiFine" : "原版";
-                String icon = "Fabric".equals(loader) ? "Fabric.png" : "NeoForge".equals(loader) ? "NeoForge.png"
-                        : "Forge".equals(loader) ? "CobbleStone.png" : "Grass.png";
-                instances.add(new Instance(name, name, loader, "", "已安装版本", icon, System.currentTimeMillis(), false, gameDir));
+                String loader = InstanceMeta.detectLoader(dir);
+                if (loader.isEmpty()) {
+                    loader = lower.contains("fabric") ? "Fabric" : lower.contains("neoforge") ? "NeoForge"
+                            : lower.contains("forge") ? "Forge" : lower.contains("optifine") ? "OptiFine" : "原版";
+                }
+                Instance seeded = new Instance(name, name, loader, "", "已安装版本", "Grass.png",
+                        System.currentTimeMillis(), false, gameDir);
+                seeded.icon = InstanceMeta.icon(seeded);
+                instances.add(seeded);
             });
         } catch (Exception e) {
             log("读取已安装版本失败：" + Log.describe(e));
@@ -1170,7 +1174,7 @@ public final class Data {
                 props.setProperty("SystemLanguage", "0");
                 props.setProperty("SystemMaxThreads", "64");
                 props.setProperty("SystemDownloadSource", "0");
-                // 默认自动测速：更新源走镜像测速，资源镜像同时准备官方与内置镜像
+                // 默认自动测速 更新源测速 资源镜像同时准备官方与内置
                 props.setProperty("SystemUpdateMirrorMode", "1");
                 props.setProperty("SystemMirrorMode", "3");
                 return;
@@ -1181,14 +1185,14 @@ public final class Data {
             try (InputStream in = Files.newInputStream(configPath)) {
                 props.load(in);
             }
-            // 老配置补齐默认：更新源和资源镜像都默认自动测速
+            // 老配置补齐默认 更新源和资源镜像都默认自动测速
             if (!props.containsKey("SystemUpdateMirrorMode")) {
                 props.setProperty("SystemUpdateMirrorMode", "1");
             }
             if (!props.containsKey("SystemMirrorMode")) {
                 props.setProperty("SystemMirrorMode", "3");
             }
-            // 老版本默认是官方源（0），升级后一次性切到自动测速；用户之后仍可手动改回
+            // 老版本默认官方源 升级后切一次自动测速 之后仍可手动改
             if (!getBool("SystemAutoSpeedMigrated", false)) {
                 if ("0".equals(props.getProperty("SystemMirrorMode", "0"))) {
                     props.setProperty("SystemMirrorMode", "3");
@@ -1426,7 +1430,7 @@ public final class Data {
         }
     }
 
-    // 先以 600/仅当前用户创建临时文件，再写入令牌；普通 newOutputStream 会先按 umask 建 644。
+    // 先按 600/仅当前用户建临时文件再写令牌 普通流会先按 umask 建 644
     private static OutputStream privateOutput(Path tmp) throws IOException {
         try {
             Files.deleteIfExists(tmp);
@@ -1437,7 +1441,7 @@ public final class Data {
             Files.createFile(tmp, java.nio.file.attribute.PosixFilePermissions.asFileAttribute(
                     java.nio.file.attribute.PosixFilePermissions.fromString("rw-------")));
         } catch (UnsupportedOperationException e) {
-            // Windows 没有 POSIX 权限，创建后再用 ACL 收紧。
+            // Windows 无 POSIX 权限 建完再用 ACL 收紧
             Files.createFile(tmp);
         }
         return Files.newOutputStream(tmp, java.nio.file.StandardOpenOption.WRITE,

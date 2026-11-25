@@ -326,7 +326,7 @@ public final class RemoteImages {
                         .getConstructor(imageClass);
                 return true;
             } catch (Throwable t) {
-                // 只有“解码器加载失败”才全局降级；单张坏图不能让后续 WebP 全部失效。
+                // 仅解码器加载失败才全局降级 单张坏图不影响后续 WebP
                 webpUnavailable = true;
                 return false;
             }

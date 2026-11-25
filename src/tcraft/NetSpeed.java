@@ -21,7 +21,7 @@ public final class NetSpeed {
         if (bytes > 0) BYTES.add(bytes);
     }
 
-    // PCL 同款加权滑动平均 避免瞬时速度跳字
+    // 加权滑动平均 防瞬时速度跳字
     public static synchronized long current() {
         long now = System.nanoTime();
         long total = BYTES.sum();

@@ -2,8 +2,10 @@ package tcraft;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.geometry.Rectangle2D;
 import javafx.scene.Node;
 import javafx.scene.control.*;
+import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
@@ -228,7 +230,7 @@ public class PageInstanceSetup implements Page {
         hero.setAlignment(Pos.CENTER_LEFT);
         hero.setMaxWidth(Double.MAX_VALUE);
         hero.setPadding(new Insets(4, 0, 16, 0));
-        StackPane iconBox = new StackPane(Ui.image(ins.icon, 64, 64, true));
+        StackPane iconBox = new StackPane(Ui.image(InstanceMeta.icon(ins), 64, 64, true));
         iconBox.setMinSize(64, 64);
         VBox info = new VBox(4);
         Label name = Ui.bold(ins.name, 25, Theme.text);
@@ -1591,8 +1593,7 @@ public class PageInstanceSetup implements Page {
         return item;
     }
 
-    // 读盘须后台 不读缓存
-    // 读元数据必须有上限 防恶意条目撑爆堆
+    // 读盘须后台 元数据限长 防恶意条目撑爆堆
     private static String readZipText(java.util.zip.ZipFile zip, java.util.zip.ZipEntry entry, long max)
             throws Exception {
         if (entry == null) return "";
@@ -1877,8 +1878,7 @@ public class PageInstanceSetup implements Page {
             boolean isFolderPack = Files.isDirectory(pack);
             String display = disabled ? name.substring(0, name.length() - ".disabled".length()) : name;
             String info = disabled ? "已禁用" : isFolderPack ? "文件夹包" : sizeOf(pack);
-            Ui.ListItem item = new Ui.ListItem(Theme.icon(disabled ? "link-2-off" : isFolderPack ? "folder" : "image", 16,
-                    disabled ? Theme.gray4 : Theme.accent), display, info, 40);
+            Ui.ListItem item = new Ui.ListItem(packIcon(pack, disabled, isFolderPack, folder), display, info, 40);
             StackPane toggle = Ui.listAction("power", 26, 15, disabled ? "启用" : "禁用",
                     () -> togglePack(pack, disabled, folder));
             item.addAction(toggle);
@@ -1908,6 +1908,50 @@ public class PageInstanceSetup implements Page {
                 renderPacks(root, dir, folder, label, isShader, packs, pageNo, pageSize, rows);
             }));
         }
+    }
+
+    // 包内图片优先 找不到用通用图标
+    private Node packIcon(Path pack, boolean disabled, boolean isFolder, String folder) {
+        String glyph = disabled ? "link-2-off"
+                : "shaderpacks".equals(folder) ? "sun"
+                : "resourcepacks".equals(folder) ? "palette"
+                : isFolder ? "folder" : "image";
+        Node fallback = Theme.icon(glyph, 16, disabled ? Theme.gray4 : Theme.accent);
+        StackPane box = new StackPane(fallback);
+        box.setMinSize(28, 28);
+        box.setPrefSize(28, 28);
+        box.setMaxSize(28, 28);
+        if (disabled) box.setOpacity(0.5);
+        ImageView view = new ImageView();
+        view.setFitWidth(28);
+        view.setFitHeight(28);
+        view.setPreserveRatio(true);
+        view.setSmooth(true);
+        Rectangle clip = new Rectangle(28, 28);
+        clip.setArcWidth(7);
+        clip.setArcHeight(7);
+        view.setClip(clip);
+        view.setVisible(false);
+        box.getChildren().add(view);
+        Threads.start("TCL-PackIcon", () -> {
+            Image image = PackIcons.load(pack);
+            if (image == null) return;
+            javafx.application.Platform.runLater(() -> {
+                squareCrop(view, image);
+                view.setVisible(true);
+                fallback.setVisible(false);
+            });
+        });
+        return box;
+    }
+
+    private static void squareCrop(ImageView view, Image image) {
+        double w = image.getWidth();
+        double h = image.getHeight();
+        if (w <= 0 || h <= 0) return;
+        double side = Math.min(w, h);
+        view.setViewport(new Rectangle2D((w - side) / 2, (h - side) / 2, side, side));
+        view.setImage(image);
     }
 
     private void installPacks(Path dir, String label) {
@@ -3558,13 +3602,11 @@ public class PageInstanceSetup implements Page {
         });
     }
 
-    // 直接在父 ZipInputStream 的当前条目上顺序读嵌套 jar，只取 fabric.mod.json，
-    // 不再把 32MB 内嵌 jar 整个读进 byte[]（大量 mod 时会造成明显 GC 峰值）。
+    // 顺父流读嵌套 jar 的 fabric.mod.json 不整包载入也不关父流
     private static String[] jijReadNestedInfo(java.io.InputStream raw) {
         java.io.InputStream nonClosing = new java.io.FilterInputStream(raw) {
             @Override
             public void close() {
-                // 不能关父流，否则外层 ZipInputStream 无法继续下一个条目。
             }
         };
         try (java.util.zip.ZipInputStream nested = new java.util.zip.ZipInputStream(nonClosing)) {

@@ -8,7 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Properties;
 
-// 自更新成功标记：更新进程写 applied，新本体首次启动读取并清理
+// 自更新成功标记 更新进程写 applied 新本体首次启动读取并清理
 public final class UpgradeState {
 
     public static final class Notice {
@@ -36,7 +36,7 @@ public final class UpgradeState {
         write(from, to, versions, changelog, "true");
     }
 
-    // 更新进程在复制、改名完成后调用
+    // 更新进程在复制改名完成后调用
     public static void applied() {
         Properties p = read();
         if (p == null) return;

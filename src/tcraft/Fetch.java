@@ -35,7 +35,7 @@ public final class Fetch {
         fileCandidates(task, java.util.List.of(url), target, sha1, from, to, report);
     }
 
-    // HMCL 同款候选源循环：每个源先少量重试，失败立刻换下一个源
+    // 候选源逐个试 单源少量重试 失败立刻换下一个
     static void fileCandidates(Tasks.Task task, java.util.List<String> urls, Path target, String sha1,
                                double from, double to, boolean report) throws IOException {
         java.util.List<String> candidates = urls == null ? java.util.List.of()

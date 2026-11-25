@@ -1034,7 +1034,7 @@ public final class GameLauncher {
 
     private static Path prepareAssetsRoot(Path game, String assetId) {
         Path assets = game.resolve("assets");
-        // assetId 来自版本 JSON，会拼进 indexes/virtual 路径；不允许路径分隔符和 ..
+        // assetId 来自版本 JSON 拼进 indexes/virtual 路径 禁分隔符和 ..
         if (assetId == null || !assetId.matches("[A-Za-z0-9][A-Za-z0-9._-]{0,127}")) {
             Data.get().log("资源索引 id 不合法，已忽略：" + assetId);
             return assets;
