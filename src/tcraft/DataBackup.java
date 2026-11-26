@@ -110,7 +110,8 @@ public final class DataBackup {
     private static void exportTo(MainWindow win, Path target) {
         Path base = Data.get().baseDir().toAbsolutePath().normalize();
         Path part = target.resolveSibling(target.getFileName() + ".part");
-        int generation = win.importPanel.begin(Lang.t("正在导出数据"), Lang.t("正在收集启动器数据"), 0);
+        int generation = win.importPanel.begin(Lang.t("正在导出数据"), target.getFileName().toString(), 0);
+        win.importPanel.note(Lang.t("导出期间请勿关闭启动器；备份包含配置、实例、插件、皮肤和预设。"));
         Threads.start("TCL-DataExport", () -> {
             try {
                 ZipInfo info = exportArchive(base, target, part,
@@ -150,7 +151,8 @@ public final class DataBackup {
         }
         try (ZipOutputStream zos = new ZipOutputStream(new BufferedOutputStream(
                 Files.newOutputStream(part), 64 * 1024))) {
-            zos.setLevel(6);
+            // 速度优先：备份/导入的瓶颈是磁盘 IO 和单线程压缩，低压缩比换更快吞吐
+            zos.setLevel(1);
             putText(zos, MARKER, marker(count, bytes));
             int done = 0;
             for (Path file : files) {
@@ -220,6 +222,7 @@ public final class DataBackup {
                 + "-" + UUID.randomUUID().toString().substring(0, 8);
         Path staging = base.resolveSibling(name);
         int generation = win.importPanel.begin(Lang.t("正在导入数据"), zip.getFileName().toString(), info.files);
+        win.importPanel.note(Lang.t("导入完成后会自动重启启动器，旧数据保留为 .tcl.pre-import-*。"));
         Threads.start("TCL-DataImport", () -> {
             try {
                 extractArchive(zip, info, staging,
@@ -282,15 +285,19 @@ public final class DataBackup {
     }
 
     private static void restart(MainWindow win, Path staging) {
-        Path self = SelfUpdate.target();
-        if (self == null) {
-            Dialogs.message(win, Lang.t("需要手动重启"),
-                    Lang.t("数据已导入，但无法定位启动器本体。请关闭后手动重新打开。"), true, Lang.t("确定"));
-            return;
-        }
+        Path base = Data.get().baseDir().toAbsolutePath().normalize();
+        Path pending = base.resolveSibling(base.getFileName() + ".import-pending");
         try {
-            SelfUpdate.startJava(self, "--apply-data-import", staging.toAbsolutePath().toString());
+            // 单文件外壳不保证把参数传给内嵌 jar，用标记文件交接，Windows / macOS / Linux 同一套
+            Files.writeString(pending, ProcessHandle.current().pid() + System.lineSeparator()
+                    + staging.toAbsolutePath().normalize(), StandardCharsets.UTF_8);
+            SelfUpdate.restartSelf();
         } catch (Throwable t) {
+            try {
+                Files.deleteIfExists(pending);
+            } catch (Throwable ignored) {
+                // 标记清不掉时下一次启动会重试导入
+            }
             Dialogs.message(win, Lang.t("重启失败"),
                     Lang.tf("数据已解压到临时目录，但新进程启动失败：\n%s\n请手动重启。", message(t)),
                     true, Lang.t("确定"));

@@ -494,16 +494,6 @@ public class PageOther implements Page {
 
     private void buildTools(VBox page) {
         header(page, "实用工具", "常用工具。");
-        Ui.Card backup = Ui.card("数据备份");
-        Label backupText = paragraph("导出启动器配置、实例记录、插件、皮肤和预设；换电脑或重装前先做一份备份。"
-                + "导入备份会自动解压并重启，旧数据保留为 .tcl.pre-import-*。");
-        backup.add(backupText);
-        StackPane backupButton = Ui.button("打开数据备份", Ui.BTN_HIGHLIGHT, win::openDataPanel);
-        backupButton.setMaxWidth(Region.USE_PREF_SIZE);
-        backup.add(backupButton);
-        VBox.setMargin(backup, new Insets(0, 0, 15, 0));
-        page.getChildren().add(backup);
-
         Ui.Card utilCard = Ui.card("实用工具");
         FlowPane flow = new FlowPane(15, 15);
         flow.setPadding(new Insets(4, 0, 0, 0));

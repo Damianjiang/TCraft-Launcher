@@ -39,7 +39,9 @@ public final class Tasks {
         }
 
         public void cancel() {
+            if (canceled) return;
             canceled = true;
+            stage = "正在取消…";
             if (onCancel != null) onCancel.run();
         }
     }

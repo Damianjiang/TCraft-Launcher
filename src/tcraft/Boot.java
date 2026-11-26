@@ -21,6 +21,8 @@ public final class Boot {
     }
 
     public static void main(String[] args) {
+        // 旧实例还在关窗口时先等它释放数据目录和锁 跨平台通用
+        args = waitForPrevious(args);
         // 更新进程先替换文件 再拉起新版本
         if (args.length == 2 && args[0].equals("--apply-to")) {
             Path oldFile = Paths.get(args[1]);
@@ -53,6 +55,35 @@ public final class Boot {
                 return;
             }
             args = new String[0];
+        }
+        // 部分单文件外壳不转发命令行参数，导入重启用标记文件交接
+        if (args.length == 0) {
+            Path pending = Resources.home().toAbsolutePath().normalize()
+                    .resolveSibling(Resources.home().getFileName() + ".import-pending");
+            if (Files.isRegularFile(pending)) {
+                boolean hasSource = false;
+                boolean applied = false;
+                try {
+                    java.util.List<String> lines = Files.readAllLines(pending,
+                            java.nio.charset.StandardCharsets.UTF_8);
+                    if (lines.size() >= 2 && !lines.get(1).isBlank()) {
+                        hasSource = true;
+                        waitForPid(parsePid(lines.get(0)), 20_000);
+                        applied = applyDataImport(Paths.get(lines.get(1).trim()));
+                    }
+                } catch (Throwable t) {
+                    System.err.println("[TCL] 读取导入标记失败：" + t);
+                }
+                try {
+                    Files.deleteIfExists(pending);
+                } catch (Throwable ignored) {
+                    // 删不掉就留到下次启动重试
+                }
+                if (hasSource && !applied) {
+                    dataImportFail();
+                    return;
+                }
+            }
         }
         // 语言先于一切 UI
         applySystemProperties();
@@ -97,15 +128,51 @@ public final class Boot {
         }
     }
 
-    private static boolean acquireInstanceLock() {
-        // stub 互斥量已失效 长期单实例靠此文件锁
+    // --wait-pid <pid>：等旧进程退出后再继续 避免抢锁 超时也照常启动
+    private static String[] waitForPrevious(String[] args) {
+        long pid = -1;
+        java.util.List<String> rest = new java.util.ArrayList<>();
+        for (int i = 0; i < args.length; i++) {
+            if (args[i].equals("--wait-pid") && i + 1 < args.length) {
+                pid = parsePid(args[++i]);
+            } else {
+                rest.add(args[i]);
+            }
+        }
+        waitForPid(pid, 20_000);
+        return rest.toArray(new String[0]);
+    }
+
+    private static long parsePid(String text) {
+        try {
+            return Long.parseLong(text.trim());
+        } catch (Throwable ignored) {
+            return -1;
+        }
+    }
+
+    // 旧进程可能还在关窗口，等它退出最多 timeout 毫秒
+    private static void waitForPid(long pid, long timeoutMillis) {
+        if (pid <= 0) return;
+        try {
+            java.util.Optional<ProcessHandle> old = ProcessHandle.of(pid);
+            if (old.isPresent() && old.get().isAlive()) {
+                old.get().onExit().get(timeoutMillis, java.util.concurrent.TimeUnit.MILLISECONDS);
+            }
+        } catch (Throwable ignored) {
+            // 超时或无权查询时继续启动
+        }
+    }
+
+    private static boolean acquireInstanceLock() {        // stub 互斥量已失效 长期单实例靠此文件锁
         Path lockFile = Resources.home().resolve("launcher.lock");
         try {
             // 锁文件可能是符号链接 不能顺它锁外部文件
             if (Files.isSymbolicLink(lockFile)) Files.deleteIfExists(lockFile);
         } catch (Exception ignored) {
         }
-        for (int attempt = 0; attempt < 20; attempt++) {
+        // 旧进程退出可能拖到 2 秒以上，导入重启时放宽到 10 秒
+        for (int attempt = 0; attempt < 100; attempt++) {
             FileChannel ch;
             try {
                 ch = FileChannel.open(lockFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE,
@@ -252,29 +319,17 @@ public final class Boot {
             if (!"tcraft-backup-import".equals(Json.str(root, "type", ""))) {
                 throw new IOException("导入标记类型不正确");
             }
-            // 旧窗口退出和文件锁释放需要时间；Windows 上旧进程可能还会占用日志/配置文件
+            // 旧窗口退出和文件锁释放需要时间；单文件外壳会占住 .tcl 内的句柄，
+            // 所以不整目录改名，先快照旧数据再按文件覆盖，Windows / macOS / Linux 同一套
             Thread.sleep(1200);
             Path backup = base.resolveSibling(base.getFileName() + ".pre-import-"
                     + System.currentTimeMillis());
-            if (Files.exists(base)) {
-                IOException last = null;
-                for (int i = 0; i < 120; i++) {
-                    try {
-                        moveDir(base, backup);
-                        last = null;
-                        break;
-                    } catch (IOException e) {
-                        last = e;
-                        Thread.sleep(250);
-                    }
-                }
-                if (last != null) throw last;
-            }
-            try {
-                moveDir(payload, base);
-            } catch (IOException e) {
-                if (!Files.exists(base) && Files.exists(backup)) moveDir(backup, base);
-                throw e;
+            if (Files.exists(base)) snapshotDir(base, backup);
+            int failed = copyOver(payload, base);
+            Path config = base.resolve("config.properties");
+            if (!Files.isRegularFile(config) || Files.size(config) <= 0) {
+                throw new IOException("导入后缺少 config.properties，"
+                        + failed + " 个文件被占用或写入失败");
             }
             deleteTree(stage);
             return true;
@@ -298,12 +353,77 @@ public final class Boot {
         System.exit(1);
     }
 
-    private static void moveDir(Path from, Path to) throws IOException {
+    // 导入前把旧数据快照到 .tcl.pre-import-*；运行库和游戏目录不复制，避免几 GB 拷贝
+    private static final java.util.Set<String> SNAPSHOT_SKIP = java.util.Set.of(
+            "cache", "log", "logs", "update", "dependencies", "java", "EasyTier",
+            "assets", "libraries", "versions", "mods", "saves", "resourcepacks",
+            "shaderpacks", "crash-reports", "screenshots", "replay_recordings", "backups", "backup");
+
+    private static void snapshotDir(Path base, Path backup) {
         try {
-            Files.move(from, to, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
-        } catch (java.nio.file.AtomicMoveNotSupportedException e) {
-            Files.move(from, to);
+            Files.walkFileTree(base, new java.nio.file.SimpleFileVisitor<Path>() {
+                @Override
+                public java.nio.file.FileVisitResult preVisitDirectory(Path dir,
+                        java.nio.file.attribute.BasicFileAttributes attrs) {
+                    if (dir.equals(base)) return java.nio.file.FileVisitResult.CONTINUE;
+                    String first = base.relativize(dir).getName(0).toString();
+                    return SNAPSHOT_SKIP.contains(first)
+                            ? java.nio.file.FileVisitResult.SKIP_SUBTREE
+                            : java.nio.file.FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public java.nio.file.FileVisitResult visitFile(Path file,
+                        java.nio.file.attribute.BasicFileAttributes attrs) {
+                    try {
+                        Path out = backup.resolve(base.relativize(file));
+                        Files.createDirectories(out.getParent());
+                        Files.copy(file, out, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    } catch (Throwable ignored) {
+                        // 被占用的文件跳过，快照只是兜底
+                    }
+                    return java.nio.file.FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public java.nio.file.FileVisitResult visitFileFailed(Path file, IOException e) {
+                    return java.nio.file.FileVisitResult.CONTINUE;
+                }
+            });
+        } catch (Throwable ignored) {
+            // 快照失败不阻断导入
         }
+    }
+
+    // 把备份里的文件逐个覆盖回数据目录，返回失败数量
+    private static int copyOver(Path payload, Path base) throws IOException {
+        int[] failed = {0};
+        Files.walkFileTree(payload, new java.nio.file.SimpleFileVisitor<Path>() {
+            @Override
+            public java.nio.file.FileVisitResult preVisitDirectory(Path dir,
+                    java.nio.file.attribute.BasicFileAttributes attrs) {
+                try {
+                    Files.createDirectories(base.resolve(payload.relativize(dir)));
+                } catch (Throwable ignored) {
+                    failed[0]++;
+                }
+                return java.nio.file.FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public java.nio.file.FileVisitResult visitFile(Path file,
+                    java.nio.file.attribute.BasicFileAttributes attrs) {
+                try {
+                    Path out = base.resolve(payload.relativize(file));
+                    Files.createDirectories(out.getParent());
+                    Files.copy(file, out, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                } catch (Throwable ignored) {
+                    failed[0]++;
+                }
+                return java.nio.file.FileVisitResult.CONTINUE;
+            }
+        });
+        return failed[0];
     }
 
     private static void deleteTree(Path dir) {

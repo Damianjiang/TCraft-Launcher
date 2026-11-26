@@ -2538,3 +2538,30 @@ AI 命令：	AI command:	AI 命令：
 接口地址和提示词不能为空	Endpoint URL and prompt cannot be empty	介面位址和提示詞不能為空
 请求中…	Requesting…	請求中…
 AI 请求失败：	AI request failed: 	AI 請求失敗：
+\n同时删除磁盘目录（不可恢复）：\n%s	\nThe disk folder will also be deleted (cannot be undone):\n%s	\n同時刪除磁碟目錄（不可復原）：\n%s
+\n当前未开启版本隔离，共享游戏目录不会被删除。	\nVersion isolation is off, so the shared game folder will not be deleted.	\n目前未開啟版本隔離，共用遊戲目錄不會被刪除。
+ · MC 	 · MC 	 · MC 
+ 安装器超过 45 分钟没有结束，请检查 Java、网络或安装器日志：	 Installer has not finished after 45 minutes; check Java, network or the installer log: 	 安裝器超過 45 分鐘沒有結束，請檢查 Java、網路或安裝器日誌：
+%d 个文件下载失败：%s	%d files failed to download: %s	%d 個檔案下載失敗：%s
+%s 有新版本：%s\n新文件：%s\n\n新版本 Mod 可能不兼容旧存档或者其他 Mod，这可能导致游戏崩溃，甚至永久损坏存档。	%s has a new version: %s\nNew file: %s\n\nA newer Mod may be incompatible with old saves or other Mods, which can crash the game or even permanently corrupt your save.	%s 有新版本：%s\n新檔案：%s\n\n新版本 Mod 可能不相容舊存檔或其他 Mod，這可能導致遊戲崩潰，甚至永久損壞存檔。
+JavaFX 包中没有找到原生库	No native libraries found in the JavaFX package	JavaFX 套件中沒有找到原生函式庫
+导入完成后会自动重启启动器，旧数据保留为 .tcl.pre-import-*。	The launcher will restart after import; old data is kept as .tcl.pre-import-*.	匯入完成後會自動重新啟動啟動器，舊資料保留為 .tcl.pre-import-*。
+导出期间请勿关闭启动器；备份包含配置、实例、插件、皮肤和预设。	Do not close the launcher while exporting; the backup includes settings, instances, plugins, skins and presets.	匯出期間請勿關閉啟動器；備份包含設定、實例、外掛、面板和預設。
+将导入 %s 中的配置，同名设置会被文件内容覆盖。\n\n	Settings from %s will be imported; values with the same name will be overwritten.\n\n	將匯入 %s 中的設定，同名設定會被檔案內容覆寫。\n\n
+将用备份覆盖当前的配置、实例、插件、皮肤和预设，导入完成后会自动重启启动器。\n\n	Current settings, instances, plugins, skins and presets will be replaced by the backup; the launcher restarts afterwards.\n\n	將用備份覆寫目前的設定、實例、外掛、面板和預設，匯入完成後會自動重新啟動啟動器。\n\n
+已从 v%s 升级到 v%s	Updated from v%s to v%s	已從 v%s 升級到 v%s
+本次更新内容如下。	Here is what changed in this update.	本次更新內容如下。
+本次更新日志	This update's changelog	本次更新日誌
+本次跨越 %d 个版本，以下是这段时间的全部更新内容。	This update spans %d versions; below is everything that changed in that time.	本次跨越 %d 個版本，以下是這段時間的全部更新內容。
+正在导入数据	Importing data	正在匯入資料
+确定要删除实例「%s」吗？%s	Delete instance "%s"?%s	確定要刪除實例「%s」嗎？%s
+缺少 JavaFX 包：	Missing JavaFX package: 	缺少 JavaFX 套件：
+联机模块体积异常	Multiplayer module has an abnormal size	連線模組體積異常
+联网获取部分文件信息失败（%s），是否继续导出？\n\n	Could not fetch some file info online (%s). Continue exporting?\n\n	連網取得部分檔案資訊失敗（%s），是否繼續匯出？\n\n
+请稍后	Please try again later	請稍後
+这个版本没有附带更新说明。	This version has no release notes.	這個版本沒有附帶更新說明。
+完整错误已写入剪贴板	Full error copied to clipboard	完整錯誤已寫入剪貼簿
+导出启动器配置、实例记录、插件、皮肤和预设；换电脑或重装前先做一份备份。	Exports launcher settings, instance records, plugins, skins and presets; make a backup before switching PCs or reinstalling.	匯出啟動器設定、實例記錄、外掛、面板和預設；換電腦或重裝前先做一份備份。
+影响 Modrinth / CurseForge 的接口、图标与文件下载。默认自动测速，官方与内置镜像同时作为候选，下载时按测速结果择优；某个源失败会自动换另一个。	Affects Modrinth / CurseForge APIs, icons and file downloads. Auto mode measures speed with the official and built-in mirrors as candidates and picks the faster one; a failing source falls back to the other.	影響 Modrinth / CurseForge 的介面、圖示與檔案下載。預設自動測速，官方與內建鏡像同時作為候選，下載時依測速結果擇優；某個來源失敗會自動換另一個。
+自动模式会同时测试官方源与镜像源，按当前网络选择更快的源；	Auto mode tests the official and mirror sources at the same time and picks the faster one for your network; 	自動模式會同時測試官方源與鏡像源，依目前網路選擇更快的來源；
+自动模式按最大线程数并发；串行模式只保留一个文件下载，	Auto mode downloads with the maximum thread count; serial mode keeps a single file download, 	自動模式依最大執行緒數並發；串行模式只保留一個檔案下載，

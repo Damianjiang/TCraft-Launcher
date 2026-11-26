@@ -29,6 +29,31 @@ public final class Isolation {
         return run;
     }
 
+    // 删除实例时可以清理的目录：只有版本隔离真正把数据落在独立目录里才返回，共享游戏目录一律不动
+    public static Path deletableDir(Data.Instance ins) {
+        if (ins == null || !on(ins)) return null;
+        Path base = base(ins).toAbsolutePath().normalize();
+        Path versions = base.resolve("versions").normalize();
+        Path dir = run(ins).toAbsolutePath().normalize();
+        if (dir.equals(versions) || !dir.startsWith(versions)) return null;
+        String version = ins.version == null ? "" : ins.version.trim();
+        if (version.isEmpty()) return null;
+        return dir;
+    }
+
+    public static void deleteTree(Path dir) {
+        if (dir == null || !java.nio.file.Files.exists(dir)) return;
+        try (java.util.stream.Stream<Path> walk = java.nio.file.Files.walk(dir)) {
+            walk.sorted(java.util.Comparator.reverseOrder()).forEach(p -> {
+                try {
+                    java.nio.file.Files.deleteIfExists(p);
+                } catch (java.io.IOException ignored) {
+                }
+            });
+        } catch (java.io.IOException ignored) {
+        }
+    }
+
     public static boolean on(Data.Instance ins) {
         if (ins == null) return false;
         if (ins.isolation == ON) return true;

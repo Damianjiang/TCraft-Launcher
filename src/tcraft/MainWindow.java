@@ -75,7 +75,6 @@ public final class MainWindow {
     public StackPane toastLayer;
     public StackPane launchLayer;
     public ImportPanel importPanel;
-    public DataBackupPanel dataPanel;
     public StackPane modalLayer;
     public StackPane searchLayer;
 
@@ -114,6 +113,8 @@ public final class MainWindow {
     private double pageLeftWidth;
     private double currentLeftWidth;
     public String currentKey = "launch";
+    // 子页面（设置/账户/任务等）返回时回到进入前的那个主页面
+    private String lastMainKey = "launch";
     public String pendingSetupSection = "launch";
     public ResourceInfo pendingResource = null;
     private int switchToken;
@@ -225,10 +226,6 @@ public final class MainWindow {
         };
         stage.initStyle(javafx.stage.StageStyle.TRANSPARENT);
         stage.setScene(scene);
-        if (dataPanel != null) {
-            dataPanel.minWidthProperty().bind(scene.widthProperty());
-            dataPanel.maxWidthProperty().bind(scene.widthProperty());
-        }
         stage.setTitle("TCraft Launcher");
         // 图标为空时跳过
         javafx.scene.image.Image winIcon = Theme.loadImage("logo.png");
@@ -1633,10 +1630,6 @@ public final class MainWindow {
         b.getChildren().add(pageHost);
         importPanel = new ImportPanel();
         b.getChildren().add(importPanel);
-        dataPanel = new DataBackupPanel(this);
-        b.getChildren().add(dataPanel);
-        // 宽度在 scene 建好后再绑，避免 body 的逻辑宽度把面板顶到窗口外
-        StackPane.setAlignment(dataPanel, Pos.TOP_LEFT);
 
         toastLayer = new StackPane();
         toastLayer.setAlignment(Pos.BOTTOM_RIGHT);
@@ -2016,6 +2009,11 @@ public final class MainWindow {
     public void openPage(String key, boolean animate) {
         if (pageHidden(key)) key = firstVisiblePage();
         if (Objects.equals(currentKey, key) && currentPage != null && animate) return;
+        switch (key) {
+            case "launch", "instance", "download", "link", "other" -> lastMainKey = key;
+            default -> {
+            }
+        }
         cancelRightRefresh();
         Page page;
         try {
@@ -2419,6 +2417,8 @@ public final class MainWindow {
         switch (key) {
             case "account":
                 return Lang.t("账户管理");
+            case "setup":
+                return Lang.t("设置");
             case "tasks":
                 return Lang.t("任务管理");
             case "instanceSetup": {
@@ -2460,7 +2460,8 @@ public final class MainWindow {
     }
 
     private void pageBack() {
-        openPage("launch", true);
+        String back = lastMainKey;
+        openPage(back == null || back.isEmpty() ? "launch" : back, true);
     }
 
     // 直接摆终态会先闪一帧
@@ -3204,7 +3205,7 @@ public final class MainWindow {
                 {"联机设置", "link"}, {"主题", "ui"}, {"背景", "ui"}, {"背景音乐", "ui"}, {"动画速度", "ui"}, {"窗口圆角", "ui"},
                 {"文件下载源", "system"}, {"HTTP 代理", "system"}, {"语言", "system"},
                 {"Java 运行时", "java"}, {"启动日志", "log"}, {"存储与清理", "cache"},
-                {"下载源测速", "network"}, {"社区", "more"}
+                {"下载源测速", "network"}, {"数据备份", "more"}, {"社区", "more"}
         };
         if (!data.getBool("UiHiddenPageSetup", false)) {
             for (String[] s : settingNames) {
@@ -4004,10 +4005,6 @@ public final class MainWindow {
         if (!pendingRebuild) return;
         pendingRebuild = false;
         rebuildUi();
-    }
-
-    public void openDataPanel() {
-        if (dataPanel != null) dataPanel.open();
     }
 
     public void requestClose() {

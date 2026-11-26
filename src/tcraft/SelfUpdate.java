@@ -188,6 +188,37 @@ public final class SelfUpdate {
         spawn(buildCommand(file, appArgs));
     }
 
+    // 跨平台重启：外壳（exe / sh / command）自己会找回内嵌 jar，纯 jar 才用 java -jar
+    static void restartSelf() throws IOException {
+        Path self = launchTarget();
+        String name = self.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
+        java.util.List<String> cmd = new java.util.ArrayList<>();
+        if (name.endsWith(".exe")) {
+            // Windows 单文件：直接执行外壳，参数交接交给导入标记文件
+            cmd.add(self.toAbsolutePath().toString());
+        } else if (name.endsWith(".sh") || name.endsWith(".command")) {
+            // Linux / macOS：用系统 sh 跑脚本头，不依赖可执行位和终端
+            cmd.add("/bin/sh");
+            cmd.add(self.toAbsolutePath().toString());
+        } else {
+            spawn(buildCommand(self));
+            return;
+        }
+        spawn(cmd);
+    }
+
+    // 优先当前外壳路径，退回 jar 本体
+    private static Path launchTarget() throws IOException {
+        String self = System.getProperty("tcraft.exe", "");
+        if (!self.isEmpty()) {
+            Path path = Paths.get(self);
+            if (Files.isRegularFile(path)) return path;
+        }
+        Path target = target();
+        if (target != null) return target;
+        throw new IOException("无法定位启动器本体");
+    }
+
     static java.util.List<String> buildCommand(Path file, String... appArgs) throws IOException {
         java.util.List<String> cmd = new java.util.ArrayList<>();
         String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);

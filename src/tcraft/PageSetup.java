@@ -77,9 +77,6 @@ public class PageSetup implements Page {
             win.pendingSetupSection = data.setupSection;
         }
         for (String[] s : visibleSections) items.getChildren().add(navItem(s[1], s[2], s[3], s[0]));
-        Ui.ListItem back = new Ui.ListItem(Theme.icon("arrow-left", 16, Theme.text), "返回", null, 34);
-        back.setOnMouseClicked(e -> win.openPage("launch", true));
-        VBox.setMargin(back, new Insets(6, 0, 0, 0));
 
         search.textProperty().addListener((o, a, b) -> {
             String q = b == null ? "" : b.toLowerCase();
@@ -91,7 +88,7 @@ public class PageSetup implements Page {
                 }
             }
         });
-        panel.getChildren().addAll(title, search, scroll, back);
+        panel.getChildren().addAll(title, search, scroll);
         return panel;
     }
 
@@ -2467,6 +2464,16 @@ public class PageSetup implements Page {
 
     private void buildMore(VBox page) {
         header(page, "更多", "社区与启动器维护。");
+        Ui.Card backup = addCard(page, "数据备份");
+        Label backupText = Ui.label("导出启动器配置、实例记录、插件、皮肤和预设；换电脑或重装前先做一份备份。"
+                + "导入备份会自动解压并重启，旧数据保留为 .tcl.pre-import-*。", 12.5, Theme.gray2);
+        backupText.setWrapText(true);
+        backup.add(backupText);
+        FlowPane backupActions = new FlowPane(10, 10);
+        backupActions.getChildren().addAll(
+                Ui.button("导出全部数据", Ui.BTN_HIGHLIGHT, () -> DataBackup.chooseExport(win)),
+                Ui.button("导入备份并重启", Ui.BTN_NORMAL, () -> DataBackup.chooseImport(win)));
+        backup.add(backupActions);
         communityCard(page);
     }
 

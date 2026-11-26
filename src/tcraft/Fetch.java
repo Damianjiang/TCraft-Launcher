@@ -99,7 +99,14 @@ public final class Fetch {
                             continue candidateLoop;
                         }
                     } catch (IOException e) {
-                        if (task != null && task.canceled) throw e;
+                        if (task != null && task.canceled) {
+                            // 取消后不留下半截文件，避免下次复用时反复校验失败
+                            try {
+                                Files.deleteIfExists(part);
+                            } catch (IOException ignored) {
+                            }
+                            throw e;
+                        }
                         last = e;
                         if (e instanceof Http.StatusException se && se.code == 416) {
                             Files.deleteIfExists(part);

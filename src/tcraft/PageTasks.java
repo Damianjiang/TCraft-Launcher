@@ -265,7 +265,7 @@ public class PageTasks implements Page {
         final Label stageLabel;
         final Label detail;
         final VBox subs;
-        final StackPane cancel;
+        StackPane cancel;
         private String subSig = "";
         private boolean pendingAdded;
 
@@ -281,10 +281,14 @@ public class PageTasks implements Page {
             stateLabel = Ui.label(stateText(task.state), 11.5, stateColor(task.state));
             Region sp = new Region();
             HBox.setHgrow(sp, Priority.ALWAYS);
-            cancel = Ui.iconButton("x", 24, 13, "取消任务", () -> {
+            cancel = Ui.button(Lang.t("取消任务"), Ui.BTN_NORMAL, () -> {
+                cancel.setDisable(true);
                 task.cancel();
                 update();
             });
+            cancel.setPrefHeight(28);
+            cancel.setMinWidth(76);
+            cancel.setMaxWidth(76);
             HBox head = new HBox(8, title, stateLabel, sp, cancel);
             head.setAlignment(Pos.CENTER_LEFT);
 

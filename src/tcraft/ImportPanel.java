@@ -14,7 +14,10 @@ import javafx.scene.control.Label;
 import javafx.scene.control.OverrunStyle;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.ColumnConstraints;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
@@ -34,6 +37,7 @@ public final class ImportPanel extends StackPane {
     private final Label step = Ui.label("准备导入", 12, Theme.text);
     private final Label count = Ui.label("", 12, Theme.gray2);
     private final Label percent = Ui.label("0 %", 12, Theme.gray2);
+    private final Label note = Ui.label("", 11.5, Theme.gray2);
     private final Ui.Loading loading = new Ui.Loading(260, 76, "");
     private final Rectangle mask = new Rectangle();
     private final Rectangle track = new Rectangle();
@@ -103,21 +107,58 @@ public final class ImportPanel extends StackPane {
         barBox.getChildren().add(bar);
         VBox.setMargin(barBox, new Insets(16, 0, 14, 0));
 
-        HBox stepRow = new HBox(10);
-        stepRow.setAlignment(Pos.CENTER_LEFT);
-        stepRow.getChildren().addAll(Ui.label("当前文件", 12, Theme.gray2), Ui.spacer(), step);
+        GridPane info = new GridPane();
+        info.setHgap(8);
+        info.setVgap(5);
+        info.setMaxWidth(Double.MAX_VALUE);
+        ColumnConstraints spacerCol = new ColumnConstraints();
+        spacerCol.setHgrow(Priority.ALWAYS);
+        ColumnConstraints keyCol = new ColumnConstraints();
+        keyCol.setHalignment(javafx.geometry.HPos.RIGHT);
+        ColumnConstraints gapCol = new ColumnConstraints();
+        gapCol.setMinWidth(15);
+        ColumnConstraints valueCol = new ColumnConstraints();
+        valueCol.setHgrow(Priority.ALWAYS);
+        info.getColumnConstraints().addAll(spacerCol, keyCol, gapCol, valueCol);
+        info.add(keyLabel("当前步骤"), 1, 0);
         step.setMaxWidth(226);
         step.setTextOverrun(OverrunStyle.ELLIPSIS);
-        HBox countRow = new HBox(10);
-        countRow.setAlignment(Pos.CENTER_LEFT);
-        countRow.getChildren().addAll(Ui.label("进度", 12, Theme.gray2), Ui.spacer(), count, percent);
+        info.add(step, 3, 0);
+        info.add(keyLabel("进度"), 1, 1);
+        HBox valueRow = new HBox(6, count, percent);
+        valueRow.setAlignment(Pos.CENTER_LEFT);
+        info.add(valueRow, 3, 1);
 
-        inner.getChildren().addAll(title, line, loading, subtitle, barBox, stepRow, countRow);
+        Region bottom = new Region();
+        bottom.setMinHeight(30);
+        VBox.setVgrow(bottom, javafx.scene.layout.Priority.ALWAYS);
+
+        note.setWrapText(true);
+        note.setMaxWidth(312);
+        note.setVisible(false);
+        note.setManaged(false);
+        VBox.setMargin(note, new Insets(0, 0, 0, 0));
+
+        inner.getChildren().addAll(title, line, loading, subtitle, barBox, info, bottom, note);
         VBox.setVgrow(loading, javafx.scene.layout.Priority.ALWAYS);
         panel.setCenter(inner);
 
         getChildren().addAll(mask, panel);
         panel.setMaxWidth(0);
+    }
+
+    private Label keyLabel(String text) {
+        Label l = Ui.label(text, 12.5, Theme.text);
+        l.setOpacity(0.5);
+        return l;
+    }
+
+    // 底部说明文字 导出/导入时用，空字符串则不占位
+    public void note(String text) {
+        String value = text == null ? "" : text;
+        note.setText(value);
+        note.setVisible(!value.isEmpty());
+        note.setManaged(!value.isEmpty());
     }
 
     public int begin(String heading, String target, int total) {
@@ -127,12 +168,13 @@ public final class ImportPanel extends StackPane {
         setPickOnBounds(true);
         title.setText(Lang.t(heading));
         subtitle.setText(target);
-        step.setText(Lang.t("准备导入"));
-        count.setText(total > 0 ? "0 / " + total : Lang.t("正在读取"));
+        step.setText(Lang.t("准备中"));
+        count.setText(total > 0 ? "0 / " + total : "");
         percent.setText("0 %");
+        note("");
         progress.set(0);
-        barBox.setVisible(total > 0);
-        barBox.setManaged(total > 0);
+        barBox.setVisible(true);
+        barBox.setManaged(true);
         loading.start();
 
         panel.setMaxWidth(0);
@@ -170,11 +212,11 @@ public final class ImportPanel extends StackPane {
         }
         double value = total <= 0 ? 0 : Math.min(1, done / (double) total);
         progress.set(value);
-        count.setText(total > 0 ? done + " / " + total : Lang.t("正在读取"));
+        count.setText(total > 0 ? done + " / " + total : "");
         percent.setText(Math.round(value * 100) + " %");
         step.setText(text == null ? "" : Lang.t(text));
-        barBox.setVisible(total > 0);
-        barBox.setManaged(total > 0);
+        barBox.setVisible(true);
+        barBox.setManaged(true);
     }
 
     public void finish(int gen, String text, Runnable after) {

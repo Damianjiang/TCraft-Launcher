@@ -256,15 +256,22 @@ public class PageInstanceSetup implements Page {
                 }),
                 Ui.button("打开文件夹", Ui.BTN_NORMAL, () -> openFolder(instanceRoot().toString())),
                 Ui.button("复制实例", Ui.BTN_NORMAL, this::copyInstance),
-                Ui.button("删除实例", Ui.BTN_RED, () -> Dialogs.confirm(win, "删除实例",
-                        Lang.tf("确定要删除实例「%s」吗？", ins.name),
-                        () -> {
-                            data.instances.remove(ins);
-                            data.selectedInstance = 0;
-                            data.save();
-                            win.openPage("instance", true);
-                            win.toast("实例已删除", ins.name, 1);
-                        }, true))
+                Ui.button("删除实例", Ui.BTN_RED, () -> {
+                    java.nio.file.Path dir = Isolation.deletableDir(ins);
+                    String extra = dir != null
+                            ? Lang.tf("\n同时删除磁盘目录（不可恢复）：\n%s", dir)
+                            : Lang.t("\n当前未开启版本隔离，共享游戏目录不会被删除。");
+                    Dialogs.confirm(win, "删除实例",
+                            Lang.tf("确定要删除实例「%s」吗？%s", ins.name, extra),
+                            () -> {
+                                data.instances.remove(ins);
+                                data.selectedInstance = 0;
+                                data.save();
+                                if (dir != null) Isolation.deleteTree(dir);
+                                win.openPage("instance", true);
+                                win.toast("实例已删除", ins.name, 1);
+                            }, true);
+                })
         );
         VBox.setMargin(buttons, new Insets(0, 0, 16, 0));
         page.getChildren().add(buttons);

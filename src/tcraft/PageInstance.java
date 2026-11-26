@@ -470,19 +470,26 @@ public class PageInstance implements Page {
             rebuild();
         }));
         rows.add(Ui.MenuRow.separator());
-        rows.add(Ui.MenuRow.of("删除", "trash-2", () -> Dialogs.confirm(win, "删除实例",
-                Lang.tf("确定要删除实例「%s」吗？\n只会从列表中移除，不会删除磁盘文件。", ins.name), () -> {
-                    int removed = data.instances.indexOf(ins);
-                    if (removed < 0) return;
-                    data.instances.remove(removed);
-                    if (removed < data.selectedInstance) data.selectedInstance--;
-                    else if (removed == data.selectedInstance && data.selectedInstance >= data.instances.size()) {
-                        data.selectedInstance = Math.max(0, data.instances.size() - 1);
-                    }
-                    data.save();
-                    rebuild();
-                    win.toast("实例已删除", ins.name, 1);
-                }, true)));
+        rows.add(Ui.MenuRow.of("删除", "trash-2", () -> {
+            java.nio.file.Path dir = Isolation.deletableDir(ins);
+            String extra = dir != null
+                    ? Lang.tf("\n同时删除磁盘目录（不可恢复）：\n%s", dir)
+                    : Lang.t("\n当前未开启版本隔离，共享游戏目录不会被删除。");
+            Dialogs.confirm(win, "删除实例",
+                    Lang.tf("确定要删除实例「%s」吗？%s", ins.name, extra), () -> {
+                        int removed = data.instances.indexOf(ins);
+                        if (removed < 0) return;
+                        data.instances.remove(removed);
+                        if (removed < data.selectedInstance) data.selectedInstance--;
+                        else if (removed == data.selectedInstance && data.selectedInstance >= data.instances.size()) {
+                            data.selectedInstance = Math.max(0, data.instances.size() - 1);
+                        }
+                        data.save();
+                        if (dir != null) Isolation.deleteTree(dir);
+                        rebuild();
+                        win.toast("实例已删除", ins.name, 1);
+                    }, true);
+        }));
         return rows;
     }
 

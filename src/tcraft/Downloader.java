@@ -71,6 +71,11 @@ public final class Downloader {
         win.toast("开始下载", version.id + " · " + Lang.t(loader), 0);
         Data data = Data.get();
         data.log("开始安装 " + version.id + "（" + loader + "）");
+        // 本次安装新建的版本目录：取消时整目录清掉，否则残留会让「下载游戏」以为已经装过
+        final java.nio.file.Path gamePath = gameDirOverride != null
+                ? gameDirOverride : java.nio.file.Paths.get(data.gameDir);
+        final java.nio.file.Path versionPath = gamePath.resolve("versions").resolve(version.id);
+        final boolean freshVersionDir = !Files.exists(versionPath);
 
         Thread thread = new Thread(() -> {
             try {
@@ -96,6 +101,11 @@ public final class Downloader {
                 if (task.canceled) {
                     task.state = Tasks.State.CANCELED;
                     task.stage = "已取消";
+                    task.speed = "";
+                    task.remainingFiles = 0;
+                    task.threads = 0;
+                    if (freshVersionDir) deleteTree(versionPath);
+                    data.log("已取消安装 " + version.id);
                 } else {
                     task.state = Tasks.State.FAILED;
                     task.error = e.getMessage();
@@ -1547,6 +1557,20 @@ public final class Downloader {
         }
     }
 
+    // 只清理本次新建的半成品版本目录，已存在的版本不动
+    static void deleteTree(java.nio.file.Path dir) {
+        if (dir == null || !Files.exists(dir)) return;
+        try (java.util.stream.Stream<java.nio.file.Path> walk = Files.walk(dir)) {
+            walk.sorted(java.util.Comparator.reverseOrder()).forEach(p -> {
+                try {
+                    Files.deleteIfExists(p);
+                } catch (IOException ignored) {
+                }
+            });
+        } catch (IOException ignored) {
+        }
+    }
+
     static int downloadThreads(int max) {
         int threads = Math.max(1, Math.min(max, Data.get().getInt("SystemMaxThreads", 64)));
         // 串行模式只保留一个下载线程，避免小文件把带宽和磁盘队列打满
@@ -1606,7 +1630,8 @@ public final class Downloader {
         if (url.contains("meta.fabricmc.net")) {
             addMirror(mirrorUrls, url, "https://meta.fabricmc.net", root + "/fabric-meta");
         }
-        if (source == 2 && !mirrorUrls.isEmpty()) {
+        if (source == 2 || source == 0) {
+            // 自动与镜像模式都先走 BMCLAPI，官方源作为兜底（国内直连官方 CDN 明显更慢）
             out.addAll(mirrorUrls);
             out.add(url);
         } else {
