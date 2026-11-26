@@ -134,6 +134,15 @@ public final class MsAuth {
     }
 
     public static Result refresh(String refreshToken) throws Exception {
+        return refresh(refreshToken, null);
+    }
+
+    /**
+     * onRotated receives the new refresh token before the Xbox/Minecraft steps run,
+     * so a rotated token is persisted even if those later calls fail.
+     */
+    public static Result refresh(String refreshToken,
+                                 Consumer<String> onRotated) throws Exception {
         if (!available()) throw new Exception(Lang.t("这个版本没有内置微软登录凭据"));
         if (refreshToken == null || refreshToken.isEmpty()) {
             throw new Exception(Lang.t("没有可用的续期令牌，请重新登录微软账号"));
@@ -157,7 +166,14 @@ public final class MsAuth {
         String token = Json.str(m, "access_token", "");
         if (token.isEmpty()) throw new Exception(Lang.t("微软没有返回访问令牌"));
         String next = Json.str(m, "refresh_token", refreshToken);
-        return authenticate(token, next.isEmpty() ? refreshToken : next, null);
+        String rotated = next.isEmpty() ? refreshToken : next;
+        if (onRotated != null && !rotated.equals(refreshToken)) {
+            try {
+                onRotated.accept(rotated);
+            } catch (RuntimeException ignored) {
+            }
+        }
+        return authenticate(token, rotated, null);
     }
 
     public static boolean validate(String accessToken) throws Exception {
@@ -319,20 +335,26 @@ public final class MsAuth {
     }
 
     public static String refreshSkin(Data.Account account) throws Exception {
-        String token = account.accessToken == null ? "" : account.accessToken;
-        if (token.isEmpty() || account.expiresAt <= System.currentTimeMillis()) {
-            return refreshSkinWithToken(account);
+        // Same lock as launch: avoid two concurrent refresh-token rotations.
+        synchronized (account) {
+            String token = account.accessToken == null ? "" : account.accessToken;
+            if (token.isEmpty() || account.expiresAt <= System.currentTimeMillis()) {
+                return refreshSkinWithToken(account);
+            }
+            Resp resp = get(MC_PROFILE_URL, token, 15000);
+            if (resp.code == 401 || resp.code == 403) return refreshSkinWithToken(account);
+            if (resp.code != 200) throw new Exception(Lang.tf("获取 Minecraft 档案失败：%s", errorText(resp)));
+            String url = activeSkinUrl(parse(resp.body));
+            if (url.isEmpty()) throw new Exception(Lang.t("该账户当前没有皮肤"));
+            return Skins.download(account.name, url);
         }
-        Resp resp = get(MC_PROFILE_URL, token, 15000);
-        if (resp.code == 401 || resp.code == 403) return refreshSkinWithToken(account);
-        if (resp.code != 200) throw new Exception(Lang.tf("获取 Minecraft 档案失败：%s", errorText(resp)));
-        String url = activeSkinUrl(parse(resp.body));
-        if (url.isEmpty()) throw new Exception(Lang.t("该账户当前没有皮肤"));
-        return Skins.download(account.name, url);
     }
 
     private static String refreshSkinWithToken(Data.Account account) throws Exception {
-        Result r = refresh(account.refreshToken);
+        Result r = refresh(account.refreshToken, rotated -> {
+            account.refreshToken = rotated;
+            Data.get().save();
+        });
         account.accessToken = r.accessToken;
         if (!r.refreshToken.isEmpty()) account.refreshToken = r.refreshToken;
         account.expiresAt = r.expiresAt;

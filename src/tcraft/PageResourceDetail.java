@@ -489,7 +489,7 @@ public class PageResourceDetail implements Page {
                 List<String> loaders = new ArrayList<>();
                 if (info.loaders().size() > 1 && v.resourceType.equals("mod") && ResourceVersion.isStandard(verName)) {
                     for (String l : v.loaders) {
-                        if (info.loaders().contains(l.toLowerCase())) loaders.add(cap(l) + " ");
+                        if (info.loaders().contains(l.toLowerCase(java.util.Locale.ROOT))) loaders.add(cap(l) + " ");
                     }
                 }
                 if (loaders.isEmpty()) loaders.add("");
@@ -704,7 +704,7 @@ public class PageResourceDetail implements Page {
 
     private String instanceLoaderKey(Data.Instance ins) {
         if (ins == null || ins.loader == null || ins.loader.isEmpty() || ins.loader.equals("原版")) return "";
-        return ins.loader.toLowerCase();
+        return ins.loader.toLowerCase(java.util.Locale.ROOT);
     }
 
     private boolean versionCompatible(List<String> gameVersions, String vanilla) {
@@ -904,7 +904,7 @@ public class PageResourceDetail implements Page {
         task.subs.add(new Tasks.SubTask("下载文件"));
         boolean hasDeps = !deps.isEmpty();
         if (hasDeps) task.subs.add(new Tasks.SubTask("下载前置文件"));
-        String ext = extOf(file).toLowerCase();
+        String ext = extOf(file).toLowerCase(java.util.Locale.ROOT);
         boolean worldZip = file.resourceType.equals("world") && ext.equals("zip");
         // 子任务用引用
         Tasks.SubTask worldSub = worldZip ? new Tasks.SubTask("安装世界存档") : null;
@@ -929,6 +929,12 @@ public class PageResourceDetail implements Page {
                         Path depTarget = dir.resolve(d.version.fileName.replace("~", "-")).toAbsolutePath().normalize();
                         if (!depTarget.startsWith(dirAbs)) {
                             data.log("前置文件名包含非法路径，已跳过：" + d.version.fileName);
+                            continue;
+                        }
+                        // never overwrite an existing dependency without user confirmation
+                        if (Files.exists(depTarget)) {
+                            i++;
+                            task.subs.get(1).progress = i / (double) deps.size();
                             continue;
                         }
                         tryDownload(task, d.version.downloadUrls, depTarget, d.version.hash);
@@ -1080,14 +1086,14 @@ public class PageResourceDetail implements Page {
             List<String> keys = new ArrayList<>();
             for (String raw : new String[]{slug, depName}) {
                 if (raw == null || raw.isEmpty()) continue;
-                String k = raw.toLowerCase().replaceAll("[^a-z0-9]", "");
+                String k = raw.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]", "");
                 if (k.length() >= 4) keys.add(k);
             }
             if (keys.isEmpty()) return false;
             File[] files = dir.listFiles();
             if (files == null) return false;
             for (File f : files) {
-                String name = f.getName().toLowerCase().replaceAll("[^a-z0-9]", "");
+                String name = f.getName().toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]", "");
                 for (String k : keys) {
                     if (name.contains(k)) return true;
                 }
@@ -1199,9 +1205,17 @@ public class PageResourceDetail implements Page {
         win.toast("已复制名称", text, 1);
     }
 
+    private String favoriteType() {
+        return info.projectType == null || info.projectType.isEmpty() ? "mod" : info.projectType;
+    }
+
+    private String favoriteSlug() {
+        return info.slug == null || info.slug.isEmpty() ? info.name : info.slug;
+    }
+
     private Data.Favorite findFavorite() {
-        String type = info.projectType.isEmpty() ? "mod" : info.projectType;
-        String slug = info.slug.isEmpty() ? info.name : info.slug;
+        String type = favoriteType();
+        String slug = favoriteSlug();
         for (Data.Favorite f : data.favorites) {
             if (f.type.equals(type) && f.slug.equals(slug)) return f;
         }
@@ -1220,7 +1234,7 @@ public class PageResourceDetail implements Page {
             win.toast("已取消收藏", info.name, 1);
             setButtonText(favButton, "收藏");
         } else {
-            Data.Favorite fav = Data.Favorite.of(info.projectType, info.slug, info.name, info.desc, info.icon, websiteOf());
+            Data.Favorite fav = Data.Favorite.of(favoriteType(), favoriteSlug(), info.name, info.desc, info.icon, websiteOf());
             fav.platform = info.platform == null ? "" : info.platform;
             fav.projectId = info.projectId == null ? "" : info.projectId;
             data.favorites.add(fav);

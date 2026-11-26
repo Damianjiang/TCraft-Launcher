@@ -38,26 +38,33 @@ public final class Downloader {
     }
 
     public static void startInstall(MainWindow win, Data.McVersion version, String loader) {
-        startInstall(win, version, loader, (java.nio.file.Path) null, null, null, null);
+        startInstall(win, version, loader, (java.nio.file.Path) null, null, null, null, null);
     }
 
     public static void startInstall(MainWindow win, Data.McVersion version, String loader, String loaderVersion) {
-        startInstall(win, version, loader, (java.nio.file.Path) null, loaderVersion, null, null);
+        startInstall(win, version, loader, (java.nio.file.Path) null, loaderVersion, null, null, null);
     }
 
     public static void startInstall(MainWindow win, Data.McVersion version, String loader,
                                     java.nio.file.Path gameDirOverride) {
-        startInstall(win, version, loader, gameDirOverride, (String) null, (Inst) null, null);
+        startInstall(win, version, loader, gameDirOverride, (String) null, (Inst) null, null, null);
     }
 
     public static void startInstall(MainWindow win, Data.McVersion version, String loader,
                                     java.nio.file.Path gameDirOverride, String loaderVersion, Inst inst) {
-        startInstall(win, version, loader, gameDirOverride, loaderVersion, inst, null);
+        startInstall(win, version, loader, gameDirOverride, loaderVersion, inst, null, null);
     }
 
     public static void startInstall(MainWindow win, Data.McVersion version, String loader,
                                     java.nio.file.Path gameDirOverride, String loaderVersion, Inst inst,
                                     java.util.function.Consumer<String> onInstalled) {
+        startInstall(win, version, loader, gameDirOverride, loaderVersion, inst, onInstalled, null);
+    }
+
+    public static void startInstall(MainWindow win, Data.McVersion version, String loader,
+                                    java.nio.file.Path gameDirOverride, String loaderVersion, Inst inst,
+                                    java.util.function.Consumer<String> onInstalled,
+                                    Runnable onFinished) {
         Tasks.Task task = new Tasks.Task("安装 " + version.id + ("原版".equals(loader) ? "" : " · " + loader)
                 + (inst != null && !inst.name.isEmpty() && !inst.name.equals(version.id) ? "（" + inst.name + "）" : ""));
         task.stage = "准备下载";
@@ -110,10 +117,18 @@ public final class Downloader {
                     task.state = Tasks.State.FAILED;
                     task.error = e.getMessage();
                     task.stage = "安装失败";
+                    if (freshVersionDir) deleteTree(versionPath);
                     data.log("安装失败：" + Log.describe(e));
                     Errors.error(Lang.tf("安装 %s 失败", version.id), e);
                 }
             } finally {
+                if (onFinished != null) {
+                    try {
+                        javafx.application.Platform.runLater(onFinished);
+                    } catch (Throwable ignored) {
+                        // 启动器正在退出时不再回调
+                    }
+                }
             }
         }, "TCL-Download-" + version.id);
         thread.setDaemon(true);
@@ -121,6 +136,10 @@ public final class Downloader {
     }
 
     public static void startInstall(MainWindow win, Inst inst) {
+        startInstall(win, inst, null);
+    }
+
+    public static void startInstall(MainWindow win, Inst inst, Runnable onFinished) {
         Data data = Data.get();
         Data.McVersion version = null;
         for (Data.McVersion v : data.versions) {
@@ -136,7 +155,7 @@ public final class Downloader {
                 : !inst.liteLoader.isEmpty() ? inst.liteLoader
                 : !inst.legacyFabric.isEmpty() ? inst.legacyFabric : "";
         // 装当前游戏目录 隔离在启动时决定
-        startInstall(win, version, loader, (java.nio.file.Path) null, loaderVersion, inst);
+        startInstall(win, version, loader, (java.nio.file.Path) null, loaderVersion, inst, null, onFinished);
     }
 
     public static String install(Tasks.Task task, Data.McVersion version, String loader, Data data, MainWindow win,
@@ -661,6 +680,10 @@ public final class Downloader {
             if (body.length >= 0 && written != body.length) {
                 throw new IOException(Lang.t("下载不完整：") + written + " / " + body.length);
             }
+            // 空响应不能当成功，否则会落盘 0 字节文件
+            if (written == 0) {
+                throw new IOException(Lang.t("响应为空：") + url);
+            }
         } finally {
             guard.close();
         }
@@ -769,7 +792,7 @@ public final class Downloader {
         }
 
         Path installer = game.resolve("TCL").resolve("installers")
-                .resolve(loader.toLowerCase() + "-" + mc + "-installer.jar");
+                .resolve(loader.toLowerCase(java.util.Locale.ROOT) + "-" + mc + "-installer.jar");
         task.stage = "下载 " + Lang.t(loader) + " 安装器";
         // 安装器会被执行 无 .sha1 即中止
         String installerSha1 = fetchRemoteSha1(installerUrl);
@@ -795,7 +818,7 @@ public final class Downloader {
                             + "\"version\":3}", StandardCharsets.UTF_8);
         }
         // 安装器日志落文件
-        Path logFile = installer.getParent().resolve(loader.toLowerCase() + "-" + mc + ".log");
+        Path logFile = installer.getParent().resolve(loader.toLowerCase(java.util.Locale.ROOT) + "-" + mc + ".log");
         Files.createDirectories(logFile.getParent());
         ForgePrefetch prefetch = prefetchInstallerLibraries(task, installer, game, loader, mc);
         if (task.canceled) throw new IOException(Lang.t("已取消"));
@@ -1211,6 +1234,12 @@ public final class Downloader {
         } catch (Exception ignored) {
         }
         process.destroyForcibly();
+        try {
+            // 等子进程真正退出，回收句柄（Windows 下文件锁会随进程释放）
+            process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private static String lastLogLine(Path logFile) {
@@ -1440,7 +1469,19 @@ public final class Downloader {
     static boolean existingDownloadValid(Path target, String sha1) {
         try {
             String name = target.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
-            if (sha1 != null) return GameLauncher.sha1Of(target).equalsIgnoreCase(sha1);
+            if (sha1 != null) {
+                // Reinstalling the same version would otherwise re-hash hundreds of MB of libraries.
+                String key = target.toAbsolutePath() + "|" + Files.size(target) + "|"
+                        + Files.getLastModifiedTime(target).toMillis() + "|"
+                        + sha1.toLowerCase(java.util.Locale.ROOT);
+                if (EXISTING_VERIFIED.containsKey(key)) return true;
+                boolean ok = GameLauncher.sha1Of(target).equalsIgnoreCase(sha1);
+                if (ok) {
+                    if (EXISTING_VERIFIED.size() > 20000) EXISTING_VERIFIED.clear();
+                    EXISTING_VERIFIED.put(key, Boolean.TRUE);
+                }
+                return ok;
+            }
             if (name.endsWith(".json")) {
                 Json.parse(readFileText(target, ZIP_TEXT_MAX));
                 return true;
@@ -1450,6 +1491,9 @@ public final class Downloader {
             return false;
         }
     }
+
+    private static final java.util.Map<String, Boolean> EXISTING_VERIFIED =
+            new java.util.concurrent.ConcurrentHashMap<>();
 
     static boolean jarLooksValid(Path part, Path target) {
         String name = target.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
@@ -1655,8 +1699,12 @@ public final class Downloader {
     }
 
     static String speed(long bytesPerSec) {
-        if (bytesPerSec >= 1024 * 1024) return String.format("%.1f M/s", bytesPerSec / 1024.0 / 1024);
-        if (bytesPerSec >= 1024) return String.format("%.0f K/s", bytesPerSec / 1024.0);
+        if (bytesPerSec >= 1024 * 1024) {
+            return String.format(java.util.Locale.ROOT, "%.1f M/s", bytesPerSec / 1024.0 / 1024);
+        }
+        if (bytesPerSec >= 1024) {
+            return String.format(java.util.Locale.ROOT, "%.0f K/s", bytesPerSec / 1024.0);
+        }
         return bytesPerSec + " B/s";
     }
 
@@ -1665,8 +1713,9 @@ public final class Downloader {
         if (v.isEmpty() || !v.matches(".*[0-9.].*")) return 0;
         try {
             double n = Double.parseDouble(v.replaceAll("[^0-9.]", ""));
-            if (v.toUpperCase().contains("M")) return (long) (n * 1024 * 1024);
-            if (v.toUpperCase().contains("K")) return (long) (n * 1024);
+            String unit = v.toUpperCase(java.util.Locale.ROOT);
+            if (unit.contains("M")) return (long) (n * 1024 * 1024);
+            if (unit.contains("K")) return (long) (n * 1024);
             return (long) (n * 1024);
         } catch (Exception e) {
             return 0;

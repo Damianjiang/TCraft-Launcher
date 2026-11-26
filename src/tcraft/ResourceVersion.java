@@ -49,11 +49,11 @@ public class ResourceVersion {
             r.size = (long) Json.num(primary, "size", -1);
             Map<String, Object> hashes = Json.obj(primary.get("hashes"));
             String sha1 = Json.str(hashes, "sha1", "");
-            if (!sha1.isEmpty()) r.hash = sha1.toLowerCase();
+            if (!sha1.isEmpty()) r.hash = sha1.toLowerCase(java.util.Locale.ROOT);
         }
         for (Object o : files) {
             Map<String, Object> f = Json.obj(o);
-            String fn = Json.str(f, "filename", "").toLowerCase();
+            String fn = Json.str(f, "filename", "").toLowerCase(java.util.Locale.ROOT);
             if (fn.contains("source") || fn.contains("javadoc") || fn.endsWith("-dev.jar")) continue;
             String u = Json.str(f, "url", "");
             if (!u.isEmpty() && !r.downloadUrls.contains(u)) r.downloadUrls.add(u);
@@ -64,7 +64,7 @@ public class ResourceVersion {
         }
         if (expectedType.equals("mod") || expectedType.equals("datapack")) {
             for (String l : rawLoaders) {
-                if (java.util.List.of("bukkit", "folia", "paper", "purpur", "spigot").contains(l.toLowerCase())) {
+                if (java.util.List.of("bukkit", "folia", "paper", "purpur", "spigot").contains(l.toLowerCase(java.util.Locale.ROOT))) {
                     r.resourceType = "plugin";
                     break;
                 }
@@ -86,7 +86,7 @@ public class ResourceVersion {
         List<String> rawVersions = strList(data.get("game_versions"));
         List<String> standards = new ArrayList<>();
         for (String v : rawVersions) {
-            String t = v.trim().toLowerCase();
+            String t = v.trim().toLowerCase(java.util.Locale.ROOT);
             if (!t.contains(".")) continue;
             String mapped;
             if (t.contains("-")) mapped = t.substring(0, t.indexOf('-')) + " 预览版";
@@ -125,7 +125,7 @@ public class ResourceVersion {
         for (Object h : Json.arr(data.get("hashes"))) {
             Map<String, Object> hm = Json.obj(h);
             int algo = (int) Json.num(hm, "algo", 0);
-            if (algo == 1) { r.hash = Json.str(hm, "value", "").toLowerCase(); break; }
+            if (algo == 1) { r.hash = Json.str(hm, "value", "").toLowerCase(java.util.Locale.ROOT); break; }
         }
         String url = Json.str(data, "downloadUrl", "");
         if (url.isEmpty() && r.id.length() > 4) {
@@ -151,7 +151,7 @@ public class ResourceVersion {
         List<String> rawVersions = strList(data.get("gameVersions"));
         List<String> standards = new ArrayList<>();
         for (String v : rawVersions) {
-            String t = v.trim().toLowerCase();
+            String t = v.trim().toLowerCase(java.util.Locale.ROOT);
             if (!isStandard(t)) continue;
             String mapped = t.contains("-snapshot") ? t.replace("-snapshot", " 预览版") : t;
             if (!standards.contains(mapped)) standards.add(mapped);
@@ -179,7 +179,7 @@ public class ResourceVersion {
         if (!dependencies.isEmpty()) parts.add(dependencies.size() + Lang.t(" 项前置"));
         boolean allNonStandard = !gameVersions.isEmpty();
         for (String v : gameVersions) {
-            if (v.contains(".") && !v.contains("w") && !v.toLowerCase().contains("snapshot")
+            if (v.contains(".") && !v.contains("w") && !v.toLowerCase(java.util.Locale.ROOT).contains("snapshot")
                     && !v.contains("rc") && !v.contains("pre") && !v.contains("experimental")
                     && !v.contains("-") && !v.equals("远古版本")) {
                 allNonStandard = false;
@@ -207,7 +207,7 @@ public class ResourceVersion {
     public static String stripExtension(String name) {
         if (name == null) return "";
         for (String ext : new String[]{".zip", ".jar", ".mrpack", ".litemod"}) {
-            int idx = name.toLowerCase().lastIndexOf(ext);
+            int idx = name.toLowerCase(java.util.Locale.ROOT).lastIndexOf(ext);
             if (idx > 0) return name.substring(0, idx);
         }
         return name;
@@ -217,7 +217,7 @@ public class ResourceVersion {
         List<String> names = new ArrayList<>();
         for (String l : loaders) {
             if (l == null || l.isEmpty()) continue;
-            names.add(Character.toUpperCase(l.charAt(0)) + l.substring(1).toLowerCase());
+            names.add(Character.toUpperCase(l.charAt(0)) + l.substring(1).toLowerCase(java.util.Locale.ROOT));
         }
         return String.join(Lang.t("、"), names);
     }
@@ -258,8 +258,8 @@ public class ResourceVersion {
     public static int compareVersion(String a, String b) {
         if (a == null) a = "";
         if (b == null) b = "";
-        String[] sa = a.toLowerCase().split("[.\\s_+-]+");
-        String[] sb = b.toLowerCase().split("[.\\s_+-]+");
+        String[] sa = a.toLowerCase(java.util.Locale.ROOT).split("[.\\s_+-]+");
+        String[] sb = b.toLowerCase(java.util.Locale.ROOT).split("[.\\s_+-]+");
         int n = Math.max(sa.length, sb.length);
         for (int i = 0; i < n; i++) {
             String xa = i < sa.length ? sa[i] : "";

@@ -61,15 +61,17 @@ public final class Tasks {
     private static final int MAX_FINISHED = 40;
 
     private void trim() {
-        int finished = 0;
-        for (Task t : list) if (t.state != State.RUNNING) finished++;
-        int drop = finished - MAX_FINISHED;
+        // add() may run on worker threads; snapshot first and remove by value, so two
+        // concurrent trims cannot hit IndexOutOfBounds on a shifting list.
+        List<Task> finished = new ArrayList<>();
+        for (Task t : list) if (t.state != State.RUNNING) finished.add(t);
+        int drop = finished.size() - MAX_FINISHED;
         if (drop <= 0) return;
-        for (int i = list.size() - 1; i >= 0 && drop > 0; i--) {
-            if (list.get(i).state != State.RUNNING) {
-                list.remove(i);
-                drop--;
-            }
+        // List head holds the newest, so the tail is the oldest entry to drop first.
+        int i = finished.size() - 1;
+        while (i >= 0 && drop > 0) {
+            if (list.remove(finished.get(i))) drop--;
+            i--;
         }
     }
 

@@ -12,6 +12,7 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 import javafx.stage.FileChooser;
 
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
@@ -258,18 +259,32 @@ public class PageInstanceSetup implements Page {
                 Ui.button("复制实例", Ui.BTN_NORMAL, this::copyInstance),
                 Ui.button("删除实例", Ui.BTN_RED, () -> {
                     java.nio.file.Path dir = Isolation.deletableDir(ins);
+                    boolean shared = versionDirShared(ins, dir);
                     String extra = dir != null
-                            ? Lang.tf("\n同时删除磁盘目录（不可恢复）：\n%s", dir)
+                            ? shared
+                            ? Lang.t("\n该版本目录仍被其他实例使用，只删除实例配置，不删除磁盘文件。")
+                            : Lang.tf("\n同时删除磁盘目录（不可恢复）：\n%s", dir)
                             : Lang.t("\n当前未开启版本隔离，共享游戏目录不会被删除。");
                     Dialogs.confirm(win, "删除实例",
                             Lang.tf("确定要删除实例「%s」吗？%s", ins.name, extra),
                             () -> {
-                                data.instances.remove(ins);
-                                data.selectedInstance = 0;
+                                int removed = data.instances.indexOf(ins);
+                                if (removed < 0) return;
+                                data.instances.remove(removed);
+                                if (removed < data.selectedInstance) data.selectedInstance--;
+                                else if (data.selectedInstance >= data.instances.size()) {
+                                    data.selectedInstance = Math.max(0, data.instances.size() - 1);
+                                }
                                 data.save();
-                                if (dir != null) Isolation.deleteTree(dir);
+                                // recursive delete must not block FX thread
+                                if (dir != null && !shared) Threads.start("TCL-Instance-Delete", () -> {
+                                    Exception err = deleteTreeChecked(dir);
+                                    if (err != null) javafx.application.Platform.runLater(() -> win.toast(
+                                            "目录清理失败", err.getMessage() == null ? dir.toString() : err.getMessage(), 2));
+                                });
                                 win.openPage("instance", true);
-                                win.toast("实例已删除", ins.name, 1);
+                                win.toast("实例已删除", shared
+                                        ? Lang.t("版本目录仍被其他实例使用，未删除磁盘文件") : ins.name, 1);
                             }, true);
                 })
         );
@@ -510,14 +525,14 @@ public class PageInstanceSetup implements Page {
     private void diagApplyFilter() {
         if (diagList == null) return;
         diagDisplay.clear();
-        String keyword = diagSearch == null || diagSearch.getText() == null ? "" : diagSearch.getText().trim().toLowerCase();
+        String keyword = diagSearch == null || diagSearch.getText() == null ? "" : diagSearch.getText().trim().toLowerCase(java.util.Locale.ROOT);
         for (String[] item : diagAll) {
             int level = Integer.parseInt(item[1]);
             if (level == 0 && !diagChkError.isSelected()) continue;
             if (level == 1 && !diagChkWarn.isSelected()) continue;
             if (level == 2 && !diagChkInfo.isSelected()) continue;
             if (level == 3 && !diagChkDebug.isSelected()) continue;
-            if (!keyword.isEmpty() && !item[0].toLowerCase().contains(keyword)) continue;
+            if (!keyword.isEmpty() && !item[0].toLowerCase(java.util.Locale.ROOT).contains(keyword)) continue;
             diagDisplay.add(item);
         }
         diagList.getItems().setAll(diagDisplay);
@@ -1989,7 +2004,7 @@ public class PageInstanceSetup implements Page {
             }
         } catch (Exception ignored) {
         }
-        out.sort(Comparator.comparing(p -> p.getFileName().toString().toLowerCase()));
+        out.sort(Comparator.comparing(p -> p.getFileName().toString().toLowerCase(java.util.Locale.ROOT)));
         return out;
     }
 
@@ -1999,7 +2014,7 @@ public class PageInstanceSetup implements Page {
             if (Files.isDirectory(dir)) {
                 try (var stream = Files.list(dir)) {
                     stream.filter(Files::isRegularFile).filter(p -> {
-                        String n = p.getFileName().toString().toLowerCase();
+                        String n = p.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
                         return n.endsWith(".jar") || n.endsWith(".jar.disabled")
                                 || n.endsWith(".zip") || n.endsWith(".zip.disabled")
                                 || n.endsWith(".litemod") || n.endsWith(".litemod.disabled");
@@ -2008,7 +2023,7 @@ public class PageInstanceSetup implements Page {
             }
         } catch (Exception ignored) {
         }
-        out.sort(Comparator.comparing(p -> p.getFileName().toString().toLowerCase()));
+        out.sort(Comparator.comparing(p -> p.getFileName().toString().toLowerCase(java.util.Locale.ROOT)));
         return out;
     }
 
@@ -2094,7 +2109,7 @@ public class PageInstanceSetup implements Page {
                 if (isDisabledPack(p)) continue;
                 String n = p.getFileName().toString();
                 boolean isFolder = Files.isDirectory(p);
-                if (!isFolder && n.toLowerCase().endsWith(".zip")) n = n.substring(0, n.length() - 4);
+                if (!isFolder && n.toLowerCase(java.util.Locale.ROOT).endsWith(".zip")) n = n.substring(0, n.length() - 4);
                 if (legacy) {
                     items.add(isFolder ? n : n + ".zip");
                 } else {
@@ -2171,10 +2186,17 @@ public class PageInstanceSetup implements Page {
         Tasks.INSTANCE.add(task);
         win.toast("开始导出", save.getFileName().toString(), 0);
         Threads.start("TCL-SaveExport", () -> {
-            try (ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(file))) {
+            Path target = file.toPath();
+            Path part = target.resolveSibling(target.getFileName() + ".part");
+            try (ZipOutputStream zip = new ZipOutputStream(new BufferedOutputStream(
+                    new FileOutputStream(part.toFile()), 64 * 1024))) {
+                zip.setLevel(1);
                 List<Path> files = new ArrayList<>();
                 try (var stream = Files.walk(save)) {
-                    stream.filter(p -> !Files.isSymbolicLink(p)).filter(Files::isRegularFile).forEach(files::add);
+                    stream.filter(p -> !Files.isSymbolicLink(p)).filter(Files::isRegularFile)
+                            .filter(p -> !p.toAbsolutePath().normalize().equals(part.toAbsolutePath().normalize()))
+                            .filter(p -> !p.toAbsolutePath().normalize().equals(target.toAbsolutePath().normalize()))
+                            .forEach(files::add);
                 }
                 task.remainingFiles = files.size();
                 int done = 0;
@@ -2184,16 +2206,21 @@ public class PageInstanceSetup implements Page {
                     Files.copy(p, zip);
                     zip.closeEntry();
                     done++;
-                    task.progress = done / (double) files.size();
+                    task.progress = done / (double) Math.max(1, files.size());
                     task.stage = "正在压缩 " + done + " / " + files.size();
                     task.remainingFiles = files.size() - done;
                 }
+                Files.move(part, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                 task.subs.get(0).state = Tasks.State.DONE;
                 task.state = Tasks.State.DONE;
                 task.progress = 1;
                 task.stage = "导出完成";
                 javafx.application.Platform.runLater(() -> win.toast("导出完成", file.getName(), 1));
             } catch (Exception e) {
+                try {
+                    Files.deleteIfExists(part);
+                } catch (Exception ignored) {
+                }
                 task.subs.forEach(sub -> {
                     if (sub.state == Tasks.State.RUNNING) sub.state = Tasks.State.FAILED;
                 });
@@ -2230,11 +2257,11 @@ public class PageInstanceSetup implements Page {
             if (Files.isDirectory(dir)) {
                 try (var stream = Files.list(dir)) {
                     stream.filter(Files::isRegularFile).filter(p -> {
-                        String n = p.getFileName().toString().toLowerCase();
+                        String n = p.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
                         for (String s : suffixes) if (n.endsWith(s)) return true;
                         return false;
                     }).limit(10000).forEach(out::add);
-                    out.sort(Comparator.comparing(p -> p.getFileName().toString().toLowerCase()));
+                    out.sort(Comparator.comparing(p -> p.getFileName().toString().toLowerCase(java.util.Locale.ROOT)));
                 }
             }
         } catch (Exception ignored) {
@@ -2273,7 +2300,7 @@ public class PageInstanceSetup implements Page {
     private String sizeOf(Path p) {
         try {
             long size = Files.size(p);
-            if (size > 1024 * 1024) return String.format("%.1f MB", size / 1024.0 / 1024);
+            if (size > 1024 * 1024) return String.format(java.util.Locale.ROOT, "%.1f MB", size / 1024.0 / 1024);
             return size / 1024 + " KB";
         } catch (Exception e) {
             return "";
@@ -2288,7 +2315,7 @@ public class PageInstanceSetup implements Page {
                 try (var s = Files.list(savesDir)) {
                     s.filter(Files::isDirectory).limit(10000)
                             .forEach(saves::add);
-                    saves.sort(Comparator.comparing(p -> p.getFileName().toString().toLowerCase()));
+                    saves.sort(Comparator.comparing(p -> p.getFileName().toString().toLowerCase(java.util.Locale.ROOT)));
                 }
             }
         } catch (Exception ignored) {
@@ -2511,11 +2538,14 @@ public class PageInstanceSetup implements Page {
             n++;
         }
         Path finalTarget = target;
+        Path part = finalTarget.resolveSibling(finalTarget.getFileName() + ".part");
         win.toast("正在备份", save.getFileName().toString(), 0);
         Threads.start("TCL-Save-Backup", () -> {
             try {
                 Files.createDirectories(dir);
-                try (ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(finalTarget.toFile()))) {
+                try (ZipOutputStream zip = new ZipOutputStream(new BufferedOutputStream(
+                        new FileOutputStream(part.toFile()), 64 * 1024))) {
+                    zip.setLevel(1);
                     try (var walk = Files.walk(save)) {
                         var files = walk.filter(Files::isRegularFile)
                                 .filter(p -> !Files.isSymbolicLink(p)).iterator();
@@ -2528,13 +2558,19 @@ public class PageInstanceSetup implements Page {
                         }
                     }
                 }
+                try {
+                    Files.move(part, finalTarget, java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                            java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+                } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                    Files.move(part, finalTarget, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                }
                 javafx.application.Platform.runLater(() -> {
                     win.openSetup("saves");
                     win.toast("备份完成", finalTarget.getFileName().toString(), 1);
                 });
             } catch (Exception e) {
                 try {
-                    Files.deleteIfExists(finalTarget);
+                    Files.deleteIfExists(part);
                 } catch (Exception ignored) {
                 }
                 javafx.application.Platform.runLater(() -> win.toast("备份失败", e.getMessage(), 3));
@@ -3360,7 +3396,7 @@ public class PageInstanceSetup implements Page {
         }
         if (packPath == null) {
             try (var stream = Files.list(instanceRoot())) {
-                packPath = stream.filter(p -> p.getFileName().toString().toLowerCase().endsWith(".mrpack"))
+                packPath = stream.filter(p -> p.getFileName().toString().toLowerCase(java.util.Locale.ROOT).endsWith(".mrpack"))
                         .findFirst().orElse(null);
             } catch (Exception ignored) {
             }
@@ -3396,7 +3432,7 @@ public class PageInstanceSetup implements Page {
                     card.add(Ui.label(Lang.tf("读取失败：%s", fError), 13, Theme.gray2));
                     return;
                 }
-                if (scanPack.getFileName().toString().toLowerCase().endsWith(".mrpack")) {
+                if (scanPack.getFileName().toString().toLowerCase(java.util.Locale.ROOT).endsWith(".mrpack")) {
                     buildCompManifestModrinth(page, scanPack, modrinthBytes);
                 } else {
                     buildCompManifestCurseForge(page, scanPack, curseBytes);
@@ -3540,7 +3576,7 @@ public class PageInstanceSetup implements Page {
         List<Path> modJars = new ArrayList<>();
         if (Files.isDirectory(mods)) {
             try (var stream = Files.list(mods)) {
-                stream.filter(p -> p.getFileName().toString().toLowerCase().endsWith(".jar"))
+                stream.filter(p -> p.getFileName().toString().toLowerCase(java.util.Locale.ROOT).endsWith(".jar"))
                         .limit(10000).forEach(modJars::add);
                 modJars.sort(java.util.Comparator.comparing(p -> p.getFileName().toString()));
             } catch (Exception ignored) {
@@ -3887,6 +3923,18 @@ public class PageInstanceSetup implements Page {
         deleteTreeChecked(dir);
     }
 
+    // Another instance in the same game folder still uses this version; keep its files.
+    private boolean versionDirShared(Data.Instance ins, Path dir) {
+        if (dir == null || ins.version == null) return false;
+        Path base = Isolation.base(ins).toAbsolutePath().normalize();
+        for (Data.Instance other : data.instances) {
+            if (other == ins) continue;
+            if (!base.equals(Isolation.base(other).toAbsolutePath().normalize())) continue;
+            if (ins.version.equals(other.version)) return true;
+        }
+        return false;
+    }
+
     private static Exception deleteTreeChecked(Path dir) {
         if (dir == null || !Files.exists(dir, java.nio.file.LinkOption.NOFOLLOW_LINKS)) return null;
         if (Files.isSymbolicLink(dir)) {
@@ -4051,7 +4099,8 @@ public class PageInstanceSetup implements Page {
             stream.limit(10000).forEach(p -> {
                 String n = p.getFileName().toString();
                 for (String b : blacklist) if (n.contains(b)) return;
-                if (Files.isRegularFile(p) && (n.toLowerCase().endsWith(".zip") || n.toLowerCase().endsWith(".rar"))) {
+                if (Files.isRegularFile(p) && (n.toLowerCase(java.util.Locale.ROOT).endsWith(".zip")
+                        || n.toLowerCase(java.util.Locale.ROOT).endsWith(".rar"))) {
                     exportSubOptions.add(new ExportOption(folder + "/" + n, Lang.t(label) + " · " + n,
                             globEscape(folder + "/" + n), null, true, false, false, false));
                 } else if (acceptFolder && Files.isDirectory(p)) {
@@ -4309,8 +4358,8 @@ public class PageInstanceSetup implements Page {
                         first = false;
                         String relative = overrides.relativize(file).toString().replace('\\', '/');
                         filesJson.append("{\"path\":").append(Json.quote(relative))
-                                .append(",\"hashes\":{\"sha1\":").append(Json.quote(sha1Hex(file).toLowerCase()))
-                                .append(",\"sha512\":").append(Json.quote(sha512Hex(file).toLowerCase()))
+                                .append(",\"hashes\":{\"sha1\":").append(Json.quote(sha1Hex(file)))
+                                .append(",\"sha512\":").append(Json.quote(sha512Hex(file)))
                                 .append("},\"env\":{\"client\":\"required\",\"server\":\"required\"},\"downloads\":[")
                                 .append(Json.quote(e.getValue()))
                                 .append("],\"fileSize\":").append(Files.size(file)).append("}");
@@ -4413,9 +4462,7 @@ public class PageInstanceSetup implements Page {
             int n;
             while ((n = in.read(buf)) > 0) md.update(buf, 0, n);
         }
-        StringBuilder sb = new StringBuilder();
-        for (byte b : md.digest()) sb.append(String.format("%02x", b));
-        return sb.toString();
+        return java.util.HexFormat.of().formatHex(md.digest());
     }
 
     private static String sha512Hex(Path file) throws Exception {
@@ -4425,9 +4472,7 @@ public class PageInstanceSetup implements Page {
             int n;
             while ((n = in.read(buf)) > 0) md.update(buf, 0, n);
         }
-        StringBuilder sb = new StringBuilder();
-        for (byte b : md.digest()) sb.append(String.format("%02x", b));
-        return sb.toString();
+        return java.util.HexFormat.of().formatHex(md.digest());
     }
 
     private void backupInstance() {
@@ -4456,6 +4501,8 @@ public class PageInstanceSetup implements Page {
         Tasks.INSTANCE.add(task);
         Threads.start("TCL-Backup", () -> {
             boolean complete = false;
+            Path target = file.toPath();
+            Path part = target.resolveSibling(target.getFileName() + ".part");
             try {
                 Path game = instanceRoot();
                 List<Path> files = new ArrayList<>();
@@ -4468,7 +4515,9 @@ public class PageInstanceSetup implements Page {
                     } else if (Files.isRegularFile(p)) files.add(p);
                 }
                 task.remainingFiles = files.size();
-                try (ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(file))) {
+                try (ZipOutputStream zip = new ZipOutputStream(new BufferedOutputStream(
+                        new FileOutputStream(part.toFile()), 64 * 1024))) {
+                    zip.setLevel(1);
                     int done = 0;
                     for (Path p : files) {
                         if (task.canceled) throw new Exception(Lang.t("已取消"));
@@ -4479,6 +4528,12 @@ public class PageInstanceSetup implements Page {
                         task.progress = done / (double) Math.max(1, files.size());
                         task.stage = "正在备份 " + done + " / " + files.size();
                     }
+                }
+                try {
+                    Files.move(part, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                            java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+                } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                    Files.move(part, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                 }
                 task.state = Tasks.State.DONE;
                 task.subs.get(0).state = Tasks.State.DONE;
@@ -4495,7 +4550,7 @@ public class PageInstanceSetup implements Page {
             } finally {
                 if (!complete) {
                     try {
-                        Files.deleteIfExists(file.toPath());
+                        Files.deleteIfExists(part);
                     } catch (Exception ignored) {
                     }
                 }
@@ -4682,7 +4737,7 @@ public class PageInstanceSetup implements Page {
         }
         Path self = Resources.jar();
         if (self != null && Files.isRegularFile(self)) {
-            String name = self.getFileName().toString().toLowerCase();
+            String name = self.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
             String target = name.endsWith(".exe") ? "TCraftLauncher.exe" : "TCraftLauncher.jar";
             Files.copy(self, payloadRoot.resolve(target), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         }

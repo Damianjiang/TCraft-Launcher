@@ -364,7 +364,13 @@ public final class Network {
             if (last) {
                 String message = buffer.toString();
                 buffer.setLength(0);
-                if (onText != null) onText.accept(message);
+                // a plugin callback must not break the WebSocket reader thread
+                if (onText != null) {
+                    try {
+                        onText.accept(message);
+                    } catch (Throwable ignored) {
+                    }
+                }
             }
             webSocket.request(1);
             return null;
@@ -372,13 +378,23 @@ public final class Network {
 
         @Override
         public void onError(WebSocket webSocket, Throwable error) {
-            if (onError != null) onError.accept(error);
+            if (onError != null) {
+                try {
+                    onError.accept(error);
+                } catch (Throwable ignored) {
+                }
+            }
         }
 
         @Override
         public CompletableFuture<?> onClose(WebSocket webSocket, int statusCode, String reason) {
             closed = true;
-            if (onClose != null) onClose.accept(statusCode + " " + reason);
+            if (onClose != null) {
+                try {
+                    onClose.accept(statusCode + " " + reason);
+                } catch (Throwable ignored) {
+                }
+            }
             return null;
         }
 

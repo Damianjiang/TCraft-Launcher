@@ -136,7 +136,8 @@ public final class Plugins {
         final Manifest manifest;
         final Path source;
         final boolean directory;
-        PluginContext ctx;
+        // read from plugin threads, cleared on unload
+        volatile PluginContext ctx;
         URLClassLoader loader;
         TcraftPlugin instance;
         String state = "disabled";
@@ -168,6 +169,7 @@ public final class Plugins {
 
         @Override
         public void addPage(String id, String title, String icon, Function<PageView, Node> builder) {
+            requireLoaded();
             String pid = Plugins.get().safeId(id, "页面 id");
             String key = manifest.id + ":" + pid;
             if (Plugins.get().pages.containsKey(key)) {
@@ -200,8 +202,12 @@ public final class Plugins {
 
         @Override
         public void addCommand(String name, String description, Consumer<CommandContext> handler) {
+            requireLoaded();
             if (name == null || name.isBlank()) throw new IllegalArgumentException(Lang.t("命令名不能为空"));
             String key = name.trim();
+            if (Plugins.get().commands.containsKey(key)) {
+                throw new IllegalArgumentException(Lang.t("命令名已被占用：") + key);
+            }
             Plugins.get().commands.put(key, new Cmd(key, description, manifest.id, handler));
             commandNames.add(key);
         }
@@ -213,31 +219,52 @@ public final class Plugins {
 
         @Override
         public void toast(String title, String message, int type) {
-            if (Plugins.get().win != null) Plugins.get().win.toast(title, message, type);
+            fx(() -> {
+                if (Plugins.get().win != null) Plugins.get().win.toast(title, message, type);
+            });
         }
 
         @Override
         public void message(String title, String text, boolean error) {
-            Dialogs.message(Plugins.get().win, title, text, error, "确定");
+            fx(() -> Dialogs.message(Plugins.get().win, title, text, error, "确定"));
         }
 
         @Override
         public void confirm(String title, String text, Runnable onOk, boolean danger) {
-            Dialogs.confirm(Plugins.get().win, title, text, onOk, danger);
+            fx(() -> Dialogs.confirm(Plugins.get().win, title, text, onOk, danger));
         }
 
         @Override
         public void custom(Node node) {
-            if (node != null) Plugins.get().win.showModal(node);
+            if (node == null) return;
+            fx(() -> {
+                if (Plugins.get().win != null) Plugins.get().win.showModal(node);
+            });
         }
 
         @Override
         public void closeModal() {
-            if (Plugins.get().win != null) Plugins.get().win.closeModal();
+            fx(() -> {
+                if (Plugins.get().win != null) Plugins.get().win.closeModal();
+            });
         }
 
         @Override
         public String input(String title, String hint, String defaultValue) {
+            if (!Platform.isFxApplicationThread()) {
+                // blocking dialogs must be built and shown on the FX thread
+                java.util.concurrent.FutureTask<String> task =
+                        new java.util.concurrent.FutureTask<>(() -> input(title, hint, defaultValue));
+                Platform.runLater(task);
+                try {
+                    return task.get();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return null;
+                } catch (java.util.concurrent.ExecutionException e) {
+                    return null;
+                }
+            }
             javafx.scene.control.TextInputDialog d = new javafx.scene.control.TextInputDialog(
                     defaultValue == null ? "" : defaultValue);
             d.setTitle(title == null ? manifest.name : title);
@@ -251,27 +278,47 @@ public final class Plugins {
 
         @Override
         public String storageGet(String key, String defaultValue) {
+            if (ctx == null) return defaultValue;
             ensureStore();
             return store.getProperty(key, defaultValue);
         }
 
         @Override
         public void storageSet(String key, String value) {
+            if (ctx == null) return;
             ensureStore();
             store.setProperty(key, value == null ? "" : value);
         }
 
         @Override
         public void storageSave() {
-            if (store == null) return;
+            if (store == null || ctx == null) return;
+            Path temp = null;
             try {
                 Path dir = Plugins.get().dataDir(manifest.id);
                 Files.createDirectories(dir);
-                try (OutputStream out = Files.newOutputStream(dir.resolve("storage.properties"))) {
+                Path target = dir.resolve("storage.properties");
+                temp = dir.resolve("storage.properties.tmp");
+                try (OutputStream out = Files.newOutputStream(temp)) {
                     store.store(out, manifest.name);
                 }
+                // atomic swap so a crash cannot truncate the previous values
+                try {
+                    Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING,
+                            StandardCopyOption.ATOMIC_MOVE);
+                } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                    Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING);
+                }
+                temp = null;
             } catch (Exception e) {
                 Plugins.get().log(manifest.id, "保存配置失败：" + Log.describe(e));
+            } finally {
+                if (temp != null) {
+                    try {
+                        Files.deleteIfExists(temp);
+                    } catch (Exception ignored) {
+                    }
+                }
             }
         }
 
@@ -293,6 +340,7 @@ public final class Plugins {
         @Override
         public void listen(String event, Consumer<Event> handler) {
             if (event == null || event.isBlank() || handler == null) return;
+            if (ctx == null) return;
             listeners.add(new Listener(event.trim(), handler));
         }
 
@@ -303,12 +351,16 @@ public final class Plugins {
 
         @Override
         public void launchGame() {
-            if (Plugins.get().win != null) Plugins.get().win.launchGame();
+            fx(() -> {
+                if (Plugins.get().win != null) Plugins.get().win.launchGame();
+            });
         }
 
         @Override
         public void refreshLauncher() {
-            if (Plugins.get().win != null) Plugins.get().win.refreshRight();
+            fx(() -> {
+                if (Plugins.get().win != null) Plugins.get().win.refreshRight();
+            });
         }
 
         @Override
@@ -320,13 +372,32 @@ public final class Plugins {
         public String launcherVersion() {
             return Build.VERSION;
         }
+
+        // registration is only valid while the plugin is loaded
+        private void requireLoaded() {
+            if (ctx == null) throw new IllegalStateException("plugin is not loaded");
+        }
+
+        // plugin callbacks may come from worker threads; UI work belongs on FX
+        private void fx(Runnable action) {
+            if (ctx == null) return;
+            if (Platform.isFxApplicationThread()) {
+                action.run();
+            } else {
+                Platform.runLater(() -> {
+                    if (ctx != null) action.run();
+                });
+            }
+        }
     }
 
     private MainWindow win;
     private volatile boolean loaded;
     private final List<LoadedPlugin> plugins = new CopyOnWriteArrayList<>();
-    private final Map<String, PageDef> pages = new LinkedHashMap<>();
-    private final Map<String, Cmd> commands = new LinkedHashMap<>();
+    private final Map<String, PageDef> pages =
+            java.util.Collections.synchronizedMap(new LinkedHashMap<>());
+    private final Map<String, Cmd> commands =
+            java.util.Collections.synchronizedMap(new LinkedHashMap<>());
     private long orderSeq;
 
     private Plugins() {
@@ -355,9 +426,11 @@ public final class Plugins {
 
     public List<PageEntry> pluginPages() {
         List<PageEntry> out = new ArrayList<>();
-        for (Map.Entry<String, PageDef> e : pages.entrySet()) {
-            PageDef d = e.getValue();
-            out.add(new PageEntry(e.getKey(), d.title, d.icon, d.owner));
+        synchronized (pages) {
+            for (Map.Entry<String, PageDef> e : pages.entrySet()) {
+                PageDef d = e.getValue();
+                out.add(new PageEntry(e.getKey(), d.title, d.icon, d.owner));
+            }
         }
         return out;
     }
@@ -400,12 +473,14 @@ public final class Plugins {
     }
 
     public List<CommandInfo> commandsOf(String pluginId) {
+        LoadedPlugin owner = find(pluginId);
+        String name = owner == null ? "" : owner.manifest.name;
         List<CommandInfo> out = new ArrayList<>();
-        for (Cmd c : commands.values()) {
-            if (c.owner.equals(pluginId)) {
-                String name = "";
-                for (LoadedPlugin p : plugins) if (p.manifest.id.equals(pluginId)) name = p.manifest.name;
-                out.add(new CommandInfo(c.name, c.description, pluginId, name));
+        synchronized (commands) {
+            for (Cmd c : commands.values()) {
+                if (c.owner.equals(pluginId)) {
+                    out.add(new CommandInfo(c.name, c.description, pluginId, name));
+                }
             }
         }
         return out;
@@ -422,7 +497,9 @@ public final class Plugins {
     }
 
     public Map<String, PageDef> pages() {
-        return Collections.unmodifiableMap(pages);
+        synchronized (pages) {
+            return java.util.Collections.unmodifiableMap(new LinkedHashMap<>(pages));
+        }
     }
 
 
@@ -539,7 +616,7 @@ public final class Plugins {
             URLClassLoader loader = new URLClassLoader(urls.toArray(new URL[0]), Plugins.class.getClassLoader());
             lp.loader = loader;
             Class<?> type = Class.forName(lp.manifest.main, true, loader);
-            Object object = type.getDeclaredConstructor().newInstance();
+            Object object = newInstance(type);
             if (!(object instanceof TcraftPlugin p)) {
                 throw new IllegalArgumentException(Lang.t("main 类未实现 tcraft.api.TcraftPlugin"));
             }
@@ -565,6 +642,16 @@ public final class Plugins {
             log(lp.manifest.id, "加载失败：" + lp.error);
             cleanup(lp);
         }
+    }
+
+    // plugin classes live in the unnamed module; allow non-public entry classes
+    private static Object newInstance(Class<?> type) throws Exception {
+        java.lang.reflect.Constructor<?> ctor = type.getDeclaredConstructor();
+        if (!java.lang.reflect.Modifier.isPublic(ctor.getModifiers())
+                || !java.lang.reflect.Modifier.isPublic(type.getModifiers())) {
+            ctor.setAccessible(true);
+        }
+        return ctor.newInstance();
     }
 
     private void collectJars(Path dir, List<URL> urls) throws IOException {
@@ -615,6 +702,8 @@ public final class Plugins {
         lp.toolButtons.clear();
         lp.launchButtons.clear();
         lp.floatButtons.clear();
+        // drop cached values so a zombie thread cannot rewrite them
+        lp.store = null;
         if (lp.ctx != null) {
             try {
                 lp.ctx.close();
@@ -650,7 +739,13 @@ public final class Plugins {
     public void reload(String id) {
         LoadedPlugin lp = find(id);
         if (lp == null) return;
-        load(lp, lp.enabled);
+        if (lp.enabled || "failed".equals(lp.state)) {
+            // a failed plugin is retried as enabled so onEnable runs again
+            load(lp, true);
+        } else {
+            // never load code for a plugin the user disabled
+            unload(lp);
+        }
         refreshUi();
     }
 
@@ -755,8 +850,9 @@ public final class Plugins {
         if (clean.isEmpty() || clean.startsWith("/") || clean.contains("..")) return null;
         try {
             if (lp.directory) {
-                Path f = lp.source.resolve(clean).normalize();
-                if (!f.startsWith(lp.source) || !Files.isRegularFile(f) || Files.size(f) > IMAGE_MAX) return null;
+                Path root = lp.source.toAbsolutePath().normalize();
+                Path f = root.resolve(clean).normalize();
+                if (!f.startsWith(root) || !Files.isRegularFile(f) || Files.size(f) > IMAGE_MAX) return null;
                 return Files.readAllBytes(f);
             }
             try (java.util.jar.JarFile jar = new java.util.jar.JarFile(lp.source.toFile())) {
@@ -799,7 +895,12 @@ public final class Plugins {
     }
 
     public void openPage(String key) {
-        if (win != null) win.openPage(key, true);
+        if (win == null) return;
+        if (Platform.isFxApplicationThread()) {
+            win.openPage(key, true);
+        } else {
+            Platform.runLater(() -> win.openPage(key, true));
+        }
     }
 
 
@@ -828,6 +929,8 @@ public final class Plugins {
         Runnable task = () -> {
             List<LoadedPlugin> owners = new ArrayList<>(plugins);
             for (LoadedPlugin p : owners) {
+                // disabled and unloaded plugins must not receive events
+                if (!"loaded".equals(p.state) || p.ctx == null) continue;
                 for (Listener l : new ArrayList<>(p.listeners)) {
                     if (!l.event.equals(event)) continue;
                     try {
@@ -900,7 +1003,9 @@ public final class Plugins {
                         if (name.isEmpty() || name.endsWith("/")) continue;
                         if (++entries[0] > MAX_ENTRIES) throw new IOException(Lang.t("插件包文件过多（上限 ") + MAX_ENTRIES + "）");
                         Path out = staging.resolve(name).normalize();
-                        if (!out.startsWith(staging)) throw new IOException(Lang.t("插件包包含非法路径：") + e.getName());
+                        if (!out.startsWith(staging) || out.equals(staging)) {
+                            throw new IOException(Lang.t("插件包包含非法路径：") + e.getName());
+                        }
                         Files.createDirectories(out.getParent());
                         try (InputStream in = zf.getInputStream(e);
                              OutputStream os = Files.newOutputStream(out)) {
@@ -912,17 +1017,50 @@ public final class Plugins {
                     Files.writeString(staging.resolve("plugin.json"), manifestText, StandardCharsets.UTF_8);
                 }
             }
-            if (Files.exists(target)) deleteTree(target);
+            // swap via backup so a failed move cannot destroy the installed version
+            // Windows keeps the plugin JAR open through the class loader, so unload before renaming.
+            LoadedPlugin loaded = find(m.id);
+            if (loaded != null && loaded.loader != null) unload(loaded);
+            Path backup = target.resolveSibling("." + m.id + ".backup");
+            deleteTree(backup);
+            boolean hadOld = Files.exists(target);
+            if (hadOld) moveDir(target, backup);
             try {
-                Files.move(staging, target, StandardCopyOption.ATOMIC_MOVE);
-            } catch (java.nio.file.AtomicMoveNotSupportedException e) {
-                Files.move(staging, target, StandardCopyOption.REPLACE_EXISTING);
+                moveDir(staging, target);
+            } catch (IOException | RuntimeException e) {
+                if (hadOld) {
+                    try {
+                        deleteTree(target);
+                        moveDir(backup, target);
+                    } catch (Exception restore) {
+                        log(m.id, "恢复旧版本失败：" + Log.describe(restore));
+                    }
+                }
+                throw e;
+            }
+            try {
+                deleteTree(backup);
+            } catch (Exception e) {
+                log(m.id, "清理旧版本失败：" + Log.describe(e));
             }
         } catch (IOException | RuntimeException e) {
             deleteTree(staging);
+            // 安装失败时把旧版重新挂上，避免插件一直处于禁用状态
+            try {
+                loadAll();
+            } catch (Throwable ignored) {
+            }
             throw e;
         }
         return m.id;
+    }
+
+    private static void moveDir(Path from, Path to) throws IOException {
+        try {
+            Files.move(from, to, StandardCopyOption.ATOMIC_MOVE);
+        } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+            Files.move(from, to, StandardCopyOption.REPLACE_EXISTING);
+        }
     }
 
     // 导入后重新扫描并执行 onInstall

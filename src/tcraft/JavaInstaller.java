@@ -247,9 +247,23 @@ public final class JavaInstaller {
     private static void copyDir(Path src, Path dst) throws IOException {
         try (var walk = Files.walk(src)) {
             for (Path p : walk.toList()) {
-                Path out = dst.resolve(src.relativize(p).toString());
-                if (Files.isDirectory(p)) Files.createDirectories(out);
-                else Files.copy(p, out, StandardCopyOption.REPLACE_EXISTING);
+                Path out = dst.resolve(src.relativize(p));
+                if (Files.isSymbolicLink(p)) {
+                    // macOS/Linux runtimes rely on relative links inside the bundle
+                    try {
+                        Files.createDirectories(out.getParent());
+                        Files.deleteIfExists(out);
+                        Files.createSymbolicLink(out, Files.readSymbolicLink(p));
+                        continue;
+                    } catch (Exception e) {
+                        // no symlink privilege (Windows): fall back to copying the content
+                    }
+                }
+                if (Files.isDirectory(p)) {
+                    Files.createDirectories(out);
+                } else {
+                    Files.copy(p, out, StandardCopyOption.REPLACE_EXISTING);
+                }
             }
         }
     }

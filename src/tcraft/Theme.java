@@ -1062,9 +1062,21 @@ public final class Theme {
         int scale = Math.max(1, (int) Math.floor(skin.getWidth() / 64.0));
         int tex = 8 * scale;
         int s = (int) Math.round(size);
+        PixelReader pr = skin.getPixelReader();
+        // 64x32 is the smallest valid skin layout; smaller or unreadable images cannot be cropped.
+        if (pr == null || skin.getWidth() < 64 || skin.getHeight() < 32) {
+            javafx.scene.layout.StackPane fallback = new javafx.scene.layout.StackPane(new ImageView(skin));
+            fallback.setMinSize(size, size);
+            fallback.setPrefSize(size, size);
+            fallback.setMaxSize(size, size);
+            Rectangle fallbackClip = new Rectangle(size, size);
+            fallbackClip.setArcWidth(3);
+            fallbackClip.setArcHeight(3);
+            fallback.setClip(fallbackClip);
+            return fallback;
+        }
         // 预渲染 1:1 位图
         WritableImage out = new WritableImage(s, s);
-        PixelReader pr = skin.getPixelReader();
         javafx.scene.image.PixelWriter pw = out.getPixelWriter();
         for (int py = 0; py < s; py++) {
             int ty = texelAt(py, s, tex);

@@ -44,7 +44,7 @@ public final class Fetch {
         Path part = target.resolveSibling(target.getFileName() + ".part");
         Files.createDirectories(target.toAbsolutePath().getParent());
 
-        final String expect = sha1 == null || sha1.isEmpty() ? null : sha1.toLowerCase();
+        final String expect = sha1 == null || sha1.isEmpty() ? null : sha1.toLowerCase(java.util.Locale.ROOT);
         MessageDigest digest = expect == null ? null : sha1();
 
         String lockKey = part.toAbsolutePath().toString();
@@ -191,6 +191,10 @@ public final class Fetch {
             if (body.length >= 0 && written != body.length) {
                 throw new IOException(Lang.t("下载不完整：") + written + " / " + body.length);
             }
+            // 空响应不能当成功，否则会落盘 0 字节文件
+            if (written == 0) {
+                throw new IOException(Lang.t("响应为空：") + url);
+            }
         } finally {
             guard.close();
         }
@@ -286,8 +290,12 @@ public final class Fetch {
     }
 
     private static String speed(long bytesPerSec) {
-        if (bytesPerSec > 1024 * 1024) return String.format("%.1f M/s", bytesPerSec / 1024.0 / 1024);
-        if (bytesPerSec > 1024) return String.format("%.0f K/s", bytesPerSec / 1024.0);
+        if (bytesPerSec > 1024 * 1024) {
+            return String.format(java.util.Locale.ROOT, "%.1f M/s", bytesPerSec / 1024.0 / 1024);
+        }
+        if (bytesPerSec > 1024) {
+            return String.format(java.util.Locale.ROOT, "%.0f K/s", bytesPerSec / 1024.0);
+        }
         return bytesPerSec + " B/s";
     }
 

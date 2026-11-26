@@ -331,8 +331,11 @@ public final class PluginsPage {
                     win.toast("插件已导入", info.name + " " + info.version, 1);
                 }));
             } catch (Throwable t) {
-                Platform.runLater(() -> win.importPanel.finish(gen, "插件导入失败", () ->
-                        win.toast("导入插件失败", Log.describe(t), 3)));
+                Platform.runLater(() -> win.importPanel.finish(gen, "插件导入失败", () -> {
+                    // release() unloaded the installed version; bring it back on failure
+                    if (replace) Plugins.get().reload(info.id);
+                    win.toast("导入插件失败", Log.describe(t), 3);
+                }));
             }
         }, "TCL-Plugin-Install");
         worker.setDaemon(true);

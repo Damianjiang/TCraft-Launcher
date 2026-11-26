@@ -289,8 +289,11 @@ public final class DataBackup {
         Path pending = base.resolveSibling(base.getFileName() + ".import-pending");
         try {
             // 单文件外壳不保证把参数传给内嵌 jar，用标记文件交接，Windows / macOS / Linux 同一套
-            Files.writeString(pending, ProcessHandle.current().pid() + System.lineSeparator()
+            // write then rename: a half-written marker is silently dropped by Boot
+            Path tmp = pending.resolveSibling(pending.getFileName() + ".tmp");
+            Files.writeString(tmp, ProcessHandle.current().pid() + System.lineSeparator()
                     + staging.toAbsolutePath().normalize(), StandardCharsets.UTF_8);
+            move(tmp, pending);
             SelfUpdate.restartSelf();
         } catch (Throwable t) {
             try {
@@ -427,9 +430,15 @@ public final class DataBackup {
     }
 
     private static String sizeText(long bytes) {
-        if (bytes >= 1024L * 1024 * 1024) return String.format("%.2f GB", bytes / 1024.0 / 1024 / 1024);
-        if (bytes >= 1024L * 1024) return String.format("%.1f MB", bytes / 1024.0 / 1024);
-        if (bytes >= 1024) return String.format("%.1f KB", bytes / 1024.0);
+        if (bytes >= 1024L * 1024 * 1024) {
+            return String.format(java.util.Locale.ROOT, "%.2f GB", bytes / 1024.0 / 1024 / 1024);
+        }
+        if (bytes >= 1024L * 1024) {
+            return String.format(java.util.Locale.ROOT, "%.1f MB", bytes / 1024.0 / 1024);
+        }
+        if (bytes >= 1024) {
+            return String.format(java.util.Locale.ROOT, "%.1f KB", bytes / 1024.0);
+        }
         return bytes + " B";
     }
 

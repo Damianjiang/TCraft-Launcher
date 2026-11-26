@@ -158,6 +158,9 @@ public final class MainWindow {
 
     private Popup langPopup;
 
+    /// In-flight fade-out of the global search overlay (cancelled when it is reopened).
+    private FadeTransition searchCloseFade;
+
     private StackPane dropLayer;
 
     private HBox titleInner;
@@ -2649,6 +2652,11 @@ public final class MainWindow {
             // 图形环境未就绪 错误已由 Errors 落盘
             return;
         }
+        // toastList is created in buildBody; plugin/startup calls may arrive earlier.
+        if (toastList == null) {
+            data.log(title + (message.isEmpty() ? "" : "：" + message));
+            return;
+        }
         for (javafx.scene.Node n : toastList.getChildren()) {
             ActiveToast at = (ActiveToast) n.getProperties().get("toast");
             if (at != null && !at.dismissed && at.title.equals(title) && at.message.equals(message == null ? "" : message)) {
@@ -3113,6 +3121,11 @@ public final class MainWindow {
 
     private void showGlobalSearch() {
         if (searchLayer == null) return;
+        // A running close fade would fire setOnFinished later and wipe the new content.
+        if (searchCloseFade != null) {
+            searchCloseFade.stop();
+            searchCloseFade = null;
+        }
         searchLayer.getChildren().clear();
         VBox card = new VBox(8);
         card.setMaxWidth(430);
@@ -3223,7 +3236,8 @@ public final class MainWindow {
         Consumer<String> filter = q -> {
             results.getChildren().clear();
             visibleActions.clear();
-            String query = q == null ? "" : q.trim().toLowerCase();
+            // Locale.ROOT so that tr/az (I -> dotless i) keeps query and entry case folding symmetrical.
+            String query = q == null ? "" : q.trim().toLowerCase(java.util.Locale.ROOT);
             int count = 0;
             for (Object[] entry : entries) {
                 // 原文与中文都参与匹配
@@ -3232,8 +3246,10 @@ public final class MainWindow {
                 String titleRaw = (String) entry[0];
                 String subRaw = (String) entry[1];
                 if (!query.isEmpty()
-                        && !(title.toLowerCase().contains(query) || titleRaw.toLowerCase().contains(query))
-                        && !(sub.toLowerCase().contains(query) || subRaw.toLowerCase().contains(query)))
+                        && !(title.toLowerCase(java.util.Locale.ROOT).contains(query)
+                        || titleRaw.toLowerCase(java.util.Locale.ROOT).contains(query))
+                        && !(sub.toLowerCase(java.util.Locale.ROOT).contains(query)
+                        || subRaw.toLowerCase(java.util.Locale.ROOT).contains(query)))
                     continue;
                 Node icon = Theme.icon((String) entry[2], 16, Theme.text);
                 Ui.ListItem item = new Ui.ListItem(icon, title, sub, 38);
@@ -3311,12 +3327,16 @@ public final class MainWindow {
 
     private void closeSearch() {
         if (searchLayer == null || !searchLayer.isVisible()) return;
+        if (searchCloseFade != null) searchCloseFade.stop();
         FadeTransition ft = new FadeTransition(Duration.millis(120), searchLayer);
         ft.setToValue(0);
         ft.setOnFinished(e -> {
+            if (searchCloseFade != ft) return;
+            searchCloseFade = null;
             searchLayer.setVisible(false);
             searchLayer.getChildren().clear();
         });
+        searchCloseFade = ft;
         ft.play();
     }
 

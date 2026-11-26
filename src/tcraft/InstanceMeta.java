@@ -100,6 +100,9 @@ public final class InstanceMeta {
             if (Files.isRegularFile(file) && Files.size(file) > 1024L * 1024) {
                 throw new java.io.IOException("Setup.ini 过大");
             }
+            // one-line only: a CR/LF inside a value would inject extra ini entries
+            String k = oneLine(key);
+            String v = value == null ? "" : oneLine(value);
             List<String> lines = Files.isRegularFile(file)
                     ? readSetupLines(file)
                     : new ArrayList<>();
@@ -108,22 +111,45 @@ public final class InstanceMeta {
             for (String line : lines) {
                 String trimmed = line.trim();
                 int eq = trimmed.indexOf('=');
-                if (eq > 0 && trimmed.substring(0, eq).trim().equalsIgnoreCase(key)) {
-                    if (!replaced && value != null && !value.isEmpty()) {
-                        out.add(key + "=" + value);
+                if (eq > 0 && trimmed.substring(0, eq).trim().equalsIgnoreCase(k)) {
+                    if (!replaced && !v.isEmpty()) {
+                        out.add(k + "=" + v);
                         replaced = true;
                     }
                     continue;
                 }
                 out.add(line);
             }
-            if (!replaced && value != null && !value.isEmpty()) out.add(key + "=" + value);
+            if (!replaced && !v.isEmpty()) out.add(k + "=" + v);
             Files.createDirectories(file.getParent());
-            Files.write(file, out, StandardCharsets.UTF_8);
+            writeAtomic(file, out);
             INI_CACHE.remove(file.toAbsolutePath().toString());
         } catch (Exception e) {
             // brief 可能被再次查表
             Errors.error(Lang.t("保存实例设置失败：") + ins.name + " / " + key, e);
+        }
+    }
+
+    private static String oneLine(String raw) {
+        return raw == null ? "" : raw.replace('\r', ' ').replace('\n', ' ').trim();
+    }
+
+    // Temp file + rename so a crash mid-write cannot destroy the existing Setup.ini.
+    private static void writeAtomic(Path file, List<String> lines) throws Exception {
+        Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
+        try {
+            Files.write(tmp, lines, StandardCharsets.UTF_8);
+            try {
+                Files.move(tmp, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                        java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+            } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                Files.move(tmp, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally {
+            try {
+                Files.deleteIfExists(tmp);
+            } catch (Exception ignored) {
+            }
         }
     }
 

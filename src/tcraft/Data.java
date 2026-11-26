@@ -1008,6 +1008,8 @@ public final class Data {
                 // 版本数量不写盘 仅兜底数据需留痕
             } catch (Exception e) {
                 log("获取官方版本列表失败，改用标注过的离线兜底数据：" + Log.describe(e));
+                // a transient failure must not replace an already loaded real list with built-ins
+                if (!fallbackVersions && !versions.isEmpty()) return;
                 seedBuiltinVersions();
             } finally {
                 List<Runnable> waiters;
@@ -1156,6 +1158,10 @@ public final class Data {
     }
 
     public void load() {
+        // Snapshot first: if parsing aborts, keep the previous state instead of
+        // leaving props half-filled for the next save() to persist.
+        Properties previous = new Properties();
+        previous.putAll(props);
         try {
             // 清旧键 防导入残留叠加
             props.clear();
@@ -1255,6 +1261,8 @@ public final class Data {
             selectedAccount = getInt("account.selected", 0);
             int icount = Math.max(0, Math.min(10000, getInt("instance.count", 0)));
             instances.clear();
+            // stale orphans from the previous config would be re-saved by save()
+            orphanInstances.clear();
             for (int i = 0; i < icount; i++) {
                 String raw = props.getProperty("instance." + i);
                 if (raw == null) continue;
@@ -1280,12 +1288,13 @@ public final class Data {
                 if (p.length >= 2) folders.add(new FolderItem(p[0], p[1]));
             }
             String folderPath = get("folder.current", "");
-            // 迁移来的空目录回落到启动器所在文件夹
-            if (!folderPath.isEmpty() && isStockMinecraft(folderPath)
-                    && !Files.isDirectory(Paths.get(folderPath, "versions"))) {
+            // 迁移来的空目录或非法路径文本回落到启动器所在文件夹
+            if (!folderPath.isEmpty() && (!validPath(folderPath)
+                    || (isStockMinecraft(folderPath) && !stockVersionsExist(folderPath)))) {
                 try {
                     folderPath = Resources.appDir().toString();
                 } catch (Exception ignored) {
+                    folderPath = "";
                 }
             }
             if (folders.isEmpty() && !folderPath.isEmpty()) folders.add(new FolderItem("当前文件夹", folderPath));
@@ -1298,7 +1307,28 @@ public final class Data {
                 if (f != null && !f.isEmpty()) favorites.add(Favorite.decode(f));
             }
         } catch (Exception e) {
+            props.clear();
+            props.putAll(previous);
             Errors.error("配置加载异常，部分数据使用默认值", e, Errors.Behavior.NONE);
+        }
+    }
+
+    // 配置里的路径文本可能来自旧版本或手工编辑，非法字符不能拖垮启动
+    private static boolean validPath(String text) {
+        try {
+            Paths.get(text);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    // invalid path text in the config must not abort the whole load
+    private static boolean stockVersionsExist(String folderPath) {
+        try {
+            return Files.isDirectory(Paths.get(folderPath, "versions"));
+        } catch (Exception e) {
+            return false;
         }
     }
 

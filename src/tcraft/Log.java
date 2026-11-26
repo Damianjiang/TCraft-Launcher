@@ -152,7 +152,7 @@ public final class Log {
         }
         int count = 0;
         try (DirectoryStream<Path> ds = Files.newDirectoryStream(Resources.logDir(), p -> {
-            String n = p.getFileName().toString().toLowerCase();
+            String n = p.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
             return n.startsWith("launcher") || n.startsWith("errors")
                     || n.startsWith("launch") || n.startsWith("bootstrap")
                     || n.equals("crash.txt") || n.startsWith("crash.");
@@ -349,7 +349,7 @@ public final class Log {
         List<Path> files = new ArrayList<>();
         try (DirectoryStream<Path> ds = Files.newDirectoryStream(Resources.logDir())) {
             for (Path p : ds) {
-                String n = p.getFileName().toString().toLowerCase();
+                String n = p.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
                 if (Files.isRegularFile(p) && (n.endsWith(".log") || n.endsWith(".txt"))) files.add(p);
             }
         } catch (Throwable ignored) {

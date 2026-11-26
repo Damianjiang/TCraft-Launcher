@@ -584,9 +584,10 @@ public final class Updates {
                 // 窗口关闭时在 worker 安装
                 if (!windowAlive(win)) {
                     Data.get().save();
-                    Boot.releaseInstanceLock();
+                    // Spawn the installer first so a spawn failure keeps the instance lock.
                     SelfUpdate.spawn(SelfUpdate.buildCommand(file,
                             "--apply-to", target.toAbsolutePath().toString()));
+                    Boot.releaseInstanceLock();
                     Data.get().log("已下载 v" + ver + "，窗口已关闭，后台安装更新");
                     System.exit(0);
                 }
@@ -596,7 +597,7 @@ public final class Updates {
                         poller.stop();
                         win.closeModal();
                         Data.get().save();
-                        // 先构建命令 再释放锁
+                        // 先构建命令再拉起进程 都成功后才放锁
                         java.util.List<String> installCmd;
                         try {
                             installCmd = SelfUpdate.buildCommand(file,
@@ -607,9 +608,10 @@ public final class Updates {
                             win.toast("更新失败", Lang.t("无法启动安装进程，请前往下载手动更新。"), 3);
                             return;
                         }
-                        Boot.releaseInstanceLock();
                         try {
                             SelfUpdate.spawn(installCmd);
+                            // Release only after the installer started; otherwise keep running locked.
+                            Boot.releaseInstanceLock();
                             Data.get().log("已下载 v" + ver + "，正在安装更新并重启");
                             // 留 teardown 时间再退出
                             javafx.application.Platform.exit();

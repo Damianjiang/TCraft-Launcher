@@ -670,8 +670,8 @@ public final class Ui {
                 lab.setTextFill(from.interpolate(to, f));
             }
         };
+        // startExclusive already plays it; playing twice restarts the tween from 0.
         startExclusive(owner, "uiTextFill", t);
-        t.play();
     }
 
     public static final class MenuRow {
@@ -1215,8 +1215,8 @@ public final class Ui {
                 tint(glyph, from.interpolate(to, f));
             }
         };
+        // startExclusive already plays it; playing twice restarts the tween from 0.
         startExclusive(owner, "uiIconTint", t);
-        t.play();
     }
 
     public static final class ListItem extends HBox {
@@ -2081,7 +2081,8 @@ public final class Ui {
                 boolean has = b != null && !b.isEmpty();
                 Timeline t = new Timeline(new KeyFrame(Duration.millis(100),
                         new KeyValue(clearBtn.opacityProperty(), has ? 1 : 0)));
-                t.play();
+                // Each keystroke used to stack another timeline on the same property.
+                startExclusive(this, "uiSearchClear", t);
                 clearBtn.setMouseTransparent(!has);
             });
         }

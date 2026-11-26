@@ -472,8 +472,11 @@ public class PageInstance implements Page {
         rows.add(Ui.MenuRow.separator());
         rows.add(Ui.MenuRow.of("删除", "trash-2", () -> {
             java.nio.file.Path dir = Isolation.deletableDir(ins);
+            boolean shared = versionDirShared(ins, dir);
             String extra = dir != null
-                    ? Lang.tf("\n同时删除磁盘目录（不可恢复）：\n%s", dir)
+                    ? shared
+                    ? Lang.t("\n该版本目录仍被其他实例使用，只删除实例配置，不删除磁盘文件。")
+                    : Lang.tf("\n同时删除磁盘目录（不可恢复）：\n%s", dir)
                     : Lang.t("\n当前未开启版本隔离，共享游戏目录不会被删除。");
             Dialogs.confirm(win, "删除实例",
                     Lang.tf("确定要删除实例「%s」吗？%s", ins.name, extra), () -> {
@@ -485,12 +488,28 @@ public class PageInstance implements Page {
                             data.selectedInstance = Math.max(0, data.instances.size() - 1);
                         }
                         data.save();
-                        if (dir != null) Isolation.deleteTree(dir);
+                        // recursive delete off the FX thread
+                        if (dir != null && !shared) {
+                            Threads.start("TCL-Instance-Delete", () -> deleteTree(dir));
+                        }
                         rebuild();
-                        win.toast("实例已删除", ins.name, 1);
+                        win.toast("实例已删除",
+                                shared ? Lang.t("版本目录仍被其他实例使用，未删除磁盘文件") : ins.name, 1);
                     }, true);
         }));
         return rows;
+    }
+
+    // Another instance in the same game folder still uses this version; keep its files.
+    private boolean versionDirShared(Data.Instance ins, java.nio.file.Path dir) {
+        if (dir == null || ins.version == null) return false;
+        java.nio.file.Path base = Isolation.base(ins).toAbsolutePath().normalize();
+        for (Data.Instance other : data.instances) {
+            if (other == ins) continue;
+            if (!base.equals(Isolation.base(other).toAbsolutePath().normalize())) continue;
+            if (ins.version.equals(other.version)) return true;
+        }
+        return false;
     }
 
     private void showCollectionMenu(javafx.stage.Popup popup, Node anchor, Data.Instance ins) {
@@ -719,7 +738,7 @@ public class PageInstance implements Page {
         if (!java.nio.file.Files.isRegularFile(oldJson)) {
             try (var list = java.nio.file.Files.list(dir)) {
                 List<java.nio.file.Path> candidates = list
-                        .filter(p -> p.getFileName().toString().toLowerCase().endsWith(".json"))
+                        .filter(p -> p.getFileName().toString().toLowerCase(java.util.Locale.ROOT).endsWith(".json"))
                         .limit(2)
                         .toList();
                 if (candidates.size() != 1) return;
@@ -939,8 +958,11 @@ public class PageInstance implements Page {
             try (java.util.zip.ZipOutputStream zos = new java.util.zip.ZipOutputStream(
                     new java.io.BufferedOutputStream(java.nio.file.Files.newOutputStream(partZip)));
                  var walk = java.nio.file.Files.walk(src)) {
+                zos.setLevel(1);
                 walk.filter(p -> !java.nio.file.Files.isSymbolicLink(p)
-                                && java.nio.file.Files.isRegularFile(p, java.nio.file.LinkOption.NOFOLLOW_LINKS))
+                                && java.nio.file.Files.isRegularFile(p, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                                && !p.toAbsolutePath().normalize().equals(partZip)
+                                && !p.toAbsolutePath().normalize().equals(outPath))
                         .forEach(f -> {
                     try {
                         // 输出文件本身不能进压缩包

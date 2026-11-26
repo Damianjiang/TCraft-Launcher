@@ -1148,6 +1148,8 @@ public class PageLink implements Page {
     // 离开页面不持有节点 回来按 state 重建
     @Override
     public void onHide() {
+        // stop the 1s peer poll while the link page is not visible
+        if (state == State.FINISH) peerGeneration++;
         loadingDescLabel = null;
         hintSlot = null;
         pingLabel = null;

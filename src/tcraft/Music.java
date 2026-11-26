@@ -29,7 +29,7 @@ public final class Music {
             if (Files.isDirectory(dir)) {
                 try (var stream = Files.list(dir)) {
                     stream.filter(Files::isRegularFile).filter(p -> {
-                        String n = p.getFileName().toString().toLowerCase();
+                        String n = p.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
                         return n.endsWith(".mp3") || n.endsWith(".wav") || n.endsWith(".m4a") || n.endsWith(".aac");
                     }).limit(1000).sorted().forEach(FILES::add);
                 }

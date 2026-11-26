@@ -134,9 +134,9 @@ final class PluginDev {
                   "description": "%s",
                   "icon": "puzzle",
                   "main": "%s",
-                  "api": 1
+                  "api": %d
                 }
-                """.formatted(id, display, escapeJson(author), escapeJson(desc), main);
+                """.formatted(id, display, escapeJson(author), escapeJson(desc), main, Plugins.API_VERSION);
         Files.writeString(root.resolve("plugin.json"), manifest, StandardCharsets.UTF_8);
 
         String packageLine = packageName.isEmpty() ? "" : "package " + packageName + ";\n\n";

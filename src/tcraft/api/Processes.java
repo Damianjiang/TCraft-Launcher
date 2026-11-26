@@ -26,6 +26,7 @@ public final class Processes {
 
     private final PluginContext ctx;
     private final List<Process> running = new CopyOnWriteArrayList<>();
+    private volatile boolean closed;
 
     Processes(PluginContext ctx) {
         this.ctx = ctx;
@@ -44,6 +45,8 @@ public final class Processes {
     /// Starts a command list with an optional working directory and environment.
     public Process start(List<String> command, Path workDir, Map<String, String> environment) throws IOException {
         if (command == null || command.isEmpty()) throw new IllegalArgumentException("command is empty");
+        // a disabled plugin must not spawn new processes
+        if (closed) throw new IllegalStateException("processes API is closed");
         ProcessBuilder builder = new ProcessBuilder(new ArrayList<>(command));
         if (workDir != null) builder.directory(workDir.toFile());
         if (environment != null) builder.environment().putAll(environment);
@@ -101,6 +104,7 @@ public final class Processes {
 
     /// Terminates every process started by this plugin.
     public void close() {
+        closed = true;
         for (Process process : running) {
             try {
                 process.destroy();

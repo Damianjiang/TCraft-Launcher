@@ -141,6 +141,8 @@ public class PageDownload implements Page {
     private final Map<String, Integer> versionPages = new java.util.HashMap<>();
     private StackPane startLayer;
     private StackPane startButton;
+    private boolean installing;
+    private final java.util.Set<String> installerTasks = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     private static class LoaderCard {
         String key;
@@ -680,7 +682,7 @@ public class PageDownload implements Page {
 
     private int dropOf(String id) {
         if (id == null || id.isEmpty()) return 0;
-        String s = id.toLowerCase();
+        String s = id.toLowerCase(java.util.Locale.ROOT);
         try {
             if (s.startsWith("1.")) {
                 String rest = s.substring(2);
@@ -815,7 +817,7 @@ public class PageDownload implements Page {
     }
 
     private void startInstallFromSelect() {
-        if (selectVersion == null) return;
+        if (selectVersion == null || installing) return;
         String name = selectNameField.getText() == null ? "" : selectNameField.getText().trim();
         if (name.isEmpty()) {
             win.toast("实例名称不能为空", "", 2);
@@ -831,7 +833,10 @@ public class PageDownload implements Page {
         }
         Inst inst = buildInst(name);
         Runnable begin = () -> {
-            Downloader.startInstall(win, inst);
+            // guard against double click starting two install tasks
+            if (installing) return;
+            installing = true;
+            Downloader.startInstall(win, inst, () -> installing = false);
             exitSelectPage();
         };
         int isolation = data.getInt("LaunchIsolation", 4);
@@ -881,6 +886,11 @@ public class PageDownload implements Page {
         name = name.replaceAll("[\\\\/:*?\"<>|]", "_");
         if (name.isEmpty() || name.equals(".") || name.equals("..")) name = "installer.jar";
         java.nio.file.Path target = java.nio.file.Paths.get(data.gameDir, "TCL", "installers", name);
+        String taskKey = target.toAbsolutePath().normalize().toString();
+        if (!installerTasks.add(taskKey)) {
+            win.toast("正在下载安装器", Lang.t(lc.title) + " · " + version, 0);
+            return;
+        }
         win.toast("正在下载安装器", Lang.t(lc.title) + " · " + version, 0);
         Thread t = new Thread(() -> {
             try {
@@ -890,6 +900,8 @@ public class PageDownload implements Page {
             } catch (Exception e) {
                 javafx.application.Platform.runLater(() ->
                         win.toast("下载失败", e.getMessage() == null ? "网络错误" : e.getMessage(), 3));
+            } finally {
+                installerTasks.remove(taskKey);
             }
         }, "TCL-Installer-" + lc.key);
         t.setDaemon(true);
@@ -1163,7 +1175,7 @@ public class PageDownload implements Page {
         }
         final int fCfCategoryId = cfCategoryId;
         String loader = loaderCombo.isVisible() && loaderCombo.getSelectionModel().getSelectedIndex() > 0
-                ? loaderCombo.getValue().toLowerCase() : null;
+                ? loaderCombo.getValue().toLowerCase(java.util.Locale.ROOT) : null;
         int offset = resourcePage * RESOURCE_PAGE_SIZE;
         boolean wantMr = !source.equals("CurseForge");
         boolean wantCf = !source.equals("Modrinth");
@@ -1321,7 +1333,7 @@ public class PageDownload implements Page {
         r.downloads = (int) Json.num(m, "downloads", 0);
         r.projectType = projectType;
         for (Object c : Json.arr(m.get("categories"))) {
-            String cat = String.valueOf(c).toLowerCase();
+            String cat = String.valueOf(c).toLowerCase(java.util.Locale.ROOT);
             if ((cat.equals("fabric") || cat.equals("forge") || cat.equals("quilt") || cat.equals("neoforge"))
                     && !r.loaders.contains(cat)) {
                 r.loaders.add(cat);
@@ -1355,7 +1367,7 @@ public class PageDownload implements Page {
         Data.Instance ins = data.instance();
         if (ins != null) {
             info.targetVersion = ins.version == null ? "" : ins.version;
-            String loaderKey = ins.loader == null ? "" : ins.loader.toLowerCase();
+            String loaderKey = ins.loader == null ? "" : ins.loader.toLowerCase(java.util.Locale.ROOT);
             if (loaderKey.equals("forge") || loaderKey.equals("fabric")
                     || loaderKey.equals("quilt") || loaderKey.equals("neoforge")) {
                 info.targetLoader = loaderKey;

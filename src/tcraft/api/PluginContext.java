@@ -163,9 +163,19 @@ public final class PluginContext {
     public void close() {
         if (closed) return;
         closed = true;
-        scheduler.close();
-        network.close();
-        processes.close();
+        // one failing subsystem must not keep the others alive
+        try {
+            scheduler.close();
+        } catch (Throwable ignored) {
+        }
+        try {
+            network.close();
+        } catch (Throwable ignored) {
+        }
+        try {
+            processes.close();
+        } catch (Throwable ignored) {
+        }
     }
 
     /// Indicates whether the plugin context has been closed.

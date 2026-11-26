@@ -433,10 +433,10 @@ public final class GameLauncher {
         }
         boolean showConsole = data.getInstanceBool("Console", false)
                 || data.getBool("LaunchAdvanceNoJavaw", false);
-        if (showConsole && javaExe.toLowerCase().endsWith("javaw.exe")) {
+        if (showConsole && javaExe.toLowerCase(java.util.Locale.ROOT).endsWith("javaw.exe")) {
             Path console = Paths.get(javaExe.substring(0, javaExe.length() - 9) + "java.exe");
             if (Files.isRegularFile(console)) javaExe = console.toString();
-        } else if (!showConsole && javaExe.toLowerCase().endsWith("java.exe")) {
+        } else if (!showConsole && javaExe.toLowerCase(java.util.Locale.ROOT).endsWith("java.exe")) {
             Path w = Paths.get(javaExe.substring(0, javaExe.length() - 8) + "javaw.exe");
             if (Files.isRegularFile(w)) javaExe = w.toString();
         }
@@ -557,25 +557,35 @@ public final class GameLauncher {
 
         Data.Account account = data.account();
         if (account != null && "msa".equals(account.userType)) {
-            boolean overdue = account.expiresAt == 0 || System.currentTimeMillis() > account.expiresAt;
-            boolean valid = true;
-            if (overdue) {
-                try {
-                    valid = MsAuth.validate(account.accessToken);
-                } catch (Exception e) {
-                    // 校验失败不算有效
-                    valid = false;
+            // A refresh token is single-use; serialize per account so a concurrent
+            // skin refresh cannot rotate the token out from under us.
+            synchronized (account) {
+                boolean overdue = account.expiresAt == 0 || System.currentTimeMillis() > account.expiresAt;
+                boolean valid = true;
+                if (overdue) {
+                    try {
+                        valid = MsAuth.validate(account.accessToken);
+                    } catch (java.io.IOException net) {
+                        // Network failure is not proof the token is invalid; keep it.
+                        data.log("无法验证微软登录状态，将沿用现有令牌：" + Log.describe(net));
+                    } catch (Exception e) {
+                        // 校验失败不算有效
+                        valid = false;
+                    }
                 }
-            }
-            if (!valid) {
-                try {
-                    MsAuth.Result r = MsAuth.refresh(account.refreshToken);
-                    account.accessToken = r.accessToken;
-                    if (!r.refreshToken.isEmpty()) account.refreshToken = r.refreshToken;
-                    account.expiresAt = r.expiresAt;
-                    data.save();
-                } catch (Exception e) {
-                    throw new Exception(Lang.t("微软登录已失效：") + e.getMessage(), e);
+                if (!valid) {
+                    try {
+                        MsAuth.Result r = MsAuth.refresh(account.refreshToken, rotated -> {
+                            account.refreshToken = rotated;
+                            data.save();
+                        });
+                        account.accessToken = r.accessToken;
+                        if (!r.refreshToken.isEmpty()) account.refreshToken = r.refreshToken;
+                        account.expiresAt = r.expiresAt;
+                        data.save();
+                    } catch (Exception e) {
+                        throw new Exception(Lang.t("微软登录已失效：") + e.getMessage(), e);
+                    }
                 }
             }
         }
@@ -830,7 +840,8 @@ public final class GameLauncher {
             String port = hp[1].matches("\\d+") ? hp[1] : "";
             if (!port.isEmpty()) {
                 try {
-                    if (Long.parseLong(port) > 65535) port = "";
+                    long p = Long.parseLong(port);
+                    if (p <= 0 || p > 65535) port = "";
                 } catch (NumberFormatException ignored) {
                     port = "";
                 }
@@ -1166,7 +1177,8 @@ public final class GameLauncher {
         String jarHash = "";
         try {
             String text = Downloader.getText("https://auth.mc-user.com:233/" + serverCode);
-            jarHash = Json.str(Json.obj(Json.parse(text)), "jarHash", "").toLowerCase();
+            jarHash = Json.str(Json.obj(Json.parse(text)), "jarHash", "")
+                    .toLowerCase(java.util.Locale.ROOT);
         } catch (Exception e) {
             if (Files.isRegularFile(jar)) {
                 Data.get().log("获取统一通行证下载信息失败，使用本地 jar：" + Log.describe(e));
@@ -1203,7 +1215,8 @@ public final class GameLauncher {
             throw e;
         }
         java.util.Map<String, Object> artifact = Json.obj(Json.obj(Json.parse(text)).get("artifact"));
-        String sha1 = Json.str(Json.obj(artifact.get("checksums")), "sha1", "").toLowerCase();
+        String sha1 = Json.str(Json.obj(artifact.get("checksums")), "sha1", "")
+                .toLowerCase(java.util.Locale.ROOT);
         String url = Json.str(artifact, "downloadUrl", "");
         if (sha1.isEmpty()) {
             if (Files.isRegularFile(jar)) return;
@@ -1224,8 +1237,6 @@ public final class GameLauncher {
             int n;
             while ((n = in.read(buf)) > 0) digest.update(buf, 0, n);
         }
-        StringBuilder sb = new StringBuilder();
-        for (byte b : digest.digest()) sb.append(String.format("%02x", b));
-        return sb.toString();
+        return java.util.HexFormat.of().formatHex(digest.digest());
     }
 }

@@ -993,7 +993,8 @@ public final class Dialogs {
         String uuid;
         // parseInt 会溢出 用正则判 32 位 UUID
         if (id.matches("[0-9a-fA-F]{32}")) {
-            uuid = id.toLowerCase();
+            // Locale.ROOT: 土耳其语环境下 "I".toLowerCase() 会变成 "ı"，破坏 UUID。
+            uuid = id.toLowerCase(java.util.Locale.ROOT);
         } else {
             uuid = mojangUuidFromName(id);
         }
@@ -1043,7 +1044,7 @@ public final class Dialogs {
         if (site.isEmpty()) site = "https://littleskin.cn";
         if (!site.startsWith("http://") && !site.startsWith("https://")) site = "https://" + site;
         while (site.endsWith("/")) site = site.substring(0, site.length() - 1);
-        String cslBase = site.toLowerCase().endsWith("/csl") ? site : site + "/csl";
+        String cslBase = site.toLowerCase(java.util.Locale.ROOT).endsWith("/csl") ? site : site + "/csl";
         String body = httpGetString(cslBase + "/" + java.net.URLEncoder.encode(who, "UTF-8") + ".json");
         Map<String, Object> json = Json.obj(Json.parse(body));
         if (Json.str(json, "username", "").isEmpty()) {

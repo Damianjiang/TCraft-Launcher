@@ -12,7 +12,9 @@ public final class Event {
 
     public Event(String name, Map<String, Object> data) {
         this.name = name;
-        this.data = data == null ? Collections.emptyMap() : Collections.unmodifiableMap(data);
+        this.data = data == null || data.isEmpty()
+                ? Collections.emptyMap()
+                : Collections.unmodifiableMap(new java.util.LinkedHashMap<>(data));
     }
 
     public Map<String, Object> data() {
@@ -42,6 +44,7 @@ public final class Event {
     @SuppressWarnings("unchecked")
     public List<Object> list(String key) {
         Object v = data.get(key);
-        return v instanceof List ? (List<Object>) v : Collections.emptyList();
+        if (!(v instanceof List)) return Collections.emptyList();
+        return Collections.unmodifiableList((List<Object>) v);
     }
 }

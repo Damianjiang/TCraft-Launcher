@@ -141,7 +141,9 @@ public final class Modrinth {
 
     // null 仅表示未收录
     public static String[] checkUpdateBySha1(String sha1) {
-        String key = sha1 == null ? "" : sha1.toLowerCase();
+        String key = sha1 == null ? "" : sha1.trim().toLowerCase(java.util.Locale.ROOT);
+        // 空哈希查询会被 API 判为参数错误，按未收录处理
+        if (key.isEmpty()) return null;
         Object[] cached = UPDATE_CACHE.get(key);
         if (cached != null && System.currentTimeMillis() - (Long) cached[1] < UPDATE_TTL_MS) {
             String[] value = (String[]) cached[0];
@@ -168,7 +170,7 @@ public final class Modrinth {
             if (Json.bool(fm, "primary", false) || url.isEmpty()) {
                 fileName = Json.str(fm, "filename", fileName);
                 url = Json.str(fm, "url", url);
-                hash = Json.str(Json.obj(fm.get("hashes")), "sha1", hash).toLowerCase();
+                hash = Json.str(Json.obj(fm.get("hashes")), "sha1", hash).toLowerCase(java.util.Locale.ROOT);
             }
         }
         String[] result = projectId.isEmpty() || url.isEmpty()

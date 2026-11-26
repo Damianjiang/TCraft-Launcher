@@ -66,7 +66,8 @@ public final class Loaders {
         }
         synchronized (CACHE) {
             if (CACHE.size() >= CACHE_MAX) CACHE.remove(CACHE.keySet().iterator().next());
-            CACHE.put(key, list);
+            // keep an isolated snapshot: callers must not be able to mutate the cached entry
+            CACHE.put(key, List.copyOf(list));
         }
         return list;
     }

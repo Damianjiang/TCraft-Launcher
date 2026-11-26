@@ -31,17 +31,19 @@ public final class Boot {
             } catch (Throwable t) {
                 // javaw 无 stderr 失败落盘并留标记
                 System.err.println("[TCL] 应用更新失败：" + t);
-                t.printStackTrace();
                 try {
                     Log.error("应用更新失败：" + t);
                     Log.error(Log.describe(t));
-                    Files.writeString(Resources.home().resolve("update").resolve("last-apply-error.txt"),
-                            String.valueOf(t));
+                    // Keep the failure report even when update/ is missing.
+                    Path marker = Resources.home().resolve("update").resolve("last-apply-error.txt");
+                    Files.createDirectories(marker.getParent());
+                    Files.writeString(marker, String.valueOf(t));
                 } catch (Throwable ignored) {
                 }
                 try {
-                    // 失败时保留本体并回滚旧版
-                    SelfUpdate.startJava(oldFile);
+                    // 失败时保留本体并回滚旧版；改名成功后原路径已不存在 用实际落位文件
+                    Path installed = SelfUpdate.installed;
+                    SelfUpdate.startAny(installed != null ? installed : oldFile);
                 } catch (Throwable ignored) {
                 }
                 System.exit(1);
@@ -69,7 +71,18 @@ public final class Boot {
                     if (lines.size() >= 2 && !lines.get(1).isBlank()) {
                         hasSource = true;
                         waitForPid(parsePid(lines.get(0)), 20_000);
-                        applied = applyDataImport(Paths.get(lines.get(1).trim()));
+                        // Data must not be touched while the old process can still hold the lock.
+                        if (!acquireInstanceLock()) {
+                            System.err.println("[TCL] old instance still running, retry import later");
+                            return;
+                        }
+                        Path source = Paths.get(lines.get(1).trim());
+                        if (!Files.isDirectory(source)) {
+                            // A previous import finished but the marker could not be removed.
+                            hasSource = false;
+                        } else {
+                            applied = applyDataImport(source);
+                        }
                     }
                 } catch (Throwable t) {
                     System.err.println("[TCL] 读取导入标记失败：" + t);
@@ -164,7 +177,9 @@ public final class Boot {
         }
     }
 
-    private static boolean acquireInstanceLock() {        // stub 互斥量已失效 长期单实例靠此文件锁
+    private static boolean acquireInstanceLock() {
+        if (instanceLock != null && instanceLock.isValid()) return true;
+        // stub mutex is no longer reliable; the file lock keeps a single instance
         Path lockFile = Resources.home().resolve("launcher.lock");
         try {
             // 锁文件可能是符号链接 不能顺它锁外部文件
@@ -324,31 +339,53 @@ public final class Boot {
             Thread.sleep(1200);
             Path backup = base.resolveSibling(base.getFileName() + ".pre-import-"
                     + System.currentTimeMillis());
-            if (Files.exists(base)) snapshotDir(base, backup);
+            if (Files.exists(base)) {
+                snapshotDir(base, backup);
+                Path oldConfig = base.resolve("config.properties");
+                if (Files.isRegularFile(oldConfig)
+                        && !Files.isRegularFile(backup.resolve("config.properties"))) {
+                    throw new IOException("旧配置备份失败，已中止导入以免覆盖原数据");
+                }
+            }
             int failed = copyOver(payload, base);
             Path config = base.resolve("config.properties");
+            Path sourceConfig = payload.resolve("config.properties");
             if (!Files.isRegularFile(config) || Files.size(config) <= 0) {
                 throw new IOException("导入后缺少 config.properties，"
                         + failed + " 个文件被占用或写入失败");
+            }
+            if (failed > 0 || Files.mismatch(sourceConfig, config) != -1) {
+                throw new IOException("导入未完整写入，"
+                        + failed + " 个文件被占用或写入失败，旧数据保留在 " + backup.getFileName());
             }
             deleteTree(stage);
             return true;
         } catch (Throwable t) {
             System.err.println("[TCL] 应用数据导入失败：" + t);
-            t.printStackTrace();
+            try {
+                Log.error("应用数据导入失败：" + Log.describe(t));
+            } catch (Throwable ignored) {
+            }
             return false;
         }
     }
 
     private static void dataImportFail() {
         String text = "启动器数据导入失败。\n\n"
-                + "旧数据没有被删除；如果目录已改名，会保留为 .tcl.pre-import-*。\n"
+                + "旧数据没有被删除，已尽量快照到 .tcl.pre-import-*。\n"
                 + "请检查磁盘权限和剩余空间后重试。";
         System.err.println("[TCL] " + text);
-        try {
-            javax.swing.JOptionPane.showMessageDialog(null, text, "TCraft Launcher",
-                    javax.swing.JOptionPane.ERROR_MESSAGE);
-        } catch (Throwable ignored) {
+        if (Shell.mac()) {
+            try {
+                Shell.macAlert("TCraft Launcher", text);
+            } catch (Throwable ignored) {
+            }
+        } else {
+            try {
+                javax.swing.JOptionPane.showMessageDialog(null, text, "TCraft Launcher",
+                        javax.swing.JOptionPane.ERROR_MESSAGE);
+            } catch (Throwable ignored) {
+            }
         }
         System.exit(1);
     }

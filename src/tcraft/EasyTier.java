@@ -541,17 +541,31 @@ public final class EasyTier {
     }
 
     public static synchronized void stop() {
-        if (core == null) return;
+        Process p = core;
+        if (p == null) return;
+        core = null;
         try {
-            core.descendants().forEach(ProcessHandle::destroy);
-            core.destroy();
-            if (!core.waitFor(3, TimeUnit.SECONDS)) {
-                core.descendants().forEach(ProcessHandle::destroyForcibly);
-                core.destroyForcibly();
+            // Snapshot children first: once the parent exits they may be reparented.
+            List<ProcessHandle> kids = new ArrayList<>();
+            try {
+                p.descendants().forEach(kids::add);
+            } catch (Exception ignored) {
+            }
+            kids.forEach(ProcessHandle::destroy);
+            p.destroy();
+            if (!p.waitFor(3, TimeUnit.SECONDS)) p.destroyForcibly();
+            for (ProcessHandle h : kids) {
+                if (h.isAlive()) h.destroyForcibly();
+            }
+            // Also catch children spawned after the snapshot.
+            try {
+                p.descendants().forEach(h -> {
+                    if (h.isAlive()) h.destroyForcibly();
+                });
+            } catch (Exception ignored) {
             }
         } catch (Exception ignored) {
         }
-        core = null;
     }
 
     public static void stopAsync() {
@@ -664,7 +678,9 @@ public final class EasyTier {
                         String cmd = h.info().command().orElse("").toLowerCase(Locale.ROOT);
                         return cmd.contains("easytier-core") && cmd.startsWith(own);
                     })
-                    .forEach(ProcessHandle::destroy);
+                    // Only orphans: never kill a core owned by another live launcher.
+                    .filter(h -> h.parent().map(parent -> !parent.isAlive()).orElse(true))
+                    .forEach(ProcessHandle::destroyForcibly);
         } catch (Exception ignored) {
         }
     }

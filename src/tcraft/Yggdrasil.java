@@ -132,20 +132,23 @@ public final class Yggdrasil {
 
     public static void ensureFresh(Data.Account account) throws IOException, AuthException {
         if (account == null || account.server == null || account.server.isEmpty()) return;
-        Server server = new Server(account.server.endsWith("/") ? account.server : account.server + "/", "");
-        String client = account.clientToken == null ? "" : account.clientToken;
-        if (client.isEmpty()) {
-            client = UUID.randomUUID().toString();
-            account.clientToken = client;
-        }
-        if (account.accessToken != null && !account.accessToken.isEmpty()
-                && validate(server, account.accessToken, client)) return;
+        // Serialize per account: refreshing rotates accessToken/clientToken.
+        synchronized (account) {
+            Server server = new Server(account.server.endsWith("/") ? account.server : account.server + "/", "");
+            String client = account.clientToken == null ? "" : account.clientToken;
+            if (client.isEmpty()) {
+                client = UUID.randomUUID().toString();
+                account.clientToken = client;
+            }
+            if (account.accessToken != null && !account.accessToken.isEmpty()
+                    && validate(server, account.accessToken, client)) return;
 
-        Profile self = new Profile(compact(account.uuid), account.name);
-        Session session = refresh(server, account.accessToken, client, self);
-        account.accessToken = session.accessToken;
-        if (!session.clientToken.isEmpty()) account.clientToken = session.clientToken;
-        Data.get().save();
+            Profile self = new Profile(compact(account.uuid), account.name);
+            Session session = refresh(server, account.accessToken, client, self);
+            account.accessToken = session.accessToken;
+            if (!session.clientToken.isEmpty()) account.clientToken = session.clientToken;
+            Data.get().save();
+        }
     }
 
     private static Session send(Server server, String path, String body, String clientToken)

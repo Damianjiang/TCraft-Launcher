@@ -36,6 +36,10 @@ public final class Launcher {
 
     /// Selects an instance by list index, saves the choice, and refreshes the UI.
     public Instance select(int index) {
+        // mutating shared launcher state and refreshing the UI belongs on the FX thread
+        if (!javafx.application.Platform.isFxApplicationThread()) {
+            return onFx(() -> select(index));
+        }
         tcraft.Data data = tcraft.Data.get();
         if (index < 0 || index >= data.instances.size()) {
             throw new IllegalArgumentException("instance index out of range: " + index);
@@ -61,7 +65,12 @@ public final class Launcher {
 
     /// Starts the currently selected instance through the normal launcher UI.
     public void launch() {
-        host.launchGame();
+        // the launch flow owns login and progress UI; always run it on FX
+        if (javafx.application.Platform.isFxApplicationThread()) {
+            host.launchGame();
+        } else {
+            javafx.application.Platform.runLater(host::launchGame);
+        }
     }
 
     /// Selects an instance by name or version, then starts it.
@@ -98,6 +107,26 @@ public final class Launcher {
     private static Instance convert(tcraft.Data.Instance instance, int index) {
         return new Instance(index, instance.name, instance.version, instance.loader,
                 instance.loaderVersion, instance.folder, instance.favorite);
+    }
+
+    private static <T> T onFx(java.util.function.Supplier<T> action) {
+        // Running on the FX thread already; queuing again would deadlock.
+        if (javafx.application.Platform.isFxApplicationThread()) {
+            return action.get();
+        }
+        java.util.concurrent.FutureTask<T> task = new java.util.concurrent.FutureTask<>(action::get);
+        javafx.application.Platform.runLater(task);
+        try {
+            return task.get();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("interrupted while waiting for the JavaFX thread", e);
+        } catch (java.util.concurrent.ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException runtime) throw runtime;
+            if (cause instanceof Error error) throw error;
+            throw new IllegalStateException(cause);
+        }
     }
 
     /// Immutable instance information exposed to plugins.

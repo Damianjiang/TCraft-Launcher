@@ -25,6 +25,11 @@ public final class SelfUpdate {
     private static final Pattern VERSIONED = Pattern.compile(
             "^(TCraftLauncher-)(\\d+(?:\\.\\d+)*)(-win\\.exe|\\.exe|\\.jar|\\.sh|-linux\\.sh|\\.command)$",
             Pattern.CASE_INSENSITIVE);
+
+    // Path that actually received the new build (rename may move it); Boot uses
+    // it to relaunch the right file when starting the new process fails.
+    static volatile Path installed;
+
     private SelfUpdate() {
     }
 
@@ -67,20 +72,35 @@ public final class SelfUpdate {
             }
         }
         // 复制和改名都完成 才允许新本体展示升级完成
+        installed = target;
         UpgradeState.applied();
         startJavaAfterUpdate(target);
     }
 
     // 更新后本体路径已变 不能把旧 -Dtcraft.exe 传给新进程
     private static void startJavaAfterUpdate(Path file) throws IOException {
-        java.util.List<String> cmd = buildCommand(file);
-        cmd.removeIf(arg -> arg.startsWith("-Dtcraft.exe="));
-        cmd.removeIf(arg -> arg.startsWith("-Dtcl.webpRetry="));
-        if (file.getFileName().toString().toLowerCase(java.util.Locale.ROOT).endsWith(".exe")) {
-            int jar = cmd.indexOf("-jar");
-            if (jar >= 0) cmd.add(jar, "-Dtcraft.exe=" + file.toAbsolutePath());
+        startAny(file);
+    }
+
+    // 按后缀选启动方式：exe 直接跑，sh/command 交给 /bin/sh，其余当 jar
+    static void startAny(Path file, String... appArgs) throws IOException {
+        String name = file.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
+        if (name.endsWith(".exe")) {
+            java.util.List<String> cmd = new java.util.ArrayList<>();
+            cmd.add(file.toAbsolutePath().toString());
+            for (String arg : appArgs) cmd.add(arg);
+            spawn(cmd);
+            return;
         }
-        spawn(cmd);
+        if (name.endsWith(".sh") || name.endsWith(".command")) {
+            java.util.List<String> cmd = new java.util.ArrayList<>();
+            cmd.add("/bin/sh");
+            cmd.add(file.toAbsolutePath().toString());
+            for (String arg : appArgs) cmd.add(arg);
+            spawn(cmd);
+            return;
+        }
+        startJava(file, appArgs);
     }
 
     private static Optional<String> suffix(Path file) {
@@ -128,10 +148,25 @@ public final class SelfUpdate {
     }
 
     // 复制更新 jar 并按目标文件名后缀追加内置外壳
+    /// Write next to the target first, then swap it in, so an interrupted
+    /// copy can never leave a truncated launcher on disk.
     static void copyWithHeader(Path from, Path to) throws IOException {
+        Path tmp = to.resolveSibling(to.getFileName() + ".tcl-new");
+        try {
+            writeWithHeader(from, tmp, to);
+            replaceWithRetry(tmp, to);
+        } finally {
+            try {
+                Files.deleteIfExists(tmp);
+            } catch (IOException ignored) {
+            }
+        }
+    }
+
+    private static void writeWithHeader(Path from, Path outFile, Path target) throws IOException {
         try (FileChannel in = FileChannel.open(from, StandardOpenOption.READ);
              ZipFile zip = new ZipFile(from.toFile())) {
-            Optional<String> suffix = suffix(to);
+            Optional<String> suffix = suffix(target);
             byte[] header = new byte[0];
             if (suffix.isPresent() && headerLocation(suffix.get()).isPresent()) {
                 Optional<byte[]> found = readHeader(zip, suffix.get());
@@ -141,7 +176,7 @@ public final class SelfUpdate {
                 }
                 header = found.get();
             }
-            try (FileChannel out = FileChannel.open(to, StandardOpenOption.CREATE,
+            try (FileChannel out = FileChannel.open(outFile, StandardOpenOption.CREATE,
                     StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING,
                     java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
                 if (header.length > 0) out.write(ByteBuffer.wrap(header));
@@ -151,9 +186,35 @@ public final class SelfUpdate {
             if (("sh".equals(suffix.orElse("")) || "command".equals(suffix.orElse("")))
                     && !System.getProperty("os.name", "")
                     .toLowerCase(java.util.Locale.ROOT).contains("windows")) {
-                to.toFile().setExecutable(true);
+                outFile.toFile().setExecutable(true);
             }
         }
+    }
+
+    /// Windows keeps a running image locked until its process is gone; retry
+    /// the swap while the old launcher finishes shutting down.
+    private static void replaceWithRetry(Path from, Path to) throws IOException {
+        IOException last = null;
+        for (int attempt = 0; attempt < 40; attempt++) {
+            try {
+                try {
+                    Files.move(from, to, java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+                            java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                    Files.move(from, to, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                }
+                return;
+            } catch (IOException e) {
+                last = e;
+                try {
+                    Thread.sleep(150);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw last;
+                }
+            }
+        }
+        throw last;
     }
 
     private static Optional<Path> tryRename(Path file) {

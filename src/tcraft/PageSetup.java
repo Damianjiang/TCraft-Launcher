@@ -27,8 +27,9 @@ public class PageSetup implements Page {
 
     public PageSetup(MainWindow win, String section) {
         this.win = win;
-        data.setupSection = section;
-        win.pendingSetupSection = section;
+        String safe = section == null || section.isEmpty() ? "launch" : section;
+        data.setupSection = safe;
+        win.pendingSetupSection = safe;
     }
 
     @Override
@@ -79,10 +80,10 @@ public class PageSetup implements Page {
         for (String[] s : visibleSections) items.getChildren().add(navItem(s[1], s[2], s[3], s[0]));
 
         search.textProperty().addListener((o, a, b) -> {
-            String q = b == null ? "" : b.toLowerCase();
+            String q = b == null ? "" : b.toLowerCase(java.util.Locale.ROOT);
             for (Node n : items.getChildren()) {
                 if (n instanceof Ui.ListItem li) {
-                    boolean match = q.isEmpty() || li.title.getText().toLowerCase().contains(q);
+                    boolean match = q.isEmpty() || li.title.getText().toLowerCase(java.util.Locale.ROOT).contains(q);
                     li.setVisible(match);
                     li.setManaged(match);
                 }
@@ -560,14 +561,14 @@ public class PageSetup implements Page {
         bars.getChildren().addAll(
                 memoryBox("已使用内存", gb(usedMb) + " / " + gb(totalMb),
                         usedMb / (double) Math.max(1, totalMb)),
-                memoryBox("游戏分配", gameRamMb >= 1024 ? String.format("%.1f GB", gameRamMb / 1024.0)
+                memoryBox("游戏分配", gameRamMb >= 1024 ? String.format(java.util.Locale.ROOT, "%.1f GB", gameRamMb / 1024.0)
                                 : gameRamMb + " MB",
                         gameRamMb / (double) Math.max(1, totalMb)));
         host.getChildren().setAll(bars);
     }
 
     private static String gb(long mb) {
-        return mb >= 1024 ? String.format("%.1f GB", mb / 1024.0) : mb + " MB";
+        return mb >= 1024 ? String.format(java.util.Locale.ROOT, "%.1f GB", mb / 1024.0) : mb + " MB";
     }
 
     private VBox memoryBox(String title, String value, double ratio) {
@@ -1765,7 +1766,7 @@ public class PageSetup implements Page {
         try (var s = Files.list(logDir)) {
             s.filter(Files::isRegularFile)
                     .filter(p -> {
-                        String n = p.getFileName().toString().toLowerCase();
+                        String n = p.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
                         return n.endsWith(".log") || n.endsWith(".txt");
                     })
                     .sorted(Comparator.comparing(p -> p.getFileName().toString()))
@@ -1845,9 +1846,9 @@ public class PageSetup implements Page {
 
     private String filterLog(String[] lines, int level, String query) {
         StringBuilder sb = new StringBuilder();
-        String q = query == null ? "" : query.toLowerCase();
+        String q = query == null ? "" : query.toLowerCase(java.util.Locale.ROOT);
         for (String line : lines) {
-            String lower = line.toLowerCase();
+            String lower = line.toLowerCase(java.util.Locale.ROOT);
             if (level == 1 && !(lower.contains("warn") || lower.contains("error") || lower.contains("失败"))) continue;
             if (level == 2 && !(lower.contains("error") || lower.contains("失败"))) continue;
             if (!q.isEmpty() && !lower.contains(q)) continue;
@@ -1996,7 +1997,7 @@ public class PageSetup implements Page {
         if (!Files.isDirectory(base)) return 0;
         try (var s = Files.list(base)) {
             return s.filter(Files::isRegularFile)
-                    .filter(p -> p.getFileName().toString().toLowerCase().endsWith(".log"))
+                    .filter(p -> p.getFileName().toString().toLowerCase(java.util.Locale.ROOT).endsWith(".log"))
                     .mapToLong(PageSetup::fileSize).sum();
         } catch (Exception e) {
             return 0;
@@ -2014,7 +2015,7 @@ public class PageSetup implements Page {
     }
 
     private boolean isTempFile(Path p) {
-        String n = p.getFileName().toString().toLowerCase();
+        String n = p.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
         return n.endsWith(".tmp") || n.endsWith(".part");
     }
 
@@ -2066,7 +2067,7 @@ public class PageSetup implements Page {
         long freed = 0;
         try (var s = Files.list(base)) {
             for (Path p : s.filter(Files::isRegularFile)
-                    .filter(f -> f.getFileName().toString().toLowerCase().endsWith(".log")).toList()) {
+                    .filter(f -> f.getFileName().toString().toLowerCase(java.util.Locale.ROOT).endsWith(".log")).toList()) {
                 freed += fileSize(p);
                 try {
                     Files.deleteIfExists(p);
@@ -2160,9 +2161,9 @@ public class PageSetup implements Page {
     }
 
     private String bytes(long b) {
-        if (b > 1024L * 1024 * 1024) return String.format("%.2f GB", b / 1024.0 / 1024 / 1024);
-        if (b > 1024L * 1024) return String.format("%.1f MB", b / 1024.0 / 1024);
-        if (b > 1024) return String.format("%.1f KB", b / 1024.0);
+        if (b > 1024L * 1024 * 1024) return String.format(java.util.Locale.ROOT, "%.2f GB", b / 1024.0 / 1024 / 1024);
+        if (b > 1024L * 1024) return String.format(java.util.Locale.ROOT, "%.1f MB", b / 1024.0 / 1024);
+        if (b > 1024) return String.format(java.util.Locale.ROOT, "%.1f KB", b / 1024.0);
         return b + " B";
     }
 

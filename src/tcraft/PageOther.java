@@ -425,6 +425,7 @@ public class PageOther implements Page {
 
     @Override
     public void onHide() {
+        newsPage = null;
         stopSkeletons();
     }
 

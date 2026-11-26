@@ -159,7 +159,7 @@ public final class Files {
 
     /// Deletes a file tree without following symbolic links.
     public void deleteRecursive(Path path) throws IOException {
-        if (!java.nio.file.Files.exists(path)) return;
+        if (!java.nio.file.Files.exists(path, java.nio.file.LinkOption.NOFOLLOW_LINKS)) return;
         java.nio.file.Files.walkFileTree(path, new SimpleFileVisitor<>() {
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {

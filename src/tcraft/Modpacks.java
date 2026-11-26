@@ -162,7 +162,7 @@ public final class Modpacks {
         info.name = Json.str(json, "name", info.name);
         for (Object o : Json.arr(json.get("addons"))) {
             java.util.Map<String, Object> addon = Json.obj(o);
-            String id = Json.str(addon, "id", "").toLowerCase();
+            String id = Json.str(addon, "id", "").toLowerCase(java.util.Locale.ROOT);
             String version = Json.str(addon, "version", "").trim();
             switch (id) {
                 case "game" -> info.mcVersion = version;
@@ -198,7 +198,7 @@ public final class Modpacks {
     private static void parseLoaderId(String id, PackInfo info) {
         if (id == null || id.isBlank()) return;
         String text = id.trim();
-        String lower = text.toLowerCase();
+        String lower = text.toLowerCase(java.util.Locale.ROOT);
         if (lower.startsWith("forge-")) {
             if (lower.endsWith("-recommended") || lower.endsWith("-latest")) {
                 info.unsupportedLoaders.add(text);
@@ -339,7 +339,7 @@ public final class Modpacks {
             try {
                 Path versionsDir = Paths.get(data.gameDir, "versions", name);
                 Files.createDirectories(versionsDir);
-                String ext = packFile.resourceType.equals("modpack") && packFile.fileName.toLowerCase().endsWith(".mrpack")
+                String ext = packFile.resourceType.equals("modpack") && packFile.fileName.toLowerCase(java.util.Locale.ROOT).endsWith(".mrpack")
                         ? "mrpack" : "zip";
                 Path target = versionsDir.resolve("原始整合包." + ext);
                 task.subs.get(0).state = Tasks.State.RUNNING;
@@ -520,12 +520,6 @@ public final class Modpacks {
                 throw new Exception(Lang.t("该整合包使用了 TCL 不支持的加载器：") + String.join(Lang.t("、"), info.unsupportedLoaders));
             }
 
-            task.stage = "解压整合包文件";
-            task.progress = 0.05;
-            extractContent(zip, versionFolder, info, contentDirs, task);
-            // 清包内危险设置
-            sanitizeImportedInstanceSettings(versionFolder);
-
             if (index != null) {
                 downloadModrinthContent(win, zip, index, versionFolder, task);
             } else if (info.genericLayout || info.mmcLayout) {
@@ -536,7 +530,11 @@ public final class Modpacks {
             } else if (manifest != null) {
                 downloadCurseForgeContent(win, readJson(zip, manifest), versionFolder, task);
             }
-            // 装完再清 TCL/
+            // Overrides are applied after index downloads so pack overrides take precedence.
+            task.stage = "解压整合包文件";
+            task.progress = Math.max(task.progress, 0.78);
+            extractContent(zip, versionFolder, info, contentDirs, task);
+            // 清包内危险设置（含覆盖目录带来的 Setup.ini）
             sanitizeImportedInstanceSettings(versionFolder);
 
             task.stage = "整理文件";
@@ -544,7 +542,8 @@ public final class Modpacks {
             if (Files.isDirectory(saves)) {
                 try (var stream = Files.list(saves)) {
                     for (Path p : stream.toList()) {
-                        if (p.toString().toLowerCase().endsWith(".zip")) {
+                        Path name = p.getFileName();
+                        if (name != null && name.toString().toLowerCase(java.util.Locale.ROOT).endsWith(".zip")) {
                             unzipTo(p, saves);
                             Files.deleteIfExists(p);
                         }
@@ -604,8 +603,12 @@ public final class Modpacks {
                     info.loader.isEmpty() ? "原版" : info.loader, info.loaderVersion, desc,
                     iconPath, System.currentTimeMillis(), false, data.gameDir, Isolation.ON);
             instance.addedAt = System.currentTimeMillis();
+            Path currentDir = Paths.get(data.gameDir).toAbsolutePath().normalize();
             for (Data.Instance ins : data.instances) {
-                if (instanceName.equals(ins.name)) {
+                if (!instanceName.equals(ins.name)) continue;
+                // Only replace the same-named instance that lives in this game folder.
+                String folder = ins.folder == null || ins.folder.isEmpty() ? data.gameDir : ins.folder;
+                if (Paths.get(folder).toAbsolutePath().normalize().equals(currentDir)) {
                     data.instances.remove(ins);
                     break;
                 }
@@ -875,12 +878,12 @@ public final class Modpacks {
     }
 
     static String inferModuleTarget(List<String> modules, String fileName) {
-        String lower = fileName == null ? "" : fileName.toLowerCase();
+        String lower = fileName == null ? "" : fileName.toLowerCase(java.util.Locale.ROOT);
         // jar 优先归 mod
         if (lower.endsWith(".jar") || lower.endsWith(".litemod")) return "mods";
         if (lower.endsWith(".mrpack")) return "modpacks";
         for (String m : modules) {
-            String n = m == null ? "" : m.toLowerCase();
+            String n = m == null ? "" : m.toLowerCase(java.util.Locale.ROOT);
             if (n.contains("shaders")) return "shaderpacks";
             if (n.equals("data")) return "datapacks";
             if (n.equals("assets")) return "resourcepacks";
@@ -1154,6 +1157,7 @@ public final class Modpacks {
             if (!prefix.endsWith("/")) prefix += "/";
             for (java.util.Enumeration<? extends ZipEntry> it = zip.entries(); it.hasMoreElements(); ) {
                 ZipEntry e = it.nextElement();
+                if (task != null && task.canceled) throw new java.io.IOException(Lang.t("已取消"));
                 String name = e.getName().replace('\\', '/');
                 if (!name.startsWith(prefix) || name.length() <= prefix.length()) continue;
                 String rel = name.substring(prefix.length());

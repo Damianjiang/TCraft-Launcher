@@ -72,7 +72,7 @@ public final class Imports {
                         same++;
                     } else {
                         Files.createDirectories(target);
-                        Files.copy(source, destination, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                        copyInto(source, destination);
                         imported++;
                     }
                 } catch (Exception e) {
@@ -91,6 +91,25 @@ public final class Imports {
         }, "TCL-Import");
         worker.setDaemon(true);
         worker.start();
+    }
+
+    // Copy to a sibling temp file first so a failed copy never leaves a truncated mod behind.
+    private static void copyInto(Path source, Path destination) throws java.io.IOException {
+        Path tmp = destination.resolveSibling(destination.getFileName() + ".tcl-import.tmp");
+        try {
+            Files.copy(source, tmp, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            try {
+                Files.move(tmp, destination, java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                        java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+            } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                Files.move(tmp, destination, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally {
+            try {
+                Files.deleteIfExists(tmp);
+            } catch (Exception ignored) {
+            }
+        }
     }
 
     private static boolean accept(Path path, Predicate<String> allowed) {
