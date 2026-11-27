@@ -876,7 +876,7 @@ public class PageInstance implements Page {
                         Process gio = new ProcessBuilder("gio", "set", link.toString(),
                                 "metadata::trusted", "true").redirectErrorStream(true)
                                 .redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
-                        gio.waitFor(3, java.util.concurrent.TimeUnit.SECONDS);
+                        if (!gio.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)) gio.destroyForcibly();
                     } catch (Exception ignored) {
                     }
                 }
@@ -1060,6 +1060,8 @@ public class PageInstance implements Page {
         if (!java.nio.file.Files.isDirectory(versions)) return "";
         String folderKey = gameDir.toAbsolutePath().normalize().toString();
         boolean windows = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("windows");
+        boolean caseInsensitiveFs = windows
+                || System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("mac");
         try (var stream = java.nio.file.Files.list(versions)) {
             stream.limit(10000).filter(java.nio.file.Files::isDirectory).forEach(dir -> {
                 String name = dir.getFileName().toString();
@@ -1068,8 +1070,8 @@ public class PageInstance implements Page {
                 for (Data.Instance i : data.instances) {
                     String folder = i.folder == null || i.folder.isEmpty() ? "" : java.nio.file.Paths.get(i.folder)
                             .toAbsolutePath().normalize().toString();
-                    // 路径比较 Windows 忽略大小写
-                    if ((windows ? folder.equalsIgnoreCase(folderKey) : folder.equals(folderKey))
+                    // Windows and macOS filesystems are usually case-insensitive.
+                    if ((caseInsensitiveFs ? folder.equalsIgnoreCase(folderKey) : folder.equals(folderKey))
                             && (i.name.equals(name) || name.equals(i.version))) exists = true;
                 }
                 if (exists) return;
@@ -1163,11 +1165,13 @@ public class PageInstance implements Page {
         }
         String path = target.toAbsolutePath().normalize().toString();
         boolean windows = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("windows");
+        boolean caseInsensitiveFs = windows
+                || System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("mac");
         Data.FolderItem existing = null;
         for (Data.FolderItem folder : data.folders) {
             String known = java.nio.file.Paths.get(folder.path).toAbsolutePath().normalize().toString();
-            // Windows 路径忽略大小写
-            if (windows ? known.equalsIgnoreCase(path) : known.equals(path)) {
+            // Windows and macOS filesystems are usually case-insensitive.
+            if (caseInsensitiveFs ? known.equalsIgnoreCase(path) : known.equals(path)) {
                 existing = folder;
                 break;
             }

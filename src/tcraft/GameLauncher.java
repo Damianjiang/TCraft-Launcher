@@ -11,6 +11,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -426,6 +428,19 @@ public final class GameLauncher {
     }
 
     public static Process launch(Data.Instance instance, String serverIp, String resolvedJava) throws Exception {
+        return launch(instance, serverIp, resolvedJava, null, null);
+    }
+
+    public static Process launch(Data.Instance instance, String serverIp, String resolvedJava,
+                                 BooleanSupplier cancelled, Consumer<Process> onProcess) throws Exception {
+        return launch(instance, serverIp, resolvedJava, cancelled, onProcess, null);
+    }
+
+    public static Process launch(Data.Instance instance, String serverIp, String resolvedJava,
+                                 BooleanSupplier cancelled, Consumer<Process> onProcess,
+                                 Consumer<String> onLog) throws Exception {
+        BooleanSupplier stop = cancelled == null ? () -> false : cancelled;
+        if (stop.getAsBoolean()) throw cancelException();
         Data data = Data.get();
         String javaExe = resolvedJava;
         if (javaExe == null || javaExe.isEmpty() || !Files.isRegularFile(Paths.get(javaExe))) {
@@ -857,16 +872,18 @@ public final class GameLauncher {
 
         String pre = data.getInstance("PreCommand", data.get("LaunchPreCommand", ""));
         if (!pre.isEmpty()) {
+            Process preProcess = null;
             try {
                 boolean win = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("windows");
                 String shell = win ? "cmd.exe" : "/bin/sh";
                 String arg = win ? "/c" : "-c";
-                Process preProcess = new ProcessBuilder(shell, arg, pre).directory(run.toFile())
+                preProcess = new ProcessBuilder(shell, arg, pre).directory(run.toFile())
                         .redirectErrorStream(true).start();
                 // 持续排水防管道阻塞
+                final Process drain = preProcess;
                 Thread consumer = new Thread(() -> {
                     try (BufferedReader br = new BufferedReader(
-                            new InputStreamReader(preProcess.getInputStream(), StandardCharsets.UTF_8))) {
+                            new InputStreamReader(drain.getInputStream(), StandardCharsets.UTF_8))) {
                         while (br.readLine() != null) {
                         }
                     } catch (Exception ignored) {
@@ -875,18 +892,39 @@ public final class GameLauncher {
                 consumer.setDaemon(true);
                 consumer.start();
                 if (data.getInstanceBool("PreCommandWait", data.getBool("LaunchPreCommandWait", true))) {
-                    if (!preProcess.waitFor(5, java.util.concurrent.TimeUnit.MINUTES)) {
-                        preProcess.descendants().forEach(ProcessHandle::destroyForcibly);
-                        preProcess.destroyForcibly();
-                        data.launchLog("启动前命令超过 5 分钟未结束，已强制结束：" + pre);
+                    long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.MINUTES.toNanos(5);
+                    while (preProcess.isAlive()) {
+                        if (stop.getAsBoolean()) {
+                            killTree(preProcess);
+                            throw cancelException();
+                        }
+                        long remain = deadline - System.nanoTime();
+                        if (remain <= 0) {
+                            killTree(preProcess);
+                            data.launchLog("启动前命令超过 5 分钟未结束，已强制结束：" + pre);
+                            break;
+                        }
+                        try {
+                            preProcess.waitFor(Math.min(200,
+                                    java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(remain)),
+                                    java.util.concurrent.TimeUnit.MILLISECONDS);
+                        } catch (InterruptedException interrupted) {
+                            Thread.currentThread().interrupt();
+                            killTree(preProcess);
+                            throw cancelException();
+                        }
                     }
                 }
                 // 不等待模式不杀常驻进程
                 data.launchLog("已执行启动前命令：" + pre);
+            } catch (java.util.concurrent.CancellationException cancelError) {
+                if (preProcess != null && preProcess.isAlive()) killTree(preProcess);
+                throw cancelError;
             } catch (Exception e) {
                 data.launchLog("启动前命令执行失败：" + e.getMessage());
             }
         }
+        if (stop.getAsBoolean()) throw cancelException();
 
         boolean optimizeRam = data.getInstanceBool("OptimizeRam", data.getBool("LaunchOptimizeRam", true));
         if (optimizeRam) {
@@ -895,12 +933,24 @@ public final class GameLauncher {
                 Thread.sleep(80);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
+                throw cancelException();
             }
         }
+        if (stop.getAsBoolean()) throw cancelException();
         ProcessBuilder builder = new ProcessBuilder(cmd);
         builder.directory(run.toFile());
         builder.redirectErrorStream(true);
         Process process = builder.start();
+        try {
+            if (onProcess != null) onProcess.accept(process);
+        } catch (RuntimeException callbackError) {
+            killTree(process);
+            throw callbackError;
+        }
+        if (stop.getAsBoolean()) {
+            killTree(process);
+            throw cancelException();
+        }
         data.launchLog("游戏目录：" + run);
         // 诊断看游戏 latest.log
         data.launchLog("已启动游戏进程，PID " + process.pid());
@@ -909,8 +959,14 @@ public final class GameLauncher {
             try (BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
                 String line;
                 while ((line = br.readLine()) != null) {
-                    // 写入环形缓冲
+                    // Append to the ring buffer.
                     data.launchLog(line);
+                    if (onLog != null) {
+                        try {
+                            onLog.accept(line);
+                        } catch (Exception ignored) {
+                        }
+                    }
                 }
             } catch (Exception ignored) {
             }
@@ -918,6 +974,142 @@ public final class GameLauncher {
         reader.setDaemon(true);
         reader.start();
         return process;
+    }
+
+    /// Waits for the game window, process exit, or cancellation. No fixed grace period.
+    public static boolean waitForWindow(Process process, BooleanSupplier ready, BooleanSupplier cancelled) {
+        if (process == null) return false;
+        BooleanSupplier stop = cancelled == null ? () -> false : cancelled;
+        BooleanSupplier logReady = ready == null ? () -> false : ready;
+        long lastWindowCheck = System.nanoTime();
+        while (process.isAlive()) {
+            if (stop.getAsBoolean()) return false;
+            if (logReady.getAsBoolean()) return true;
+            long now = System.nanoTime();
+            if (now - lastWindowCheck >= java.util.concurrent.TimeUnit.SECONDS.toNanos(1)) {
+                lastWindowCheck = now;
+                if (hasWindow(process.pid())) return true;
+            }
+            try {
+                Thread.sleep(300);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        }
+        return false;
+    }
+
+    /// Dispatches to the native window probe for the current OS.
+    private static boolean hasWindow(long pid) {
+        if (Shell.windows()) return windowsHasWindow(pid);
+        if (Shell.mac()) return macHasWindow(pid);
+        if (Shell.linux()) return linuxHasWindow(pid);
+        return false;
+    }
+
+    /// Returns whether `tasklist` reports a visible window title for the PID.
+    private static boolean windowsHasWindow(long pid) {
+        Process task = null;
+        try {
+            task = new ProcessBuilder("tasklist", "/FI", "PID eq " + pid,
+                    "/FO", "CSV", "/NH", "/V").redirectErrorStream(true).start();
+            if (!task.waitFor(1, java.util.concurrent.TimeUnit.SECONDS)) {
+                task.destroyForcibly();
+                return false;
+            }
+            String line;
+            try (BufferedReader br = new BufferedReader(
+                    new InputStreamReader(task.getInputStream(), StandardCharsets.UTF_8))) {
+                line = br.readLine();
+            }
+            if (line == null || !line.contains(",")) return false;
+            String title = lastCsvField(line);
+            return !title.isEmpty() && !"N/A".equalsIgnoreCase(title) && !"无".equals(title)
+                    && !"暂缺".equals(title) && !"不可用".equals(title);
+        } catch (Exception ignored) {
+            return false;
+        } finally {
+            if (task != null && task.isAlive()) task.destroyForcibly();
+        }
+    }
+
+    /// Returns whether System Events can see a window owned by the PID.
+    private static boolean macHasWindow(long pid) {
+        String script = "tell application \"System Events\" to count windows of (first process whose unix id is "
+                + pid + ")";
+        String out = readCommand(new String[]{"/usr/bin/osascript", "-e", script}, 3000);
+        try {
+            return Integer.parseInt(out.trim()) > 0;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    /// Tries xdotool and wmctrl; both are optional and X11-only.
+    private static boolean linuxHasWindow(long pid) {
+        String xdo = readCommand(new String[]{"xdotool", "search", "--onlyvisible", "--pid",
+                Long.toString(pid)}, 2500);
+        for (String line : xdo.split("\n")) {
+            if (line.trim().matches("[0-9]+")) return true;
+        }
+        String wm = readCommand(new String[]{"wmctrl", "-lp"}, 3000);
+        String id = Long.toString(pid);
+        for (String line : wm.split("\n")) {
+            String[] cols = line.trim().split("\\s+");
+            if (cols.length >= 3 && cols[2].equals(id)) return true;
+        }
+        return false;
+    }
+
+    /// Runs a short-lived probe and returns trimmed output; timeout kills the process.
+    private static String readCommand(String[] command, long timeoutMillis) {
+        Process process = null;
+        try {
+            process = new ProcessBuilder(command).redirectErrorStream(true).start();
+            if (!process.waitFor(timeoutMillis, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                process.destroyForcibly();
+                return "";
+            }
+            StringBuilder out = new StringBuilder();
+            try (BufferedReader br = new BufferedReader(
+                    new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    if (out.length() < 8192) out.append(line).append('\n');
+                }
+            }
+            return out.toString().trim();
+        } catch (Exception ignored) {
+            return "";
+        } finally {
+            if (process != null && process.isAlive()) process.destroyForcibly();
+        }
+    }
+
+    private static String lastCsvField(String line) {
+        int end = line.lastIndexOf('"');
+        if (end > 0) {
+            int start = line.lastIndexOf('"', end - 1);
+            if (start >= 0) return line.substring(start + 1, end).trim();
+        }
+        int comma = line.lastIndexOf(',');
+        return comma >= 0 ? line.substring(comma + 1).replace("\"", "").trim() : "";
+    }
+
+    private static java.util.concurrent.CancellationException cancelException() {
+        return new java.util.concurrent.CancellationException(Lang.t("已取消"));
+    }
+
+    private static void killTree(Process process) {
+        if (process == null) return;
+        try {
+            process.descendants().forEach(handle -> {
+                if (handle.isAlive()) handle.destroyForcibly();
+            });
+        } catch (Exception ignored) {
+        }
+        if (process.isAlive()) process.destroyForcibly();
     }
 
     static boolean rulesAllow(Map<String, Object> item) {

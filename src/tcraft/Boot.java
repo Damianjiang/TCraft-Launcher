@@ -108,11 +108,11 @@ public final class Boot {
         }
         if (!acquireInstanceLock()) {
             System.err.println("[TCL] 已有实例在运行，本次启动退出");
-            Shell.macAlert("TCraft Launcher", Lang.t("启动器已在运行，请切换到已打开的窗口。"));
-            Shell.linuxNotify("TCraft Launcher", Lang.t("启动器已在运行，请切换到已打开的窗口。"));
+            Shell.notifyDesktop("TCraft Launcher", Lang.t("启动器已在运行，请切换到已打开的窗口。"));
             return;
         }
         cleanupLegacyCache();
+        initDockIcon();
         // 仅缺 JavaFX/需下载时显示进度窗
         StartupWindow ui = hasFx() ? StartupWindow.none() : StartupWindow.open();
         startupWindow = ui;
@@ -298,6 +298,22 @@ public final class Boot {
             return Integer.parseInt(raw == null ? "" : raw.trim());
         } catch (Exception e) {
             return 0;
+        }
+    }
+
+    // Sets the macOS Dock icon before JavaFX starts; Stage icons only cover windows.
+    private static void initDockIcon() {
+        if (!Shell.mac()) return;
+        try {
+            System.setProperty("apple.awt.application.name", "TCraft Launcher");
+            java.awt.Taskbar taskbar = java.awt.Taskbar.getTaskbar();
+            if (!taskbar.isSupported(java.awt.Taskbar.Feature.ICON_IMAGE)) return;
+            java.net.URL url = Theme.resUrl("images/icon-256.png");
+            if (url == null) return;
+            java.awt.Image icon = javax.imageio.ImageIO.read(url);
+            if (icon != null) taskbar.setIconImage(icon);
+        } catch (Throwable ignored) {
+            // Non-mac or headless environments keep the platform default.
         }
     }
 

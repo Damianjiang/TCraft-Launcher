@@ -147,7 +147,7 @@ public final class MainWindow {
     private HBox pluginActionBox;
     private VBox pluginFloatBox;
     private Arc taskProgressArc;
-    private Process gameProcess;
+    private volatile Process gameProcess;
     private boolean musicAvailable;
     private ScrollPane currentScroll;
     private ChangeListener<Number> scrollListener;
@@ -230,8 +230,11 @@ public final class MainWindow {
         stage.initStyle(javafx.stage.StageStyle.TRANSPARENT);
         stage.setScene(scene);
         stage.setTitle("TCraft Launcher");
-        // 图标为空时跳过
-        javafx.scene.image.Image winIcon = Theme.loadImage("logo.png");
+        // icon-256.png is packaged; Logo.png is excluded from release jars.
+        Image winIcon = Theme.loadImage("icon-256.png");
+        if (winIcon != null && winIcon.isError()) winIcon = null;
+        if (winIcon == null) winIcon = Theme.loadImage("Logo.png");
+        if (winIcon != null && winIcon.isError()) winIcon = null;
         if (winIcon != null) stage.getIcons().add(winIcon);
         stage.setMinWidth(MIN_WINDOW_WIDTH);
         stage.setMinHeight(MIN_WINDOW_HEIGHT);
@@ -887,6 +890,8 @@ public final class MainWindow {
 
     public void onGameStarted(Process process) {
         gameProcess = process;
+        pendingLaunchProcess = null;
+        launchWindowReady = true;
         gameStopRequested = false;
         final Data.Instance crashIns = data.instance();
         data.log("游戏进程已启动，PID " + process.pid());
@@ -1008,6 +1013,10 @@ public final class MainWindow {
         modalLayer.addEventHandler(MouseEvent.MOUSE_CLICKED, e -> {
             if (e.getTarget() == modalLayer && modalDismissable) closeModal();
         });
+        // Block title bar and sidebar clicks while launching.
+        root.addEventFilter(MouseEvent.MOUSE_PRESSED, this::blockLaunchOutsideClick);
+        root.addEventFilter(MouseEvent.MOUSE_RELEASED, this::blockLaunchOutsideClick);
+        root.addEventFilter(MouseEvent.MOUSE_CLICKED, this::blockLaunchOutsideClick);
 
         searchLayer = new StackPane();
         searchLayer.setVisible(false);
@@ -1715,6 +1724,9 @@ public final class MainWindow {
         launchLayer = new StackPane();
         launchLayer.setVisible(false);
         launchLayer.setPickOnBounds(false);
+        launchLayer.addEventFilter(MouseEvent.MOUSE_PRESSED, this::blockLaunchOutsideClick);
+        launchLayer.addEventFilter(MouseEvent.MOUSE_RELEASED, this::blockLaunchOutsideClick);
+        launchLayer.addEventFilter(MouseEvent.MOUSE_CLICKED, this::blockLaunchOutsideClick);
         b.getChildren().add(launchLayer);
 
         applyPanelBackground();
@@ -3555,6 +3567,9 @@ public final class MainWindow {
     private boolean launching;
     // 启动代次 旧线程凭 token 退出
     private volatile int launchToken;
+    private volatile Process pendingLaunchProcess;
+    private volatile boolean launchWindowReady;
+    private volatile boolean launchWindowSignal;
     private boolean pendingRebuild;
 
     private String launchServerIp;
@@ -3577,6 +3592,10 @@ public final class MainWindow {
             if (!auto.isEmpty()) launchServerIp = auto;
         }
         launching = true;
+        gameStopRequested = false;
+        pendingLaunchProcess = null;
+        launchWindowReady = false;
+        launchWindowSignal = false;
         Data.Instance ins = data.instance();
         String version = ins == null ? "未选择版本" : ins.version;
         launchLayer.getChildren().clear();
@@ -3880,11 +3899,34 @@ public final class MainWindow {
                 launchStepText("构建启动参数", 0.8);
                 if (stale(token)) return;
                 launchStepText("启动游戏", 0.88);
-                Process process = GameLauncher.launch(ins, launchServerIp, resolvedJava);
+                Process process = GameLauncher.launch(ins, launchServerIp, resolvedJava,
+                        () -> stale(token), processRef -> onLaunchProcessStarted(processRef, token),
+                        line -> onGameLogLine(line, token));
                 launchServerIp = null;
-                data.launchLog("游戏已启动：" + ins.name);
+                data.launchLog("游戏进程已启动：" + ins.name);
+                launchStepText("启动游戏", 0.94);
+                if (stale(token)) return;
+                // Keep the panel visible until the game window is ready; cancel stops the process.
+                if (!GameLauncher.waitForWindow(process, () -> launchWindowSignal, () -> stale(token))) {
+                    if (stale(token)) return;
+                    if (!process.isAlive()) {
+                        Platform.runLater(() -> {
+                            if (stale(token)) return;
+                            if (launchStep != null) launchStep.setText(Lang.t("启动失败"));
+                            toast("启动失败", "游戏已退出", 2);
+                            closeLaunchPanel();
+                        });
+                    }
+                    return;
+                }
                 Platform.runLater(() -> {
                     if (stale(token)) return;
+                    if (!process.isAlive()) {
+                        if (launchStep != null) launchStep.setText(Lang.t("启动失败"));
+                        toast("启动失败", "游戏已退出", 2);
+                        closeLaunchPanel();
+                        return;
+                    }
                     setLaunchProgress(1);
                     if (launchStep != null) launchStep.setText(Lang.t("启动完成"));
                     if (launchPercent != null) launchPercent.setText("100 %");
@@ -3973,17 +4015,72 @@ public final class MainWindow {
     }
 
     public void cancelLaunch() {
+        if (!launching) return;
         launchCancelled = true;
         // 让旧启动线程立即过期
         launchToken++;
         if (launchTimeline != null) launchTimeline.stop();
+        Process process = pendingLaunchProcess;
+        if (process == null && launchWindowReady) process = gameProcess;
+        pendingLaunchProcess = null;
+        if (process != null && process.isAlive()) {
+            // Cancel must stop the spawned game, not just close the panel.
+            gameStopRequested = true;
+            terminateLaunchProcess(process);
+        }
         data.log("已取消启动");
-        toast("已取消启动", "启动进程已停止", 0);
+        toast("已取消启动", process == null ? "启动流程已取消" : "启动进程已停止", 0);
         closeLaunchPanel();
+    }
+
+    private void onLaunchProcessStarted(Process process, int token) {
+        if (stale(token)) {
+            gameStopRequested = true;
+            terminateLaunchProcess(process);
+            return;
+        }
+        pendingLaunchProcess = process;
+        if (launchCancelled) {
+            gameStopRequested = true;
+            terminateLaunchProcess(process);
+        }
+    }
+
+    private void onGameLogLine(String line, int token) {
+        if (stale(token) || launchWindowSignal || line == null) return;
+        // These lines are emitted after the client window exists.
+        if (line.contains("Sound engine started")
+                || line.contains("OpenAL initialized")
+                || (line.contains("Created:") && line.contains("minecraft:textures/atlas"))) {
+            launchWindowSignal = true;
+        }
+    }
+
+    private void terminateLaunchProcess(Process process) {
+        if (process == null) return;
+        // Send the termination signal synchronously so closing the launcher cannot race it.
+        try {
+            process.descendants().forEach(handle -> {
+                if (handle.isAlive()) handle.destroyForcibly();
+            });
+        } catch (Exception ignored) {
+        }
+        if (process.isAlive()) process.destroyForcibly();
+    }
+
+    private void blockLaunchOutsideClick(MouseEvent event) {
+        if (!launching || launchPanel == null) return;
+        Node target = event.getTarget() instanceof Node node ? node : null;
+        while (target != null) {
+            if (target == launchPanel) return;
+            target = target.getParent();
+        }
+        event.consume();
     }
 
     private void closeLaunchPanel() {
         launching = false;
+        pendingLaunchProcess = null;
         if (launchLoading != null) {
             launchLoading.stop();
             launchLoading = null;
@@ -4029,6 +4126,10 @@ public final class MainWindow {
 
     public void requestClose() {
         if (closing) return;
+        if (launching) {
+            toast("正在启动", "请先点击启动面板的取消按钮", 2);
+            return;
+        }
         List<Tasks.Task> active = Tasks.INSTANCE.active();
         boolean transfer = importPanel != null && importPanel.isBusy();
         int count = active.size() + (transfer ? 1 : 0);

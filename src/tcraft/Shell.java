@@ -210,6 +210,25 @@ public final class Shell {
         }
     }
 
+    // Boot has no JavaFX yet; Windows uses Swing for the same running-instance notice.
+    public static void notifyDesktop(String title, String message) {
+        if (isMac()) {
+            macAlert(title, message);
+            return;
+        }
+        if (isLinux()) {
+            linuxNotify(title, message);
+            return;
+        }
+        try {
+            javax.swing.JOptionPane.showMessageDialog(null,
+                    message == null ? "" : message,
+                    title == null ? "TCraft Launcher" : title,
+                    javax.swing.JOptionPane.INFORMATION_MESSAGE);
+        } catch (Throwable ignored) {
+        }
+    }
+
     // Linux/macOS 的 open 不能只看进程起来了 等退出码才算成功
     private static boolean openExternally(String... cmd) {
         try {

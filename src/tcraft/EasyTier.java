@@ -589,6 +589,7 @@ public final class EasyTier {
     public static String runCli(String argument, int timeoutMs) throws Exception {
         Path exe = cliPath();
         if (!Files.isRegularFile(exe)) throw new Exception(Lang.t("联机模块 CLI 未安装"));
+        if (!isWindows() && !exe.toFile().canExecute()) markExecutable();
         ProcessBuilder pb = new ProcessBuilder(exe.toString());
         for (String part : Shell.splitArgs(argument)) pb.command().add(part);
         pb.directory(folder().toFile());
