@@ -86,9 +86,9 @@ public class PageInstanceSetup implements Page {
                 nav("历史", "history", "history"),
                 nav("设置", "settings", "settings"),
                 nav("Mod 管理", "puzzle", "mods"),
-                nav("更新", "refresh-cw", "updates"),
                 nav("资源包", "palette", "resourcepacks"),
                 nav("光影", "sun", "shaders"),
+                nav("更新", "refresh-cw", "updates"),
                 nav("存档", "map", "saves"),
                 nav("存档数据包", "file-box", "savesdatapack"),
                 nav("截图", "image", "screenshots"),
@@ -1586,7 +1586,7 @@ public class PageInstanceSetup implements Page {
         String cacheKey = mod.toAbsolutePath().toString();
         String cached = wantLocalName ? MOD_NAME_CACHE.get(cacheKey) : null;
         String display = cached != null && !cached.isBlank() ? cached.trim() : fileDisplay;
-        Node icon = Theme.icon(disabled ? "link-2-off" : "puzzle", 16, disabled ? Theme.gray4 : Theme.accent);
+        Node icon = modIcon(mod, disabled);
         Ui.ListItem item = new Ui.ListItem(icon, display,
                 (disabled ? Lang.t("已禁用 · ") : "") + (display.equals(fileDisplay) ? "" : fileDisplay + " · ") + sizeOf(mod), 40);
         if (wantLocalName && cached == null) {
@@ -1613,6 +1613,38 @@ public class PageInstanceSetup implements Page {
         item.addAction(delete);
         item.setOnMouseClicked(e -> modDetail(mod, item.title.getText(), disabled));
         return item;
+    }
+
+    // Reserve the slot and load the icon off the FX thread; large mods must not stall the list.
+    private Node modIcon(Path mod, boolean disabled) {
+        Node fallback = Theme.icon(disabled ? "link-2-off" : "puzzle", 16,
+                disabled ? Theme.gray4 : Theme.accent);
+        StackPane box = new StackPane(fallback);
+        box.setMinSize(28, 28);
+        box.setPrefSize(28, 28);
+        box.setMaxSize(28, 28);
+        if (disabled) box.setOpacity(0.5);
+        ImageView view = new ImageView();
+        view.setFitWidth(28);
+        view.setFitHeight(28);
+        view.setPreserveRatio(true);
+        view.setSmooth(true);
+        Rectangle clip = new Rectangle(28, 28);
+        clip.setArcWidth(7);
+        clip.setArcHeight(7);
+        view.setClip(clip);
+        view.setVisible(false);
+        box.getChildren().add(view);
+        MOD_NAME_POOL.execute(() -> {
+            Image image = ModIcons.load(mod);
+            if (image == null) return;
+            javafx.application.Platform.runLater(() -> {
+                squareCrop(view, image);
+                view.setVisible(true);
+                fallback.setVisible(false);
+            });
+        });
+        return box;
     }
 
     // 读盘须后台 元数据限长 防恶意条目撑爆堆

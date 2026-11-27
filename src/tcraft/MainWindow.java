@@ -78,6 +78,11 @@ public final class MainWindow {
     public StackPane modalLayer;
     public StackPane searchLayer;
 
+    private StackPane refreshLoading;
+    private Ui.Loading refreshSpinner;
+    private PauseTransition refreshLoadingHold;
+    private FadeTransition refreshLoadingFade;
+
     private VBox toastList;
     private javafx.animation.Timeline toastWatchdog;
     private Rectangle bgRect;
@@ -87,6 +92,8 @@ public final class MainWindow {
     private Region coverShadow;
     private Pane coverLayer;
     private HBox navBox;
+    private HBox titleLeftBox;
+    private HBox titleRightBox;
     private HBox badgeBox;
     private final List<NavTab> navTabs = new ArrayList<>();
     private StackPane badgeAvatar;
@@ -246,6 +253,7 @@ public final class MainWindow {
             Platform.runLater(() -> fitWindowToScreen(true));
         });
         lastScreenSignature = screenSignature();
+        installToastHoverGuard(scene);
         installResize(scene);
         installDropTarget(scene);
         scene.addEventFilter(KeyEvent.KEY_PRESSED, e -> {
@@ -1286,6 +1294,8 @@ public final class MainWindow {
         titleInner.getChildren().addAll(backBtn, titleInnerLabel);
 
         leftGroup = left;
+        titleLeftBox = left;
+        titleRightBox = right;
         StackPane.setAlignment(left, Pos.CENTER_LEFT);
         if (data.getBool("UiTitleLeft", false)) {
             StackPane.setAlignment(navBox, Pos.CENTER_LEFT);
@@ -1297,18 +1307,14 @@ public final class MainWindow {
         StackPane.setMargin(titleInner, new Insets(0, 0, 0, 12));
         StackPane.setAlignment(right, Pos.CENTER_RIGHT);
         bar.getChildren().addAll(left, navBox, titleInner, right);
-        PauseTransition adaptDebounce = new PauseTransition(Duration.millis(100));
-        adaptDebounce.setOnFinished(e -> adaptTitleTabs());
-        // 首帧定稿 缩放防抖
-        final boolean[] sized = {false};
+        final boolean[] adaptQueued = {false};
         bar.widthProperty().addListener((o, a, b) -> {
-            if (b.doubleValue() <= 0) return;
-            if (!sized[0]) {
-                sized[0] = true;
+            if (b.doubleValue() <= 0 || adaptQueued[0]) return;
+            adaptQueued[0] = true;
+            Platform.runLater(() -> {
+                adaptQueued[0] = false;
                 adaptTitleTabs();
-                return;
-            }
-            adaptDebounce.playFromStart();
+            });
         });
 
         bar.addEventHandler(MouseEvent.MOUSE_PRESSED, e -> {
@@ -1318,6 +1324,7 @@ public final class MainWindow {
                 dragY = e.getScreenY() - stage.getY();
             }
         });
+        Platform.runLater(this::adaptTitleTabs);
         bar.addEventHandler(MouseEvent.MOUSE_DRAGGED, e -> {
             if (titleDrag && e.getButton() == MouseButton.PRIMARY && !closing) {
                 moveWindowTo(e.getScreenX() - dragX, e.getScreenY() - dragY);
@@ -1352,29 +1359,63 @@ public final class MainWindow {
         try {
             double barW = titleBar.getWidth() > 1 ? titleBar.getWidth() : stage.getWidth();
             if (barW <= 1) return;
+
+            // Reset to full size first so the measured width is stable while the badge name is hidden.
+            boolean badgeVisible = badgeBox != null && badgeBox.isVisible();
+            if (badgeVisible && badgeName != null) {
+                badgeName.setVisible(true);
+                badgeName.setManaged(true);
+            }
+            navBox.setSpacing(10);
             for (NavTab t : navTabs) {
                 t.setIconOnly(false);
                 t.setCompact(13, false);
             }
-            double natural = navBox.prefWidth(-1);
-            double leftUsed = 78 + (badgeBox != null && badgeBox.isVisible() ? badgeBox.getWidth() : 0);
-            double available = barW - leftUsed - 152 - 2 * 24;
-            boolean iconOnly = available < 280 && natural > available;
-            if (badgeName != null) {
-                badgeName.setVisible(!iconOnly);
-                badgeName.setManaged(!iconOnly);
-            }
-            for (NavTab t : navTabs) t.setIconOnly(iconOnly);
-            if (iconOnly) {
-                navBox.setSpacing(6);
+
+            double fullNatural = navBox.prefWidth(-1);
+            double leftUsed = titleLeftBox != null ? titleLeftBox.prefWidth(-1) : 78;
+            double rightUsed = titleRightBox != null ? titleRightBox.prefWidth(-1) : 152;
+            double available = Math.max(0, barW - leftUsed - rightUsed - 16);
+
+            if (fullNatural <= available) {
+                setTitleBadgeNameVisible(badgeVisible, true);
                 return;
             }
-            double fs = natural > 0 && natural > available ? Math.max(9, 13 * available / natural) : 13;
-            boolean tight = fs < 13 - 0.4;
-            for (NavTab t : navTabs) t.setCompact(fs, tight);
-            navBox.setSpacing(tight ? Math.max(2, 10 * fs / 13) : 10);
+
+            // Scale the font before falling back to icons; a narrow window should not collapse immediately.
+            double fs = Math.max(9.0, Math.min(13.0, 13.0 * available / Math.max(1.0, fullNatural)));
+            applyTitleCompact(fs);
+            if (navBox.prefWidth(-1) <= available) {
+                setTitleBadgeNameVisible(badgeVisible, true);
+                return;
+            }
+
+            // 9 px is the last text mode; collapse only when even that does not fit.
+            if (fs > 9.0) {
+                applyTitleCompact(9.0);
+                if (navBox.prefWidth(-1) <= available) {
+                    setTitleBadgeNameVisible(badgeVisible, true);
+                    return;
+                }
+            }
+
+            setTitleBadgeNameVisible(badgeVisible, false);
+            for (NavTab t : navTabs) t.setIconOnly(true);
+            navBox.setSpacing(6);
         } catch (Exception ignored) {
         }
+    }
+
+    private void applyTitleCompact(double fontSize) {
+        boolean tight = fontSize < 13 - 0.4;
+        for (NavTab t : navTabs) t.setCompact(fontSize, tight);
+        navBox.setSpacing(tight ? Math.max(2, 10 * fontSize / 13) : 10);
+    }
+
+    private void setTitleBadgeNameVisible(boolean badgeVisible, boolean nameVisible) {
+        if (!badgeVisible || badgeName == null) return;
+        badgeName.setVisible(nameVisible);
+        badgeName.setManaged(nameVisible);
     }
 
     private Node titleLogo() {
@@ -1560,13 +1601,15 @@ public final class MainWindow {
 
         void setCompact(double fontSize, boolean tight) {
             label.setFont(Theme.font(fontSize));
+            setSpacing(tight ? 5 : 8);
+            setPadding(new Insets(0, tight ? 1 : 2, 0, tight ? 1 : 2));
             if (label.isVisible()) {
                 if (!tight) {
                     HBox.setMargin(iconNode, new Insets(0, 0, 0, 10));
                     HBox.setMargin(label, new Insets(0, 10, 0, 0));
                 } else {
                     double f = Math.max(0.6, fontSize / 13.0);
-                    double gap = Math.max(4, 10 * f);
+                    double gap = Math.max(3, 8 * f);
                     HBox.setMargin(iconNode, new Insets(0, 0, 0, gap));
                     HBox.setMargin(label, new Insets(0, gap, 0, 0));
                 }
@@ -1812,19 +1855,77 @@ public final class MainWindow {
     }
 
     public void refreshRightWithLoading() {
-        if (importPanel == null || importPanel.isBusy()) {
+        if (pageHost == null) return;
+        clearRefreshLoading();
+        if (Data.get().getInt("UiAnimSpeed", 100) <= 0) {
             refreshRight(true);
             return;
         }
-        importPanel.begin("正在刷新", "正在读取本地列表", 0);
-        PauseTransition delay = new PauseTransition(Duration.millis(80));
-        delay.setOnFinished(e -> {
+
+        Ui.Loading spinner = new Ui.Loading(180, 76, Lang.t("正在刷新"));
+        spinner.start();
+        StackPane card = new StackPane(spinner);
+        card.setPadding(new Insets(16, 24, 16, 24));
+        card.setBackground(Ui.glassFill(12));
+        card.setBorder(Ui.glassBorder(12));
+        card.setEffect(Theme.shadow(18, 4, 0.30, Theme.text));
+        card.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
+
+        StackPane layer = new StackPane(card);
+        layer.setAlignment(Pos.CENTER);
+        layer.setPickOnBounds(false);
+        layer.setOnMousePressed(MouseEvent::consume);
+        layer.setOnMouseClicked(MouseEvent::consume);
+        StackPane.setMargin(layer, new Insets(0, 24, 0, Math.max(0, currentLeftWidth) + 24));
+        layer.setOpacity(0);
+
+        refreshLoading = layer;
+        refreshSpinner = spinner;
+        pageHost.getChildren().add(layer);
+
+        FadeTransition in = new FadeTransition(Duration.millis(120), layer);
+        in.setToValue(1);
+        in.play();
+
+        PauseTransition hold = new PauseTransition(Duration.millis(140));
+        refreshLoadingHold = hold;
+        hold.setOnFinished(e -> {
+            if (refreshLoading != layer) return;
             refreshRight(true);
-            PauseTransition wait = new PauseTransition(Duration.millis(260));
-            wait.setOnFinished(x -> importPanel.close());
-            wait.play();
+            FadeTransition out = new FadeTransition(Duration.millis(180), layer);
+            refreshLoadingFade = out;
+            out.setToValue(0);
+            out.setOnFinished(x -> {
+                spinner.stop();
+                pageHost.getChildren().remove(layer);
+                if (refreshLoading == layer) {
+                    refreshLoading = null;
+                    refreshSpinner = null;
+                }
+                if (refreshLoadingFade == out) refreshLoadingFade = null;
+            });
+            out.play();
         });
-        delay.play();
+        hold.play();
+    }
+
+    private void clearRefreshLoading() {
+        if (refreshLoadingHold != null) {
+            refreshLoadingHold.stop();
+            refreshLoadingHold = null;
+        }
+        if (refreshLoadingFade != null) {
+            refreshLoadingFade.stop();
+            refreshLoadingFade = null;
+        }
+        if (refreshSpinner != null) {
+            refreshSpinner.stop();
+            refreshSpinner = null;
+        }
+        if (refreshLoading != null) {
+            pageHost.getChildren().remove(refreshLoading);
+            refreshLoading = null;
+        }
     }
 
     public void refreshRight(boolean animate) {
@@ -2022,6 +2123,7 @@ public final class MainWindow {
     }
 
     public void openPage(String key, boolean animate) {
+        clearRefreshLoading();
         if (pageHidden(key)) key = firstVisiblePage();
         if (Objects.equals(currentKey, key) && currentPage != null && animate) return;
         switch (key) {
@@ -2417,9 +2519,9 @@ public final class MainWindow {
         }
         hideTitleInner();
         String nav = switch (key) {
-            case "instance", "instanceSetup" -> "instance";
+            case "instance", "instanceSetup", "versions" -> "instance";
             case "resourceDetail" -> "download";
-            case "setup", "versions" -> "launch";
+            case "setup" -> "launch";
             case "tasks" -> "";
             default -> key;
         };
@@ -2583,36 +2685,46 @@ public final class MainWindow {
         final VBox stack;
         final HBox card;
         final Region progress;
+        final HBox progressTrack;
         final StackPane close;
         final String title;
         final String message;
         final int totalMs;
-        long startMs;
+        long deadlineMs;
         double pausedRemaining = -1;
         javafx.animation.Timeline drain;
         javafx.animation.PauseTransition hide;
         javafx.animation.Timeline entry;
         boolean dismissed = false;
+        boolean hovering = false;
+        boolean dragging = false;
 
-        ActiveToast(VBox stack, HBox card, Region progress, StackPane close,
+        ActiveToast(VBox stack, HBox card, Region progress, HBox progressTrack, StackPane close,
                     String title, String message, int totalMs) {
             this.stack = stack;
             this.card = card;
             this.progress = progress;
+            this.progressTrack = progressTrack;
             this.close = close;
             this.title = title;
             this.message = message == null ? "" : message;
             this.totalMs = totalMs;
-            this.startMs = System.currentTimeMillis();
+            this.deadlineMs = System.currentTimeMillis() + totalMs;
         }
 
         double remainingMs() {
             if (pausedRemaining >= 0) return pausedRemaining;
-            return Math.max(0, totalMs - (System.currentTimeMillis() - startMs));
+            return Math.max(0, deadlineMs - System.currentTimeMillis());
+        }
+
+        boolean containsScenePoint(double sceneX, double sceneY) {
+            if (stack.getScene() == null) return false;
+            javafx.geometry.Bounds bounds = stack.localToScene(stack.getBoundsInLocal());
+            return bounds != null && bounds.contains(sceneX, sceneY);
         }
 
         void pauseProgress() {
-            if (pausedRemaining >= 0) return;
+            if (pausedRemaining >= 0 || dismissed) return;
             pausedRemaining = remainingMs();
             if (entry != null) entry.stop();
             if (drain != null) drain.stop();
@@ -2624,7 +2736,7 @@ public final class MainWindow {
             double remaining = Math.max(1, pausedRemaining);
             double currentWidth = progress.getPrefWidth();
             pausedRemaining = -1;
-            startMs = System.currentTimeMillis();
+            deadlineMs = System.currentTimeMillis() + (long) remaining;
             if (currentWidth > 0) {
                 drain = new javafx.animation.Timeline(new javafx.animation.KeyFrame(
                         javafx.util.Duration.millis(remaining),
@@ -2639,6 +2751,7 @@ public final class MainWindow {
         void dismiss() {
             if (dismissed) return;
             dismissed = true;
+            if (entry != null) entry.stop();
             if (drain != null) drain.stop();
             if (hide != null) hide.stop();
         }
@@ -2678,11 +2791,9 @@ public final class MainWindow {
         }
         HBox card = new HBox(10);
         card.setAlignment(Pos.CENTER_LEFT);
-        card.setPadding(new Insets(10, 12, 13, 12));
+        card.setPadding(new Insets(10, 12, 12, 13));
         double toastMax = toastMaxWidth();
         card.setMaxWidth(toastMax);
-        card.setBackground(Ui.fill(Theme.dialogBg, 8));
-        card.setEffect(Theme.shadow(18, 3, 0.2, Theme.text));
         Color c;
         String icon;
         switch (type) {
@@ -2704,10 +2815,18 @@ public final class MainWindow {
                 icon = "info";
             }
         }
+        LinearGradient cardFill = new LinearGradient(0, 0, 1, 0, true, CycleMethod.NO_CYCLE,
+                new Stop(0, Theme.alpha(c, 0.10)),
+                new Stop(0.34, Theme.dialogBg),
+                new Stop(1, Theme.dialogBg));
+        card.setBackground(new Background(new BackgroundFill(cardFill, new CornerRadii(9), Insets.EMPTY)));
+        card.setBorder(new Border(new BorderStroke(c, BorderStrokeStyle.SOLID, new CornerRadii(9),
+                new BorderWidths(0, 0, 0, 3))));
+        card.setEffect(Theme.shadow(20, 3, 0.22, Theme.text));
         StackPane iconBox = new StackPane(Theme.icon(icon, 17, c));
         iconBox.setMinSize(28, 28);
         iconBox.setMaxSize(28, 28);
-        iconBox.setBackground(Ui.fill(Theme.alpha(c, 0.14), 8));
+        iconBox.setBackground(Ui.fill(Theme.alpha(c, 0.16), 8));
         VBox texts = new VBox(2);
         Label t = Ui.bold(title, 12.5, Theme.gray1);
         Label m = Ui.label(message == null ? "" : message, 11.5, Theme.gray2);
@@ -2718,23 +2837,40 @@ public final class MainWindow {
         StackPane close = Ui.iconButton("x", 20, 12, null, null);
         card.getChildren().addAll(iconBox, texts, close);
         Region progress = new Region();
+        progress.setMinHeight(3);
+        progress.setPrefHeight(3);
         progress.setMaxHeight(3);
-        progress.setBackground(Ui.fill(c, 0));
-        VBox stack = new VBox(card, progress);
+        progress.setMaxWidth(Region.USE_PREF_SIZE);
+        progress.setBackground(Ui.fill(c, new CornerRadii(0.0, 0.0, 9.0, 9.0, false)));
+        HBox progressTrack = new HBox(progress);
+        progressTrack.setAlignment(Pos.CENTER_LEFT);
+        progressTrack.setMinHeight(3);
+        progressTrack.setMaxHeight(3);
+        progressTrack.setPickOnBounds(false);
+        progressTrack.setBackground(Ui.fill(Theme.alpha(c, 0.22), new CornerRadii(0.0, 0.0, 9.0, 9.0, false)));
+        VBox stack = new VBox(card, progressTrack);
         stack.setMaxWidth(toastMax);
         stack.setOpacity(0);
         stack.setTranslateX(60);
         // 防 aniMs=0 时 toast 即逝
         int duration = 800 + Math.max(5, Math.min(23, (message == null ? 0 : message.length() + title.length())) * 180);
-        ActiveToast at = new ActiveToast(stack, card, progress, close, title, message, duration);
+        ActiveToast at = new ActiveToast(stack, card, progress, progressTrack, close, title, message, duration);
         stack.getProperties().put("toast", at);
         close.getProperties().put("toastClose", Boolean.TRUE);
         close.setOnMouseClicked(e -> {
             at.dismiss();
             dismissToast(stack);
         });
-        stack.addEventHandler(MouseEvent.MOUSE_ENTERED, e -> at.pauseProgress());
-        stack.addEventHandler(MouseEvent.MOUSE_EXITED, e -> at.resumeProgress());
+        stack.addEventHandler(MouseEvent.MOUSE_ENTERED, e -> {
+            at.hovering = true;
+            at.pauseProgress();
+        });
+        stack.addEventHandler(MouseEvent.MOUSE_EXITED, e -> {
+            // Child transitions also bubble MOUSE_EXITED; only a real exit from the whole toast counts.
+            if (e.getTarget() != stack) return;
+            at.hovering = false;
+            at.resumeProgress();
+        });
         // toastList 未挂回时重试
         Runnable[] addRef = new Runnable[1];
         addRef[0] = () -> {
@@ -2759,17 +2895,18 @@ public final class MainWindow {
                             new KeyValue(stack.translateXProperty(), 0, Ui.EASE_OUT_FLUENT)));
             in.play();
             stack.widthProperty().addListener((o, a, b) -> {
+                progressTrack.setMaxWidth(b.doubleValue());
                 if (at.pausedRemaining < 0 && at.drain == null) {
                     progress.setPrefWidth(b.doubleValue());
-                    progress.setMaxWidth(b.doubleValue());
                 }
             });
             PauseTransition measure = new PauseTransition(Duration.millis(50));
             measure.setOnFinished(ev -> {
-                if (at.dismissed || at.pausedRemaining >= 0) return;
+                if (at.dismissed) return;
                 double w = stack.getWidth() > 0 ? stack.getWidth() : 300;
+                progressTrack.setMaxWidth(w);
                 progress.setPrefWidth(w);
-                progress.setMaxWidth(w);
+                if (at.pausedRemaining >= 0) return;
                 at.drain = new javafx.animation.Timeline(
                         new KeyFrame(Duration.millis(Math.max(1, duration)),
                                 new KeyValue(progress.prefWidthProperty(), 0)));
@@ -2809,6 +2946,37 @@ public final class MainWindow {
         }
     }
 
+    // Resume on pointer movement, clicks elsewhere, and focus loss; MOUSE_EXITED alone is unreliable.
+    private void installToastHoverGuard(Scene scene) {
+        scene.addEventFilter(MouseEvent.MOUSE_MOVED, e -> syncToastHover(e.getSceneX(), e.getSceneY()));
+        scene.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> syncToastHover(e.getSceneX(), e.getSceneY()));
+        stage.focusedProperty().addListener((o, a, focused) -> {
+            if (!focused) releaseToastHover();
+        });
+    }
+
+    private void syncToastHover(double sceneX, double sceneY) {
+        if (toastList == null) return;
+        for (javafx.scene.Node n : toastList.getChildren()) {
+            ActiveToast at = (ActiveToast) n.getProperties().get("toast");
+            if (at == null || at.dismissed || at.dragging) continue;
+            boolean inside = at.containsScenePoint(sceneX, sceneY);
+            at.hovering = inside;
+            if (inside) at.pauseProgress();
+            else at.resumeProgress();
+        }
+    }
+
+    private void releaseToastHover() {
+        if (toastList == null) return;
+        for (javafx.scene.Node n : toastList.getChildren()) {
+            ActiveToast at = (ActiveToast) n.getProperties().get("toast");
+            if (at == null || at.dismissed) continue;
+            at.hovering = false;
+            at.resumeProgress();
+        }
+    }
+
     // 清理过期 toast
     private void startToastWatchdog() {
         if (toastWatchdog != null) toastWatchdog.stop();
@@ -2823,7 +2991,13 @@ public final class MainWindow {
         for (javafx.scene.Node n : new java.util.ArrayList<>(toastList.getChildren())) {
             ActiveToast at = (ActiveToast) n.getProperties().get("toast");
             if (at == null || at.dismissed) continue;
-            if (at.pausedRemaining < 0 && at.remainingMs() <= 0) dismissToast(n);
+            if (at.dragging) continue;
+            if (at.pausedRemaining >= 0) {
+                // A paused toast must not survive focus loss or a missed hover transition.
+                if (!stage.isFocused() || !at.hovering) at.resumeProgress();
+                continue;
+            }
+            if (at.remainingMs() <= 0) dismissToast(n);
         }
     }
 
@@ -2838,7 +3012,9 @@ public final class MainWindow {
                 new KeyFrame(Duration.millis(140), new KeyValue(at.stack.translateXProperty(), 16, Interpolator.LINEAR)),
                 new KeyFrame(Duration.millis(210), new KeyValue(at.stack.translateXProperty(), -8, Ui.EASE_OUT_FLUENT)),
                 new KeyFrame(Duration.millis(230), new KeyValue(at.stack.translateXProperty(), 0)));
-        wobble.setOnFinished(e -> at.resumeProgress());
+        wobble.setOnFinished(e -> {
+            if (!at.hovering) at.resumeProgress();
+        });
         wobble.play();
     }
 
@@ -2867,6 +3043,7 @@ public final class MainWindow {
                 if (!dragPending[0] || dx < TOAST_DRAG_DEADZONE) return;
                 dragging[0] = true;
                 dragPending[0] = false;
+                at.dragging = true;
                 at.pauseProgress();
             }
             double newX = dragStartTranslate[0] + Math.max(0, dx);
@@ -2884,6 +3061,8 @@ public final class MainWindow {
             dragging[0] = false;
             dragPending[0] = false;
             e.consume();
+            at.dragging = false;
+            at.hovering = at.containsScenePoint(e.getSceneX(), e.getSceneY());
             double currentX = stack.getTranslateX();
             double threshold = Math.max(TOAST_DISMISS_THRESHOLD_MIN,
                     Math.max(1, stack.getWidth()) * TOAST_DISMISS_THRESHOLD_RATIO);
@@ -2906,7 +3085,9 @@ public final class MainWindow {
                     new KeyFrame(Duration.millis(TOAST_RETURN_MS),
                             new KeyValue(stack.translateXProperty(), 0, Ui.EASE_OUT_FLUENT),
                             new KeyValue(stack.opacityProperty(), 1)));
-            back.setOnFinished(ev -> at.resumeProgress());
+            back.setOnFinished(ev -> {
+                if (!at.hovering) at.resumeProgress();
+            });
             back.play();
         });
     }
@@ -3366,7 +3547,7 @@ public final class MainWindow {
         Ui.MenuRow[] rows = new Ui.MenuRow[names.length];
         for (int i = 0; i < names.length; i++) {
             final int mode = i;
-            rows[i] = Ui.MenuRow.of((Lang.mode == i ? "✓  " : "") + Lang.t(names[i]), "languages", () -> {
+            rows[i] = Ui.MenuRow.of((Lang.mode == i ? "✓  " : "") + Lang.t(names[i]), null, () -> {
                 if (Lang.mode == mode) return;
                 Lang.setMode(mode);
                 data.set("SystemLanguage", mode);

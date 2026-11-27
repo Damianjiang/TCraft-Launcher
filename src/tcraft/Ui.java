@@ -723,7 +723,8 @@ public final class Ui {
                 box.getChildren().add(sep);
                 continue;
             }
-            ListItem item = new ListItem(Theme.icon(row.icon, 16, Theme.text), Lang.t(row.title), null, 34);
+            Node rowIcon = (row.icon == null || row.icon.isBlank()) ? null : Theme.icon(row.icon, 16, Theme.text);
+            ListItem item = new ListItem(rowIcon, Lang.t(row.title), null, 34);
             item.setOnMouseClicked(e -> {
                 if (!row.keepOpen) closeMenuCard(activeMenu);
                 if (row.action != null) row.action.run();
