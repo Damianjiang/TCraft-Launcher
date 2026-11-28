@@ -112,6 +112,7 @@ public final class Skins {
         String csl = site.toLowerCase(java.util.Locale.ROOT).endsWith("/csl") ? site : site + "/csl";
         String role = URLEncoder.encode(roleName, StandardCharsets.UTF_8).replace("+", "%20");
         String body = Http.get(csl + "/" + role + ".json");
+        if (body == null || body.isBlank()) return null;
         Map<String, Object> json = Json.obj(Json.parse(body));
         if (Json.str(json, "username", "").isEmpty()) return null;
 

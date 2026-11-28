@@ -192,6 +192,7 @@ public final class Yggdrasil {
         String url = server.apiRoot + "sessionserver/session/minecraft/profile/"
                 + compact(profile.id).toLowerCase(java.util.Locale.ROOT);
         String body = Http.get(url);
+        if (body == null || body.isBlank()) return null;
         Map<String, Object> m = Json.obj(Json.parse(body));
         for (Object o : Json.arr(m.get("properties"))) {
             Map<String, Object> prop = Json.obj(o);
