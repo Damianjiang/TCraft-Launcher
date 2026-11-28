@@ -88,12 +88,13 @@ public class PageLink implements Page {
     private Node buildSelect() {
         VBox column = new VBox(14);
         column.setAlignment(Pos.CENTER);
+        column.setMaxWidth(Double.MAX_VALUE);
         column.setPickOnBounds(false);
 
         HBox cards = new HBox(14);
         cards.setAlignment(Pos.CENTER);
         cards.setPrefWidth(660);
-        cards.setMinWidth(660);
+        cards.setMinWidth(0);
         cards.setMaxWidth(660);
         cards.setPickOnBounds(false);
         Node create = linkCard("create-room", "创建房间", "邀请朋友加入你的单人游戏。", this::createRoom);
@@ -112,8 +113,9 @@ public class PageLink implements Page {
 
     private Node linkCard(String icon, String title, String desc, Runnable action) {
         StackPane card = new StackPane();
-        card.setMinWidth(300);
+        card.setMinWidth(220);
         card.setPrefWidth(320);
+        card.setMaxWidth(Double.MAX_VALUE);
         card.setMinHeight(190);
         card.setPrefHeight(190);
         card.setBackground(Ui.fill(Theme.cardBg, 16));
@@ -138,6 +140,7 @@ public class PageLink implements Page {
         badge.setBackground(Ui.fill(Theme.accent, 15));
         Label t = Ui.semi(title, 19, Theme.text);
         Label d = Ui.wrap(Ui.label(desc, 13, Theme.gray1), 250);
+        d.maxWidthProperty().bind(card.widthProperty().subtract(48));
 
         Region gap = new Region();
         gap.setMinHeight(10);
@@ -151,7 +154,7 @@ public class PageLink implements Page {
     private Node hintCard() {
         StackPane card = new StackPane();
         card.setPrefWidth(660);
-        card.setMinWidth(660);
+        card.setMinWidth(0);
         card.setMaxWidth(660);
         card.setBackground(Ui.fill(Theme.cardBg, 14));
         card.setBorder(Ui.border(Color.web("#000000", 0.07), 13, 1));
@@ -637,8 +640,10 @@ public class PageLink implements Page {
     }
 
     private static Map<String, Object> decodeLinkCode(String raw) {
+        lastDecodeError = "";
         Map<String, Object> plain = decodePlain(raw);
         if (plain != null) return plain;
+        if (!lastDecodeError.isEmpty()) return null;
         String token = extractToken(raw);
         return token.isEmpty() ? null : decodePayload(token);
     }
@@ -646,13 +651,30 @@ public class PageLink implements Page {
     private static Map<String, Object> decodePlain(String raw) {
         if (raw == null) return null;
         String text = raw.replace('：', ':').replace('\u3000', ' ').trim();
+        // Some chat clients flatten line breaks into a literal "?R".
+        text = text.replaceAll("(?i)\\?r\\s*", "");
         if (text.isEmpty() || text.length() > 4000) return null;
         java.util.Map<String, String> kv = new java.util.HashMap<>();
-        java.util.regex.Matcher m = java.util.regex.Pattern.compile(
-                "(?i)(房间|密钥|端口|节点|节点ID|版本|room|secret|port|node|nodeid|version)\\s*:\\s*([^\\r\\n]+)")
-                .matcher(text);
+
+        // A pasted code can be flattened into one line, so split on field labels
+        // instead of treating the rest of the line as one value.
+        java.util.regex.Pattern label = java.util.regex.Pattern.compile(
+                "(?i)(房间|密钥|端口|节点\\s*ID|节点|版本|room|secret|port|node\\s*id|node|version)\\s*:\\s*");
+        java.util.regex.Matcher m = label.matcher(text);
+        List<String> keys = new ArrayList<>();
+        List<Integer> starts = new ArrayList<>();
+        List<Integer> ends = new ArrayList<>();
         while (m.find()) {
-            String key = m.group(1).toLowerCase(java.util.Locale.ROOT);
+            keys.add(m.group(1));
+            starts.add(m.start());
+            ends.add(m.end());
+        }
+        for (int i = 0; i < keys.size(); i++) {
+            String key = keys.get(i).toLowerCase(java.util.Locale.ROOT).replaceAll("\\s+", "");
+            int end = i + 1 < keys.size() ? starts.get(i + 1) : text.length();
+            String value = text.substring(ends.get(i), end).trim()
+                    .replaceAll("[\\s|｜,，;；]+$", "").trim()
+                    .replaceAll("^[\"'“”]+|[\"'“”]+$", "");
             kv.put(switch (key) {
                 case "房间", "room" -> "n";
                 case "密钥", "secret" -> "s";
@@ -660,8 +682,14 @@ public class PageLink implements Page {
                 case "节点", "node" -> "a";
                 case "节点id", "nodeid" -> "id";
                 default -> "v";
-            }, m.group(2).trim());
+            }, value);
         }
+
+        // The header carries the protocol version; parse it separately.
+        java.util.regex.Matcher head = java.util.regex.Pattern
+                .compile("(?i)(?:TCL联机码|TCL Link Code)\\s+(\\d+)").matcher(text);
+        if (head.find()) kv.putIfAbsent("v", head.group(1));
+
         if (kv.isEmpty()) {
             // 兼容单行竖线格式
             String[] parts = text.split("\\s*[|｜]\\s*");
@@ -673,30 +701,48 @@ public class PageLink implements Page {
                 if (parts.length >= 5) kv.put("id", parts[4]);
             }
         }
+        if (kv.isEmpty()) return null;
         String name = kv.getOrDefault("n", "");
         String secret = kv.getOrDefault("s", "");
-        if (!safeToken(name) || !safeToken(secret)) return null;
+        if (!safeToken(name) || !safeToken(secret)) {
+            lastDecodeError = Lang.t("联机码缺少房间或密钥信息，请让房主重新复制。");
+            return null;
+        }
         String node = kv.getOrDefault("a", "");
         if (!node.isEmpty()) {
             node = node.replaceFirst("\\s*（[^）]*）\\s*$", "").trim();
-            if (!safeNode(node)) return null;
+            if (!safeNode(node)) {
+                lastDecodeError = Lang.t("联机码里的节点地址无效，请让房主重新复制。");
+                return null;
+            }
         }
         int port = 25565;
-        try {
-            int v = Integer.parseInt(kv.getOrDefault("p", "25565").trim());
-            if (v >= 1024 && v <= 65535) port = v;
-        } catch (Exception ignored) {
+        java.util.regex.Matcher pm = java.util.regex.Pattern.compile("\\d+")
+                .matcher(kv.getOrDefault("p", "25565"));
+        if (pm.find()) {
+            try {
+                int v = Integer.parseInt(pm.group());
+                if (v >= 1024 && v <= 65535) port = v;
+            } catch (Exception ignored) {
+            }
         }
         int id = 0;
-        try {
-            id = Math.max(0, Integer.parseInt(kv.getOrDefault("id", "0").trim()));
-        } catch (Exception ignored) {
+        java.util.regex.Matcher im = java.util.regex.Pattern.compile("\\d+")
+                .matcher(kv.getOrDefault("id", "0"));
+        if (im.find()) {
+            try {
+                id = Math.max(0, Integer.parseInt(im.group()));
+            } catch (Exception ignored) {
+            }
         }
         int version = LINK_CODE_VERSION;
-        try {
-            String v = kv.get("v");
-            if (v != null) version = (int) Double.parseDouble(v.trim().split("\\s+")[0]);
-        } catch (Exception ignored) {
+        java.util.regex.Matcher vm = java.util.regex.Pattern.compile("\\d+")
+                .matcher(kv.getOrDefault("v", ""));
+        if (vm.find()) {
+            try {
+                version = Integer.parseInt(vm.group());
+            } catch (Exception ignored) {
+            }
         }
         Map<String, Object> out = new java.util.HashMap<>();
         out.put("v", version);

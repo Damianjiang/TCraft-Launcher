@@ -109,6 +109,7 @@ public class PageTasks implements Page {
         head.getChildren().addAll(title, sp, clear);
 
         taskList = new VBox(12);
+        taskList.setMinWidth(0);
         ScrollPane scroll = Ui.scroll(taskList);
         scroll.setFitToWidth(true);
         VBox.setVgrow(scroll, Priority.ALWAYS);
@@ -272,13 +273,19 @@ public class PageTasks implements Page {
         TaskCard(Tasks.Task task) {
             this.task = task;
             root = new VBox(8);
+            root.setMinWidth(0);
             root.setMaxWidth(Double.MAX_VALUE);
             root.setPadding(new Insets(14, 16, 14, 16));
             root.setBackground(Ui.fill(Theme.cardBg, 14));
             root.setEffect(Theme.shadow(16, 3, 0.14, Theme.text));
 
             Label title = Ui.bold(taskText(task.title), 14, Theme.text);
+            title.setMinWidth(0);
+            title.setMaxWidth(Double.MAX_VALUE);
+            HBox.setHgrow(title, Priority.ALWAYS);
             stateLabel = Ui.label(stateText(task.state), 11.5, stateColor(task.state));
+            stateLabel.setMinWidth(0);
+            stateLabel.setMaxWidth(Region.USE_PREF_SIZE);
             Region sp = new Region();
             HBox.setHgrow(sp, Priority.ALWAYS);
             cancel = Ui.button(Lang.t("取消任务"), Ui.BTN_NORMAL, () -> {
@@ -290,6 +297,7 @@ public class PageTasks implements Page {
             cancel.setMinWidth(76);
             cancel.setMaxWidth(76);
             HBox head = new HBox(8, title, stateLabel, sp, cancel);
+            head.setMinWidth(0);
             head.setAlignment(Pos.CENTER_LEFT);
 
             track = new Rectangle();
@@ -306,6 +314,8 @@ public class PageTasks implements Page {
             progress.setMaxWidth(Double.MAX_VALUE);
 
             stageLabel = Ui.label(taskText(task.stage), 11.5, Theme.gray2);
+            stageLabel.setMinWidth(0);
+            stageLabel.setMaxWidth(Double.MAX_VALUE);
             detail = Ui.label("", 11, Theme.red);
             detail.setWrapText(true);
             detail.setVisible(false);

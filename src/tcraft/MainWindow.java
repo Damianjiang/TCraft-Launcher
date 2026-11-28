@@ -2692,9 +2692,9 @@ public final class MainWindow {
         final int totalMs;
         long deadlineMs;
         double pausedRemaining = -1;
-        javafx.animation.Timeline drain;
-        javafx.animation.PauseTransition hide;
+        javafx.animation.Timeline life;
         javafx.animation.Timeline entry;
+        Runnable expire;
         boolean dismissed = false;
         boolean hovering = false;
         boolean dragging = false;
@@ -2723,37 +2723,60 @@ public final class MainWindow {
             return bounds != null && bounds.contains(sceneX, sceneY);
         }
 
+        void startLife() {
+            if (dismissed) return;
+            if (life != null) life.stop();
+            deadlineMs = System.currentTimeMillis() + totalMs;
+            pausedRemaining = -1;
+            life = new javafx.animation.Timeline(new javafx.animation.KeyFrame(
+                    javafx.util.Duration.millis(50), e -> tick()));
+            life.setCycleCount(javafx.animation.Animation.INDEFINITE);
+            life.play();
+            updateBar();
+        }
+
+        void tick() {
+            if (dismissed) {
+                if (life != null) life.stop();
+                return;
+            }
+            if (pausedRemaining >= 0 || dragging) return;
+            if (remainingMs() <= 0) {
+                if (expire != null) expire.run();
+                return;
+            }
+            updateBar();
+        }
+
+        void updateBar() {
+            double width = stack.getWidth();
+            if (width <= 0) return;
+            double fraction = Math.max(0, Math.min(1, remainingMs() / totalMs));
+            progress.setPrefWidth(width * fraction);
+        }
+
         void pauseProgress() {
             if (pausedRemaining >= 0 || dismissed) return;
             pausedRemaining = remainingMs();
-            if (entry != null) entry.stop();
-            if (drain != null) drain.stop();
-            if (hide != null) hide.stop();
+            if (life != null) life.stop();
+            updateBar();
         }
 
         void resumeProgress() {
             if (pausedRemaining < 0 || dismissed) return;
             double remaining = Math.max(1, pausedRemaining);
-            double currentWidth = progress.getPrefWidth();
             pausedRemaining = -1;
             deadlineMs = System.currentTimeMillis() + (long) remaining;
-            if (currentWidth > 0) {
-                drain = new javafx.animation.Timeline(new javafx.animation.KeyFrame(
-                        javafx.util.Duration.millis(remaining),
-                        new javafx.animation.KeyValue(progress.prefWidthProperty(), 0)));
-                drain.play();
-            }
-            hide = new javafx.animation.PauseTransition(javafx.util.Duration.millis(remaining));
-            hide.setOnFinished(e -> dismiss());
-            hide.play();
+            if (life == null) startLife();
+            else life.play();
+            updateBar();
         }
 
         void dismiss() {
             if (dismissed) return;
             dismissed = true;
             if (entry != null) entry.stop();
-            if (drain != null) drain.stop();
-            if (hide != null) hide.stop();
+            if (life != null) life.stop();
         }
     }
 
@@ -2789,9 +2812,9 @@ public final class MainWindow {
                 return;
             }
         }
-        HBox card = new HBox(10);
+        HBox card = new HBox(9);
         card.setAlignment(Pos.CENTER_LEFT);
-        card.setPadding(new Insets(10, 12, 12, 13));
+        card.setPadding(new Insets(9, 12, 9, 12));
         double toastMax = toastMaxWidth();
         card.setMaxWidth(toastMax);
         Color c;
@@ -2799,7 +2822,7 @@ public final class MainWindow {
         switch (type) {
             // 1 绿 / 2 橙警告 / 3 红错误 / 默认主题蓝
             case 1 -> {
-                c = Color.web("#4de68c");
+                c = Theme.green;
                 icon = "circle-check";
             }
             case 2 -> {
@@ -2807,54 +2830,60 @@ public final class MainWindow {
                 icon = "triangle-alert";
             }
             case 3 -> {
-                c = Color.web("#e64d59");
+                c = Theme.red;
                 icon = "circle-minus";
             }
             default -> {
-                c = Theme.accentLight;
-                icon = "info";
+                c = Theme.accent;
+                icon = "circle-help";
             }
         }
-        LinearGradient cardFill = new LinearGradient(0, 0, 1, 0, true, CycleMethod.NO_CYCLE,
-                new Stop(0, Theme.alpha(c, 0.10)),
-                new Stop(0.34, Theme.dialogBg),
-                new Stop(1, Theme.dialogBg));
-        card.setBackground(new Background(new BackgroundFill(cardFill, new CornerRadii(9), Insets.EMPTY)));
-        card.setBorder(new Border(new BorderStroke(c, BorderStrokeStyle.SOLID, new CornerRadii(9),
-                new BorderWidths(0, 0, 0, 3))));
-        card.setEffect(Theme.shadow(20, 3, 0.22, Theme.text));
-        StackPane iconBox = new StackPane(Theme.icon(icon, 17, c));
-        iconBox.setMinSize(28, 28);
-        iconBox.setMaxSize(28, 28);
-        iconBox.setBackground(Ui.fill(Theme.alpha(c, 0.16), 8));
+        // Light theme: solid white card, no gradient.
+        card.setBackground(Ui.fill(Color.web("#ffffff", 0.97), 8));
+        card.setBorder(new Border(new BorderStroke(Theme.gray6,
+                BorderStrokeStyle.SOLID, new CornerRadii(8, 8, 0, 0, false),
+                new BorderWidths(1))));
+        card.setEffect(Theme.shadow(14, 3, 0.16, Theme.text));
+        StackPane iconBox = new StackPane(Theme.icon(icon, 18, c));
+        iconBox.setMinSize(22, 22);
+        iconBox.setMaxSize(22, 22);
         VBox texts = new VBox(2);
+        texts.setMinWidth(0);
+        texts.setMaxWidth(Math.max(100, toastMax - 76));
         Label t = Ui.bold(title, 12.5, Theme.gray1);
+        t.setMinWidth(0);
         Label m = Ui.label(message == null ? "" : message, 11.5, Theme.gray2);
         m.setWrapText(true);
-        m.setMaxWidth(Math.max(120, toastMax - 95));
+        m.setMinWidth(0);
+        m.setMaxWidth(Math.max(100, toastMax - 76));
+        boolean hasMessage = message != null && !message.isBlank();
+        m.setVisible(hasMessage);
+        m.setManaged(hasMessage);
         texts.getChildren().addAll(t, m);
         HBox.setHgrow(texts, Priority.ALWAYS);
         StackPane close = Ui.iconButton("x", 20, 12, null, null);
         card.getChildren().addAll(iconBox, texts, close);
         Region progress = new Region();
-        progress.setMinHeight(3);
-        progress.setPrefHeight(3);
-        progress.setMaxHeight(3);
+        progress.setMinHeight(2);
+        progress.setPrefHeight(2);
+        progress.setMaxHeight(2);
         progress.setMaxWidth(Region.USE_PREF_SIZE);
-        progress.setBackground(Ui.fill(c, new CornerRadii(0.0, 0.0, 9.0, 9.0, false)));
+        progress.setBackground(Ui.fill(c, new CornerRadii(0.0, 0.0, 8.0, 8.0, false)));
         HBox progressTrack = new HBox(progress);
         progressTrack.setAlignment(Pos.CENTER_LEFT);
-        progressTrack.setMinHeight(3);
-        progressTrack.setMaxHeight(3);
+        progressTrack.setMinHeight(2);
+        progressTrack.setMaxHeight(2);
         progressTrack.setPickOnBounds(false);
-        progressTrack.setBackground(Ui.fill(Theme.alpha(c, 0.22), new CornerRadii(0.0, 0.0, 9.0, 9.0, false)));
+        progressTrack.setBackground(Ui.fill(Theme.gray6,
+                new CornerRadii(0.0, 0.0, 8.0, 8.0, false)));
         VBox stack = new VBox(card, progressTrack);
         stack.setMaxWidth(toastMax);
         stack.setOpacity(0);
-        stack.setTranslateX(60);
+        stack.setTranslateX(28);
         // 防 aniMs=0 时 toast 即逝
         int duration = 800 + Math.max(5, Math.min(23, (message == null ? 0 : message.length() + title.length())) * 180);
         ActiveToast at = new ActiveToast(stack, card, progress, progressTrack, close, title, message, duration);
+        at.expire = () -> dismissToast(stack);
         stack.getProperties().put("toast", at);
         close.getProperties().put("toastClose", Boolean.TRUE);
         close.setOnMouseClicked(e -> {
@@ -2881,6 +2910,7 @@ public final class MainWindow {
                 return;
             }
             toastList.getChildren().add(stack);
+            at.startLife();
             while (toastList.getChildren().size() > 4) {
                 javafx.scene.Node oldest = toastList.getChildren().remove(0);
                 ActiveToast old = (ActiveToast) oldest.getProperties().get("toast");
@@ -2889,33 +2919,16 @@ public final class MainWindow {
             javafx.animation.Timeline in = new javafx.animation.Timeline(
                     new KeyFrame(Duration.ZERO,
                             new KeyValue(stack.opacityProperty(), 0),
-                            new KeyValue(stack.translateXProperty(), 60)),
-                    new KeyFrame(Duration.millis(400),
+                            new KeyValue(stack.translateXProperty(), 28)),
+                    new KeyFrame(Duration.millis(260),
                             new KeyValue(stack.opacityProperty(), 1),
                             new KeyValue(stack.translateXProperty(), 0, Ui.EASE_OUT_FLUENT)));
+            at.entry = in;
             in.play();
             stack.widthProperty().addListener((o, a, b) -> {
                 progressTrack.setMaxWidth(b.doubleValue());
-                if (at.pausedRemaining < 0 && at.drain == null) {
-                    progress.setPrefWidth(b.doubleValue());
-                }
+                at.updateBar();
             });
-            PauseTransition measure = new PauseTransition(Duration.millis(50));
-            measure.setOnFinished(ev -> {
-                if (at.dismissed) return;
-                double w = stack.getWidth() > 0 ? stack.getWidth() : 300;
-                progressTrack.setMaxWidth(w);
-                progress.setPrefWidth(w);
-                if (at.pausedRemaining >= 0) return;
-                at.drain = new javafx.animation.Timeline(
-                        new KeyFrame(Duration.millis(Math.max(1, duration)),
-                                new KeyValue(progress.prefWidthProperty(), 0)));
-                at.drain.play();
-            });
-            measure.play();
-            at.hide = new PauseTransition(Duration.millis(Math.max(1, duration)));
-            at.hide.setOnFinished(e -> dismissToast(stack));
-            at.hide.play();
         };
         addRef[0].run();
         installToastDrag(card, stack, at, close);
@@ -2924,22 +2937,25 @@ public final class MainWindow {
     private double toastMaxWidth() {
         double host = body != null && body.getWidth() > 1 ? body.getWidth()
                 : (stage.getScene() != null ? stage.getScene().getWidth() : DEFAULT_WINDOW_WIDTH);
-        return Math.max(200, Math.min(360, host - 56));
+        return Math.max(200, Math.min(420, host - 56));
     }
 
     private void updateToastWidths() {
         if (toastList == null) return;
         double max = toastMaxWidth();
-        double textMax = Math.max(120, max - 95);
+        double textMax = Math.max(100, max - 76);
         for (Node n : toastList.getChildren()) {
             if (n instanceof VBox stack) stack.setMaxWidth(max);
             if (n instanceof VBox stack && !stack.getChildren().isEmpty()
                     && stack.getChildren().get(0) instanceof HBox card) {
                 card.setMaxWidth(max);
                 for (Node c : card.getChildren()) {
-                    if (c instanceof VBox texts && texts.getChildren().size() > 1
-                            && texts.getChildren().get(1) instanceof Label message) {
-                        message.setMaxWidth(textMax);
+                    if (c instanceof VBox texts) {
+                        texts.setMaxWidth(Math.max(100, max - 76));
+                        if (texts.getChildren().size() > 1
+                                && texts.getChildren().get(1) instanceof Label message) {
+                            message.setMaxWidth(textMax);
+                        }
                     }
                 }
             }

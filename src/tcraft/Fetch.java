@@ -41,6 +41,12 @@ public final class Fetch {
         java.util.List<String> candidates = urls == null ? java.util.List.of()
                 : urls.stream().filter(u -> u != null && !u.isEmpty()).distinct().toList();
         if (candidates.isEmpty()) throw new IOException(Lang.t("没有可用的下载地址：") + target.getFileName());
+        // A single stream still represents one active file and one active connection; without
+        // this the task page has no counter to sample and reports 0 B/s for the whole transfer.
+        if (report && task != null) {
+            if (task.remainingFiles <= 0) task.remainingFiles = 1;
+            if (task.threads <= 0) task.threads = 1;
+        }
         Path part = target.resolveSibling(target.getFileName() + ".part");
         Files.createDirectories(target.toAbsolutePath().getParent());
 
@@ -79,7 +85,21 @@ public final class Fetch {
                     }
                     if (task != null && task.canceled) throw new IOException(Lang.t("已取消"));
                     try {
-                        transfer(task, url, part, done, digest, from, to, report);
+                        boolean segmented = false;
+                        if (report && done == 0 && Files.notExists(part)) {
+                            try {
+                                segmented = transferSegments(task, url, part, from, to);
+                            } catch (IOException e) {
+                                last = e;
+                                if (task != null && task.canceled) throw e;
+                            }
+                        }
+                        if (!segmented) {
+                            transfer(task, url, part, done, digest, from, to, report);
+                        } else if (digest != null) {
+                            digest.reset();
+                            replay(part, digest);
+                        }
                         if (digest != null) {
                             String actual = HexFormat.of().formatHex(digest.digest());
                             if (!expect.equals(actual)) {
@@ -134,6 +154,151 @@ public final class Fetch {
             PART_LOCKS.remove(lockKey, lock);
         }
         throw last != null ? last : new IOException(Lang.t("下载失败：") + target.getFileName());
+    }
+
+    private static final long SEGMENT_MIN_BYTES = 8L * 1024 * 1024;
+    private static final int SEGMENT_MAX = 1;
+
+    /// Downloads a large fresh file through several HTTP range requests.
+    ///
+    /// Returns `false` when the source ignores ranges, the file is small, or serial download
+    /// mode is active, so the caller can keep the normal single-stream path.
+    private static boolean transferSegments(Tasks.Task task, String url, Path part,
+                                            double from, double to) throws IOException {
+        long total;
+        try (Http.Body probe = Http.openOnce(url, Duration.ofSeconds(20), 0, 0)) {
+            if (probe.status != 206 || probe.total < SEGMENT_MIN_BYTES) return false;
+            total = probe.total;
+        } catch (IOException e) {
+            return false;
+        }
+        int threads = Downloader.downloadThreads(SEGMENT_MAX);
+        if (threads < 2) return false;
+        if (task != null) task.threads = Math.max(task.threads, threads);
+
+        java.util.List<Path> segments = new java.util.ArrayList<>();
+        java.util.concurrent.atomic.AtomicLong received = new java.util.concurrent.atomic.AtomicLong();
+        long started = System.currentTimeMillis();
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(
+                threads, r -> {
+                    Thread t = new Thread(r, "TCL-Segment");
+                    t.setDaemon(true);
+                    return t;
+                });
+        boolean completed = false;
+        try {
+            Files.deleteIfExists(part);
+            java.util.List<java.util.concurrent.Future<?>> futures = new java.util.ArrayList<>();
+            for (int i = 0; i < threads; i++) {
+                long start = total * i / threads;
+                long end = total * (i + 1) / threads - 1;
+                Path seg = part.resolveSibling(part.getFileName() + ".seg" + i);
+                Files.deleteIfExists(seg);
+                segments.add(seg);
+                futures.add(pool.submit(() -> {
+                    downloadSegment(task, url, seg, start, end, received, total, from, to, started);
+                    return null;
+                }));
+            }
+            for (java.util.concurrent.Future<?> future : futures) {
+                future.get();
+            }
+            completed = true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException(Lang.t("下载被中断"), e);
+        } catch (java.util.concurrent.ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof IOException io) throw io;
+            throw new IOException(cause == null ? Lang.t("分段下载失败") : cause.getMessage(), cause);
+        } finally {
+            pool.shutdownNow();
+            try {
+                pool.awaitTermination(2, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            if (!completed) {
+                for (Path seg : segments) {
+                    try {
+                        Files.deleteIfExists(seg);
+                    } catch (IOException ignored) {
+                    }
+                }
+                try {
+                    Files.deleteIfExists(part);
+                } catch (IOException ignored) {
+                }
+            }
+        }
+        try (OutputStream out = Files.newOutputStream(part, StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE)) {
+            for (Path seg : segments) Files.copy(seg, out);
+        } catch (IOException e) {
+            try {
+                Files.deleteIfExists(part);
+            } catch (IOException ignored) {
+            }
+            throw e;
+        } finally {
+            for (Path seg : segments) {
+                try {
+                    Files.deleteIfExists(seg);
+                } catch (IOException ignored) {
+                }
+            }
+        }
+        if (Files.size(part) != total) {
+            Files.deleteIfExists(part);
+            throw new IOException(Lang.t("分段下载不完整"));
+        }
+        if (task != null && to > from) task.progress = to;
+        return true;
+    }
+
+    private static void downloadSegment(Tasks.Task task, String url, Path segment, long start, long end,
+                                        java.util.concurrent.atomic.AtomicLong received, long total,
+                                        double from, double to, long started) throws IOException {
+        long expected = end - start + 1;
+        long limit = Downloader.speedLimitBytes();
+        if (task != null && task.canceled) throw new IOException(Lang.t("已取消"));
+        try (Http.Body body = Http.openOnce(url, Duration.ofSeconds(60), start, end)) {
+            if (body.status != 206) throw new IOException(Lang.t("分段下载不受支持"));
+            IdleGuard guard = new IdleGuard(body.in, IDLE_TIMEOUT_MS);
+            guard.start();
+            try (InputStream in = body.in;
+                 OutputStream out = Files.newOutputStream(segment, StandardOpenOption.CREATE,
+                         StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE)) {
+                byte[] buffer = new byte[65536];
+                long written = 0;
+                long lastTick = System.currentTimeMillis();
+                int n;
+                while ((n = in.read(buffer)) >= 0) {
+                    guard.touch();
+                    if (task != null && task.canceled) throw new IOException(Lang.t("已取消"));
+                    out.write(buffer, 0, n);
+                    written += n;
+                    received.addAndGet(n);
+                    NetSpeed.add(n);
+                    if (limit > 0) Downloader.throttle(n, limit);
+                    long now = System.currentTimeMillis();
+                    if (task != null && now - lastTick >= 400) {
+                        lastTick = now;
+                        if (total > 0 && to > from) {
+                            task.progress = from + (to - from)
+                                    * Math.min(1.0, received.get() / (double) total);
+                        }
+                        task.speed = speed(received.get() * 1000 / Math.max(1, now - started));
+                    }
+                    if (written > expected) throw new IOException(Lang.t("分段响应超过预期长度"));
+                }
+                if (written != expected) {
+                    throw new IOException(Lang.t("分段下载不完整：") + written + " / " + expected);
+                }
+            } finally {
+                guard.close();
+            }
+        }
     }
 
     private static void transfer(Tasks.Task task, String url, Path part, long done,

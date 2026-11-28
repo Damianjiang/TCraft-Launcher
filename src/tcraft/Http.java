@@ -43,7 +43,8 @@ public final class Http {
     // 下载线程 64 HTTP 回调同量级
     private static final ExecutorService ASYNC = idlePool(64, "TCL-Http");
 
-    private static volatile HttpClient client = build();
+    private static volatile HttpClient client = build(HttpClient.Redirect.NORMAL, HttpClient.Version.HTTP_2);
+    private static volatile HttpClient clientRange = build(HttpClient.Redirect.NORMAL, HttpClient.Version.HTTP_1_1);
     private static volatile HttpClient clientNoRedirect = build(HttpClient.Redirect.NEVER);
 
     private static HttpClient build() {
@@ -51,12 +52,15 @@ public final class Http {
     }
 
     private static HttpClient build(HttpClient.Redirect redirects) {
+        return build(redirects, HttpClient.Version.HTTP_2);
+    }
+
+    private static HttpClient build(HttpClient.Redirect redirects, HttpClient.Version version) {
         HttpClient.Builder b = HttpClient.newBuilder()
                 // 跨洋握手 6s
                 .connectTimeout(Duration.ofSeconds(6))
                 .followRedirects(redirects)
-                // h2 不支持时回落 1.1
-                .version(HttpClient.Version.HTTP_2)
+                .version(version)
                 .executor(ASYNC);
         try {
             ProxySelector selector = proxySelector();
@@ -88,8 +92,10 @@ public final class Http {
     public static void rebuild() {
         // 建好再落 volatile
         HttpClient redirect = build();
+        HttpClient range = build(HttpClient.Redirect.NORMAL, HttpClient.Version.HTTP_1_1);
         HttpClient noRedirect = build(HttpClient.Redirect.NEVER);
         clientNoRedirect = noRedirect;
+        clientRange = range;
         client = redirect;
     }
 
@@ -544,11 +550,13 @@ public final class Http {
     public static final class Body implements AutoCloseable {
         public final InputStream in;
         public final long length;
+        public final long total;
         public final int status;
 
-        Body(InputStream in, long length, int status) {
+        Body(InputStream in, long length, long total, int status) {
             this.in = in;
             this.length = length;
+            this.total = total;
             this.status = status;
         }
 
@@ -590,6 +598,10 @@ public final class Http {
     }
 
     // 单次连接 由 Fetch 的候选源循环负责重试 避免内外层叠加
+    static Body openOnce(String url, Duration timeout, long rangeStart, long rangeEnd) throws IOException {
+        return openAttempt(url, timeout, rangeStart, rangeEnd, 1);
+    }
+
     static Body openOnce(String url, Duration timeout, long rangeStart) throws IOException {
         return openAttempt(url, timeout, rangeStart, -1, 1);
     }
@@ -614,7 +626,8 @@ public final class Http {
             }
             HttpResponse<InputStream> resp;
             try {
-                resp = client.send(builder.build(), HttpResponse.BodyHandlers.ofInputStream());
+                HttpClient http = rangeStart > 0 || rangeEnd >= 0 ? clientRange : client;
+                resp = http.send(builder.build(), HttpResponse.BodyHandlers.ofInputStream());
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new IOException(Lang.t("请求被中断"), e);
@@ -625,7 +638,21 @@ public final class Http {
             int code = resp.statusCode();
             if (code >= 200 && code < 300) {
                 long len = resp.headers().firstValueAsLong("content-length").orElse(-1L);
-                return new Body(resp.body(), len, code);
+                long total = len;
+                String contentRange = resp.headers().firstValue("content-range").orElse("");
+                if (contentRange.startsWith("bytes ")) {
+                    int slash = contentRange.lastIndexOf('/');
+                    if (slash >= 0) {
+                        String value = contentRange.substring(slash + 1).trim();
+                        if (!"*".equals(value)) {
+                            try {
+                                total = Long.parseLong(value);
+                            } catch (NumberFormatException ignored) {
+                            }
+                        }
+                    }
+                }
+                return new Body(resp.body(), len, total, code);
             }
             try {
                 resp.body().close();
