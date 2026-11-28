@@ -906,7 +906,7 @@ public final class MainWindow {
         // UiMusicStop/Start 键义为游戏期暂停/继续
         if (data.getBool("UiMusicStop", false)) Music.pauseForGame();
         else if (data.getBool("UiMusicStart", false)) Music.resumeAfterGame();
-        int visibility = data.getInt("LaunchVisibility", 5);
+        int visibility = data.getInt("LaunchVisibility", 0);
         boolean closeOnExit = visibility == 2;
         if (visibility == 4) {
             stage.setIconified(true);

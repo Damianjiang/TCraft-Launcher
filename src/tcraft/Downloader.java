@@ -180,11 +180,11 @@ public final class Downloader {
         Files.createDirectories(game.resolve("assets").resolve("indexes"));
         Files.createDirectories(game.resolve("assets").resolve("objects"));
 
-        int source = data.getInt("SystemDownloadSource", 0);
+        int source = data.getInt("SystemDownloadSource", 2);
         String manifestBmcl = bmcl() + "/mc/game/version_manifest_v2.json";
+        // 0/2 都镜像优先，只有 1 是仅官方
         String manifestText = source == 1 ? getText(MANIFEST)
-                : source == 2 ? getText(manifestBmcl, MANIFEST)
-                : getText(MANIFEST, manifestBmcl);
+                : getText(manifestBmcl, MANIFEST);
         Map<String, Object> manifest = Json.obj(Json.parse(manifestText));
         Map<String, Object> entry = null;
         for (Object o : Json.arr(manifest.get("versions"))) {
@@ -205,8 +205,7 @@ public final class Downloader {
         // 带 sha1 防版本 JSON 被换
         String versionSha1 = Json.str(entry, "sha1", "");
         if (source == 1) downloadTo(task, versionUrl, "", versionJson, 0.03, 0.08, versionSha1);
-        else if (source == 2) downloadTo(task, bmcl() + "/version/" + version.id + "/json", versionUrl, versionJson, 0.03, 0.08, versionSha1);
-        else downloadTo(task, versionUrl, bmcl() + "/version/" + version.id + "/json", versionJson, 0.03, 0.08, versionSha1);
+        else downloadTo(task, bmcl() + "/version/" + version.id + "/json", versionUrl, versionJson, 0.03, 0.08, versionSha1);
         sub(task, 0, Tasks.State.DONE);
         task.progress = 0.08;
 
@@ -315,7 +314,12 @@ public final class Downloader {
         String indexSha1 = Json.str(assetIndex, "sha1", "");
         if (!safeAssetId(assetId)) throw new IOException(Lang.t("资源索引名称不合法：") + assetId);
         Path indexPath = game.resolve("assets").resolve("indexes").resolve(assetId + ".json");
-        downloadTo(task, indexUrl, bmcl() + "/indexes/" + assetId + ".json", indexPath, 0.50, 0.55, indexSha1);
+        if (source == 1) {
+            downloadTo(task, indexUrl, "", indexPath, 0.50, 0.55, indexSha1);
+        } else {
+            downloadTo(task, bmcl() + "/indexes/" + assetId + ".json", indexUrl,
+                    indexPath, 0.50, 0.55, indexSha1);
+        }
         sub(task, 3, Tasks.State.DONE);
 
         sub(task, 4, Tasks.State.RUNNING);
@@ -905,7 +909,7 @@ public final class Downloader {
     }
 
     private static String installerMirrorUrl() {
-        String source = Data.get().get("SystemDownloadSource", "0");
+        String source = Data.get().get("SystemDownloadSource", "2");
         if ("1".equals(source)) return "";
         return bmcl() + "/maven/";
     }
@@ -1628,7 +1632,7 @@ public final class Downloader {
 
     private static List<String> mirrors(String url) {
         List<String> out = new ArrayList<>();
-        int source = Data.get().getInt("SystemDownloadSource", 0);
+        int source = Data.get().getInt("SystemDownloadSource", 2);
         if (source == 1) {
             out.add(url);
             return out;
@@ -1674,7 +1678,7 @@ public final class Downloader {
         if (url.contains("meta.fabricmc.net")) {
             addMirror(mirrorUrls, url, "https://meta.fabricmc.net", root + "/fabric-meta");
         }
-        if (source == 2 || source == 0) {
+        if (source != 1) {
             // 自动与镜像模式都先走 BMCLAPI，官方源作为兜底（国内直连官方 CDN 明显更慢）
             out.addAll(mirrorUrls);
             out.add(url);

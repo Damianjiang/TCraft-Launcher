@@ -29,6 +29,8 @@ public final class Sources {
 
     public static List<String> rank(List<String> urls) {
         if (urls == null || urls.size() < 2) return urls;
+        // 镜像源已经排在前面时不再测速重排，保证默认镜像优先
+        if (isMirrorHost(host(urls.get(0)))) return urls;
         // 每个域名取一个样本 URL
         Map<String, String> sample = new LinkedHashMap<>();
         for (String u : urls) {
@@ -112,5 +114,18 @@ public final class Sources {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    private static boolean isMirrorHost(String h) {
+        if (h == null) return false;
+        return h.equals("bmclapi2.bangbang93.com")
+                || h.equals("bmclapi.bangbang93.com")
+                || h.equals("mirrors.cloud.tencent.com")
+                || h.equals("mod.mcimirror.top")
+                || h.equals("gh-proxy.com")
+                || h.equals("gh-proxy.org")
+                || h.equals("ghfast.top")
+                || h.equals("ghproxy.net")
+                || h.equals("ghproxy.imciel.com");
     }
 }

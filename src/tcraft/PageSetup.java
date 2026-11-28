@@ -117,7 +117,7 @@ public class PageSetup implements Page {
                 data.set("LaunchIsolation", 4);
                 data.set("LaunchWindowTitle", "");
                 data.set("LaunchCustomInfo", "TCL");
-                data.set("LaunchVisibility", 5);
+                data.set("LaunchVisibility", 0);
                 data.set("LaunchPriority", 1);
                 data.set("LaunchWindowType", 1);
                 data.set("LaunchWindowWidth", "854");
@@ -169,9 +169,9 @@ public class PageSetup implements Page {
                 win.rebuildUi();
             }
             case "system" -> {
-                data.set("SystemDownloadSource", 0);
+                data.set("SystemDownloadSource", 2);
                 data.set("SystemDownloadMode", 0);
-                data.set("SystemVersionSource", 1);
+                data.set("SystemVersionSource", 0);
                 data.set("SystemBmclRoot", "");
                 data.set("SystemMaxThreads", "64");
                 data.set("SystemSpeedLimit", "");
@@ -286,7 +286,7 @@ public class PageSetup implements Page {
                 + "libraries 与 assets 仍然共用，不会重复占空间。", 0));
         textRow(arg, "游戏窗口标题", "默认", data.get("LaunchWindowTitle", ""), s -> data.set("LaunchWindowTitle", s));
         textRow(arg, "自定义信息", "TCL", data.get("LaunchCustomInfo", "TCL"), s -> data.set("LaunchCustomInfo", s));
-        int visValue = data.getInt("LaunchVisibility", 5);
+        int visValue = data.getInt("LaunchVisibility", 0);
         int visIndex = 4;
         for (int i = 0; i < VISIBILITY_VALUES.length; i++) {
             if (VISIBILITY_VALUES[i] == visValue) visIndex = i;
@@ -1276,7 +1276,7 @@ public class PageSetup implements Page {
         header(page, "系统", "下载、网络、语言与启动器行为。");
         Ui.Card download = addCard(page, "下载");
         String[] sourceNames = {"自动选择（官方 / 镜像测速择优）", "仅使用官方源", "镜像源优先（BMCLAPI / 自定义，失败回退官方）"};
-        int fileCur = Math.max(0, Math.min(2, data.getInt("SystemDownloadSource", 0)));
+        int fileCur = Math.max(0, Math.min(2, data.getInt("SystemDownloadSource", 2)));
         comboRow(download, "文件下载源", sourceNames, fileCur,
                 i -> data.set("SystemDownloadSource", Math.max(0, Math.min(2, i))));
         Label speedHint = Ui.label("自动模式会同时测试官方源与镜像源，按当前网络选择更快的源；"
@@ -1286,7 +1286,7 @@ public class PageSetup implements Page {
         comboRow(download, "版本列表源", new String[]{
                 "尽量使用镜像源（可能缺少刚刚更新的版本）",
                 "优先使用官方源，在加载缓慢时换用镜像源", "尽量使用官方源"},
-                data.getInt("SystemVersionSource", 1), i -> data.set("SystemVersionSource", i));
+                data.getInt("SystemVersionSource", 0), i -> data.set("SystemVersionSource", i));
         textRow(download, "自定义镜像根", "留空用内置源", data.get("SystemBmclRoot", ""), s -> data.set("SystemBmclRoot", s == null ? "" : s.trim()));
         Label bmclHint = Ui.label("填自建或内网的 BMCLAPI 兼容镜像根（如 http://192.168.1.10:8080），版本清单 / 文件 / 资源 / 安装器会全部走这个根；适合 Win7 老电脑或公司内网环境。留空则用官方 + 内置 BMCLAPI。", 12, Theme.gray3);
         bmclHint.setWrapText(true);
@@ -1422,6 +1422,13 @@ public class PageSetup implements Page {
         other.add(directCheck("接收正式版更新提示", "ToolUpdateRelease", true));
         other.add(directCheck("接收测试版更新提示", "ToolUpdateSnapshot", false));
         other.add(directCheck("游戏语言自动设为中文（仅当游戏内为英文时）", "ToolHelpChinese", true));
+        String lowMode = data.get("SystemLowMemoryMode", "on");
+        String[] lowItems = {"自动（8GB 及以下开启）", "开启", "关闭"};
+        String[] lowValues = {"auto", "on", "off"};
+        int lowIndex = lowMode.equals("on") ? 1 : lowMode.equals("off") ? 2 : 0;
+        comboRow(other, "低内存模式", lowItems, lowIndex,
+                i -> data.set("SystemLowMemoryMode", lowValues[i]));
+        other.add(Ui.hint("低内存模式会关闭硬件加速并更早回收空闲堆；启动游戏后默认关闭启动器，重启生效。", 0));
         other.add(directCheck("禁用硬件加速（下次启动生效，远程桌面/老显卡可用）",
                 "SystemDisableHardwareAcceleration", false));
         other.add(Ui.hint("启动后从 GitHub Releases 读取最新版本与更新日志；发现新版本会弹窗提示，无法连接时会提示网络问题。", 0));

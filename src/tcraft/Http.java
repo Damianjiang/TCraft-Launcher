@@ -38,21 +38,25 @@ public final class Http {
     }
 
     private static final ExecutorService POOL = idlePool(
-            Math.max(4, Math.min(8, Runtime.getRuntime().availableProcessors())), "TCL-Net");
+            Boolean.getBoolean("tcl.lowMemory") ? 4
+                    : Math.max(4, Math.min(8, Runtime.getRuntime().availableProcessors())), "TCL-Net");
 
-    // 下载线程 64 HTTP 回调同量级
-    private static final ExecutorService ASYNC = idlePool(64, "TCL-Http");
+    // 低内存模式只保留 8 个 HTTP 回调线程
+    private static final ExecutorService ASYNC = idlePool(
+            Boolean.getBoolean("tcl.lowMemory") ? 8 : 64, "TCL-Http");
 
-    private static volatile HttpClient client = build(HttpClient.Redirect.NORMAL, HttpClient.Version.HTTP_2);
+    private static final HttpClient.Version PREFERRED_VERSION = HttpClient.Version.HTTP_2;
+
+    private static volatile HttpClient client = build(HttpClient.Redirect.NORMAL, PREFERRED_VERSION);
     private static volatile HttpClient clientRange = build(HttpClient.Redirect.NORMAL, HttpClient.Version.HTTP_1_1);
-    private static volatile HttpClient clientNoRedirect = build(HttpClient.Redirect.NEVER);
+    private static volatile HttpClient clientNoRedirect = build(HttpClient.Redirect.NEVER, PREFERRED_VERSION);
 
     private static HttpClient build() {
-        return build(HttpClient.Redirect.NORMAL);
+        return build(HttpClient.Redirect.NORMAL, PREFERRED_VERSION);
     }
 
     private static HttpClient build(HttpClient.Redirect redirects) {
-        return build(redirects, HttpClient.Version.HTTP_2);
+        return build(redirects, PREFERRED_VERSION);
     }
 
     private static HttpClient build(HttpClient.Redirect redirects, HttpClient.Version version) {

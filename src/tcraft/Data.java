@@ -1126,10 +1126,10 @@ public final class Data {
         Threads.start("TCL-Manifest", () -> {
             try {
                 lastVersionRefresh = System.currentTimeMillis();
-                // 下载策略 0 镜像 / 1 官方优先 / 2 仅官方
+                // 下载策略 0 自动 / 1 仅官方 / 2 镜像优先
                 String official = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
                 String mirror = "https://bmclapi2.bangbang93.com/mc/game/version_manifest_v2.json";
-                int src = getInt("SystemVersionSource", 1);
+                int src = getInt("SystemVersionSource", 0);
                 String text = src == 0 ? Downloader.getText(progress, mirror, official)
                         : src == 2 ? Downloader.getText(progress, official)
                         : Downloader.getText(progress, official, mirror);
@@ -1332,7 +1332,8 @@ public final class Data {
                 props.setProperty("UiRememberWindowPos", "false");
                 props.setProperty("SystemLanguage", "0");
                 props.setProperty("SystemMaxThreads", "64");
-                props.setProperty("SystemDownloadSource", "0");
+                props.setProperty("SystemDownloadSource", "2");
+                props.setProperty("SystemVersionSource", "0");
                 props.setProperty("SystemDownloadMode", "0");
                 // 默认自动测速 更新源测速 资源镜像同时准备官方与内置
                 props.setProperty("SystemUpdateMirrorMode", "1");

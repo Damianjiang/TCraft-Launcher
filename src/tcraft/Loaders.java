@@ -257,8 +257,8 @@ public final class Loaders {
         } catch (Exception ignored) {
         }
         if (out.isEmpty()) {
-            String xml = get("https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml",
-                    Downloader.bmcl() + "/maven/net/minecraftforge/forge/maven-metadata.xml");
+            String xml = get(Downloader.bmcl() + "/maven/net/minecraftforge/forge/maven-metadata.xml",
+                    "https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml");
             Matcher m = Pattern.compile("<version>([^<]+)</version>").matcher(xml);
             while (m.find()) {
                 String v = m.group(1);

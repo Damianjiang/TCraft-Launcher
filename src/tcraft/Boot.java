@@ -277,6 +277,14 @@ public final class Boot {
                 System.setProperty("javafx.animation.pulse", String.valueOf(fps));
                 System.setProperty("prism.targetvblank", String.valueOf(fps));
             }
+            boolean lowMemory = lowMemoryMode(p.getProperty("SystemLowMemoryMode", "on"));
+            System.setProperty("tcl.lowMemory", Boolean.toString(lowMemory));
+            if (lowMemory) {
+                // 低内存模式默认软件渲染，省掉 D3D 管线与显存映射
+                System.setProperty("prism.order", "sw");
+                System.setProperty("prism.forceGPU", "false");
+                System.setProperty("prism.vsync", "false");
+            }
             if ("true".equalsIgnoreCase(p.getProperty("SystemDisableHardwareAcceleration", "false"))) {
                 // 关闭 GPU 管线 兼容老显卡与远程桌面
                 System.setProperty("prism.order", "sw");
@@ -299,6 +307,26 @@ public final class Boot {
         } catch (Exception e) {
             return 0;
         }
+    }
+
+    private static boolean lowMemoryMode(String raw) {
+        String mode = raw == null ? "auto" : raw.trim().toLowerCase(java.util.Locale.ROOT);
+        if (mode.equals("on") || mode.equals("true") || mode.equals("1")) return true;
+        if (mode.equals("off") || mode.equals("false") || mode.equals("0")) return false;
+        long total = totalMemory();
+        // 自动模式只在小内存机器上关闭硬件加速，避免影响高配机器的动画
+        return total > 0 && total <= 8L * 1024 * 1024 * 1024;
+    }
+
+    private static long totalMemory() {
+        try {
+            Object bean = java.lang.management.ManagementFactory.getOperatingSystemMXBean();
+            if (bean instanceof com.sun.management.OperatingSystemMXBean os) {
+                return os.getTotalMemorySize();
+            }
+        } catch (Throwable ignored) {
+        }
+        return 0;
     }
 
     // Sets the macOS Dock icon before JavaFX starts; Stage icons only cover windows.

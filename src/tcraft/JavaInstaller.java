@@ -57,7 +57,7 @@ public final class JavaInstaller {
         String key = platformKey();
         if (key.isEmpty()) throw new IOException(Lang.t("当前平台不受 Mojang Java 运行时支持"));
         // source 同 Downloader.mirrors
-        String text = Data.get().getInt("SystemDownloadSource", 0) == 1
+        String text = Data.get().getInt("SystemDownloadSource", 2) == 1
                 ? Downloader.getText(ALL_JSON)
                 : Downloader.getText(ALL_JSON_BMCL, ALL_JSON);
         Map<String, Object> all = Json.obj(Json.parse(text));
@@ -68,8 +68,14 @@ public final class JavaInstaller {
         Map<String, Object> entry = Json.obj(entries.get(0));
         String manifestUrl = Json.str(Json.obj(entry.get("manifest")), "url", "");
         if (manifestUrl.isEmpty()) throw new IOException(Lang.t("Java 运行时清单缺少下载地址"));
+        String manifestBmcl = manifestUrl
+                .replace("https://launchermeta.mojang.com", Downloader.bmcl())
+                .replace("https://piston-meta.mojang.com", Downloader.bmcl());
 
-        Map<String, Object> manifest = Json.obj(Json.parse(Downloader.getText(manifestUrl)));
+        String manifestText = Data.get().getInt("SystemDownloadSource", 2) == 1
+                ? Downloader.getText(manifestUrl)
+                : Downloader.getText(manifestBmcl, manifestUrl);
+        Map<String, Object> manifest = Json.obj(Json.parse(manifestText));
         Map<String, Object> files = Json.obj(manifest.get("files"));
         Path base = Resources.home().resolve("java").resolve(key);
         Path target = base.resolve(component);

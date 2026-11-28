@@ -2117,6 +2117,10 @@ TCL/Videos 里没有可用视频，请放入 mp4/m4v/mov。	No usable video in T
 字体过大	Font file too large	字型過大
 字体文件不能超过 32MB。	Font files cannot exceed 32 MB.	字型檔案不能超過 32MB。
 调试模式（重启生效，排查问题时开启，会把日志同步输出到控制台）	Debug mode (takes effect after restart; enable when troubleshooting to mirror logs to the console)	偵錯模式（重新啟動後生效，排查問題時開啟，會把日誌同步輸出到主控台）
+低内存模式	Low memory mode	低記憶體模式
+自动（8GB 及以下开启）	Auto (on at 8 GB or less)	自動（8GB 及以下開啟）
+开启	On	開啟
+低内存模式会关闭硬件加速并让 JVM 更早回收空闲堆；自动模式只在物理内存不超过 8GB 时开启。该模式下启动游戏后默认关闭启动器，重启启动器生效，不影响已有功能。	Low memory mode disables hardware acceleration and lets the JVM reclaim idle heap sooner; Auto enables it only when physical memory is 8 GB or less. In this mode the launcher closes after the game starts by default. Restart the launcher to apply; existing features are unchanged.	低記憶體模式會關閉硬體加速並讓 JVM 更早回收閒置堆；自動模式只在實體記憶體不超過 8GB 時開啟。該模式下啟動遊戲後預設關閉啟動器，重新啟動啟動器生效，不影響既有功能。
 TCL 检查更新	TCL update check	TCL 檢查更新
 启动时自动检查更新	Check for updates on startup	啟動時自動檢查更新
 资源镜像	Resource mirrors	資源鏡像

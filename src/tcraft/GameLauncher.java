@@ -1400,8 +1400,8 @@ public final class GameLauncher {
         String text;
         try {
             text = Downloader.getText(
-                    "https://authlib-injector.yushi.moe/artifact/latest.json",
-                    "https://bmclapi2.bangbang93.com/mirrors/authlib-injector/artifact/latest.json");
+                    "https://bmclapi2.bangbang93.com/mirrors/authlib-injector/artifact/latest.json",
+                    "https://authlib-injector.yushi.moe/artifact/latest.json");
         } catch (Exception e) {
             if (Files.isRegularFile(jar)) return;
             throw e;
@@ -1432,7 +1432,18 @@ public final class GameLauncher {
             if (Files.isRegularFile(jar)) return;
             throw new Exception(Lang.t("获取 authlib-injector 下载地址失败"));
         }
-        Modrinth.downloadUrl(probe, url, jar, expected);
+        try {
+            Modrinth.downloadUrl(probe, url, jar, expected);
+        } catch (Exception mirrorError) {
+            String official = url.replace(
+                    "https://bmclapi2.bangbang93.com/mirrors/authlib-injector",
+                    "https://authlib-injector.yushi.moe");
+            if (official.equals(url)) throw mirrorError;
+            // BMCL authlib 偶发断流，回退官方
+            Files.deleteIfExists(jar);
+            Files.deleteIfExists(jar.resolveSibling(jar.getFileName() + ".part"));
+            Modrinth.downloadUrl(probe, official, jar, expected);
+        }
     }
 
     static String sha1Of(Path file) throws Exception {

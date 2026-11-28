@@ -10,6 +10,9 @@ import java.util.HexFormat;
 public final class Mesa {
 
     private static final String URL =
+            "https://mirrors.cloud.tencent.com/nexus/repository/maven-public/org/glavo/"
+                    + "mesa-loader-windows/26.2.6/mesa-loader-windows-26.2.6-x64.jar";
+    private static final String FALLBACK_URL =
             "https://repo1.maven.org/maven2/org/glavo/mesa-loader-windows/26.2.6/"
                     + "mesa-loader-windows-26.2.6-x64.jar";
     private static final String SHA1 = "f3400d97cb312a9bf1b7c8430a8d0c2849383245";
@@ -41,7 +44,13 @@ public final class Mesa {
         Files.createDirectories(dir);
         Path tmp = dir.resolve(FILE + ".tmp");
         Files.deleteIfExists(tmp);
-        Downloader.downloadFileTo(null, URL, tmp, "mesa-loader");
+        try {
+            Downloader.downloadFileTo(null, URL, tmp, "mesa-loader");
+        } catch (Exception mirrorError) {
+            Files.deleteIfExists(tmp);
+            Files.deleteIfExists(tmp.resolveSibling(tmp.getFileName() + ".part"));
+            Downloader.downloadFileTo(null, FALLBACK_URL, tmp, "mesa-loader");
+        }
         if (!SHA1.equalsIgnoreCase(sha1(tmp))) {
             Files.deleteIfExists(tmp);
             throw new IOException(Lang.t("渲染器组件下载校验失败，请重试"));

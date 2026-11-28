@@ -378,8 +378,21 @@ public final class Resources {
             "-XX:-UsePerfData"
     };
 
+    private static final String[] LOW_MEMORY_JVM_OPTIONS = {
+            "-XX:MaxHeapFreeRatio=25",
+            "-XX:MinHeapFreeRatio=5",
+            "-Dprism.order=sw",
+            "-Dprism.forceGPU=false",
+            "-Dprism.vsync=false"
+    };
+
+    public static boolean lowMemory() {
+        return Boolean.getBoolean("tcl.lowMemory");
+    }
+
     private static void addLauncherJvmOptions(List<String> cmd) {
         cmd.addAll(java.util.Arrays.asList(LAUNCHER_JVM_OPTIONS));
+        if (lowMemory()) cmd.addAll(java.util.Arrays.asList(LOW_MEMORY_JVM_OPTIONS));
     }
 
     static List<String> directLaunchCommand(Path app, String... appArgs) throws IOException {
