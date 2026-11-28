@@ -212,6 +212,11 @@ public final class Skin3D extends Region {
         }
     }
 
+    /// Returns whether the current viewer has a decoded skin model.
+    public boolean hasSkin() {
+        return skin != null;
+    }
+
     public void dispose() {
         wantRun = false;
         autoTimer.stop();

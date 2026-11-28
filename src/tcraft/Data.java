@@ -27,6 +27,7 @@ public final class Data {
         public String server = "";
         public String refreshToken = "";
         public long expiresAt = 0;
+        public String loginName = "";
 
         public Account(String name, String uuid, String skin, boolean online) {
             this.name = name;
@@ -223,6 +224,14 @@ public final class Data {
         }
     }
 
+    /// Game entries that belong in .minecraft, not beside the launcher executable.
+    private static final String[] LEGACY_GAME_ENTRIES = {
+            "versions", "libraries", "assets", "mods", "resourcepacks", "shaderpacks",
+            "config", "saves", "screenshots", "logs", "crash-reports", "backups",
+            "options.txt", "optionsof.txt", "optionsshaders.txt", "servers.dat",
+            "usercache.json", "launcher_profiles.json", "launcher_accounts.json", "TCL"
+    };
+
     public static final Data INSTANCE = new Data();
 
     public final List<Account> accounts = new java.util.concurrent.CopyOnWriteArrayList<>();
@@ -271,6 +280,8 @@ public final class Data {
         configPath = home.resolve("config.properties");
         gameDir = detectGameDir();
         load();
+        migrateLegacyGameDir();
+        ensureGameDir();
         cleanupConfigTmp();
         pruneInstances();
         if (instances.isEmpty()) seedInstances();
@@ -421,26 +432,168 @@ public final class Data {
         }
     }
 
-    private String detectGameDir() {
+    /// Returns the platform's normal Minecraft directory, used only when the launcher
+    /// folder is not writable.
+    private static Path legacyGameDir() {
         String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
-        Path legacy;
         if (os.contains("mac") || os.contains("darwin")) {
-            legacy = Paths.get(System.getProperty("user.home"), "Library", "Application Support", "minecraft");
-        } else if (os.contains("windows") && System.getenv("APPDATA") != null) {
-            legacy = Paths.get(System.getenv("APPDATA"), ".minecraft");
-        } else if (System.getenv("XDG_DATA_HOME") != null) {
-            legacy = Paths.get(System.getenv("XDG_DATA_HOME"), "minecraft");
-        } else {
-            legacy = Paths.get(System.getProperty("user.home"), ".minecraft");
+            return Paths.get(System.getProperty("user.home"), "Library", "Application Support", "minecraft");
         }
-        // 默认游戏目录=启动器所在文件夹 绿色版
+        if (os.contains("windows") && System.getenv("APPDATA") != null) {
+            return Paths.get(System.getenv("APPDATA"), ".minecraft");
+        }
+        if (System.getenv("XDG_DATA_HOME") != null) {
+            return Paths.get(System.getenv("XDG_DATA_HOME"), "minecraft");
+        }
+        return Paths.get(System.getProperty("user.home"), ".minecraft");
+    }
+
+    /// Returns the portable game directory under the launcher root:
+    /// `.minecraft` beside the launcher, so versions, libraries and assets are
+    /// kept separate from the launcher files.
+    private static Path portableGameDir() {
         try {
             Path app = Resources.appDir();
-            // Program Files /Applications /opt 只读时改用用户目录
-            if (app != null && Files.isDirectory(app) && Files.isWritable(app)) return app.toString();
-        } catch (Exception ignored) {
+            if (app == null) return null;
+            app = app.toAbsolutePath().normalize();
+            if (!Files.isDirectory(app) || !Files.isWritable(app)) return null;
+            Path dir = app.resolve(".minecraft");
+            if (Files.exists(dir) && !Files.isDirectory(dir)) return null;
+            if (Files.exists(dir) && !Files.isWritable(dir)) return null;
+            return dir;
+        } catch (Exception e) {
+            return null;
         }
-        return legacy.toString();
+    }
+
+    /// Returns the default game directory without touching the file system.
+    private static String defaultGameDir() {
+        Path portable = portableGameDir();
+        return (portable == null ? legacyGameDir() : portable).toString();
+    }
+
+    private String detectGameDir() {
+        // Default to the portable .minecraft layout. Only fall back to the platform
+        // directory when the launcher folder is read-only.
+        return defaultGameDir();
+    }
+
+    /// Moves a legacy portable data set into .minecraft without overwriting anything.
+    /// The old layout is kept untouched when the target already contains data or when
+    /// any move fails; moved entries are rolled back before returning.
+    private void migrateLegacyGameDir() {
+        if (gameDir == null || gameDir.isBlank()) return;
+        Path app;
+        Path current;
+        try {
+            app = Resources.appDir().toAbsolutePath().normalize();
+            current = Paths.get(gameDir).toAbsolutePath().normalize();
+        } catch (Exception e) {
+            return;
+        }
+        if (!samePath(current, app)) return;
+
+        Path target = app.resolve(".minecraft");
+        boolean targetExists = Files.exists(target, java.nio.file.LinkOption.NOFOLLOW_LINKS);
+        if (targetExists && !Files.isDirectory(target)) {
+            log("游戏目录 .minecraft 不是文件夹，保留旧目录");
+            return;
+        }
+        try {
+            Files.createDirectories(target);
+        } catch (Exception e) {
+            log("无法创建 .minecraft，保留旧游戏目录：" + Log.describe(e));
+            return;
+        }
+
+        boolean targetEmpty = isDirectoryEmpty(target);
+        if (!targetExists || targetEmpty) {
+            java.util.List<String> moved = new ArrayList<>();
+            try {
+                for (String name : LEGACY_GAME_ENTRIES) {
+                    Path src = app.resolve(name);
+                    Path dst = target.resolve(name);
+                    if (!Files.exists(src, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                            || Files.exists(dst, java.nio.file.LinkOption.NOFOLLOW_LINKS)) continue;
+                    if (Files.isSymbolicLink(src)) {
+                        throw new IOException("legacy game entry is a symbolic link: " + name);
+                    }
+                    moveEntry(src, dst);
+                    moved.add(name);
+                }
+            } catch (Exception e) {
+                for (int i = moved.size() - 1; i >= 0; i--) {
+                    String name = moved.get(i);
+                    try {
+                        moveEntry(target.resolve(name), app.resolve(name));
+                    } catch (Exception rollback) {
+                        log("迁移回滚失败：" + name + " · " + Log.describe(rollback));
+                    }
+                }
+                log("旧游戏目录迁移失败，保留原目录：" + Log.describe(e));
+                return;
+            }
+        }
+
+        switchGameDir(target);
+    }
+
+    private static void moveEntry(Path src, Path dst) throws IOException {
+        try {
+            Files.move(src, dst, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+        } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+            Files.move(src, dst);
+        }
+    }
+
+    private static boolean isDirectoryEmpty(Path dir) {
+        try (var entries = Files.list(dir)) {
+            return !entries.findAny().isPresent();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /// Switches the active game directory and rewrites every path that pointed at
+    /// the launcher folder, then persists the new setting immediately.
+    private void switchGameDir(Path target) {
+        String old = gameDir;
+        String next = target.toAbsolutePath().normalize().toString();
+        gameDir = next;
+        for (Instance ins : instances) {
+            if (samePath(ins.folder, old)) ins.folder = next;
+        }
+        for (FolderItem folder : folders) {
+            if (samePath(folder.path, old)) folder.path = next;
+        }
+        save();
+        log.add("[TCL] 游戏目录已切换到：" + next);
+    }
+
+    private void ensureGameDir() {
+        try {
+            Files.createDirectories(Paths.get(gameDir));
+        } catch (Exception e) {
+            log("无法创建游戏目录：" + Log.describe(e));
+        }
+    }
+
+    private static boolean samePath(Path left, Path right) {
+        if (left == null || right == null) return false;
+        String a = left.toAbsolutePath().normalize().toString();
+        String b = right.toAbsolutePath().normalize().toString();
+        String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
+        return os.contains("windows") || os.contains("mac") || os.contains("darwin")
+                ? a.equalsIgnoreCase(b) : a.equals(b);
+    }
+
+    private static boolean samePath(String left, String right) {
+        if (left == null || left.isBlank() || right == null || right.isBlank()) return false;
+        try {
+            return samePath(Paths.get(left), Paths.get(right));
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     public record JavaRuntime(String path, int major, String folder) {
@@ -1255,6 +1408,7 @@ public final class Data {
                         } catch (Exception ignored) {
                         }
                     }
+                    if (p.length >= 11) a.loginName = p[10];
                     accounts.add(a);
                 }
             }
@@ -1288,14 +1442,10 @@ public final class Data {
                 if (p.length >= 2) folders.add(new FolderItem(p[0], p[1]));
             }
             String folderPath = get("folder.current", "");
-            // 迁移来的空目录或非法路径文本回落到启动器所在文件夹
+            // 迁移来的空目录或非法路径文本回落到新的默认游戏目录
             if (!folderPath.isEmpty() && (!validPath(folderPath)
                     || (isStockMinecraft(folderPath) && !stockVersionsExist(folderPath)))) {
-                try {
-                    folderPath = Resources.appDir().toString();
-                } catch (Exception ignored) {
-                    folderPath = "";
-                }
+                folderPath = defaultGameDir();
             }
             if (folders.isEmpty() && !folderPath.isEmpty()) folders.add(new FolderItem("当前文件夹", folderPath));
             if (!folderPath.isEmpty()) gameDir = folderPath;
@@ -1372,7 +1522,8 @@ public final class Data {
                         + "|" + a.accessToken + "|" + Favorite.esc(a.userType) + "|" + a.clientToken
                         + "|" + a.server.replace("|", " ")
                         + "|" + (a.refreshToken == null ? "" : a.refreshToken.replace("|", " "))
-                        + "|" + a.expiresAt);
+                        + "|" + a.expiresAt
+                        + "|" + Favorite.esc(a.loginName));
             }
             props.setProperty("account.selected", String.valueOf(selectedAccountSnap));
             List<Instance> persisted = new ArrayList<>(instanceSnap);

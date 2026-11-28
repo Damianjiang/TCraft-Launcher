@@ -96,6 +96,11 @@ public class PageAccountManager implements Page {
         bar.getChildren().addAll(
                 Ui.iconTextButton("user-plus", "添加账户", false, this::addAccount),
                 Ui.iconTextButton("refresh-cw", "刷新", false, this::refreshManually));
+        Data.Account current = data.account();
+        if (current != null && current.online && "legacy".equals(current.userType)) {
+            bar.getChildren().add(Ui.iconTextButton("layers", "账户平台", false,
+                    () -> Dialogs.platformAccounts(win, current)));
+        }
         return bar;
     }
 
@@ -112,18 +117,12 @@ public class PageAccountManager implements Page {
     private void autoLoadSkins() {
         for (Data.Account a : data.accounts) {
             if (!a.online || "msa".equals(a.userType)) continue;
-            if (hasLocalSkin(a.skin)) continue;
             String key = a.userType + "|" + a.uuid + "|" + a.server;
             if (!autoChecked.add(key)) continue;
+            // Check the server on every start; an old cache can lack the skin
+            // or have expired.
             refreshAccount(a, true);
         }
-    }
-
-    private static boolean hasLocalSkin(String skin) {
-        if (skin == null || !skin.startsWith("Skins/")) return false;
-        java.nio.file.Path base = Theme.skinDir().toAbsolutePath().normalize();
-        java.nio.file.Path p = base.resolve(skin.substring(6)).normalize();
-        return p.startsWith(base) && java.nio.file.Files.isRegularFile(p);
     }
 
     private void refreshAccount(Data.Account a, boolean silent) {
@@ -139,9 +138,7 @@ public class PageAccountManager implements Page {
                     Yggdrasil.Server server = Yggdrasil.accountServer(a);
                     if (server == null) throw new Exception(Lang.t("缺少认证服务器地址，请重新登录该账户"));
                     Yggdrasil.Profile profile = new Yggdrasil.Profile(a.uuid, who);
-                    String url = Yggdrasil.skinUrlOf(server, profile);
-                    if (url == null) throw new Exception(Lang.t("服务器没有返回该账户的皮肤"));
-                    skin = Skins.download(who, url);
+                    skin = Skins.fetchThirdParty(server, profile, who);
                 }
             } catch (Exception e) {
                 error = e.getMessage() == null ? "未知错误" : e.getMessage();
@@ -257,6 +254,9 @@ public class PageAccountManager implements Page {
             if ("msa".equals(a.userType)) {
                 actions.add(Ui.iconButton("shirt", 28, 15, "在官网管理该账户的皮肤",
                         () -> openWebsite("https://www.minecraft.net/profile")));
+            } else if ("legacy".equals(a.userType)) {
+                actions.add(Ui.iconButton("layers", 28, 15, "账户平台：查看并切换该平台下的账户",
+                        () -> Dialogs.platformAccounts(win, a)));
             }
             actions.add(Ui.iconButton("refresh-cw", 28, 15, "刷新该账户的皮肤", () -> refreshAccount(a, false)));
         } else {
@@ -271,11 +271,12 @@ public class PageAccountManager implements Page {
             Clipboard.getSystemClipboard().setContent(c);
             win.toast("已复制到剪贴板。", formatUuid(a.uuid), 1);
         }));
-        actions.add(Ui.iconButton("palette", 28, 15, "编辑该账户的皮肤", () -> Dialogs.skinPicker(win, a)));
+        if (!a.online) {
+            actions.add(Ui.iconButton("palette", 28, 15, "编辑该账户的皮肤", () -> Dialogs.skinPicker(win, a)));
+        }
         actions.add(Ui.iconButton("trash-2", 28, 15, "删除此账户", () -> remove(index)));
         for (Node n : actions) {
             HBox.setMargin(n, new Insets(0, 0, 0, 3));
-            n.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED, e -> e.consume());
         }
         buttons.getChildren().addAll(actions);
 
@@ -285,6 +286,7 @@ public class PageAccountManager implements Page {
         row.setOnMouseEntered(e -> row.setBackground(Ui.fill(Theme.listHoverBg, 6)));
         row.setOnMouseExited(e -> row.setBackground(Ui.fill(Theme.cardBg, 6)));
         row.setOnMouseClicked(e -> {
+            if (inside(buttons, e.getTarget())) return;
             if (index == data.selectedAccount) return;
             select(index);
         });
@@ -321,7 +323,19 @@ public class PageAccountManager implements Page {
 
     private String rowInfo(int index, boolean current) {
         Data.Account a = data.accounts.get(index);
-        return Lang.t(loginType(a)) + (current ? Lang.t(" · 当前账户") : "");
+        String type = "legacy".equals(a.userType) && a.online
+                ? Dialogs.platformLabel(a.server) : Lang.t(loginType(a));
+        return type + (current ? Lang.t(" · 当前账户") : "");
+    }
+
+    /// Returns whether a mouse event originated inside an action button.
+    private static boolean inside(Node container, Object target) {
+        Node node = target instanceof Node ? (Node) target : null;
+        while (node != null) {
+            if (node == container) return true;
+            node = node.getParent();
+        }
+        return false;
     }
 
     private static String loginType(Data.Account a) {

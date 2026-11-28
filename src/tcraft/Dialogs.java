@@ -476,6 +476,16 @@ public final class Dialogs {
         server.setText(presetServer == null || presetServer.isBlank()
                 ? "https://littleskin.cn/api/yggdrasil" : presetServer);
         server.setPrefHeight(32);
+        HBox serverRow = new HBox(8);
+        serverRow.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(server, Priority.ALWAYS);
+        StackPane platformBtn = Ui.button("打开平台", Ui.BTN_NORMAL, () -> openPlatform(win, server.getText()));
+        platformBtn.setMinWidth(78);
+        platformBtn.setPrefWidth(78);
+        platformBtn.setPrefHeight(32);
+        platformBtn.setMinHeight(32);
+        platformBtn.setMaxHeight(32);
+        serverRow.getChildren().addAll(server, platformBtn);
         TextField email = Ui.field("用户名");
         email.setPrefHeight(32);
         PasswordField password = new PasswordField();
@@ -529,13 +539,47 @@ public final class Dialogs {
                     final String fskin = fetchYggdrasilSkin(auth, profile);
                     javafx.application.Platform.runLater(() -> {
                         if (cancelled.get()) return;
-                        Data.Account a = new Data.Account(fname, fuuid, fskin, true);
-                        a.accessToken = ftoken;
-                        a.clientToken = fclient;
-                        a.userType = "legacy";
-                        a.server = fserver;
-                        d.accounts.add(a);
-                        d.selectedAccount = d.accounts.size() - 1;
+                        Data.Account existing = null;
+                        for (Data.Account b : d.accounts) {
+                            if (!"legacy".equals(b.userType) || !sameServer(b.server, fserver)) continue;
+                            String oldUuid = normUuid(b.uuid);
+                            String newUuid = normUuid(fuuid);
+                            if ((!oldUuid.isEmpty() && !newUuid.isEmpty()
+                                    && oldUuid.equalsIgnoreCase(newUuid))
+                                    || (oldUuid.isEmpty() && newUuid.isEmpty()
+                                    && b.name.equalsIgnoreCase(fname))) {
+                                existing = b;
+                                break;
+                            }
+                        }
+                        Data.Account target;
+                        if (existing != null) {
+                            // Re-adding a role should update it instead of creating
+                            // a duplicate row in the account platform list.
+                            target = existing;
+                            target.name = fname;
+                            target.uuid = fuuid;
+                            target.accessToken = ftoken;
+                            target.clientToken = fclient;
+                            target.userType = "legacy";
+                            target.server = fserver;
+                            target.loginName = usr;
+                            target.online = true;
+                            if (!"Steve.png".equals(fskin) || target.skin == null
+                                    || target.skin.isBlank()) {
+                                target.skin = fskin;
+                            }
+                            d.selectedAccount = d.accounts.indexOf(target);
+                        } else {
+                            target = new Data.Account(fname, fuuid, fskin, true);
+                            target.accessToken = ftoken;
+                            target.clientToken = fclient;
+                            target.userType = "legacy";
+                            target.server = fserver;
+                            target.loginName = usr;
+                            d.accounts.add(target);
+                            d.selectedAccount = d.accounts.size() - 1;
+                        }
                         d.save();
                         win.refreshAccountBadge();
                         win.closeModal();
@@ -575,7 +619,7 @@ public final class Dialogs {
         HBox actions = new HBox(8);
         actions.setAlignment(Pos.CENTER_RIGHT);
         actions.getChildren().addAll(Ui.button("取消", Ui.BTN_NORMAL, win::closeModal), login);
-        form.getChildren().addAll(server, email, password, actions);
+        form.getChildren().addAll(serverRow, email, password, actions);
         card.getChildren().add(form);
         win.showModal(card);
         win.setModalCloseHook(() -> cancelled.set(true));
@@ -697,6 +741,7 @@ public final class Dialogs {
                         a.clientToken = fclient;
                         a.userType = "nide";
                         a.server = c;
+                        a.loginName = usr;
                         d.accounts.add(a);
                         d.selectedAccount = d.accounts.size() - 1;
                         // 保存服务器码以拼注册链接
@@ -776,6 +821,11 @@ public final class Dialogs {
 
         Skin3D viewer = new Skin3D(196, 240);
         if (!skinRes[0].isEmpty()) viewer.setSkinFile(skinRes[0]);
+        if (!viewer.hasSkin()) {
+            // A missing or stale cached file must not leave the 3D canvas blank.
+            viewer.setSkinFile(defaultGender(account.uuid));
+            if (!viewer.hasSkin()) viewer.setSkinFile("Steve");
+        }
         StackPane previewBack = new StackPane(viewer);
         previewBack.setAlignment(Pos.CENTER);
         previewBack.setPrefSize(216, 240);
@@ -828,6 +878,10 @@ public final class Dialogs {
         HBox actions = new HBox(10);
         actions.setAlignment(Pos.CENTER_RIGHT);
         if (readonly) {
+            if ("legacy".equals(account.userType)) {
+                actions.getChildren().add(Ui.button("打开平台", Ui.BTN_THEME,
+                        () -> openPlatform(win, account.server)));
+            }
             actions.getChildren().add(Ui.button("关闭", Ui.BTN_NORMAL, () -> {
                 viewer.dispose();
                 win.closeModal();
@@ -870,6 +924,145 @@ public final class Dialogs {
         win.showModal(card);
         // 关闭或顶掉时停自转 hook 在 showModal 后设
         win.setModalCloseHook(viewer::dispose);
+    }
+
+    /// Shows the accounts saved for every external authentication platform.
+    ///
+    /// One platform can contain several roles; switching a row updates the
+    /// selected account, saves the configuration and closes the dialog.
+    public static void platformAccounts(MainWindow win, Data.Account source) {
+        if (source == null) return;
+        VBox card = msgCard("账户平台");
+        card.setPrefWidth(490);
+        card.setMinWidth(460);
+
+        VBox body = new VBox(8);
+        body.setPadding(new Insets(15, 7, 0, 7));
+        String platform = platformLabel(source.server);
+        Label hint = Ui.label(Lang.tf("当前平台：%s。这里列出已添加的第三方账户，点击即可切换启动账户。",
+                platform), 13, Theme.gray2);
+        hint.setWrapText(true);
+        hint.setMaxWidth(440);
+
+        VBox list = new VBox(2);
+        list.setMinWidth(430);
+        Data d = Data.get();
+        java.util.Map<String, java.util.List<Data.Account>> groups = new java.util.LinkedHashMap<>();
+        for (Data.Account a : d.accounts) {
+            if (!"legacy".equals(a.userType) || !a.online) continue;
+            String key = normalizeServer(a.server);
+            if (key.isEmpty()) continue;
+            groups.computeIfAbsent(key, ignored -> new java.util.ArrayList<>()).add(a);
+        }
+        int count = 0;
+        for (java.util.Map.Entry<String, java.util.List<Data.Account>> group : groups.entrySet()) {
+            List<Data.Account> accounts = group.getValue();
+            if (accounts.isEmpty()) continue;
+            Label header = Ui.semi(platformLabel(group.getKey()), 12, Theme.accentDark);
+            header.setPadding(new Insets(count == 0 ? 0 : 8, 0, 2, 2));
+            list.getChildren().add(header);
+            for (Data.Account a : accounts) {
+                int index = d.accounts.indexOf(a);
+                String subtitle = a.loginName == null || a.loginName.isBlank()
+                        ? formatUuid(a.uuid) : a.loginName;
+                Ui.ListItem row = new Ui.ListItem(Ui.avatar(a, 26), a.name, subtitle, 44);
+                row.setSelected(index == d.selectedAccount);
+                row.setOnMouseClicked(e -> switchPlatformAccount(win, a));
+                list.getChildren().add(row);
+                count++;
+            }
+        }
+        if (count == 0) {
+            list.getChildren().add(Ui.label(Lang.t("这个平台下还没有已添加的账户。"), 13, Theme.text));
+        }
+
+        javafx.scene.control.ScrollPane scroll = new javafx.scene.control.ScrollPane(list);
+        scroll.setFitToWidth(true);
+        scroll.setPrefViewportHeight(Math.min(300, Math.max(60, count * 46 + groups.size() * 20)));
+        scroll.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
+
+        StackPane open = Ui.button("打开平台", Ui.BTN_THEME, () -> openPlatform(win, source.server));
+        StackPane add = Ui.button("添加账户", Ui.BTN_NORMAL, () -> {
+            win.closeModal();
+            yggdrasilCard(win, source.server);
+        });
+        HBox actions = new HBox(10);
+        actions.setAlignment(Pos.CENTER_RIGHT);
+        actions.getChildren().addAll(open, add,
+                Ui.button("关闭", Ui.BTN_NORMAL, win::closeModal));
+
+        body.getChildren().addAll(hint, scroll, actions);
+        card.getChildren().add(body);
+        win.showModal(card);
+    }
+
+    /// Switches the selected account from the platform dialog.
+    private static void switchPlatformAccount(MainWindow win, Data.Account account) {
+        Data d = Data.get();
+        int index = d.accounts.indexOf(account);
+        if (index < 0) return;
+        d.selectedAccount = index;
+        d.save();
+        win.closeModal();
+        win.refreshAccountBadge();
+        win.openPage(win.currentKey, false);
+        win.toast("已切换启动账户", account.name, 1);
+    }
+
+    /// Normalizes a stored API root for platform grouping.
+    private static String normalizeServer(String value) {
+        String s = value == null ? "" : value.trim();
+        while (s.endsWith("/")) s = s.substring(0, s.length() - 1);
+        return s;
+    }
+
+    private static boolean sameServer(String left, String right) {
+        return normalizeServer(left).equalsIgnoreCase(normalizeServer(right));
+    }
+
+    /// Derives the human-readable platform name from an API root.
+    static String platformLabel(String value) {
+        String url = platformUrl(value);
+        try {
+            String host = java.net.URI.create(url).getHost();
+            if (host != null && host.toLowerCase(java.util.Locale.ROOT).contains("littleskin.cn")) {
+                return "LittleSkin";
+            }
+            return host == null ? value : host;
+        } catch (Exception e) {
+            return value == null ? "" : value;
+        }
+    }
+
+    /// Builds the platform management URL, using the LittleSkin user center
+    /// when the API root belongs to LittleSkin.
+    private static String platformUrl(String value) {
+        String raw = value == null ? "" : value.trim();
+        if (raw.isEmpty()) raw = "https://littleskin.cn/api/yggdrasil";
+        if (!raw.contains("://")) raw = "https://" + raw;
+        int query = raw.indexOf('?');
+        if (query >= 0) raw = raw.substring(0, query);
+        int cut = raw.toLowerCase(java.util.Locale.ROOT).lastIndexOf("/api/yggdrasil");
+        if (cut > 0) raw = raw.substring(0, cut);
+        while (raw.endsWith("/")) raw = raw.substring(0, raw.length() - 1);
+        try {
+            String host = java.net.URI.create(raw).getHost();
+            if (host != null && host.toLowerCase(java.util.Locale.ROOT).contains("littleskin.cn")) {
+                return raw + "/user?lang=zh_CN";
+            }
+        } catch (Exception ignored) {
+        }
+        return raw;
+    }
+
+    /// Opens the platform management page and reports failures through a toast.
+    private static void openPlatform(MainWindow win, String value) {
+        String url = platformUrl(value);
+        try {
+            if (!Shell.openUrl(url)) win.toast("无法打开平台", url, 2);
+        } catch (Exception e) {
+            win.toast("无法打开平台", url, 2);
+        }
     }
 
     private static int sourceOf(Data.Account account) {
@@ -1074,8 +1267,7 @@ public final class Dialogs {
     private static String fetchYggdrasilSkin(Yggdrasil.Server server, Yggdrasil.Profile profile) {
         if (server == null || profile == null) return "Steve.png";
         try {
-            String url = Yggdrasil.skinUrlOf(server, profile);
-            if (url != null) return Skins.download(profile.name, url);
+            return Skins.fetchThirdParty(server, profile, profile.name);
         } catch (Exception e) {
             Data.get().log("获取 Yggdrasil 皮肤失败：" + Log.describe(e));
         }

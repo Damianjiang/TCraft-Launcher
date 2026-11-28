@@ -1582,6 +1582,14 @@ Minecraft 是全球销量最高的电子游戏，没有之一。٩(ˊᗜˋ*)۶	M
 服务器返回的不是 JSON，请检查地址是否为 Yggdrasil API	The server did not return JSON; check that the address is a Yggdrasil API	伺服器傳回的不是 JSON，請檢查位址是否為 Yggdrasil API
 服务器返回的 JSON 无法解析	The server's JSON could not be parsed	伺服器傳回的 JSON 無法解析
 这个账号还没有游戏角色，请先在皮肤站创建角色	This account has no game profile yet; create one on the skin site first	這個帳號還沒有遊戲角色，請先在皮膚站建立角色
+账户平台	Account platform	帳戶平台
+当前平台：%s。这里列出该平台下已添加的全部账户，点击即可切换启动账户。	Platform: %s. All accounts added for this platform are listed here; click one to switch the launch account.	當前平台：%s。這裡列出該平台下已新增的全部帳戶，點擊即可切換啟動帳戶。
+当前平台：%s。这里列出已添加的第三方账户，点击即可切换启动账户。	Platform: %s. Added third-party accounts are listed here; click one to switch the launch account.	當前平台：%s。這裡列出已新增的第三方帳戶，點擊即可切換啟動帳戶。
+这个平台下还没有已添加的账户。	No accounts have been added for this platform yet.	這個平台下還沒有已新增的帳戶。
+打开平台	Open platform	開啟平台
+无法打开平台	Could not open the platform	無法開啟平台
+已切换启动账户	Launch account switched	已切換啟動帳戶
+平台	Platform	平台
 选择角色	Choose a profile	選擇角色
 联机码里的节点地址无效，请让房主重新复制。	The node address in the link code is invalid; ask the host to copy it again.	聯機碼裡的節點位址無效，請讓房主重新複製。
 2013 | 这个秘密计划了两年的更新将游戏推向了一个新高度！	2013 | This update, secretly planned for two years, took the game to a new level!	2013 | 這個秘密計畫了兩年的更新將遊戲推向了一個新高度！

@@ -425,7 +425,7 @@ public final class Theme {
             String key = p.toAbsolutePath() + "|" + Files.getLastModifiedTime(p).toMillis() + "|" + Files.size(p);
             Image cached = IMAGE_CACHE.get(key);
             if (cached != null) return cached;
-            Image img = new Image(p.toUri().toString(), 4096, 4096, true, false);
+            Image img = new Image(p.toUri().toString(), 0, 0, true, false);
             cacheImage(key, img);
             return img;
         } catch (Exception e) {
