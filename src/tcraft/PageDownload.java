@@ -1220,9 +1220,6 @@ public class PageDownload implements Page {
             if (wantCf) {
                 Http.pool().execute(() -> {
                     try {
-                        if (CurseForge.apiKey().isEmpty()) {
-                            throw new java.io.IOException("CurseForge 需要 API Key（请在 设置 → 系统 → CurseForge Key 填入，在 https://console.curseforge.com/ 生成）");
-                        }
                         List<Resource> got = new ArrayList<>();
                         int cfLoader = loader == null ? -1 : switch (loader) {
                             case "forge" -> 1;
@@ -1283,9 +1280,7 @@ public class PageDownload implements Page {
                         partial = "无法连接到 Modrinth，所以目前仅显示了来自 CurseForge 的内容，搜索结果可能不全。\n"
                                 + "请稍后再试，或使用 VPN 改善网络环境。";
                     } else if (fCfError != null && wantMr) {
-                        String why = fCfError.contains("API Key")
-                                ? Lang.t("缺少 CurseForge API Key，可在 设置 → 系统 中配置")
-                                : fCfError;
+                        String why = fCfError;
                         partial = Lang.tf("CurseForge 的内容没有取到（%s），当前仅显示 Modrinth 的结果。", why);
                     }
                 }

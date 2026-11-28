@@ -161,7 +161,7 @@ public final class Loaders {
                 out.add(fileName.toLowerCase(java.util.Locale.ROOT).replace("optifabric-", "").replace(".jar", "").trim());
             }
         }
-        if (out.isEmpty()) throw new Exception(Lang.t("OptiFabric 没有可下载的版本（需填写 CurseForge Key）"));
+        if (out.isEmpty()) throw new Exception(Lang.t("OptiFabric 暂时没有可下载的版本，请检查网络后重试"));
         return out;
     }
 

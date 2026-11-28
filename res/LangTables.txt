@@ -1047,7 +1047,7 @@ Java 已切换	Java switched	Java 已切換
 自定义镜像根	Custom mirror root	自訂鏡像根
 请在 实例页左侧「文件夹列表」中更改下载目标文件夹。	Change the download target in the Folder list on the left of the Instances page.	請在 實例頁左側「資料夾清單」中變更下載目標資料夾。
 在某个文件夹或游戏版本上右键，即可选择打开对应文件夹。	Right-click a folder or game version to open the matching folder.	在某個資料夾或遊戲版本上按右鍵，即可選擇開啟對應資料夾。
-留空时使用内置公共 Key；OptiFabric 等 CurseForge 资源需要有效 Key 才能获取列表。	Empty uses the built-in public key; CurseForge resources such as OptiFabric need a valid key to be listed.	留空時使用內建公開 Key；OptiFabric 等 CurseForge 資源需要有效 Key 才能取得清單。
+留空时自动使用公共镜像，无需填写；填入官方 Key 后优先走 CurseForge 官方接口。	Empty uses the public mirror automatically; a configured official key takes priority.	留空時自動使用公共鏡像，無需填寫；填入官方 Key 後優先走 CurseForge 官方介面。
 语言已切换	Language switched	語言已切換
 导出翻译文件	Export translation file	匯出翻譯檔案
 重载翻译	Reload translations	重新載入翻譯
@@ -1179,6 +1179,7 @@ WScript.Shell 未能生成快捷方式：	WScript.Shell could not create the sho
 联机模块 CLI 在 	The multiplayer CLI did not respond within 	多人連線模組 CLI 在 
 ms 内没有响应	ms	ms 內沒有回應
 文件校验失败（SHA-1 不匹配）	File check failed (SHA-1 mismatch)	檔案校驗失敗（SHA-1 不符）
+文件校验失败（%s 不匹配）	File check failed (%s mismatch)	檔案校驗失敗（%s 不符）
 下载不完整：	Incomplete download: 	下載不完整：
 版本 JSON 无效或不存在：	Version JSON is invalid or missing: 	版本 JSON 無效或不存在：
 未找到版本文件：	Version file not found: 	未找到版本檔案：
@@ -1192,7 +1193,7 @@ natives 压缩包含非法路径：	Natives archive contains an illegal path: 	n
 下载统一通行证运行时失败：	Failed to download the Unified Pass runtime: 	下載統一通行證執行環境失敗：
 获取 authlib-injector 下载地址失败	Failed to get the authlib-injector download URL	取得 authlib-injector 下載位址失敗
 LiteLoader 没有适用于 Minecraft 	LiteLoader has no build for Minecraft 	LiteLoader 沒有適用於 Minecraft 
-OptiFabric 没有可下载的版本（需填写 CurseForge Key）	No OptiFabric version available (CurseForge key required)	OptiFabric 沒有可下載的版本（需填寫 CurseForge Key）
+OptiFabric 暂时没有可下载的版本，请检查网络后重试	OptiFabric has no downloadable version right now; check your network and retry.	OptiFabric 暫時沒有可下載的版本，請檢查網路後重試
 Fabric API 没有适用于 Minecraft 	Fabric API has no build for Minecraft 	Fabric API 沒有適用於 Minecraft 
 Cleanroom 获取到的列表为空	Cleanroom returned an empty list	Cleanroom 取得的清單為空
 Forge 没有适用于 Minecraft 	Forge has no build for Minecraft 	Forge 沒有適用於 Minecraft 
@@ -1210,7 +1211,6 @@ Xbox Live 验证失败：账户可能未创建 Xbox 档案	Xbox Live check faile
 该账户所在地区不支持 Xbox Live	Xbox Live isn't available in this account's region	該帳戶所在區域不支援 Xbox Live
 未成年人账户需要先加入家庭组	Minor accounts must join a family group first	未成年帳戶需要先加入家庭群組
 Minecraft 登录失败：该账户可能未拥有游戏	Minecraft sign-in failed: this account may not own the game	Minecraft 登入失敗：該帳戶可能未擁有遊戲
-CurseForge 需要 API Key（请在 设置 → 系统 → CurseForge Key 填入，在 https://console.curseforge.com/ 生成）	CurseForge needs an API key (fill it in Settings → System → CurseForge Key; create one at https://console.curseforge.com/)	CurseForge 需要 API Key（請在 設定 → 系統 → CurseForge Key 填入，在 https://console.curseforge.com/ 產生）
 导出已取消	Export cancelled	匯出已取消
 没有可用的发现节点	No discovery node available	沒有可用的發現節點
 没有可用的下载地址	No download URL available	沒有可用的下載位址
@@ -1364,7 +1364,7 @@ Mixin 注入失败	Mixin injection failed	Mixin 注入失敗
 解压世界存档	Extract world save	解壓世界存檔
 解压整合包文件	Extract modpack files	解壓整合包檔案
 该分类暂无资源	No resources in this category	該分類暫無資源
-该资源来自 CurseForge：请检查网络，或在「设置 → 系统 → CurseForge Key」配置密钥后重试。	This resource comes from CurseForge: check your network, or set a key in Settings → System → CurseForge Key and retry.	該資源來自 CurseForge：請檢查網路，或在「設定 → 系統 → CurseForge Key」設定金鑰後重試。
+该资源来自 CurseForge：请检查网络后重试；未配置官方 Key 时会自动使用镜像。	This resource comes from CurseForge: check your network and retry; the public mirror is used when no official key is configured.	該資源來自 CurseForge：請檢查網路後重試；未設定官方 Key 時會自動使用鏡像。
 请检查网络后重试；也可点上方「转到 Modrinth」手动查看。	Check your network and retry; you can also click Go to Modrinth above.	請檢查網路後重試；也可點上方「前往 Modrinth」手動查看。
 请稍后再试，或使用 VPN 改善网络环境。	Try again later, or use a VPN.	請稍後再試，或使用 VPN 改善網路環境。
 读取资源索引	Reading the asset index	讀取資源索引

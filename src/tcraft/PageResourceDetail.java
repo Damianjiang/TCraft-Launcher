@@ -268,7 +268,7 @@ public class PageResourceDetail implements Page {
         msg.setWrapText(true);
         msg.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
         String suffix = info.isCurseForge()
-                ? "该资源来自 CurseForge：请检查网络，或在「设置 → 系统 → CurseForge Key」配置密钥后重试。"
+                ? "该资源来自 CurseForge：请检查网络后重试；未配置官方 Key 时会自动使用镜像。"
                 : "请检查网络后重试；也可点上方「转到 Modrinth」手动查看。";
         Label tip = Ui.label(suffix, 12, Theme.gray2);
         tip.setWrapText(true);
@@ -276,9 +276,6 @@ public class PageResourceDetail implements Page {
         HBox actions = new HBox(10);
         actions.setAlignment(Pos.CENTER);
         actions.getChildren().add(Ui.button("重试", Ui.BTN_THEME, this::startLoad));
-        if (info.isCurseForge() && CurseForge.apiKey().isEmpty()) {
-            actions.getChildren().add(Ui.button("前往设置", Ui.BTN_NORMAL, () -> win.openSetup("system")));
-        }
         err.getChildren().addAll(msg, tip, actions);
         err.setBackground(Ui.fill(Theme.cardBg, 14));
         panLoadHost.getChildren().setAll(err);

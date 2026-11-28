@@ -1406,24 +1406,45 @@ public final class GameLauncher {
             if (Files.isRegularFile(jar)) return;
             throw e;
         }
-        java.util.Map<String, Object> artifact = Json.obj(Json.obj(Json.parse(text)).get("artifact"));
-        String sha1 = Json.str(Json.obj(artifact.get("checksums")), "sha1", "")
-                .toLowerCase(java.util.Locale.ROOT);
-        String url = Json.str(artifact, "downloadUrl", "");
-        if (sha1.isEmpty()) {
+        // The metadata format changed in 2026: the artifact fields are now at
+        // the top level and checksums.sha256 replaces the old SHA-1 value.
+        Map<String, Object> root = Json.obj(Json.parse(text));
+        Map<String, Object> artifact = root.get("artifact") instanceof Map
+                ? Json.obj(root.get("artifact"))
+                : root;
+        Map<String, Object> checksums = artifact.get("checksums") instanceof Map
+                ? Json.obj(artifact.get("checksums"))
+                : Map.of();
+        String sha256 = Json.str(checksums, "sha256", "").toLowerCase(java.util.Locale.ROOT);
+        String sha1 = Json.str(checksums, "sha1", "").toLowerCase(java.util.Locale.ROOT);
+        String expected = !sha256.isEmpty() ? sha256 : sha1;
+        String url = Json.str(artifact, "download_url", Json.str(artifact, "downloadUrl", ""));
+        if (expected.isEmpty()) {
             if (Files.isRegularFile(jar)) return;
             throw new Exception(Lang.t("authlib-injector 缺少校验值"));
         }
-        if (Files.isRegularFile(jar) && sha1Of(jar).equalsIgnoreCase(sha1)) return;
+        if (Files.isRegularFile(jar) && (expected.length() == 64
+                ? sha256Of(jar).equals(expected)
+                : sha1Of(jar).equals(expected))) {
+            return;
+        }
         if (url.isEmpty()) {
             if (Files.isRegularFile(jar)) return;
             throw new Exception(Lang.t("获取 authlib-injector 下载地址失败"));
         }
-        Modrinth.downloadUrl(probe, url, jar, sha1);
+        Modrinth.downloadUrl(probe, url, jar, expected);
     }
 
     static String sha1Of(Path file) throws Exception {
-        java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-1");
+        return digestOf(file, "SHA-1");
+    }
+
+    static String sha256Of(Path file) throws Exception {
+        return digestOf(file, "SHA-256");
+    }
+
+    private static String digestOf(Path file, String algorithm) throws Exception {
+        java.security.MessageDigest digest = java.security.MessageDigest.getInstance(algorithm);
         try (java.io.InputStream in = Files.newInputStream(file)) {
             byte[] buf = new byte[65536];
             int n;

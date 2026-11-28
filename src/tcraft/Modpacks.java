@@ -750,17 +750,20 @@ public final class Modpacks {
                                                   Tasks.Task task) throws Exception {
         List<Long> required = new ArrayList<>();
         List<Long> optional = new ArrayList<>();
+        java.util.Map<Long, Long> projectByFile = new java.util.HashMap<>();
         for (Object o : Json.arr(manifest.get("files"))) {
             java.util.Map<String, Object> f = Json.obj(o);
             long fileId = (long) Json.num(f, "fileID", 0);
             if (fileId <= 0) continue;
+            long projectId = (long) Json.num(f, "projectID", 0);
+            if (projectId > 0) projectByFile.put(fileId, projectId);
             boolean req = !"false".equalsIgnoreCase(Json.str(f, "required", "true"));
             (req ? required : optional).add(fileId);
         }
         List<Long> all = new ArrayList<>(required);
         all.addAll(optional);
         if (all.isEmpty()) return;
-        List<Object> fileInfos = CurseForge.filesByIds(all);
+        List<Object> fileInfos = CurseForge.filesByIds(all, projectByFile);
         if (!required.isEmpty()) {
             java.util.Set<String> foundRequired = new java.util.HashSet<>();
             for (Object o : fileInfos) {

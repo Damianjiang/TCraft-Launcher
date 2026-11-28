@@ -1331,7 +1331,7 @@ public class PageSetup implements Page {
                     data.set("SystemCurseKey", s == null ? "" : s.trim());
                     CurseForge.clearCache();
                 });
-        communityRes.add(Ui.label("留空时使用内置公共 Key；OptiFabric 等 CurseForge 资源需要有效 Key 才能获取列表。",
+        communityRes.add(Ui.label("留空时自动使用公共镜像，无需填写；填入官方 Key 后优先走 CurseForge 官方接口。",
                 12, Theme.gray3));
 
 

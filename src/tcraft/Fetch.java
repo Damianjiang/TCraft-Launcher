@@ -51,7 +51,7 @@ public final class Fetch {
         Files.createDirectories(target.toAbsolutePath().getParent());
 
         final String expect = sha1 == null || sha1.isEmpty() ? null : sha1.toLowerCase(java.util.Locale.ROOT);
-        MessageDigest digest = expect == null ? null : sha1();
+        MessageDigest digest = expect == null ? null : digestFor(expect);
 
         String lockKey = part.toAbsolutePath().toString();
         Object lock = new Object();
@@ -104,9 +104,10 @@ public final class Fetch {
                             String actual = HexFormat.of().formatHex(digest.digest());
                             if (!expect.equals(actual)) {
                                 Files.deleteIfExists(part);
-                                digest = sha1();
+                                digest = digestFor(expect);
                                 done = 0;
-                                last = new IOException(Lang.t("文件校验失败（SHA-1 不匹配）"));
+                                String algorithm = expect.length() == 64 ? "SHA-256" : "SHA-1";
+                                last = new IOException(Lang.tf("文件校验失败（%s 不匹配）", algorithm));
                                 // 内容不对 换源比原地重试有效
                                 continue candidateLoop;
                             }
@@ -446,9 +447,14 @@ public final class Fetch {
         }
     }
 
-    private static MessageDigest sha1() {
+    /// Selects the digest algorithm from the expected checksum length.
+    ///
+    /// Callers in the launcher pass SHA-1 hashes; authlib-injector metadata now
+    /// publishes a 64-character SHA-256 hash instead.
+    private static MessageDigest digestFor(String expected) {
+        String algorithm = expected != null && expected.length() == 64 ? "SHA-256" : "SHA-1";
         try {
-            return MessageDigest.getInstance("SHA-1");
+            return MessageDigest.getInstance(algorithm);
         } catch (Exception e) {
             return null;
         }

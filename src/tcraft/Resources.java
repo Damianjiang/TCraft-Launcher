@@ -362,11 +362,32 @@ public final class Resources {
     }
 
     // 自更新后直接带运行库拉起
+    /// JVM limits for the JavaFX launcher process.
+    ///
+    /// The launcher is a UI application, not a game runtime: a small heap,
+    /// Serial GC and a reduced JIT cache keep its background footprint lower
+    /// without changing the memory arguments passed to Minecraft.
+    private static final String[] LAUNCHER_JVM_OPTIONS = {
+            "-Xms8m",
+            "-Xmx128m",
+            "-XX:MaxMetaspaceSize=128m",
+            "-XX:ReservedCodeCacheSize=32m",
+            "-XX:+UseSerialGC",
+            "-XX:TieredStopAtLevel=1",
+            "-XX:CICompilerCount=2",
+            "-XX:-UsePerfData"
+    };
+
+    private static void addLauncherJvmOptions(List<String> cmd) {
+        cmd.addAll(java.util.Arrays.asList(LAUNCHER_JVM_OPTIONS));
+    }
+
     static List<String> directLaunchCommand(Path app, String... appArgs) throws IOException {
         String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
         String exe = os.contains("windows") ? "javaw.exe" : "java";
         List<String> cmd = new ArrayList<>();
         cmd.add(Paths.get(System.getProperty("java.home"), "bin", exe).toString());
+        addLauncherJvmOptions(cmd);
         cmd.add("-Dfile.encoding=UTF-8");
         cmd.add("-Dtcraft.dir=" + home());
         String self = System.getProperty("tcraft.exe", "");
@@ -779,6 +800,7 @@ public final class Resources {
         String exe = os.contains("windows") ? "javaw.exe" : "java";
         List<String> cmd = new ArrayList<>();
         cmd.add(Paths.get(System.getProperty("java.home"), "bin", exe).toString());
+        addLauncherJvmOptions(cmd);
         cmd.add("-Dtcl.runtime=" + plat);
         cmd.add("-Dtcl.quietStart=true");
         cmd.add("-Dtcraft.dir=" + home());
@@ -832,6 +854,13 @@ public final class Resources {
                 break;
             }
         }
-        System.exit(0);
+        // Do not let the bootstrap JVM linger after the JavaFX process owns the
+        // window. System.exit can wait forever on shutdown hooks; halt after an
+        // explicit log flush so a second 100 MB+ process is never left behind.
+        try {
+            Log.flushNow();
+        } catch (Throwable ignored) {
+        }
+        Runtime.getRuntime().halt(0);
     }
 }
